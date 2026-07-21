@@ -10,10 +10,10 @@ app.innerHTML = `
   <div class="layout-shell">
     <aside class="sidebar desktop-only">
       <div class="brand">
-        <div class="brand__logo">WM</div>
+        <div class="brand__logo">CT</div>
         <div>
-          <p class="brand__title">Wallet Manager</p>
-          <p class="brand__subtitle">Personal Finance Command Center</p>
+          <p class="brand__title">CashTrail</p>
+          <p class="brand__subtitle">Follow every rupee</p>
         </div>
       </div>
       <nav class="sidebar__nav">

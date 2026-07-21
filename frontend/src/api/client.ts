@@ -1,7 +1,12 @@
 import axios from 'axios'
 
+// Local Vite proxy uses /api. On Railway set VITE_API_URL to your backend URL
+// e.g. https://wallet-backend.up.railway.app  (no trailing slash)
+const API_ROOT = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || ''
+const API_BASE = API_ROOT ? `${API_ROOT}/api` : '/api'
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
 })
 
 api.interceptors.request.use((config) => {
@@ -21,7 +26,7 @@ api.interceptors.response.use(
       const refresh = localStorage.getItem('refresh_token')
       if (refresh) {
         try {
-          const { data } = await axios.post('/api/auth/refresh/', { refresh })
+          const { data } = await axios.post(`${API_BASE}/auth/refresh/`, { refresh })
           localStorage.setItem('access_token', data.access)
           original.headers.Authorization = `Bearer ${data.access}`
           return api(original)

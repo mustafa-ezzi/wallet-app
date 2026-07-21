@@ -4,6 +4,10 @@ from .models import (
     RecurringExpense, ReceivableInstallment, PayableInstallment
 )
 
+admin.site.site_header = 'CashTrail Admin'
+admin.site.site_title = 'CashTrail'
+admin.site.index_title = 'CashTrail management'
+
 admin.site.register(UserProfile)
 admin.site.register(Account)
 admin.site.register(Project)

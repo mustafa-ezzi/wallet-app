@@ -1,4 +1,4 @@
-# Wallet Manager — Mobile App Monetization Research
+# CashTrail — Mobile App Monetization Research
 ### Complete Guide: Play Store Launch, Revenue Models & Ad Mechanics (2026)
 
 ---
@@ -41,7 +41,7 @@ Capacitor by Ionic wraps your existing React web app inside a native Android she
 ```bash
 # In your frontend folder
 npm install @capacitor/core @capacitor/cli @capacitor/android
-npx cap init "Wallet Manager" "com.yourname.walletmanager"
+npx cap init "CashTrail" "com.cashtrail.app"
 npx cap add android
 npm run build         # build the Vite app first
 npx cap sync          # copy dist/ into the Android project

@@ -1,13 +1,15 @@
-# Wallet Manager
+# CashTrail
 
-Personal finance management app — mobile-first glassmorphism UI with a full Django REST API backend.
+Follow every rupee. Personal finance management for freelancers and small businesses — accounts, projects, installments, bills, and monthly forecasts.
+
+Mobile-first UI with a Django REST API backend.
 
 ## Stack
 
 | Layer    | Technology |
 |----------|------------|
 | Frontend | React 18 + TypeScript + Vite |
-| Backend  | Django 6 + Django REST Framework |
+| Backend  | Django 5+ + Django REST Framework |
 | Auth     | JWT (djangorestframework-simplejwt) |
 | Database | SQLite (dev) → PostgreSQL (production) |
 
@@ -35,7 +37,7 @@ npm run dev
 
 ## First-time setup
 
-Backend dependencies are already installed. If you reinstall:
+Backend dependencies:
 ```powershell
 cd backend
 py -m pip install -r requirements.txt
@@ -50,11 +52,11 @@ npm install
 
 ## Features
 
-- **Dashboard** — total net worth, per-account balances, monthly summary, recent transactions
-- **Projects** — track income sources (recurring, contract, one-time, installments)
-- **Accounts** — bank + cash accounts with live balance calculation, transaction history
-- **Reports** — monthly forecast vs actual, breakdown charts, recurring expenses, loans/payables
-- **Add Transaction** — quick-add income or expense from any screen (FAB on mobile, button in sidebar on desktop)
+- **Dashboard** — total balance, per-account balances, monthly summary, recent transactions
+- **Projects** — income sources (recurring, contract, one-time, installments) with Record Receipt
+- **Accounts** — bank + cash accounts with live balances, transfers, editable transactions
+- **Bills & Loans** — recurring expenses, payables, receivables with monthly payment tracking
+- **Reports** — monthly forecast vs actual
 - **Auth** — JWT login/signup, each user's data is fully isolated
 
 ## API Endpoints
@@ -74,11 +76,9 @@ CRUD /api/receivables/
 CRUD /api/payables/
 ```
 
-## Production Checklist
+## Railway / Production
 
-1. Change `SECRET_KEY` in `backend/wallet_manager/settings.py`
-2. Set `DEBUG = False`
-3. Switch database to PostgreSQL (update `DATABASES` setting)
-4. Run `py manage.py collectstatic`
-5. Deploy backend to Railway / Render / DigitalOcean
-6. Deploy frontend to Vercel / Netlify (set `VITE_API_URL` env var)
+Set backend vars: `SECRET_KEY`, `DEBUG=False`, `DATABASE_URL`, `FRONTEND_URL`  
+Set frontend var: `VITE_API_URL` (backend public URL, no trailing slash)
+
+See backend `Procfile` for migrate + gunicorn start.

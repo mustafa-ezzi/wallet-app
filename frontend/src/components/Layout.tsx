@@ -32,8 +32,8 @@ export default function Layout() {
       {/* ── Mobile top header ── */}
       <header className="mobile-header">
         <div className="mobile-header-brand">
-          <div className="mobile-header-logo">W</div>
-          <span className="mobile-header-title">Wallet</span>
+          <div className="mobile-header-logo">C</div>
+          <span className="mobile-header-title">CashTrail</span>
         </div>
         <button className="mobile-header-settings" aria-label="Settings">⚙</button>
       </header>
@@ -41,10 +41,10 @@ export default function Layout() {
       {/* ── Desktop Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-logo">W</div>
+          <div className="sidebar-logo">C</div>
           <div>
-            <div className="sidebar-title">Wallet</div>
-            <div className="sidebar-subtitle">Personal Finance</div>
+            <div className="sidebar-title">CashTrail</div>
+            <div className="sidebar-subtitle">Follow every rupee</div>
           </div>
         </div>
 

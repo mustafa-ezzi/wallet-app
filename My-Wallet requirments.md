@@ -1,14 +1,14 @@
-# Wallet Manager — Requirements Document
+# CashTrail — Requirements Document
 
 ## 1. Overview
 
-**Wallet Manager** is a personal/business finance management app for a freelancer/business owner who earns income from multiple projects with different payment models (one-time, monthly recurring, multi-part one-time, installment-based) and holds money across multiple bank accounts and physical cash. The app tracks every rupee coming in and going out, shows real-time balances per account, and forecasts the financial outcome of the current month.
+**CashTrail** is a personal/business finance management app for a freelancer/business owner who earns income from multiple projects with different payment models (one-time, monthly recurring, multi-part one-time, installment-based) and holds money across multiple bank accounts and physical cash. The app tracks every rupee coming in and going out, shows real-time balances per account, and forecasts the financial outcome of the current month.
 
 **Platform:** Mobile-first, responsive on laptop/desktop. Simple, uncluttered UI — no unnecessary screens or steps.
 
 **Primary user (v1):** Single user (owner), using it for personal/business finance tracking.
 
-**Future direction (multi-tenant):** The app must be architected so it can later be opened up as a hosted product where multiple independent users sign up and each manages their own private financial data within the same app instance. Each user's accounts, projects, transactions, and installments are isolated — no user can see another user's data. This is **not** a shared/team workspace (one company's books shared by many people); it's many separate users, each with their own private "wallet manager," hosted on one app. The data model and auth system should be built with this in mind from the start, even though v1 may launch with just the owner as the only real user.
+**Future direction (multi-tenant):** The app must be architected so it can later be opened up as a hosted product where multiple independent users sign up and each manages their own private financial data within the same app instance. Each user's accounts, projects, transactions, and installments are isolated — no user can see another user's data. This is **not** a shared/team workspace (one company's books shared by many people); it's many separate users, each with their own private CashTrail space, hosted on one app. The data model and auth system should be built with this in mind from the start, even though v1 may launch with just the owner as the only real user.
 
 ---
 

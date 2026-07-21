@@ -35,10 +35,10 @@ export default function Signup() {
     <div className="auth-page">
       <div className="auth-card glass">
         <div className="auth-logo">
-          <div className="auth-logo-mark">W</div>
+          <div className="auth-logo-mark">C</div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>Wallet Manager</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Personal Finance</div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>CashTrail</div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Follow every rupee</div>
           </div>
         </div>
 
