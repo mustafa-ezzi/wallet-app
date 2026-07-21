@@ -21,10 +21,11 @@ export default function Layout() {
   const handleAdded = () => { setShowAdd(false); setRefreshKey(k => k + 1) }
 
   const initials = user
-    ? ((user.first_name?.[0] ?? '') + (user.last_name?.[0] ?? '')).toUpperCase() || user.email[0].toUpperCase()
+    ? (
+        ((user.first_name?.[0] ?? '') + (user.last_name?.[0] ?? '')).toUpperCase()
+        || (user.email?.[0] ?? user.username?.[0] ?? '?').toUpperCase()
+      )
     : '?'
-
-  const currentNav = NAV.find(n => n.path === location.pathname) ?? NAV[0]
 
   return (
     <div className="app-shell" key={refreshKey}>

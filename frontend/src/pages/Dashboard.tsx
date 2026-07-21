@@ -42,6 +42,9 @@ export default function Dashboard() {
     ]).then(([dRes, fRes]) => {
       setData(dRes.data)
       setForecast(fRes.data)
+    }).catch(() => {
+      setData(null)
+      setForecast(null)
     }).finally(() => setLoading(false))
   }, [])
 
