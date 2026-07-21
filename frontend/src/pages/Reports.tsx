@@ -152,14 +152,14 @@ export default function Reports() {
           </div>
 
           {/* ── Income breakdown ── */}
-          {forecast.forecast_income.length > 0 && (
+          {(forecast.forecast_income?.length ?? 0) > 0 && (
             <div className="glass" style={{ padding: '1rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <h3>Income Sources</h3>
                 <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#34d399' }}>{fmt(forecast.total_expected_income)}</span>
               </div>
               <div className="list">
-                {forecast.forecast_income.map((item, i) => (
+                {(forecast.forecast_income ?? []).map((item, i) => (
                   <div key={i} className="list-item">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                       <div style={{ width: '0.4rem', height: '0.4rem', borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
@@ -173,14 +173,14 @@ export default function Reports() {
           )}
 
           {/* ── Outgoing breakdown ── */}
-          {forecast.forecast_outgoing.length > 0 && (
+          {(forecast.forecast_outgoing?.length ?? 0) > 0 && (
             <div className="glass" style={{ padding: '1rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                 <h3>Outgoing Breakdown</h3>
                 <span style={{ fontWeight: 800, fontSize: '0.9rem', color: '#fb7185' }}>− {fmt(forecast.total_expected_outgoing)}</span>
               </div>
               <div className="list">
-                {forecast.forecast_outgoing.map((item, i) => (
+                {(forecast.forecast_outgoing ?? []).map((item, i) => (
                   <div key={i} className="list-item">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                       <div style={{ width: '0.4rem', height: '0.4rem', borderRadius: '50%', background: '#f43f5e', flexShrink: 0 }} />
@@ -203,7 +203,7 @@ export default function Reports() {
           )}
 
           {/* Empty state when nothing is configured */}
-          {forecast.forecast_income.length === 0 && forecast.forecast_outgoing.length === 0 && (
+          {(forecast.forecast_income?.length ?? 0) === 0 && (forecast.forecast_outgoing?.length ?? 0) === 0 && (
             <div className="glass empty-state">
               <div className="empty-icon">📈</div>
               <p>No data for this month. Add projects and expenses to see your forecast.</p>

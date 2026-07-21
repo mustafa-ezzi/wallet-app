@@ -40,8 +40,13 @@ export default function Dashboard() {
       dashboardApi.get(),
       forecastApi.get(now.getFullYear(), now.getMonth() + 1),
     ]).then(([dRes, fRes]) => {
-      setData(dRes.data)
-      setForecast(fRes.data)
+      const d = dRes.data ?? {}
+      setData({
+        ...d,
+        accounts: Array.isArray(d.accounts) ? d.accounts : [],
+        recent_transactions: Array.isArray(d.recent_transactions) ? d.recent_transactions : [],
+      })
+      setForecast(fRes.data ?? null)
     }).catch(() => {
       setData(null)
       setForecast(null)
@@ -76,7 +81,7 @@ export default function Dashboard() {
           {fmtBalance(data?.total_balance ?? 0)}
         </div>
         <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)' }}>
-          Across {data?.accounts.length ?? 0} account{(data?.accounts.length ?? 0) !== 1 ? 's' : ''}
+          Across {data?.accounts?.length ?? 0} account{(data?.accounts?.length ?? 0) !== 1 ? 's' : ''}
         </p>
         <div className="balance-chips">
           <div className="balance-chip">
@@ -144,7 +149,7 @@ export default function Dashboard() {
           <h3>Accounts</h3>
           <button className="section-link" onClick={() => navigate('/accounts')}>Manage →</button>
         </div>
-        {!data?.accounts.length ? (
+        {!data?.accounts?.length ? (
           <div className="glass empty-state">
             <div className="empty-icon">🏦</div>
             <p>No accounts yet.</p>
@@ -177,7 +182,7 @@ export default function Dashboard() {
         <div className="section-row">
           <h3>Recent Transactions</h3>
         </div>
-        {!data?.recent_transactions.length ? (
+        {!data?.recent_transactions?.length ? (
           <div className="glass empty-state">
             <div className="empty-icon">📊</div>
             <p>No transactions yet. Tap + to add your first one.</p>

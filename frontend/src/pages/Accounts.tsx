@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { accountsApi, transactionsApi } from '../api/client'
+import { accountsApi, transactionsApi, asList } from '../api/client'
 import { fmt, fmtBalance } from '../utils/format'
 
 interface Account {
@@ -51,18 +51,18 @@ export default function Accounts() {
   const loadAccounts = () => {
     setLoading(true)
     accountsApi.list()
-      .then(r => setAccounts(r.data.results ?? r.data))
+      .then(r => setAccounts(asList(r.data)))
       .finally(() => setLoading(false))
   }
 
   const reloadTxs = async (acc: Account) => {
     setTxLoading(true)
     const r = await transactionsApi.list({ account: acc.id })
-    setTxs(r.data.results ?? r.data)
+    setTxs(asList(r.data))
     setTxLoading(false)
     // Refresh balance shown in header
     const ar = await accountsApi.list()
-    const fresh = (ar.data.results ?? ar.data).find((a: Account) => a.id === acc.id)
+    const fresh = asList<Account>(ar.data).find((a) => a.id === acc.id)
     if (fresh) setSelectedAccount(fresh)
   }
 
@@ -103,7 +103,7 @@ export default function Accounts() {
   const viewTxs = async (acc: Account) => {
     setSelectedAccount(acc); setTxLoading(true)
     const r = await transactionsApi.list({ account: acc.id })
-    setTxs(r.data.results ?? r.data); setTxLoading(false)
+    setTxs(asList(r.data)); setTxLoading(false)
   }
 
   // ── transaction CRUD ─────────────────────────────────────────────────

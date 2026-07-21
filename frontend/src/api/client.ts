@@ -45,6 +45,15 @@ api.interceptors.response.use(
 
 export default api
 
+/** Normalize DRF list responses (paginated or plain array). */
+export function asList<T = unknown>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[]
+  if (data && typeof data === 'object' && Array.isArray((data as { results?: unknown }).results)) {
+    return (data as { results: T[] }).results
+  }
+  return []
+}
+
 // ── Typed helpers ───────────────────────────────────────────────
 
 export const authApi = {
