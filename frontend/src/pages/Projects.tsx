@@ -24,7 +24,7 @@ interface Project {
 /** Friendly labels — avoid jargon like “recurring”. */
 const TYPE_LABELS: Record<string, string> = {
   recurring_monthly:      'Every month',
-  contract_monthly:       'Monthly deal',
+  contract_monthly:       'Salary',
   one_time:               'One-time payment',
   one_time_installments:  'Paid in parts',
 }

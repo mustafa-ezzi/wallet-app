@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Banknote, ClipboardList, CircleDollarSign, X } from 'lucide-react'
 import { expensesApi, payablesApi, receivablesApi, accountsApi, projectsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
-import { fmt, fmtNum } from '../utils/format'
+import { fmt, fmtNum, sumMoney } from '../utils/format'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -179,6 +179,16 @@ export default function Expenses() {
     await payablesApi.update(p.id, { status: 'completed' }); load()
   }
 
+  const deletePayable = async (p: Payable) => {
+    if (!confirm(`Delete loan "${p.name}"? This cannot be undone.`)) return
+    try {
+      await payablesApi.remove(p.id)
+      load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not delete loan.'))
+    }
+  }
+
   const markReceivableStuck = async (r: Receivable) => {
     const newStatus = r.status === 'stuck' ? 'ongoing' : 'stuck'
     await receivablesApi.update(r.id, { status: newStatus }); load()
@@ -211,10 +221,19 @@ export default function Expenses() {
     finally { setSaving(false) }
   }
 
-  // ── computed summaries ──
-  const monthlyExpTotal = expenses.filter(e => e.active && e.frequency === 'monthly').reduce((s, e) => s + e.amount, 0)
-  const monthlyPayTotal = payables.filter(p => p.status === 'ongoing').reduce((s, p) => s + p.monthly_amount, 0)
-  const totalRecRemaining = receivables.filter(r => r.status !== 'completed').reduce((s, r) => s + r.remaining_amount, 0)
+  // ── computed summaries (coerce Decimals — API often returns strings) ──
+  const monthlyExpTotal = sumMoney(
+    expenses.filter(e => e.active && e.frequency === 'monthly'),
+    e => e.amount,
+  )
+  const monthlyPayTotal = sumMoney(
+    payables.filter(p => p.status === 'ongoing'),
+    p => p.monthly_amount,
+  )
+  const totalRecRemaining = sumMoney(
+    receivables.filter(r => r.status !== 'completed'),
+    r => r.remaining_amount,
+  )
 
   if (loading) return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -474,6 +493,13 @@ export default function Expenses() {
                         )
                       )}
                       <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }} onClick={() => openEditPay(p)}>Edit</button>
+                      <button
+                        className="btn-glass"
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: 'var(--red-600)', borderColor: '#f5c4c0' }}
+                        onClick={() => deletePayable(p)}
+                      >
+                        Delete
+                      </button>
                       {p.status === 'ongoing' && (
                         <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: '#34d399', borderColor: 'rgba(52,211,153,0.3)' }} onClick={() => markPayableComplete(p)}>
                           Mark Complete

@@ -178,6 +178,7 @@ export const payablesApi = {
   list: () => api.get('/payables/'),
   create: (data: object) => api.post('/payables/', data),
   update: (id: number, data: object) => api.patch(`/payables/${id}/`, data),
+  remove: (id: number) => api.delete(`/payables/${id}/`),
 }
 
 export const dashboardApi = {

@@ -9,7 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import { accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
-import { fmt, fmtBalance } from '../utils/format'
+import { fmt, fmtBalance, toMoney } from '../utils/format'
 
 interface Account {
   id: number; name: string; type: string
@@ -157,7 +157,7 @@ export default function Accounts() {
 
   // ── derived ──────────────────────────────────────────────────────────
 
-  const totalBalance = accounts.reduce((s, a) => s + a.current_balance, 0)
+  const totalBalance = accounts.reduce((s, a) => s + toMoney(a.current_balance), 0)
   const banks = accounts.filter(a => a.type === 'bank')
   const cash  = accounts.filter(a => a.type === 'cash')
 
