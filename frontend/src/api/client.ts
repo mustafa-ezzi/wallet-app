@@ -1,8 +1,17 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 
+/** Ensure API root is an absolute URL (Railway vars are often pasted without https://). */
+function normalizeApiRoot(raw: string | undefined): string {
+  const value = (raw ?? '').trim().replace(/\/$/, '')
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  // Accidentally pasted as host-only → treat as https backend
+  return `https://${value.replace(/^\/+/, '')}`
+}
+
 // Local Vite proxy uses /api. On Railway set VITE_API_URL to your backend URL
-// e.g. https://wallet-backend.up.railway.app  (no trailing slash)
-const API_ROOT = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') || ''
+// e.g. https://tranquil-radiance-production.up.railway.app  (include https://)
+const API_ROOT = normalizeApiRoot(import.meta.env.VITE_API_URL as string | undefined)
 const API_BASE = API_ROOT ? `${API_ROOT}/api` : '/api'
 
 const api = axios.create({
