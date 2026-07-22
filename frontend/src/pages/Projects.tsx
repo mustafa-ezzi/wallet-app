@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Briefcase, X } from 'lucide-react'
-import { projectsApi, accountsApi, transactionsApi, asList } from '../api/client'
+import { projectsApi, accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 
 interface Project {
   id: number
@@ -151,7 +151,7 @@ export default function Projects() {
       else await projectsApi.create(payload)
       setShowModal(false); load()
     } catch (err: any) {
-      setError(Object.values(err.response?.data ?? {}).flat().join(' ') || 'Failed to save.')
+      setError(apiErrorMessage(err, 'Failed to save.'))
     } finally { setSaving(false) }
   }
 

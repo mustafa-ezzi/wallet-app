@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Banknote, ClipboardList, CircleDollarSign, X } from 'lucide-react'
-import { expensesApi, payablesApi, receivablesApi, accountsApi, projectsApi, transactionsApi, asList } from '../api/client'
+import { expensesApi, payablesApi, receivablesApi, accountsApi, projectsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt, fmtNum } from '../utils/format'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ export default function Expenses() {
       if (editingExp) await expensesApi.update(editingExp.id, payload)
       else await expensesApi.create(payload)
       setExpModal(false); load()
-    } catch (err: any) { setError(Object.values(err.response?.data ?? {}).flat().join(' ') || 'Failed.') }
+    } catch (err: any) { setError(apiErrorMessage(err, 'Failed.')) }
     finally { setSaving(false) }
   }
 
@@ -155,7 +155,7 @@ export default function Expenses() {
       if (editingPay) await payablesApi.update(editingPay.id, payload)
       else await payablesApi.create(payload)
       setPayModal(false); load()
-    } catch (err: any) { setError(Object.values(err.response?.data ?? {}).flat().join(' ') || 'Failed.') }
+    } catch (err: any) { setError(apiErrorMessage(err, 'Failed.')) }
     finally { setSaving(false) }
   }
 
@@ -166,7 +166,7 @@ export default function Expenses() {
       if (editingRec) await receivablesApi.update(editingRec.id, payload)
       else await receivablesApi.create(payload)
       setRecModal(false); load()
-    } catch (err: any) { setError(Object.values(err.response?.data ?? {}).flat().join(' ') || 'Failed.') }
+    } catch (err: any) { setError(apiErrorMessage(err, 'Failed.')) }
     finally { setSaving(false) }
   }
 

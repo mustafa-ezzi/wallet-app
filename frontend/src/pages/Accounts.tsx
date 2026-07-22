@@ -8,7 +8,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { accountsApi, transactionsApi, asList } from '../api/client'
+import { accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt, fmtBalance } from '../utils/format'
 
 interface Account {
@@ -59,8 +59,13 @@ export default function Accounts() {
 
   const loadAccounts = () => {
     setLoading(true)
+    setAccError('')
     accountsApi.list()
       .then(r => setAccounts(asList(r.data)))
+      .catch((err) => {
+        setAccounts([])
+        setAccError(apiErrorMessage(err, 'Could not load accounts.'))
+      })
       .finally(() => setLoading(false))
   }
 
@@ -98,7 +103,7 @@ export default function Accounts() {
       else await accountsApi.create(payload)
       setShowAccModal(false); loadAccounts()
     } catch (err: any) {
-      setAccError(Object.values(err.response?.data ?? {}).flat().join(' ') || 'Failed to save.')
+      setAccError(apiErrorMessage(err, 'Failed to save.'))
     } finally { setAccSaving(false) }
   }
 
@@ -176,6 +181,10 @@ export default function Accounts() {
           {fmtBalance(totalBalance)}
         </span>
       </div>
+
+      {!showAccModal && accError && (
+        <div className="auth-error" style={{ marginBottom: '1rem' }}>{accError}</div>
+      )}
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem 0' }}>

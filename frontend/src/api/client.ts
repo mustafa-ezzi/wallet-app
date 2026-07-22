@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 
 // Local Vite proxy uses /api. On Railway set VITE_API_URL to your backend URL
 // e.g. https://wallet-backend.up.railway.app  (no trailing slash)
@@ -7,9 +7,34 @@ const API_BASE = API_ROOT ? `${API_ROOT}/api` : '/api'
 
 const api = axios.create({
   baseURL: API_BASE,
+  headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
 })
 
-api.interceptors.request.use((config) => {
+function looksLikeApiPayload(data: unknown): boolean {
+  if (data == null) return false
+  if (typeof data === 'string') return false
+  if (typeof data !== 'object') return false
+  return true
+}
+
+function assertApiResponse(res: AxiosResponse) {
+  const ct = String(res.headers?.['content-type'] ?? '')
+  if (ct.includes('text/html') || !looksLikeApiPayload(res.data)) {
+    const err = new Error(
+      API_ROOT
+        ? 'API returned an invalid response. Check that the backend is running.'
+        : 'API is not configured. Set VITE_API_URL to your backend URL and redeploy the frontend.'
+    ) as Error & { response?: { data?: { detail?: string }; status?: number } }
+    err.response = {
+      status: res.status,
+      data: { detail: err.message },
+    }
+    throw err
+  }
+  return res
+}
+
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('access_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
@@ -18,16 +43,17 @@ api.interceptors.request.use((config) => {
 })
 
 api.interceptors.response.use(
-  (res) => res,
+  (res) => assertApiResponse(res),
   async (err) => {
     const original = err.config
-    if (err.response?.status === 401 && !original._retry) {
+    if (err.response?.status === 401 && original && !original._retry) {
       original._retry = true
       const refresh = localStorage.getItem('refresh_token')
       if (refresh) {
         try {
           const { data } = await axios.post(`${API_BASE}/auth/refresh/`, { refresh })
           localStorage.setItem('access_token', data.access)
+          original.headers = original.headers ?? {}
           original.headers.Authorization = `Bearer ${data.access}`
           return api(original)
         } catch {
@@ -44,6 +70,7 @@ api.interceptors.response.use(
 )
 
 export default api
+export { API_BASE, API_ROOT }
 
 /** Normalize DRF list responses (paginated or plain array). */
 export function asList<T = unknown>(data: unknown): T[] {
@@ -52,6 +79,23 @@ export function asList<T = unknown>(data: unknown): T[] {
     return (data as { results: T[] }).results
   }
   return []
+}
+
+export function apiErrorMessage(err: unknown, fallback = 'Request failed.'): string {
+  const data = (err as { response?: { data?: unknown } })?.response?.data
+  if (!data) {
+    const msg = (err as Error)?.message
+    return msg || fallback
+  }
+  if (typeof data === 'string') return data
+  if (typeof data === 'object' && data !== null) {
+    const detail = (data as { detail?: unknown }).detail
+    if (typeof detail === 'string') return detail
+    const parts = Object.values(data as Record<string, unknown>).flat()
+    const joined = parts.filter(v => typeof v === 'string' || typeof v === 'number').join(' ')
+    if (joined.trim()) return joined
+  }
+  return fallback
 }
 
 // ── Typed helpers ───────────────────────────────────────────────
