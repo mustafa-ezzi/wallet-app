@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { expensesApi, payablesApi, receivablesApi, accountsApi, projectsApi, transactionsApi } from '../api/client'
+import { expensesApi, payablesApi, receivablesApi, accountsApi, projectsApi, transactionsApi, asList } from '../api/client'
 import { fmt, fmtNum } from '../utils/format'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -98,11 +98,11 @@ export default function Expenses() {
         accountsApi.list(),
         projectsApi.list(),
       ])
-      setExpenses(eR.data.results ?? eR.data)
-      setPayables(pR.data.results ?? pR.data)
-      setReceivables(rR.data.results ?? rR.data)
-      setAccounts(aR.data.results ?? aR.data)
-      setProjects(prR.data.results ?? prR.data)
+      setExpenses(asList(eR.data))
+      setPayables(asList(pR.data))
+      setReceivables(asList(rR.data))
+      setAccounts(asList(aR.data))
+      setProjects(asList(prR.data))
     } finally {
       setLoading(false)
     }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { projectsApi, accountsApi, transactionsApi } from '../api/client'
+import { projectsApi, accountsApi, transactionsApi, asList } from '../api/client'
 
 interface Project {
   id: number
@@ -91,8 +91,8 @@ export default function Projects() {
   const load = () => {
     setLoading(true)
     Promise.all([
-      projectsApi.list().then(r => setProjects(r.data.results ?? r.data)),
-      accountsApi.list().then(r => setAccounts(r.data.results ?? r.data)),
+      projectsApi.list().then(r => setProjects(asList(r.data))),
+      accountsApi.list().then(r => setAccounts(asList(r.data))),
     ]).finally(() => setLoading(false))
   }
 

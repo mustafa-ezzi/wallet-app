@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { accountsApi, projectsApi, transactionsApi, receivablesApi, payablesApi } from '../api/client'
+import { accountsApi, projectsApi, transactionsApi, receivablesApi, payablesApi, asList } from '../api/client'
 import { fmtBalance } from '../utils/format'
 
 interface Props {
@@ -41,10 +41,10 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const [payables, setPayables]     = useState<any[]>([])
 
   useEffect(() => {
-    accountsApi.list().then(r => setAccounts(r.data.results ?? r.data))
-    projectsApi.list({ status: 'active' }).then(r => setProjects(r.data.results ?? r.data))
-    receivablesApi.list().then(r => setReceivables((r.data.results ?? r.data).filter((x: any) => x.status === 'ongoing')))
-    payablesApi.list().then(r => setPayables((r.data.results ?? r.data).filter((x: any) => x.status === 'ongoing')))
+    accountsApi.list().then(r => setAccounts(asList(r.data)))
+    projectsApi.list({ status: 'active' }).then(r => setProjects(asList(r.data)))
+    receivablesApi.list().then(r => setReceivables(asList(r.data).filter((x: any) => x.status === 'ongoing')))
+    payablesApi.list().then(r => setPayables(asList(r.data).filter((x: any) => x.status === 'ongoing')))
   }, [])
 
   const switchType = (t: TxType) => {

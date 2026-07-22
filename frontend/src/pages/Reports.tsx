@@ -37,7 +37,17 @@ export default function Reports() {
 
   const loadForecast = () => {
     setLoading(true)
-    forecastApi.get(year, month).then(r => setForecast(r.data)).finally(() => setLoading(false))
+    forecastApi.get(year, month)
+      .then(r => {
+        const d = r.data ?? {}
+        setForecast({
+          ...d,
+          forecast_income: Array.isArray(d.forecast_income) ? d.forecast_income : [],
+          forecast_outgoing: Array.isArray(d.forecast_outgoing) ? d.forecast_outgoing : [],
+        })
+      })
+      .catch(() => setForecast(null))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => { loadForecast() }, [year, month])
