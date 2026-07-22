@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BarChart3, ChevronLeft, ChevronRight } from 'lucide-react'
 import { forecastApi } from '../api/client'
 import { fmt, fmtBalance } from '../utils/format'
 
@@ -77,12 +78,16 @@ export default function Reports() {
 
       {/* Month selector */}
       <div className="glass" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 1rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
-        <button className="btn-icon" onClick={prevMonth}>‹</button>
+        <button className="btn-icon" onClick={prevMonth} aria-label="Previous month">
+          <ChevronLeft size={18} strokeWidth={2} />
+        </button>
         <div style={{ textAlign: 'center' }}>
           <span style={{ fontWeight: 700, fontSize: '1rem' }}>{MONTH_NAMES[month - 1]} {year}</span>
           {isCurrentMonth && <div style={{ fontSize: '0.7rem', color: 'var(--primary-light)', marginTop: '0.15rem' }}>Current month</div>}
         </div>
-        <button className="btn-icon" onClick={nextMonth}>›</button>
+        <button className="btn-icon" onClick={nextMonth} aria-label="Next month">
+          <ChevronRight size={18} strokeWidth={2} />
+        </button>
       </div>
 
       {loading ? (
@@ -215,7 +220,7 @@ export default function Reports() {
           {/* Empty state when nothing is configured */}
           {(forecast.forecast_income?.length ?? 0) === 0 && (forecast.forecast_outgoing?.length ?? 0) === 0 && (
             <div className="glass empty-state">
-              <div className="empty-icon">📈</div>
+              <div className="empty-icon"><BarChart3 size={36} strokeWidth={1.5} /></div>
               <p>No data for this month. Add projects and expenses to see your forecast.</p>
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1rem', flexWrap: 'wrap' }}>
                 <button className="btn-primary" onClick={() => navigate('/projects')}>Add Projects</button>

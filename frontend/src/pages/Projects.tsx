@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Briefcase, X } from 'lucide-react'
 import { projectsApi, accountsApi, transactionsApi, asList } from '../api/client'
 
 interface Project {
@@ -178,7 +179,7 @@ export default function Projects() {
         </div>
       ) : projects.length === 0 ? (
         <div className="glass empty-state">
-          <div className="empty-icon">📁</div>
+          <div className="empty-icon"><Briefcase size={36} strokeWidth={1.5} /></div>
           <p>No projects yet.</p>
           <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAdd}>
             Add your first project
@@ -218,7 +219,7 @@ export default function Projects() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>Record Receipt</h2>
-              <button className="modal-close" onClick={() => setReceiptModal(null)}>✕</button>
+              <button className="modal-close" onClick={() => setReceiptModal(null)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
               Monthly income from: <strong>{receiptModal.projectName}</strong>
@@ -274,7 +275,7 @@ export default function Projects() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>{editing ? 'Edit Project' : 'Add Project'}</h2>
-              <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+              <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
 
             {error && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}

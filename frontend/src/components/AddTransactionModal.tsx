@@ -1,4 +1,11 @@
 import { useState, useEffect } from 'react'
+import {
+  ArrowDown,
+  ArrowDownRight,
+  ArrowLeftRight,
+  ArrowUpRight,
+  X,
+} from 'lucide-react'
 import { accountsApi, projectsApi, transactionsApi, receivablesApi, payablesApi, asList } from '../api/client'
 import { fmtBalance } from '../utils/format'
 
@@ -139,7 +146,9 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
       <div className="modal-sheet">
         <div className="modal-header">
           <h2>Add Transaction</h2>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
+            <X size={18} strokeWidth={2} />
+          </button>
         </div>
 
         {/* ── Type toggle ── */}
@@ -149,21 +158,21 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
             className={type === 'income' ? 'active-income' : ''}
             onClick={() => switchType('income')}
           >
-            ↑ Income
+            <ArrowUpRight size={14} strokeWidth={2.25} /> Income
           </button>
           <button
             type="button"
             className={type === 'expense' ? 'active-expense' : ''}
             onClick={() => switchType('expense')}
           >
-            ↓ Expense
+            <ArrowDownRight size={14} strokeWidth={2.25} /> Expense
           </button>
           <button
             type="button"
             className={type === 'transfer' ? 'active-transfer' : ''}
             onClick={() => switchType('transfer')}
           >
-            ⇄ Transfer
+            <ArrowLeftRight size={14} strokeWidth={2.25} /> Transfer
           </button>
         </div>
 
@@ -210,7 +219,9 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
               </div>
 
               {/* Arrow visual */}
-              <div style={{ textAlign: 'center', fontSize: '1.3rem', color: '#2563eb', margin: '-0.3rem 0' }}>↓</div>
+              <div style={{ display: 'flex', justifyContent: 'center', color: '#2563eb', margin: '-0.3rem 0' }}>
+                <ArrowDown size={20} strokeWidth={2} />
+              </div>
 
               <div className="form-group">
                 <label>To Account</label>
@@ -241,7 +252,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 }}
                 disabled={loading}
               >
-                {loading ? <span className="spinner" /> : '⇄ Record Transfer'}
+                {loading ? <span className="spinner" /> : <><ArrowLeftRight size={15} strokeWidth={2} /> Record Transfer</>}
               </button>
             </>
           )}

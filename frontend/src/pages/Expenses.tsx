@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Banknote, ClipboardList, CircleDollarSign, X } from 'lucide-react'
 import { expensesApi, payablesApi, receivablesApi, accountsApi, projectsApi, transactionsApi, asList } from '../api/client'
 import { fmt, fmtNum } from '../utils/format'
 
@@ -257,7 +258,13 @@ export default function Expenses() {
             className={`tab-bar-item ${tab === t ? 'active' : ''}`}
             onClick={() => setTab(t)}
           >
-            {t === 'expenses' ? '📋 Fixed Expenses' : t === 'payables' ? '💸 Loans & Payables' : '💰 Receivables'}
+            {t === 'expenses' ? (
+              <><ClipboardList size={14} strokeWidth={1.75} /> Fixed Expenses</>
+            ) : t === 'payables' ? (
+              <><Banknote size={14} strokeWidth={1.75} /> Loans & Payables</>
+            ) : (
+              <><CircleDollarSign size={14} strokeWidth={1.75} /> Receivables</>
+            )}
           </button>
         ))}
       </div>
@@ -274,7 +281,7 @@ export default function Expenses() {
 
           {expenses.length === 0 ? (
             <div className="glass empty-state">
-              <div className="empty-icon">📋</div>
+              <div className="empty-icon"><ClipboardList size={36} strokeWidth={1.5} /></div>
               <p>No recurring expenses yet.</p>
               <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddExp}>Add first expense</button>
             </div>
@@ -388,7 +395,7 @@ export default function Expenses() {
 
           {payables.length === 0 ? (
             <div className="glass empty-state">
-              <div className="empty-icon">💸</div>
+              <div className="empty-icon"><Banknote size={36} strokeWidth={1.5} /></div>
               <p>No payable installments yet.</p>
               <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddPay}>Add first loan</button>
             </div>
@@ -496,7 +503,7 @@ export default function Expenses() {
 
           {receivables.length === 0 ? (
             <div className="glass empty-state">
-              <div className="empty-icon">💰</div>
+              <div className="empty-icon"><CircleDollarSign size={36} strokeWidth={1.5} /></div>
               <p>No receivable installments yet.</p>
               <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddRec}>Add receivable</button>
             </div>
@@ -602,7 +609,7 @@ export default function Expenses() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>{editingExp ? 'Edit Expense' : 'Add Recurring Expense'}</h2>
-              <button className="modal-close" onClick={() => setExpModal(false)}>✕</button>
+              <button className="modal-close" onClick={() => setExpModal(false)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             {error && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}
             <form onSubmit={submitExp} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -652,7 +659,7 @@ export default function Expenses() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>{editingPay ? 'Edit Payable' : 'Add Payable / Loan'}</h2>
-              <button className="modal-close" onClick={() => setPayModal(false)}>✕</button>
+              <button className="modal-close" onClick={() => setPayModal(false)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             {error && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}
             <form onSubmit={submitPay} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -703,7 +710,7 @@ export default function Expenses() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>{editingRec ? 'Edit Receivable' : 'Add Receivable Installment'}</h2>
-              <button className="modal-close" onClick={() => setRecModal(false)}>✕</button>
+              <button className="modal-close" onClick={() => setRecModal(false)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             {error && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}
             <form onSubmit={submitRec} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -750,7 +757,7 @@ export default function Expenses() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>{recordPayModal.type === 'receivable' ? 'Record Receipt' : 'Record Payment'}</h2>
-              <button className="modal-close" onClick={() => setRecordPayModal(null)}>✕</button>
+              <button className="modal-close" onClick={() => setRecordPayModal(null)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
               {recordPayModal.type === 'receivable' ? 'Receipt from' : 'Payment for'}: <strong>{recordPayModal.name}</strong>

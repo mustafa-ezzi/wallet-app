@@ -1,4 +1,13 @@
 import { useEffect, useState } from 'react'
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  FileText,
+  Landmark,
+  Trash2,
+  Wallet,
+  X,
+} from 'lucide-react'
 import { accountsApi, transactionsApi, asList } from '../api/client'
 import { fmt, fmtBalance } from '../utils/format'
 
@@ -174,7 +183,7 @@ export default function Accounts() {
         </div>
       ) : accounts.length === 0 ? (
         <div className="glass empty-state">
-          <div className="empty-icon">🏦</div>
+          <div className="empty-icon"><Wallet size={36} strokeWidth={1.5} /></div>
           <p>No accounts yet.</p>
           <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddAcc}>Add your first account</button>
         </div>
@@ -183,7 +192,7 @@ export default function Accounts() {
           {banks.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                <span>🏛</span><h3>Bank Accounts</h3>
+                <Landmark size={16} strokeWidth={1.75} /><h3>Bank Accounts</h3>
               </div>
               <div className="list">
                 {banks.map(acc => (
@@ -196,7 +205,7 @@ export default function Accounts() {
           {cash.length > 0 && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                <span>💳</span><h3>Cash &amp; Wallets</h3>
+                <Wallet size={16} strokeWidth={1.75} /><h3>Cash &amp; Wallets</h3>
               </div>
               <div className="list">
                 {cash.map(acc => (
@@ -215,7 +224,9 @@ export default function Accounts() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>{editingAcc ? 'Edit Account' : 'New Account'}</h2>
-              <button className="modal-close" onClick={() => setShowAccModal(false)}>✕</button>
+              <button className="modal-close" onClick={() => setShowAccModal(false)} aria-label="Close">
+                <X size={18} strokeWidth={2} />
+              </button>
             </div>
             {accError && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{accError}</div>}
             <form onSubmit={submitAcc} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -250,7 +261,7 @@ export default function Accounts() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>{selectedAccount.name}</h2>
-              <button className="modal-close" onClick={() => setSelectedAccount(null)}>✕</button>
+              <button className="modal-close" onClick={() => setSelectedAccount(null)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
 
             <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.75rem', background: 'var(--green-50)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)' }}>
@@ -265,7 +276,7 @@ export default function Accounts() {
                 <div className="spinner spinner-dark" style={{ width: '1.75rem', height: '1.75rem' }} />
               </div>
             ) : txs.length === 0 ? (
-              <div className="empty-state"><div className="empty-icon">📄</div><p>No transactions yet.</p></div>
+              <div className="empty-state"><div className="empty-icon"><FileText size={36} strokeWidth={1.5} /></div><p>No transactions yet.</p></div>
             ) : (
               <div className="list">
                 {txs.map((tx) => (
@@ -275,8 +286,10 @@ export default function Accounts() {
                   }}>
                     {/* Icon */}
                     <div className={`tx-icon ${tx.type === 'income' ? 'tx-icon-income' : 'tx-icon-expense'}`}
-                      style={{ width: '1.8rem', height: '1.8rem', fontSize: '0.75rem', flexShrink: 0 }}>
-                      {tx.type === 'income' ? '↑' : '↓'}
+                      style={{ width: '1.8rem', height: '1.8rem', flexShrink: 0 }}>
+                      {tx.type === 'income'
+                        ? <ArrowUpRight size={13} strokeWidth={2.25} />
+                        : <ArrowDownRight size={13} strokeWidth={2.25} />}
                     </div>
 
                     {/* Label + date */}
@@ -310,8 +323,9 @@ export default function Accounts() {
                         className="btn-glass"
                         style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', color: 'var(--red-600)', borderColor: '#f5c4c0' }}
                         onClick={() => deleteTx(tx)}
+                        aria-label="Delete transaction"
                       >
-                        ✕
+                        <Trash2 size={13} strokeWidth={2} />
                       </button>
                     </div>
                   </div>
@@ -328,7 +342,7 @@ export default function Accounts() {
           <div className="modal-sheet">
             <div className="modal-header">
               <h2>Edit Transaction</h2>
-              <button className="modal-close" onClick={() => setEditingTx(null)}>✕</button>
+              <button className="modal-close" onClick={() => setEditingTx(null)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.85rem' }}>
               Account: <strong>{selectedAccount?.name}</strong>
@@ -342,12 +356,12 @@ export default function Accounts() {
                 <button type="button"
                   className={txForm.type === 'income' ? 'active-income' : ''}
                   onClick={() => setTxForm(f => ({ ...f, type: 'income', category: '' }))}>
-                  ↑ Income
+                  <ArrowUpRight size={14} strokeWidth={2.25} /> Income
                 </button>
                 <button type="button"
                   className={txForm.type === 'expense' ? 'active-expense' : ''}
                   onClick={() => setTxForm(f => ({ ...f, type: 'expense', category: '' }))}>
-                  ↓ Expense
+                  <ArrowDownRight size={14} strokeWidth={2.25} /> Expense
                 </button>
                 {/* empty 3rd slot to keep grid consistent */}
                 <span />
@@ -408,8 +422,10 @@ function AccountCard({ acc, totalBalance, onEdit, onDelete, onView }: {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.65rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : 'account-icon-bank'}`}
-            style={{ width: '2.5rem', height: '2.5rem', fontSize: '1.1rem' }}>
-            {acc.type === 'cash' ? '💵' : '🏛'}
+            style={{ width: '2.5rem', height: '2.5rem' }}>
+            {acc.type === 'cash'
+              ? <Wallet size={18} strokeWidth={1.75} />
+              : <Landmark size={18} strokeWidth={1.75} />}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{acc.name}</div>

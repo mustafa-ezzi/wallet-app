@@ -1,14 +1,24 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import {
+  LayoutDashboard,
+  Wallet,
+  Briefcase,
+  Receipt,
+  BarChart3,
+  Settings,
+  LogOut,
+  Plus,
+} from 'lucide-react'
 import AddTransactionModal from './AddTransactionModal'
 
-const NAV = [
-  { path: '/',          label: 'Overview',      icon: '⊞' },
-  { path: '/accounts',  label: 'Accounts',      icon: '🏛' },
-  { path: '/projects',  label: 'Projects',      icon: '📁' },
-  { path: '/expenses',  label: 'Bills & Loans', icon: '🧾' },
-  { path: '/reports',   label: 'Reports',       icon: '📊' },
+const NAV: { path: string; label: string; icon: ReactNode }[] = [
+  { path: '/',          label: 'Overview',      icon: <LayoutDashboard size={18} strokeWidth={1.75} /> },
+  { path: '/accounts',  label: 'Accounts',      icon: <Wallet size={18} strokeWidth={1.75} /> },
+  { path: '/projects',  label: 'Projects',      icon: <Briefcase size={18} strokeWidth={1.75} /> },
+  { path: '/expenses',  label: 'Bills & Loans', icon: <Receipt size={18} strokeWidth={1.75} /> },
+  { path: '/reports',   label: 'Reports',       icon: <BarChart3 size={18} strokeWidth={1.75} /> },
 ]
 
 export default function Layout() {
@@ -36,7 +46,9 @@ export default function Layout() {
           <div className="mobile-header-logo">C</div>
           <span className="mobile-header-title">CashTrail</span>
         </div>
-        <button className="mobile-header-settings" aria-label="Settings">⚙</button>
+        <button className="mobile-header-settings" aria-label="Settings">
+          <Settings size={18} strokeWidth={1.75} />
+        </button>
       </header>
 
       {/* ── Desktop Sidebar ── */}
@@ -50,7 +62,8 @@ export default function Layout() {
         </div>
 
         <button className="sidebar-add-btn" onClick={() => setShowAdd(true)}>
-          + Add Transaction
+          <Plus size={16} strokeWidth={2.25} />
+          Add Transaction
         </button>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
@@ -81,7 +94,7 @@ export default function Layout() {
             onClick={logout}
             style={{ color: 'var(--red-600)' }}
           >
-            <span className="nav-icon">⏻</span>
+            <span className="nav-icon"><LogOut size={18} strokeWidth={1.75} /></span>
             Sign Out
           </button>
         </div>
@@ -94,7 +107,7 @@ export default function Layout() {
 
       {/* ── Mobile FAB ── */}
       <button className="fab" onClick={() => setShowAdd(true)} aria-label="Add transaction">
-        +
+        <Plus size={22} strokeWidth={2.25} />
       </button>
 
       {/* ── Mobile floating pill nav ── */}

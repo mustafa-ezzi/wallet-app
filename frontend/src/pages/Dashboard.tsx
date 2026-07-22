@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Landmark,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+  FileText,
+} from 'lucide-react'
 import { dashboardApi, forecastApi } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { fmt, fmtBalance } from '../utils/format'
@@ -85,11 +94,15 @@ export default function Dashboard() {
         </p>
         <div className="balance-chips">
           <div className="balance-chip">
-            <div className="chip-label">↑ {monthName} In</div>
+            <div className="chip-label">
+              <ArrowUpRight size={12} strokeWidth={2.25} /> {monthName} In
+            </div>
             <div className="chip-value">{fmt(data?.month_income ?? 0)}</div>
           </div>
           <div className="balance-chip">
-            <div className="chip-label">↓ {monthName} Out</div>
+            <div className="chip-label">
+              <ArrowDownRight size={12} strokeWidth={2.25} /> {monthName} Out
+            </div>
             <div className="chip-value">{fmt(data?.month_expense ?? 0)}</div>
           </div>
         </div>
@@ -105,7 +118,11 @@ export default function Dashboard() {
 
           <div style={{ fontSize: '1.75rem', fontFamily: 'var(--font-heading)', fontWeight: 700, color: net >= 0 ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             {fmtBalance(net)}
-            <span style={{ fontSize: '1rem' }}>{net >= 0 ? '↗' : '↘'}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+              {net >= 0
+                ? <TrendingUp size={18} strokeWidth={2} />
+                : <TrendingDown size={18} strokeWidth={2} />}
+            </span>
           </div>
           <p className="page-subtitle" style={{ marginTop: '0.25rem' }}>
             Based on scheduled income &amp; expenses
@@ -151,7 +168,7 @@ export default function Dashboard() {
         </div>
         {!data?.accounts?.length ? (
           <div className="glass empty-state">
-            <div className="empty-icon">🏦</div>
+            <div className="empty-icon"><Wallet size={36} strokeWidth={1.5} /></div>
             <p>No accounts yet.</p>
             <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/accounts')}>Add account</button>
           </div>
@@ -161,7 +178,9 @@ export default function Dashboard() {
               <div key={acc.id} className="list-item glass-hover" style={{ cursor: 'pointer' }} onClick={() => navigate('/accounts')}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <div className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : 'account-icon-bank'}`}>
-                    {acc.type === 'cash' ? '💵' : '🏛'}
+                    {acc.type === 'cash'
+                      ? <Wallet size={16} strokeWidth={1.75} />
+                      : <Landmark size={16} strokeWidth={1.75} />}
                   </div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{acc.name}</div>
@@ -184,7 +203,7 @@ export default function Dashboard() {
         </div>
         {!data?.recent_transactions?.length ? (
           <div className="glass empty-state">
-            <div className="empty-icon">📊</div>
+            <div className="empty-icon"><FileText size={36} strokeWidth={1.5} /></div>
             <p>No transactions yet. Tap + to add your first one.</p>
           </div>
         ) : (
@@ -193,7 +212,9 @@ export default function Dashboard() {
               <div key={tx.id} className="list-item glass-hover">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <div className={`tx-icon ${tx.type === 'income' ? 'tx-icon-income' : 'tx-icon-expense'}`}>
-                    {tx.type === 'income' ? '↑' : '↓'}
+                    {tx.type === 'income'
+                      ? <ArrowUpRight size={14} strokeWidth={2.25} />
+                      : <ArrowDownRight size={14} strokeWidth={2.25} />}
                   </div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>
