@@ -59,7 +59,13 @@ export default function Projects() {
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState('')
 
-  interface ReceiptModal { projectId: number; projectName: string; defaultAmount: number; defaultAccount: string }
+  interface ReceiptModal {
+    projectId: number
+    projectName: string
+    defaultAmount: number
+    defaultAccount: string
+    incomeType: string
+  }
   const [receiptModal, setReceiptModal]   = useState<ReceiptModal | null>(null)
   const [receiptAmount, setReceiptAmount] = useState('')
   const [receiptAccount, setReceiptAccount] = useState('')
@@ -69,8 +75,18 @@ export default function Projects() {
   const [receiptError, setReceiptError]   = useState('')
 
   const openReceiptModal = (p: Project) => {
-    setReceiptModal({ projectId: p.id, projectName: p.name, defaultAmount: p.amount, defaultAccount: p.default_account ? String(p.default_account) : '' })
-    setReceiptAmount(String(p.amount))
+    const isOneTime = p.income_type === 'one_time'
+    const defaultAmt = isOneTime
+      ? (p.remaining_amount ?? Math.max(0, p.amount - (Number(p.advance_amount) || 0)))
+      : p.amount
+    setReceiptModal({
+      projectId: p.id,
+      projectName: p.name,
+      defaultAmount: defaultAmt,
+      defaultAccount: p.default_account ? String(p.default_account) : '',
+      incomeType: p.income_type,
+    })
+    setReceiptAmount(String(defaultAmt))
     setReceiptAccount(p.default_account ? String(p.default_account) : '')
     setReceiptDate(new Date().toISOString().split('T')[0])
     setReceiptNote('')
@@ -81,6 +97,7 @@ export default function Projects() {
     ev.preventDefault(); if (!receiptModal) return
     if (!receiptAccount) { setReceiptError('Please select an account.'); return }
     setReceiptSaving(true); setReceiptError('')
+    const isOneTime = receiptModal.incomeType === 'one_time'
     try {
       await transactionsApi.create({
         type: 'income',
@@ -88,8 +105,10 @@ export default function Projects() {
         date: receiptDate,
         account: parseInt(receiptAccount),
         linked_project: receiptModal.projectId,
-        category: 'Monthly Income',
-        notes: receiptNote || `Money in: ${receiptModal.projectName}`,
+        category: isOneTime ? 'One-time Income' : 'Monthly Income',
+        notes: receiptNote || (isOneTime
+          ? `One-time payment: ${receiptModal.projectName}`
+          : `Money in: ${receiptModal.projectName}`),
       })
       setReceiptModal(null); load()
     } catch (err: any) {
@@ -234,11 +253,14 @@ export default function Projects() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setReceiptModal(null)}>
           <div className="modal-sheet">
             <div className="modal-header">
-              <h2>Record money received</h2>
+              <h2>{receiptModal.incomeType === 'one_time' ? 'Record payment' : 'Record money received'}</h2>
               <button className="modal-close" onClick={() => setReceiptModal(null)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.85rem' }}>
               {receiptModal.projectName}
+              {receiptModal.incomeType === 'one_time' && (
+                <> — recording the remaining amount marks this income as done.</>
+              )}
             </p>
             {receiptError && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{receiptError}</div>}
             <form onSubmit={submitReceipt} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -497,6 +519,16 @@ function ProjectCard({
               Got paid
             </button>
           )
+        )}
+        {p.status === 'active' && isOneTime && remainingAmt > 0 && (
+          <button className="btn-primary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.85rem' }} onClick={() => onRecordReceipt(p)}>
+            Record payment
+          </button>
+        )}
+        {p.status === 'completed' && isOneTime && (
+          <button className="btn-glass" disabled style={{ fontSize: '0.75rem', padding: '0.3rem 0.85rem', opacity: 0.65, cursor: 'not-allowed', color: 'var(--success)' }}>
+            Paid — done
+          </button>
         )}
         <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }} onClick={() => onEdit(p)}>Edit</button>
         <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', color: 'var(--red-600)', borderColor: '#f5c4c0' }} onClick={() => onDelete(p.id)}>Delete</button>

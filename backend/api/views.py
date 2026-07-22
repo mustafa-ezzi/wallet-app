@@ -21,6 +21,19 @@ from .serializers import (
 )
 
 
+def _ym_index(year, month):
+    return int(year) * 12 + int(month)
+
+
+def month_in_installment_window(start_date, total_installments, year, month):
+    """True if (year, month) falls in [start .. start + total_installments - 1]."""
+    if not start_date or not total_installments or total_installments <= 0:
+        return False
+    start = _ym_index(start_date.year, start_date.month)
+    end = start + int(total_installments) - 1
+    return start <= _ym_index(year, month) <= end
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
@@ -208,23 +221,36 @@ class ForecastView(APIView):
 
         for project in Project.objects.filter(user=user, status='active'):
             if project.income_type in ('recurring_monthly', 'contract_monthly'):
-                if project.start_date.year < year or (
-                    project.start_date.year == year and project.start_date.month <= month
-                ):
+                if _ym_index(project.start_date.year, project.start_date.month) <= _ym_index(year, month):
                     forecast_income.append({
                         'label': project.name,
                         'amount': float(project.amount),
                         'type': project.income_type,
                     })
-            elif project.income_type == 'one_time_installments':
-                for rec in project.receivable_installments.filter(status='ongoing'):
-                    if (rec.start_date.year < year or
-                            (rec.start_date.year == year and rec.start_date.month <= month)):
-                        forecast_income.append({
-                            'label': f"{project.name} (installment)",
-                            'amount': float(rec.monthly_amount),
-                            'type': 'one_time_installments',
-                        })
+            elif project.income_type == 'one_time':
+                # Pending one-time: show remaining from start month until paid/completed
+                rem = float(project.remaining_amount)
+                if rem > 0 and _ym_index(project.start_date.year, project.start_date.month) <= _ym_index(year, month):
+                    forecast_income.append({
+                        'label': project.name,
+                        'amount': rem,
+                        'type': 'one_time',
+                    })
+
+        # Receivables (standalone + paid-in-parts): only within tenure months
+        for rec in ReceivableInstallment.objects.filter(user=user, status='ongoing'):
+            if rec.installments_received >= rec.total_installments:
+                continue
+            if month_in_installment_window(rec.start_date, rec.total_installments, year, month):
+                label = (
+                    f"{rec.linked_project.name} (installment)"
+                    if rec.linked_project_id else 'Receivable'
+                )
+                forecast_income.append({
+                    'label': label,
+                    'amount': float(rec.monthly_amount),
+                    'type': 'one_time_installments',
+                })
 
         for expense in RecurringExpense.objects.filter(user=user, active=True):
             if expense.frequency == 'monthly':
@@ -235,13 +261,18 @@ class ForecastView(APIView):
                     'due_day': expense.due_day,
                 })
 
+        # Loans: only within tenure (start = created month, length = total_installments)
         for payable in PayableInstallment.objects.filter(user=user, status='ongoing'):
-            forecast_outgoing.append({
-                'label': payable.name,
-                'amount': float(payable.monthly_amount),
-                'type': 'payable_installment',
-                'due_day': payable.due_day,
-            })
+            if payable.installments_paid >= payable.total_installments:
+                continue
+            start = payable.created_at.date()
+            if month_in_installment_window(start, payable.total_installments, year, month):
+                forecast_outgoing.append({
+                    'label': payable.name,
+                    'amount': float(payable.monthly_amount),
+                    'type': 'payable_installment',
+                    'due_day': payable.due_day,
+                })
 
         total_expected_income = sum(i['amount'] for i in forecast_income)
         total_expected_outgoing = sum(o['amount'] for o in forecast_outgoing)

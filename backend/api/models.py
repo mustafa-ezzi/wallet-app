@@ -81,7 +81,12 @@ class Project(models.Model):
 
     @property
     def remaining_amount(self):
-        return max(0.0, float(self.amount) - float(self.advance_amount or 0))
+        base = max(0.0, float(self.amount) - float(self.advance_amount or 0))
+        if self.income_type == 'one_time':
+            received = self.transactions.filter(type='income').aggregate(
+                total=Sum('amount'))['total'] or 0
+            return max(0.0, base - float(received))
+        return base
 
 
 class Transaction(models.Model):
@@ -121,6 +126,10 @@ class Transaction(models.Model):
             rec.installments_received = paid_count
             if paid_count >= rec.total_installments:
                 rec.status = 'completed'
+                if rec.linked_project_id:
+                    Project.objects.filter(
+                        id=rec.linked_project_id, status='active'
+                    ).update(status='completed')
             rec.save(update_fields=['installments_received', 'status'])
 
         if self.linked_payable and self.type == 'expense':
@@ -130,6 +139,14 @@ class Transaction(models.Model):
             if paid_count >= pay.total_installments:
                 pay.status = 'completed'
             pay.save(update_fields=['installments_paid', 'status'])
+
+        # One-time income: mark project completed when remaining is fully received
+        if self.linked_project_id and self.type == 'income':
+            proj = self.linked_project
+            if proj and proj.income_type == 'one_time' and proj.status == 'active':
+                if proj.remaining_amount <= 0.01:
+                    proj.status = 'completed'
+                    proj.save(update_fields=['status'])
 
 
 class RecurringExpense(models.Model):

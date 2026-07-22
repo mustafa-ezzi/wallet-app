@@ -3,6 +3,7 @@ Scenario / regression tests for CashTrail core money flows.
 Run from backend/:  python manage.py test api.tests_scenarios -v 2
 """
 from decimal import Decimal
+from datetime import date
 from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -181,3 +182,107 @@ class AccountTransactionScenarioTests(ScenarioBase):
         self.client.delete(f'/api/transactions/{tx.data["id"]}/')
         self.account.refresh_from_db()
         self.assertEqual(Decimal(str(self.account.current_balance)), Decimal('10000'))
+
+
+class ForecastTenureScenarioTests(ScenarioBase):
+    """Forecasts must only cover installment tenure months — not forever."""
+
+    @staticmethod
+    def _add_months(year, month, delta):
+        m0 = month - 1 + delta
+        return year + m0 // 12, m0 % 12 + 1
+
+    def test_receivable_two_months_only(self):
+        ReceivableInstallment.objects.create(
+            user=self.user,
+            total_amount=Decimal('10000'),
+            monthly_amount=Decimal('5000'),
+            total_installments=2,
+            start_date=date(2026, 1, 1),
+            status='ongoing',
+        )
+        jan = self.client.get('/api/forecast/2026/1/')
+        feb = self.client.get('/api/forecast/2026/2/')
+        mar = self.client.get('/api/forecast/2026/3/')
+        self.assertEqual(jan.status_code, 200)
+        self.assertEqual(float(jan.data['total_expected_income']), 5000.0)
+        self.assertEqual(float(feb.data['total_expected_income']), 5000.0)
+        self.assertEqual(float(mar.data['total_expected_income']), 0.0)
+
+    def test_loan_three_months_only(self):
+        PayableInstallment.objects.create(
+            user=self.user, name='Short Loan', total_amount=Decimal('9000'),
+            monthly_amount=Decimal('3000'), total_installments=3, due_day=1,
+        )
+        loan = PayableInstallment.objects.get(name='Short Loan')
+        y, m = loan.created_at.year, loan.created_at.month
+        y1, m1 = self._add_months(y, m, 1)
+        y2, m2 = self._add_months(y, m, 2)
+        y3, m3 = self._add_months(y, m, 3)
+
+        self.assertEqual(
+            float(self.client.get(f'/api/forecast/{y}/{m}/').data['total_expected_outgoing']),
+            3000.0,
+        )
+        self.assertEqual(
+            float(self.client.get(f'/api/forecast/{y1}/{m1}/').data['total_expected_outgoing']),
+            3000.0,
+        )
+        self.assertEqual(
+            float(self.client.get(f'/api/forecast/{y2}/{m2}/').data['total_expected_outgoing']),
+            3000.0,
+        )
+        self.assertEqual(
+            float(self.client.get(f'/api/forecast/{y3}/{m3}/').data['total_expected_outgoing']),
+            0.0,
+        )
+
+    def test_one_time_payment_marks_completed_and_drops_forecast(self):
+        create = self.client.post('/api/projects/', {
+            'name': 'Logo Design',
+            'income_type': 'one_time',
+            'amount': '15000',
+            'advance_amount': '5000',
+            'status': 'active',
+            'start_date': '2026-07-01',
+            'default_account': self.account.id,
+        }, format='json')
+        self.assertEqual(create.status_code, 201, create.data)
+        project_id = create.data['id']
+        self.assertEqual(float(create.data['remaining_amount']), 10000.0)
+
+        before = self.client.get('/api/forecast/2026/7/')
+        self.assertEqual(float(before.data['total_expected_income']), 10000.0)
+
+        tx = self.client.post('/api/transactions/', {
+            'type': 'income',
+            'amount': '10000',
+            'date': '2026-07-15',
+            'account': self.account.id,
+            'linked_project': project_id,
+            'category': 'One-time Income',
+        }, format='json')
+        self.assertEqual(tx.status_code, 201, tx.data)
+
+        proj = Project.objects.get(id=project_id)
+        self.assertEqual(proj.status, 'completed')
+        self.assertEqual(proj.remaining_amount, 0.0)
+
+        after = self.client.get('/api/forecast/2026/7/')
+        self.assertEqual(float(after.data['total_expected_income']), 0.0)
+
+    def test_paid_in_parts_project_forecast_window(self):
+        create = self.client.post('/api/projects/', {
+            'name': 'ERP',
+            'income_type': 'one_time_installments',
+            'amount': '10000',
+            'installment_amount': '5000',
+            'advance_amount': '0',
+            'status': 'active',
+            'start_date': '2026-01-01',
+            'default_account': self.account.id,
+        }, format='json')
+        self.assertEqual(create.status_code, 201, create.data)
+        self.assertEqual(float(self.client.get('/api/forecast/2026/1/').data['total_expected_income']), 5000.0)
+        self.assertEqual(float(self.client.get('/api/forecast/2026/2/').data['total_expected_income']), 5000.0)
+        self.assertEqual(float(self.client.get('/api/forecast/2026/3/').data['total_expected_income']), 0.0)

@@ -39,8 +39,19 @@ Use this file to walk through real user flows and mark each row **OK** or **BUG*
 | C2 | Got paid | On monthly income → Got paid | Tx created; account balance up; “Received this month” | | |
 | C3 | Delete income after payment | Record payment, then Delete income | Income gone; **past transaction remains**; balance still includes that income | | |
 | C4 | One-time + advance | One-time 30,000, advance 10,000 | Remaining shows **20,000** (30k − 10k) | | |
+| C4b | One-time Record payment | One-time with remaining → **Record payment** for remaining | Tx created; status → **completed**; drops from forecast | | |
 | C5 | Paid in parts | Total 30,000, each payment 5,000 | Shows ~6 payments plan | | |
 | C6 | Paid in parts + advance | Total 30,000, advance 5,000, each 5,000 | Remaining 25,000; months based on remaining | | |
+
+---
+
+## C2. Reports forecast tenure
+
+| # | Scenario | Steps | Expected | Result | Notes |
+| --- | --- | --- | --- | --- | --- |
+| F1 | Receivable 5k × 2 mo | Start Jan; open Reports Jan / Feb / Mar | Jan & Feb show **5,000**; Mar shows **0** for that item | | |
+| F2 | Loan 3k × 3 mo | Loan with 3 installments; check 4 months from create | First **3** months show **3,000**; 4th month **0** | | |
+| F3 | One-time unpaid | One-time remaining 10k, start this month | Forecast includes **10,000** until Record payment | | |
 
 ---
 
