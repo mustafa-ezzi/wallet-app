@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { authApi } from '../api/client'
+import { authApi, apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
 export default function Signup() {
@@ -21,11 +21,7 @@ export default function Signup() {
       await login(form.email, form.password)
       navigate('/')
     } catch (err: any) {
-      const data = err.response?.data
-      setError(
-        typeof data === 'string' ? data :
-        Object.values(data ?? {}).flat().join(' ') || 'Registration failed.'
-      )
+      setError(apiErrorMessage(err, 'Registration failed.'))
     } finally {
       setLoading(false)
     }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
@@ -16,8 +17,8 @@ export default function Login() {
     try {
       await login(email, password)
       navigate('/')
-    } catch {
-      setError('Invalid email or password. Please try again.')
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Invalid email or password. Please try again.'))
     } finally {
       setLoading(false)
     }

@@ -10,19 +10,41 @@ const api = axios.create({
   headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
 })
 
-function looksLikeApiPayload(data: unknown): boolean {
-  if (data == null) return false
-  if (typeof data === 'string') return false
-  if (typeof data !== 'object') return false
-  return true
+function looksLikeHtml(data: unknown): boolean {
+  if (typeof data !== 'string') return false
+  const s = data.trim().slice(0, 200).toLowerCase()
+  return s.startsWith('<!doctype') || s.startsWith('<html') || s.includes('<head>')
+}
+
+function normalizeApiData(data: unknown): unknown {
+  if (data == null) return data
+  if (typeof data === 'object') return data
+  if (typeof data === 'string') {
+    const trimmed = data.trim()
+    if (!trimmed || looksLikeHtml(trimmed)) return data
+    try {
+      return JSON.parse(trimmed)
+    } catch {
+      return data
+    }
+  }
+  return data
 }
 
 function assertApiResponse(res: AxiosResponse) {
-  const ct = String(res.headers?.['content-type'] ?? '')
-  if (ct.includes('text/html') || !looksLikeApiPayload(res.data)) {
+  // Empty bodies (204) are fine
+  if (res.status === 204 || res.data == null || res.data === '') {
+    return res
+  }
+
+  const normalized = normalizeApiData(res.data)
+  res.data = normalized
+
+  // Accept any JSON object/array. Only reject HTML shells (misconfigured API URL).
+  if (looksLikeHtml(normalized) || typeof normalized === 'string') {
     const err = new Error(
       API_ROOT
-        ? 'API returned an invalid response. Check that the backend is running.'
+        ? 'API returned HTML instead of JSON. Check VITE_API_URL points to your backend, not the frontend.'
         : 'API is not configured. Set VITE_API_URL to your backend URL and redeploy the frontend.'
     ) as Error & { response?: { data?: { detail?: string }; status?: number } }
     err.response = {
