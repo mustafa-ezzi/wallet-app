@@ -6,7 +6,7 @@ import {
   ArrowUpRight,
   X,
 } from 'lucide-react'
-import { accountsApi, projectsApi, transactionsApi, receivablesApi, payablesApi, asList } from '../api/client'
+import { accountsApi, transactionsApi, asList } from '../api/client'
 import { fmtBalance } from '../utils/format'
 
 interface Props {
@@ -16,7 +16,7 @@ interface Props {
 
 const EXPENSE_CATEGORIES = [
   'Utilities', 'Server Charges', 'Rent', 'Food', 'Transport',
-  'Salary', 'Loan Repayment', 'Miscellaneous',
+  'Salary', 'Miscellaneous',
 ]
 
 type TxType = 'income' | 'expense' | 'transfer'
@@ -24,39 +24,26 @@ type TxType = 'income' | 'expense' | 'transfer'
 export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const [type, setType] = useState<TxType>('income')
 
-  // shared fields
   const [amount, setAmount]   = useState('')
   const [date, setDate]       = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes]     = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
 
-  // income / expense
-  const [accountId, setAccountId]       = useState('')
-  const [projectId, setProjectId]       = useState('')
-  const [receivableId, setReceivableId] = useState('')
-  const [payableId, setPayableId]       = useState('')
-  const [category, setCategory]         = useState('')
+  const [accountId, setAccountId] = useState('')
+  const [category, setCategory]   = useState('')
 
-  // transfer-specific
   const [fromAccountId, setFromAccountId] = useState('')
   const [toAccountId, setToAccountId]     = useState('')
 
-  const [accounts, setAccounts]     = useState<any[]>([])
-  const [projects, setProjects]     = useState<any[]>([])
-  const [receivables, setReceivables] = useState<any[]>([])
-  const [payables, setPayables]     = useState<any[]>([])
+  const [accounts, setAccounts] = useState<any[]>([])
 
   useEffect(() => {
     accountsApi.list().then(r => setAccounts(asList(r.data)))
-    projectsApi.list({ status: 'active' }).then(r => setProjects(asList(r.data)))
-    receivablesApi.list().then(r => setReceivables(asList(r.data).filter((x: any) => x.status === 'ongoing')))
-    payablesApi.list().then(r => setPayables(asList(r.data).filter((x: any) => x.status === 'ongoing')))
   }, [])
 
   const switchType = (t: TxType) => {
-    setType(t); setError('')
-    setProjectId(''); setReceivableId(''); setPayableId(''); setCategory('')
+    setType(t); setError(''); setCategory('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +62,6 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
       setLoading(true)
       try {
-        // Debit the source account
         await transactionsApi.create({
           type: 'expense',
           amount: parseFloat(amount),
@@ -84,7 +70,6 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
           category: 'Bank Transfer',
           notes: `${label} (out)`,
         })
-        // Credit the destination account
         await transactionsApi.create({
           type: 'income',
           amount: parseFloat(amount),
@@ -102,23 +87,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
       return
     }
 
-    // income / expense
     if (!accountId) { setError('Please select an account.'); return }
-
-    if (type === 'expense' && payableId) {
-      const pay = payables.find((p: any) => String(p.id) === payableId)
-      if (pay?.paid_this_month) {
-        setError('This loan payment is already recorded this month.')
-        return
-      }
-    }
-    if (type === 'income' && receivableId) {
-      const rec = receivables.find((r: any) => String(r.id) === receivableId)
-      if (rec?.received_this_month) {
-        setError('This receivable already has a receipt recorded this month.')
-        return
-      }
-    }
 
     setLoading(true)
     try {
@@ -127,9 +96,6 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
         amount: parseFloat(amount),
         date,
         account: parseInt(accountId),
-        linked_project:    projectId    ? parseInt(projectId)    : null,
-        linked_receivable: receivableId ? parseInt(receivableId) : null,
-        linked_payable:    payableId    ? parseInt(payableId)    : null,
         category,
         notes,
       })
@@ -151,7 +117,6 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
           </button>
         </div>
 
-        {/* ── Type toggle ── */}
         <div className="type-toggle" style={{ marginBottom: '1rem' }}>
           <button
             type="button"
@@ -180,7 +145,6 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
 
-          {/* ── Transfer form ── */}
           {type === 'transfer' && (
             <>
               <div style={{
@@ -191,7 +155,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 fontSize: '0.82rem',
                 color: '#2563eb',
               }}>
-                Moves money between your accounts. Both balances update automatically.
+                Moves money between your accounts. Both balances update automatically — transfers do not count as income or expense.
               </div>
 
               <div className="grid-2">
@@ -218,7 +182,6 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 </select>
               </div>
 
-              {/* Arrow visual */}
               <div style={{ display: 'flex', justifyContent: 'center', color: '#2563eb', margin: '-0.3rem 0' }}>
                 <ArrowDown size={20} strokeWidth={2} />
               </div>
@@ -257,7 +220,6 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
             </>
           )}
 
-          {/* ── Income / Expense form ── */}
           {type !== 'transfer' && (
             <>
               <div className="grid-2">
@@ -284,60 +246,14 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 </select>
               </div>
 
-              {type === 'income' && (
-                <>
-                  <div className="form-group">
-                    <label>Link to income (optional)</label>
-                    <select value={projectId} onChange={e => setProjectId(e.target.value)}>
-                      <option value="">None</option>
-                      {projects.map((p: any) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Link to Receivable Installment (optional)</label>
-                    <select value={receivableId} onChange={e => setReceivableId(e.target.value)}>
-                      <option value="">None</option>
-                      {receivables.map((r: any) => (
-                        <option key={r.id} value={r.id} disabled={r.received_this_month}>
-                          {r.project_name} — {r.installments_received}/{r.total_installments} received
-                          {r.received_this_month ? ' (already received this month)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {receivableId && receivables.find((r: any) => String(r.id) === receivableId)?.received_this_month && (
-                    <div className="auth-error">This receivable already has a receipt recorded this month.</div>
-                  )}
-                </>
-              )}
-
               {type === 'expense' && (
-                <>
-                  <div className="form-group">
-                    <label>Category</label>
-                    <select value={category} onChange={e => setCategory(e.target.value)}>
-                      <option value="">Select category…</option>
-                      {EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Link to Payable Installment (optional)</label>
-                    <select value={payableId} onChange={e => setPayableId(e.target.value)}>
-                      <option value="">None</option>
-                      {payables.map((p: any) => (
-                        <option key={p.id} value={p.id} disabled={p.paid_this_month}>
-                          {p.name} — {p.installments_paid}/{p.total_installments} paid
-                          {p.paid_this_month ? ' (already paid this month)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {payableId && payables.find((p: any) => String(p.id) === payableId)?.paid_this_month && (
-                    <div className="auth-error">This loan payment is already recorded this month.</div>
-                  )}
-                </>
+                <div className="form-group">
+                  <label>Category</label>
+                  <select value={category} onChange={e => setCategory(e.target.value)}>
+                    <option value="">Select category…</option>
+                    {EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
               )}
 
               <div className="form-group">

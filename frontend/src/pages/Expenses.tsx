@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Banknote, ClipboardList, CircleDollarSign, X } from 'lucide-react'
 import { expensesApi, payablesApi, receivablesApi, accountsApi, projectsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt, fmtNum, sumMoney } from '../utils/format'
+import { useConfirm } from '../hooks/useConfirm'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ type ActiveTab = 'expenses' | 'payables' | 'receivables'
 // ── Main component ─────────────────────────────────────────────────────────
 
 export default function Expenses() {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [tab, setTab] = useState<ActiveTab>('expenses')
 
   // ── data ──
@@ -138,7 +140,16 @@ export default function Expenses() {
 
   // ── submit handlers ──
   const submitExp = async (ev: React.FormEvent) => {
-    ev.preventDefault(); setSaving(true); setError('')
+    ev.preventDefault()
+    if (editingExp) {
+      const ok = await confirm({
+        title: 'Save changes?',
+        message: `Update monthly cost “${expForm.name || editingExp.name}”?`,
+        confirmLabel: 'Save',
+      })
+      if (!ok) return
+    }
+    setSaving(true); setError('')
     const payload = { name: expForm.name, amount: parseFloat(expForm.amount), frequency: expForm.frequency, due_day: expForm.due_day ? parseInt(expForm.due_day) : null, account: expForm.account ? parseInt(expForm.account) : null, active: true }
     try {
       if (editingExp) await expensesApi.update(editingExp.id, payload)
@@ -149,7 +160,16 @@ export default function Expenses() {
   }
 
   const submitPay = async (ev: React.FormEvent) => {
-    ev.preventDefault(); setSaving(true); setError('')
+    ev.preventDefault()
+    if (editingPay) {
+      const ok = await confirm({
+        title: 'Save changes?',
+        message: `Update “${payForm.name || editingPay.name}”?`,
+        confirmLabel: 'Save',
+      })
+      if (!ok) return
+    }
+    setSaving(true); setError('')
     const payload = { name: payForm.name, total_amount: parseFloat(payForm.total_amount), monthly_amount: parseFloat(payForm.monthly_amount), total_installments: parseInt(payForm.total_installments), due_day: parseInt(payForm.due_day), account: payForm.account ? parseInt(payForm.account) : null }
     try {
       if (editingPay) await payablesApi.update(editingPay.id, payload)
@@ -160,7 +180,16 @@ export default function Expenses() {
   }
 
   const submitRec = async (ev: React.FormEvent) => {
-    ev.preventDefault(); setSaving(true); setError('')
+    ev.preventDefault()
+    if (editingRec) {
+      const ok = await confirm({
+        title: 'Save changes?',
+        message: 'Update this receivable plan?',
+        confirmLabel: 'Save',
+      })
+      if (!ok) return
+    }
+    setSaving(true); setError('')
     const payload = { linked_project: parseInt(recForm.linked_project), total_amount: parseFloat(recForm.total_amount), monthly_amount: parseFloat(recForm.monthly_amount), total_installments: parseInt(recForm.total_installments), start_date: recForm.start_date }
     try {
       if (editingRec) await receivablesApi.update(editingRec.id, payload)
@@ -171,16 +200,36 @@ export default function Expenses() {
   }
 
   const toggleActive = async (exp: RecurringExpense) => {
+    const turningOff = exp.active
+    const ok = await confirm({
+      title: turningOff ? 'Deactivate cost?' : 'Activate cost?',
+      message: turningOff
+        ? `Stop including “${exp.name}” in monthly forecasts?`
+        : `Include “${exp.name}” in monthly forecasts again?`,
+      confirmLabel: turningOff ? 'Deactivate' : 'Activate',
+    })
+    if (!ok) return
     await expensesApi.update(exp.id, { active: !exp.active }); load()
   }
 
   const markPayableComplete = async (p: Payable) => {
-    if (!confirm(`Mark "${p.name}" as completed?`)) return
+    const ok = await confirm({
+      title: 'Mark as completed?',
+      message: `Mark “${p.name}” as fully paid?`,
+      confirmLabel: 'Mark completed',
+    })
+    if (!ok) return
     await payablesApi.update(p.id, { status: 'completed' }); load()
   }
 
   const deletePayable = async (p: Payable) => {
-    if (!confirm(`Delete loan "${p.name}"? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: 'Delete loan?',
+      message: `Delete “${p.name}”? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     try {
       await payablesApi.remove(p.id)
       load()
@@ -191,7 +240,26 @@ export default function Expenses() {
 
   const markReceivableStuck = async (r: Receivable) => {
     const newStatus = r.status === 'stuck' ? 'ongoing' : 'stuck'
+    const ok = await confirm({
+      title: newStatus === 'stuck' ? 'Mark as stuck?' : 'Mark as ongoing?',
+      message: newStatus === 'stuck'
+        ? `Mark “${r.project_name}” as stuck (payment delayed)?`
+        : `Mark “${r.project_name}” as ongoing again?`,
+      confirmLabel: 'Confirm',
+    })
+    if (!ok) return
     await receivablesApi.update(r.id, { status: newStatus }); load()
+  }
+
+  const deleteExpense = async (exp: RecurringExpense) => {
+    const ok = await confirm({
+      title: 'Delete cost?',
+      message: `Delete “${exp.name}”? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    await expensesApi.remove(exp.id); load()
   }
 
   const submitRecordPayment = async (ev: React.FormEvent) => {
@@ -243,10 +311,11 @@ export default function Expenses() {
 
   return (
     <div className="page">
+      {confirmDialog}
       <div className="page-header">
         <div className="page-header-left">
       <h1>Bills</h1>
-      <p className="page-subtitle">Fixed costs, loans you pay, and money still owed to you.</p>
+      <p className="page-subtitle">Fixed costs, money you owe, and money still owed to you.</p>
         </div>
       </div>
 
@@ -258,9 +327,9 @@ export default function Expenses() {
           <div className="stat-sub">fixed / month</div>
         </div>
         <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
-          <div className="stat-label">Loan Payments</div>
+          <div className="stat-label">Money You Owe</div>
           <div className="stat-value amt-negative">{fmt(monthlyPayTotal)}</div>
-          <div className="stat-sub">payable / month</div>
+          <div className="stat-sub">due / month</div>
         </div>
         <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="stat-label">Still Owed to Me</div>
@@ -280,7 +349,7 @@ export default function Expenses() {
             {t === 'expenses' ? (
               <><ClipboardList size={14} strokeWidth={1.75} /> Monthly costs</>
             ) : t === 'payables' ? (
-              <><Banknote size={14} strokeWidth={1.75} /> Loans you pay</>
+              <><Banknote size={14} strokeWidth={1.75} /> Money you owe</>
             ) : (
               <><CircleDollarSign size={14} strokeWidth={1.75} /> Money owed to you</>
             )}
@@ -389,7 +458,7 @@ export default function Expenses() {
                       <button
                         className="btn-glass"
                         style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: '#fb7185', borderColor: 'rgba(251,113,133,0.3)' }}
-                        onClick={async () => { if (confirm(`Delete "${exp.name}"?`)) { await expensesApi.remove(exp.id); load() } }}
+                        onClick={() => deleteExpense(exp)}
                       >
                         Delete
                       </button>
@@ -403,20 +472,20 @@ export default function Expenses() {
       )}
 
       {/* ══════════════════════════════════════
-          TAB 2 — Payables / Loans
+          TAB 2 — Money you owe
       ══════════════════════════════════════ */}
       {tab === 'payables' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3>Payables & Loans</h3>
-            <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '0.5rem 0.9rem' }} onClick={openAddPay}>+ Add Loan</button>
+            <h3>Money you owe</h3>
+            <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '0.5rem 0.9rem' }} onClick={openAddPay}>+ Add</button>
           </div>
 
           {payables.length === 0 ? (
             <div className="glass empty-state">
               <div className="empty-icon"><Banknote size={36} strokeWidth={1.5} /></div>
-              <p>No payable installments yet.</p>
-              <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddPay}>Add first loan</button>
+              <p>Nothing you owe yet — loans and installments you pay go here.</p>
+              <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddPay}>Add first</button>
             </div>
           ) : (
             <div className="list">
@@ -684,14 +753,14 @@ export default function Expenses() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setPayModal(false)}>
           <div className="modal-sheet">
             <div className="modal-header">
-              <h2>{editingPay ? 'Edit Payable' : 'Add Payable / Loan'}</h2>
+              <h2>{editingPay ? 'Edit' : 'Add'} — money you owe</h2>
               <button className="modal-close" onClick={() => setPayModal(false)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             {error && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}
             <form onSubmit={submitPay} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div className="form-group">
-                <label>Loan / Commitment Name</label>
-                <input type="text" placeholder="e.g. Engagement Loan, Land Payment" value={payForm.name} onChange={sP('name')} required />
+                <label>Name</label>
+                <input type="text" placeholder="e.g. Engagement loan, bike installment" value={payForm.name} onChange={sP('name')} required />
               </div>
               <div className="grid-2">
                 <div className="form-group">

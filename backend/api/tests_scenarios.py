@@ -271,6 +271,33 @@ class ForecastTenureScenarioTests(ScenarioBase):
         after = self.client.get('/api/forecast/2026/7/')
         self.assertEqual(float(after.data['total_expected_income']), 0.0)
 
+    def test_bank_transfer_excluded_from_actuals(self):
+        today = date.today()
+        d = today.replace(day=min(10, today.day)).isoformat()
+        self.client.post('/api/transactions/', {
+            'type': 'expense', 'amount': '2000', 'date': d,
+            'account': self.account.id, 'category': 'Bank Transfer', 'notes': 'out',
+        }, format='json')
+        other = Account.objects.create(
+            user=self.user, name='Cash', type='cash', opening_balance=Decimal('0'),
+        )
+        self.client.post('/api/transactions/', {
+            'type': 'income', 'amount': '2000', 'date': d,
+            'account': other.id, 'category': 'Bank Transfer', 'notes': 'in',
+        }, format='json')
+        self.client.post('/api/transactions/', {
+            'type': 'income', 'amount': '5000', 'date': d,
+            'account': self.account.id, 'category': 'Salary',
+        }, format='json')
+
+        forecast = self.client.get(f'/api/forecast/{today.year}/{today.month}/')
+        self.assertEqual(float(forecast.data['actual_income']), 5000.0)
+        self.assertEqual(float(forecast.data['actual_expense']), 0.0)
+
+        dash = self.client.get('/api/dashboard/')
+        self.assertEqual(float(dash.data['month_income']), 5000.0)
+        self.assertEqual(float(dash.data['month_expense']), 0.0)
+
     def test_paid_in_parts_project_forecast_window(self):
         create = self.client.post('/api/projects/', {
             'name': 'ERP',

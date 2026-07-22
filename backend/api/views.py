@@ -186,15 +186,16 @@ class DashboardView(APIView):
         month_start = today.replace(day=1)
         month_end = today.replace(day=calendar.monthrange(today.year, today.month)[1])
 
+        # Bank transfers are internal moves — exclude from income/expense totals
         month_income = Transaction.objects.filter(
             user=user, type='income',
-            date__gte=month_start, date__lte=month_end
-        ).aggregate(total=Sum('amount'))['total'] or 0
+            date__gte=month_start, date__lte=month_end,
+        ).exclude(category='Bank Transfer').aggregate(total=Sum('amount'))['total'] or 0
 
         month_expense = Transaction.objects.filter(
             user=user, type='expense',
-            date__gte=month_start, date__lte=month_end
-        ).aggregate(total=Sum('amount'))['total'] or 0
+            date__gte=month_start, date__lte=month_end,
+        ).exclude(category='Bank Transfer').aggregate(total=Sum('amount'))['total'] or 0
 
         recent_transactions = Transaction.objects.filter(user=user)[:8]
         tx_data = TransactionSerializer(recent_transactions, many=True).data
@@ -283,13 +284,13 @@ class ForecastView(APIView):
 
         actual_income = Transaction.objects.filter(
             user=user, type='income',
-            date__gte=month_start, date__lte=month_end
-        ).aggregate(total=Sum('amount'))['total'] or 0
+            date__gte=month_start, date__lte=month_end,
+        ).exclude(category='Bank Transfer').aggregate(total=Sum('amount'))['total'] or 0
 
         actual_expense = Transaction.objects.filter(
             user=user, type='expense',
-            date__gte=month_start, date__lte=month_end
-        ).aggregate(total=Sum('amount'))['total'] or 0
+            date__gte=month_start, date__lte=month_end,
+        ).exclude(category='Bank Transfer').aggregate(total=Sum('amount'))['total'] or 0
 
         return Response({
             'year': year,

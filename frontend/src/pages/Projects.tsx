@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Coins, X } from 'lucide-react'
 import { projectsApi, accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt } from '../utils/format'
+import { useConfirm } from '../hooks/useConfirm'
 
 interface Project {
   id: number
@@ -50,6 +51,7 @@ const EMPTY_FORM = {
 }
 
 export default function Projects() {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [projects, setProjects] = useState<Project[]>([])
   const [accounts, setAccounts] = useState<any[]>([])
   const [loading, setLoading]   = useState(true)
@@ -170,6 +172,14 @@ export default function Projects() {
       setError('Advance cannot be more than the total amount.')
       return
     }
+    if (editing) {
+      const ok = await confirm({
+        title: 'Save changes?',
+        message: `Update income source “${form.name || editing.name}”?`,
+        confirmLabel: 'Save',
+      })
+      if (!ok) return
+    }
     setSaving(true); setError('')
     const payload: any = {
       name: form.name,
@@ -192,7 +202,13 @@ export default function Projects() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Remove this income source?')) return
+    const ok = await confirm({
+      title: 'Remove income?',
+      message: 'Remove this income source? Past transactions stay in your accounts.',
+      confirmLabel: 'Remove',
+      danger: true,
+    })
+    if (!ok) return
     await projectsApi.remove(id); load()
   }
 
@@ -202,6 +218,7 @@ export default function Projects() {
 
   return (
     <div className="page">
+      {confirmDialog}
       <div className="page-header">
         <div className="page-header-left">
           <h1>Income</h1>

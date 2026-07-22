@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt, fmtBalance, toMoney } from '../utils/format'
+import { useConfirm } from '../hooks/useConfirm'
 
 interface Account {
   id: number; name: string; type: string
@@ -34,6 +35,7 @@ const EMPTY_TX_FORM = {
 }
 
 export default function Accounts() {
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading]   = useState(true)
 
@@ -96,7 +98,16 @@ export default function Accounts() {
     setAccForm(f => ({ ...f, [k]: e.target.value }))
 
   const submitAcc = async (e: React.FormEvent) => {
-    e.preventDefault(); setAccSaving(true); setAccError('')
+    e.preventDefault()
+    if (editingAcc) {
+      const ok = await confirm({
+        title: 'Save account?',
+        message: `Update account “${accForm.name || editingAcc.name}”?`,
+        confirmLabel: 'Save',
+      })
+      if (!ok) return
+    }
+    setAccSaving(true); setAccError('')
     const payload = { ...accForm, opening_balance: parseFloat(accForm.opening_balance) }
     try {
       if (editingAcc) await accountsApi.update(editingAcc.id, payload)
@@ -108,7 +119,13 @@ export default function Accounts() {
   }
 
   const deleteAcc = async (id: number) => {
-    if (!confirm('Delete this account? All its transactions will also be deleted.')) return
+    const ok = await confirm({
+      title: 'Delete account?',
+      message: 'Delete this account? All its transactions will also be deleted.',
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     await accountsApi.remove(id)
     if (selectedAccount?.id === id) setSelectedAccount(null)
     loadAccounts()
@@ -133,6 +150,12 @@ export default function Accounts() {
 
   const submitTx = async (e: React.FormEvent) => {
     e.preventDefault(); if (!editingTx || !selectedAccount) return
+    const ok = await confirm({
+      title: 'Save transaction?',
+      message: `Update this ${txForm.type} of ${fmt(parseFloat(txForm.amount) || editingTx.amount)}?`,
+      confirmLabel: 'Save',
+    })
+    if (!ok) return
     setTxSaving(true); setTxError('')
     try {
       await transactionsApi.update(editingTx.id, {
@@ -150,7 +173,13 @@ export default function Accounts() {
   }
 
   const deleteTx = async (tx: Tx) => {
-    if (!confirm(`Delete this ${tx.type} transaction of ${fmt(tx.amount)}?`)) return
+    const ok = await confirm({
+      title: 'Delete transaction?',
+      message: `Delete this ${tx.type} of ${fmt(tx.amount)}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
     await transactionsApi.remove(tx.id)
     if (selectedAccount) await reloadTxs(selectedAccount)
   }
@@ -166,6 +195,7 @@ export default function Accounts() {
   // ─────────────────────────────────────────────────────────────────────
   return (
     <div className="page">
+      {confirmDialog}
       <div className="page-header">
         <div className="page-header-left">
           <h1>Accounts</h1>
