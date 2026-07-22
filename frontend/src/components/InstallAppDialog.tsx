@@ -27,33 +27,47 @@ export default function InstallAppDialog({ open, ios, canPrompt, onClose, onInst
         </div>
 
         {canPrompt ? (
-          <button type="button" className="btn-primary" style={{ width: '100%' }} onClick={onInstall}>
-            <Download size={16} strokeWidth={2.25} />
-            Download app
-          </button>
-        ) : ios ? (
-          <ol className="install-steps">
-            <li>
-              Tap <Share size={14} strokeWidth={2} className="install-inline-icon" /> Share in Safari
-            </li>
-            <li>
-              Scroll and tap <Plus size={14} strokeWidth={2} className="install-inline-icon" /> Add to Home Screen
-            </li>
-            <li>Confirm by tapping Add</li>
-          </ol>
-        ) : (
-          <div className="install-steps" style={{ listStyle: 'none', paddingLeft: 0 }}>
-            <p style={{ margin: 0 }}>
-              Open this site in Chrome or Edge on your phone, then tap
-              {' '}<strong>Download app</strong> when the install banner appears.
+          <>
+            <button type="button" className="btn-primary" style={{ width: '100%' }} onClick={onInstall}>
+              <Download size={16} strokeWidth={2.25} />
+              Install now
+            </button>
+            <p className="text-muted" style={{ marginTop: '0.75rem', fontSize: '0.8rem', textAlign: 'center' }}>
+              Your browser will show the install confirmation next.
             </p>
-          </div>
-        )}
-
-        {!canPrompt && (
-          <button type="button" className="btn-glass" style={{ width: '100%', marginTop: '0.85rem' }} onClick={onClose}>
-            Got it
-          </button>
+          </>
+        ) : ios ? (
+          <>
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+              iPhone / iPad can’t install from a button — use Safari:
+            </p>
+            <ol className="install-steps">
+              <li>
+                Tap <Share size={14} strokeWidth={2} className="install-inline-icon" /> Share
+              </li>
+              <li>
+                Tap <Plus size={14} strokeWidth={2} className="install-inline-icon" /> Add to Home Screen
+              </li>
+              <li>Tap Add</li>
+            </ol>
+            <button type="button" className="btn-glass" style={{ width: '100%', marginTop: '0.85rem' }} onClick={onClose}>
+              Got it
+            </button>
+          </>
+        ) : (
+          <>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+              Install isn’t ready in this browser yet. Use <strong>Chrome</strong> or <strong>Edge</strong> on Android,
+              stay on the site a few seconds, then tap <strong>Install</strong> again — the system install popup should appear.
+            </p>
+            <button type="button" className="btn-primary" style={{ width: '100%', marginTop: '1rem' }} onClick={onInstall}>
+              <Download size={16} strokeWidth={2.25} />
+              Try install again
+            </button>
+            <button type="button" className="btn-glass" style={{ width: '100%', marginTop: '0.55rem' }} onClick={onClose}>
+              Close
+            </button>
+          </>
         )}
       </div>
     </div>

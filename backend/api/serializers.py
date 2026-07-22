@@ -62,14 +62,15 @@ class AccountSerializer(serializers.ModelSerializer):
 class ProjectSerializer(serializers.ModelSerializer):
     default_account_name = serializers.SerializerMethodField()
     months_to_complete    = serializers.ReadOnlyField()
+    remaining_amount      = serializers.ReadOnlyField()
     installments_received = serializers.SerializerMethodField()
     received_this_month   = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = (
-            'id', 'name', 'income_type', 'amount', 'installment_amount',
-            'months_to_complete', 'installments_received', 'received_this_month',
+            'id', 'name', 'income_type', 'amount', 'installment_amount', 'advance_amount',
+            'remaining_amount', 'months_to_complete', 'installments_received', 'received_this_month',
             'status', 'start_date', 'default_account', 'default_account_name',
             'notes', 'created_at'
         )

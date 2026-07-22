@@ -226,8 +226,8 @@ export default function Expenses() {
     <div className="page">
       <div className="page-header">
         <div className="page-header-left">
-      <h1>Bills &amp; Loans</h1>
-      <p className="page-subtitle">Manage your recurring expenses and money you owe.</p>
+      <h1>Bills</h1>
+      <p className="page-subtitle">Fixed costs, loans you pay, and money still owed to you.</p>
         </div>
       </div>
 
@@ -236,7 +236,7 @@ export default function Expenses() {
         <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="stat-label">Monthly Expenses</div>
           <div className="stat-value amt-negative">{fmt(monthlyExpTotal)}</div>
-          <div className="stat-sub">recurring / month</div>
+          <div className="stat-sub">fixed / month</div>
         </div>
         <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="stat-label">Loan Payments</div>
@@ -259,11 +259,11 @@ export default function Expenses() {
             onClick={() => setTab(t)}
           >
             {t === 'expenses' ? (
-              <><ClipboardList size={14} strokeWidth={1.75} /> Fixed Expenses</>
+              <><ClipboardList size={14} strokeWidth={1.75} /> Monthly costs</>
             ) : t === 'payables' ? (
-              <><Banknote size={14} strokeWidth={1.75} /> Loans & Payables</>
+              <><Banknote size={14} strokeWidth={1.75} /> Loans you pay</>
             ) : (
-              <><CircleDollarSign size={14} strokeWidth={1.75} /> Receivables</>
+              <><CircleDollarSign size={14} strokeWidth={1.75} /> Money owed to you</>
             )}
           </button>
         ))}
@@ -282,7 +282,7 @@ export default function Expenses() {
           {expenses.length === 0 ? (
             <div className="glass empty-state">
               <div className="empty-icon"><ClipboardList size={36} strokeWidth={1.5} /></div>
-              <p>No recurring expenses yet.</p>
+              <p>No fixed monthly costs yet.</p>
               <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddExp}>Add first expense</button>
             </div>
           ) : (
@@ -715,7 +715,7 @@ export default function Expenses() {
             {error && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}
             <form onSubmit={submitRec} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div className="form-group">
-                <label>Linked Project</label>
+                <label>Linked income (optional)</label>
                 <select value={recForm.linked_project} onChange={sR('linked_project')} required>
                   <option value="">Select project…</option>
                   {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}

@@ -287,7 +287,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
               {type === 'income' && (
                 <>
                   <div className="form-group">
-                    <label>Link to Project (optional)</label>
+                    <label>Link to income (optional)</label>
                     <select value={projectId} onChange={e => setProjectId(e.target.value)}>
                       <option value="">None</option>
                       {projects.map((p: any) => (

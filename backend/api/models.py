@@ -52,6 +52,10 @@ class Project(models.Model):
     installment_amount = models.DecimalField(
         max_digits=14, decimal_places=2, null=True, blank=True,
         help_text="Monthly installment amount for one_time_installments projects")
+    # Advance already received — reduces remaining for one-time / installment income
+    advance_amount = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0, blank=True,
+        help_text='Advance already received (subtracted from total remaining)')
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='active')
     start_date = models.DateField()
     default_account = models.ForeignKey(
@@ -69,8 +73,15 @@ class Project(models.Model):
     def months_to_complete(self):
         if self.income_type == 'one_time_installments' and self.installment_amount:
             import math
-            return math.ceil(float(self.amount) / float(self.installment_amount))
+            remaining = max(0.0, float(self.amount) - float(self.advance_amount or 0))
+            if float(self.installment_amount) <= 0:
+                return None
+            return math.ceil(remaining / float(self.installment_amount))
         return None
+
+    @property
+    def remaining_amount(self):
+        return max(0.0, float(self.amount) - float(self.advance_amount or 0))
 
 
 class Transaction(models.Model):

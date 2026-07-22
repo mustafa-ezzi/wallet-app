@@ -80,13 +80,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if (project.income_type == 'one_time_installments'
                 and project.installment_amount
                 and not project.receivable_installments.exists()):
-            total_inst = _math.ceil(float(project.amount) / float(project.installment_amount))
+            remaining = max(0.0, float(project.amount) - float(project.advance_amount or 0))
+            total_inst = _math.ceil(remaining / float(project.installment_amount)) if remaining > 0 else 0
             ReceivableInstallment.objects.create(
                 user=self.request.user,
                 linked_project=project,
-                total_amount=project.amount,
+                total_amount=remaining,
                 monthly_amount=project.installment_amount,
-                total_installments=total_inst,
+                total_installments=max(total_inst, 1) if remaining > 0 else 0,
                 start_date=project.start_date,
             )
 

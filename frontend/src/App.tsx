@@ -32,7 +32,8 @@ function AppRoutes() {
       <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/" element={<Dashboard />} />
-        <Route path="/projects" element={<Projects />} />
+        <Route path="/income" element={<Projects />} />
+        <Route path="/projects" element={<Navigate to="/income" replace />} />
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/reports" element={<Reports />} />

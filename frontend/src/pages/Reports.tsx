@@ -211,7 +211,7 @@ export default function Reports() {
                   onClick={() => navigate('/expenses')}
                   style={{ background: 'none', border: 'none', color: 'var(--primary-light)', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}
                 >
-                  Manage recurring expenses & loans →
+                  Manage bills & loans →
                 </button>
               </div>
             </div>
@@ -221,9 +221,9 @@ export default function Reports() {
           {(forecast.forecast_income?.length ?? 0) === 0 && (forecast.forecast_outgoing?.length ?? 0) === 0 && (
             <div className="glass empty-state">
               <div className="empty-icon"><BarChart3 size={36} strokeWidth={1.5} /></div>
-              <p>No data for this month. Add projects and expenses to see your forecast.</p>
+              <p>No data for this month. Add income and bills to see your forecast.</p>
               <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1rem', flexWrap: 'wrap' }}>
-                <button className="btn-primary" onClick={() => navigate('/projects')}>Add Projects</button>
+                <button className="btn-primary" onClick={() => navigate('/income')}>Add Income</button>
                 <button className="btn-glass" onClick={() => navigate('/expenses')}>Add Expenses</button>
               </div>
             </div>
