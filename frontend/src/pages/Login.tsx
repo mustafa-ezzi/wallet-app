@@ -27,11 +27,7 @@ export default function Login() {
     <div className="auth-page">
       <div className="auth-card glass">
         <div className="auth-logo">
-          <div className="auth-logo-mark">C</div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>CashTrail</div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Follow every rupee</div>
-          </div>
+          <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-lg" />
         </div>
 
         <h2 style={{ marginBottom: '0.35rem' }}>Welcome back</h2>

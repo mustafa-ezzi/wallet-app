@@ -7,11 +7,13 @@ import {
   Briefcase,
   Receipt,
   BarChart3,
-  Settings,
   LogOut,
   Plus,
+  Download,
 } from 'lucide-react'
 import AddTransactionModal from './AddTransactionModal'
+import InstallAppDialog from './InstallAppDialog'
+import { usePwaInstall } from '../hooks/usePwaInstall'
 
 const NAV: { path: string; label: string; icon: ReactNode }[] = [
   { path: '/',          label: 'Overview',      icon: <LayoutDashboard size={18} strokeWidth={1.75} /> },
@@ -27,6 +29,7 @@ export default function Layout() {
   const navigate = useNavigate()
   const [showAdd, setShowAdd] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const pwa = usePwaInstall()
 
   const handleAdded = () => { setShowAdd(false); setRefreshKey(k => k + 1) }
 
@@ -37,24 +40,35 @@ export default function Layout() {
       )
     : '?'
 
+  const openInstall = () => {
+    if (pwa.canPrompt) {
+      void pwa.install()
+    } else {
+      pwa.setDialogOpen(true)
+    }
+  }
+
   return (
     <div className="app-shell" key={refreshKey}>
 
       {/* ── Mobile top header ── */}
       <header className="mobile-header">
         <div className="mobile-header-brand">
-          <div className="mobile-header-logo">C</div>
+          <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-sm" />
           <span className="mobile-header-title">CashTrail</span>
         </div>
-        <button className="mobile-header-settings" aria-label="Settings">
-          <Settings size={18} strokeWidth={1.75} />
-        </button>
+        {pwa.showInstallUi && (
+          <button className="mobile-header-install" onClick={openInstall} aria-label="Install app">
+            <Download size={16} strokeWidth={2} />
+            <span>Install</span>
+          </button>
+        )}
       </header>
 
       {/* ── Desktop Sidebar ── */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-logo">C</div>
+          <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-md" />
           <div>
             <div className="sidebar-title">CashTrail</div>
             <div className="sidebar-subtitle">Follow every rupee</div>
@@ -80,6 +94,12 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-footer">
+          {pwa.showInstallUi && (
+            <button className="sidebar-nav-item sidebar-install-btn" onClick={openInstall}>
+              <span className="nav-icon"><Download size={18} strokeWidth={1.75} /></span>
+              Download app
+            </button>
+          )}
           <div className="sidebar-user">
             <div className="sidebar-avatar">{initials}</div>
             <div>
@@ -110,8 +130,9 @@ export default function Layout() {
         <Plus size={22} strokeWidth={2.25} />
       </button>
 
-      {/* ── Mobile floating pill nav ── */}
-      <nav className="bottom-nav">
+      {/* ── Mobile liquid-glass nav ── */}
+      <nav className="bottom-nav" aria-label="Main">
+        <div className="bottom-nav-sheen" aria-hidden />
         {NAV.map(n => (
           <button
             key={n.path}
@@ -127,6 +148,14 @@ export default function Layout() {
       {showAdd && (
         <AddTransactionModal onClose={() => setShowAdd(false)} onAdded={handleAdded} />
       )}
+
+      <InstallAppDialog
+        open={pwa.dialogOpen}
+        ios={pwa.ios}
+        canPrompt={pwa.canPrompt}
+        onClose={() => pwa.setDialogOpen(false)}
+        onInstall={() => void pwa.install()}
+      />
     </div>
   )
 }
