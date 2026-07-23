@@ -195,7 +195,7 @@ class ReceivableInstallment(models.Model):
 
 
 class PayableInstallment(models.Model):
-    STATUS = [('ongoing', 'Ongoing'), ('completed', 'Completed')]
+    STATUS = [('ongoing', 'Ongoing'), ('completed', 'Completed'), ('stuck', 'Stuck')]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='payables')
     name = models.CharField(max_length=150)

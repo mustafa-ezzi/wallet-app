@@ -222,6 +222,35 @@ export default function Expenses() {
     await payablesApi.update(p.id, { status: 'completed' }); load()
   }
 
+  const markPayableStuck = async (p: Payable) => {
+    const newStatus = p.status === 'stuck' ? 'ongoing' : 'stuck'
+    const ok = await confirm({
+      title: newStatus === 'stuck' ? 'Mark as stuck?' : 'Mark as ongoing?',
+      message: newStatus === 'stuck'
+        ? `Mark “${p.name}” as stuck? It will stop counting in your monthly forecasts until resumed.`
+        : `Resume “${p.name}”? It will count in your monthly forecasts again.`,
+      confirmLabel: 'Confirm',
+    })
+    if (!ok) return
+    await payablesApi.update(p.id, { status: newStatus }); load()
+  }
+
+  const deleteReceivable = async (r: Receivable) => {
+    const ok = await confirm({
+      title: 'Delete receivable?',
+      message: `Delete “${r.project_name}”? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await receivablesApi.remove(r.id)
+      load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not delete receivable.'))
+    }
+  }
+
   const deletePayable = async (p: Payable) => {
     const ok = await confirm({
       title: 'Delete loan?',
@@ -499,13 +528,22 @@ export default function Expenses() {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
                           <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{p.name}</span>
-                          <span className={p.status === 'completed' ? 'badge badge-green' : 'badge badge-blue'}>
+                          <span className={
+                            p.status === 'completed' ? 'badge badge-green' :
+                            p.status === 'stuck' ? 'badge badge-red' :
+                            'badge badge-blue'
+                          }>
                             {p.status}
                           </span>
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>
                           {p.installments_paid} of {p.total_installments} paid · PKR {fmtNum(amtPaid)} paid so far
                         </div>
+                        {p.status === 'stuck' && (
+                          <div style={{ marginTop: '0.3rem', fontSize: '0.78rem', color: '#fb7185' }}>
+                            ⚠ Stuck — not counted in forecasts
+                          </div>
+                        )}
                         {p.status === 'ongoing' && (
                           <div style={{ marginTop: '0.35rem' }}>
                             <span className={dueBadgeClass(days)} style={{ fontSize: '0.68rem' }}>
@@ -562,6 +600,15 @@ export default function Expenses() {
                         )
                       )}
                       <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }} onClick={() => openEditPay(p)}>Edit</button>
+                      {p.status !== 'completed' && (
+                        <button
+                          className="btn-glass"
+                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: p.status === 'stuck' ? '#34d399' : '#fb7185', borderColor: p.status === 'stuck' ? 'rgba(52,211,153,0.3)' : 'rgba(251,113,133,0.3)' }}
+                          onClick={() => markPayableStuck(p)}
+                        >
+                          {p.status === 'stuck' ? 'Resume' : 'Mark Stuck'}
+                        </button>
+                      )}
                       <button
                         className="btn-glass"
                         style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: 'var(--red-600)', borderColor: '#f5c4c0' }}
@@ -626,7 +673,7 @@ export default function Expenses() {
                         </div>
                         {r.status === 'stuck' && (
                           <div style={{ marginTop: '0.3rem', fontSize: '0.78rem', color: '#fb7185' }}>
-                            ⚠ Payment is stuck / overdue
+                            ⚠ Stuck — not counted in income forecasts
                           </div>
                         )}
                       </div>
@@ -687,6 +734,13 @@ export default function Expenses() {
                           {r.status === 'stuck' ? 'Resume' : 'Mark Stuck'}
                         </button>
                       )}
+                      <button
+                        className="btn-glass"
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: 'var(--red-600)', borderColor: '#f5c4c0' }}
+                        onClick={() => deleteReceivable(r)}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 )

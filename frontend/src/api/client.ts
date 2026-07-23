@@ -172,6 +172,7 @@ export const receivablesApi = {
   list: () => api.get('/receivables/'),
   create: (data: object) => api.post('/receivables/', data),
   update: (id: number, data: object) => api.patch(`/receivables/${id}/`, data),
+  remove: (id: number) => api.delete(`/receivables/${id}/`),
 }
 
 export const payablesApi = {
