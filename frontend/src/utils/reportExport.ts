@@ -18,9 +18,10 @@ export interface ReportMeta {
   income: number
   expense: number
   net: number
-  expectedIncome: number
-  expectedExpense: number
-  netForecast: number
+  /** Only set when exporting a single month (forecast is monthly) */
+  expectedIncome?: number
+  expectedExpense?: number
+  netForecast?: number
 }
 
 // Brand palette
@@ -185,18 +186,20 @@ export async function downloadReportPDF(rows: LedgerRow[], meta: ReportMeta) {
     doc.text(c.value, x + 12, y + 42)
   })
 
-  // ── Forecast line ──
+  // ── Forecast line (month exports only) ──
   y += cardH + 22
   doc.setDrawColor(225, 233, 228)
   doc.line(margin, y, pageW - margin, y)
-  y += 16
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...MUTED)
-  doc.text(
-    `Forecast — Expected income ${money(meta.expectedIncome)}   •   Expected expense ${money(meta.expectedExpense)}   •   Forecast net ${balanceStr(meta.netForecast)}`,
-    margin, y,
-  )
+  if (meta.expectedIncome !== undefined) {
+    y += 16
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...MUTED)
+    doc.text(
+      `Forecast — Expected income ${money(meta.expectedIncome)}   •   Expected expense ${money(meta.expectedExpense ?? 0)}   •   Forecast net ${balanceStr(meta.netForecast ?? 0)}`,
+      margin, y,
+    )
+  }
 
   // ── Ledger table ──
   y += 14

@@ -200,6 +200,7 @@ export default function Dashboard() {
       <div>
         <div className="section-row">
           <h3>Recent Transactions</h3>
+          <button className="section-link" onClick={() => navigate('/reports')}>View all →</button>
         </div>
         {!data?.recent_transactions?.length ? (
           <div className="glass empty-state">

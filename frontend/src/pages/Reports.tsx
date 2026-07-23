@@ -98,6 +98,12 @@ export default function Reports() {
   const [fromDate, setFromDate] = useState(monthStart)
   const [toDate, setToDate] = useState(monthEnd)
 
+  // export period modal
+  const [exportModal, setExportModal] = useState<'csv' | 'pdf' | null>(null)
+  const [exportScope, setExportScope] = useState<'month' | 'custom' | 'all'>('month')
+  const [expFrom, setExpFrom] = useState(monthStart)
+  const [expTo, setExpTo] = useState(monthEnd)
+
   useEffect(() => {
     setLoading(true)
     Promise.all([
@@ -187,7 +193,19 @@ export default function Reports() {
   const monthLabel = `${MONTH_NAMES[month - 1]} ${year}`
 
   const buildExport = (): { rows: LedgerRow[]; meta: ReportMeta } => {
-    const rows: LedgerRow[] = ledgerTxs
+    const base = walletFilter === 'all' ? allTxs : allTxs.filter(t => t.account === walletFilter)
+    let txs = base
+    let periodLabel = monthLabel
+    if (exportScope === 'month') {
+      txs = base.filter(t => t.date >= monthStart && t.date <= monthEnd)
+    } else if (exportScope === 'custom') {
+      txs = base.filter(t => t.date >= expFrom && t.date <= expTo)
+      periodLabel = `${expFrom} to ${expTo}`
+    } else {
+      periodLabel = 'All time'
+    }
+
+    const rows: LedgerRow[] = txs
       .slice()
       .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
       .map(tx => ({
@@ -200,33 +218,50 @@ export default function Reports() {
         credit: tx.type === 'income' ? toMoney(tx.amount) : 0,
         balance: balanceAfter.get(tx.id) ?? 0,
       }))
+
+    const income = sumMoney(txs.filter(t => t.type === 'income' && !isTransfer(t)), t => t.amount)
+    const expense = sumMoney(txs.filter(t => t.type === 'expense' && !isTransfer(t)), t => t.amount)
+
     const meta: ReportMeta = {
       username: userName,
-      monthLabel: walletFilter === 'all' ? monthLabel : `${monthLabel} — ${accountName(walletFilter)}`,
-      income: monthIncomeTotal,
-      expense: monthExpenseTotal,
-      net: monthIncomeTotal - monthExpenseTotal,
-      expectedIncome: forecast?.total_expected_income ?? 0,
-      expectedExpense: forecast?.total_expected_outgoing ?? 0,
-      netForecast: forecast?.net_forecast ?? 0,
+      monthLabel: walletFilter === 'all' ? periodLabel : `${periodLabel} — ${accountName(walletFilter)}`,
+      income,
+      expense,
+      net: income - expense,
+      // Forecast numbers only make sense for the selected month
+      ...(exportScope === 'month'
+        ? {
+            expectedIncome: forecast?.total_expected_income ?? 0,
+            expectedExpense: forecast?.total_expected_outgoing ?? 0,
+            netForecast: forecast?.net_forecast ?? 0,
+          }
+        : {}),
     }
     return { rows, meta }
   }
 
-  const handleCSV = () => {
-    const { rows, meta } = buildExport()
-    downloadLedgerCSV(rows, meta)
+  const openExport = (format: 'csv' | 'pdf') => {
     setExportOpen(false)
+    setExportScope('month')
+    setExpFrom(monthStart)
+    setExpTo(monthEnd)
+    setExportModal(format)
   }
 
-  const handlePDF = async () => {
+  const runExport = async () => {
+    if (!exportModal) return
     const { rows, meta } = buildExport()
+    if (exportModal === 'csv') {
+      downloadLedgerCSV(rows, meta)
+      setExportModal(null)
+      return
+    }
     setPdfBusy(true)
     try {
       await downloadReportPDF(rows, meta)
     } finally {
       setPdfBusy(false)
-      setExportOpen(false)
+      setExportModal(null)
     }
   }
 
@@ -251,11 +286,11 @@ export default function Reports() {
             <>
               <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setExportOpen(false)} />
               <div className="glass" style={{ position: 'absolute', right: 0, top: 'calc(100% + 0.4rem)', zIndex: 50, minWidth: 190, padding: '0.35rem', borderRadius: 'var(--radius-md)', boxShadow: '0 12px 32px rgba(0,0,0,0.14)' }}>
-                <button className="export-menu-item" onClick={handleCSV}>
+                <button className="export-menu-item" onClick={() => openExport('csv')}>
                   <FileSpreadsheet size={16} strokeWidth={1.9} /> Download CSV
                 </button>
-                <button className="export-menu-item" onClick={handlePDF} disabled={pdfBusy}>
-                  <FileText size={16} strokeWidth={1.9} /> {pdfBusy ? 'Preparing…' : 'Download PDF'}
+                <button className="export-menu-item" onClick={() => openExport('pdf')}>
+                  <FileText size={16} strokeWidth={1.9} /> Download PDF
                 </button>
               </div>
             </>
@@ -397,14 +432,6 @@ export default function Reports() {
                       </div>
                     ))}
                   </div>
-                  <button
-                    className="btn-glass"
-                    style={{ width: '100%', marginTop: '0.85rem', justifyContent: 'center', gap: '0.4rem', display: 'inline-flex', alignItems: 'center', fontSize: '0.82rem' }}
-                    onClick={() => setDetailOpen(true)}
-                  >
-                    <ListFilter size={15} strokeWidth={2} />
-                    Detailed breakdown by date
-                  </button>
                 </div>
               )}
             </>
@@ -413,7 +440,14 @@ export default function Reports() {
           {/* ── Wallet ledger (BOTTOM, one card) ── */}
           <div className="section-row" style={{ marginBottom: '0.6rem' }}>
             <h3>Wallet ledger</h3>
-            <span className="text-muted" style={{ fontSize: '0.78rem' }}>{MONTH_NAMES[month - 1]} {year}</span>
+            <button
+              className="section-link"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              onClick={() => setDetailOpen(true)}
+            >
+              <ListFilter size={14} strokeWidth={2} />
+              Breakdown by date →
+            </button>
           </div>
 
           {accounts.length > 1 && (
@@ -504,6 +538,73 @@ export default function Reports() {
             </div>
           )}
         </>
+      )}
+
+      {/* ── Export period modal ── */}
+      {exportModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && !pdfBusy && setExportModal(null)}>
+          <div className="modal-sheet" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <h2>Export {exportModal === 'csv' ? 'CSV' : 'PDF'}</h2>
+              <button className="modal-close" onClick={() => setExportModal(null)} aria-label="Close">
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+              <label>Period</label>
+              <div className="rpt-chips" style={{ marginBottom: 0 }}>
+                <button
+                  className={`rpt-chip ${exportScope === 'month' ? 'active' : ''}`}
+                  onClick={() => setExportScope('month')}
+                >
+                  {monthLabel}
+                </button>
+                <button
+                  className={`rpt-chip ${exportScope === 'custom' ? 'active' : ''}`}
+                  onClick={() => setExportScope('custom')}
+                >
+                  Custom range
+                </button>
+                <button
+                  className={`rpt-chip ${exportScope === 'all' ? 'active' : ''}`}
+                  onClick={() => setExportScope('all')}
+                >
+                  All time
+                </button>
+              </div>
+            </div>
+
+            {exportScope === 'custom' && (
+              <div className="grid-2" style={{ marginBottom: '0.85rem' }}>
+                <div className="form-group">
+                  <label>From</label>
+                  <input type="date" value={expFrom} onChange={e => setExpFrom(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>To</label>
+                  <input type="date" value={expTo} onChange={e => setExpTo(e.target.value)} />
+                </div>
+              </div>
+            )}
+
+            {walletFilter !== 'all' && (
+              <p className="text-muted" style={{ fontSize: '0.78rem', marginBottom: '0.85rem' }}>
+                Only "{accountName(walletFilter)}" transactions will be exported (change the wallet filter above the ledger to export all wallets).
+              </p>
+            )}
+
+            <button
+              className="btn-primary"
+              style={{ width: '100%', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '0.45rem' }}
+              onClick={runExport}
+              disabled={pdfBusy || (exportScope === 'custom' && (!expFrom || !expTo || expFrom > expTo))}
+            >
+              {pdfBusy ? <span className="spinner" /> : <Download size={15} strokeWidth={2} />}
+              {pdfBusy ? 'Preparing…' : `Download ${exportModal.toUpperCase()}`}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── Detailed outgoing breakdown modal ── */}
