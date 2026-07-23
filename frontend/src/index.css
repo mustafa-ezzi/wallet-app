@@ -653,11 +653,11 @@ select option { background: var(--surface); color: var(--text-primary); }
 
 .rpt-led-row {
   display: grid;
-  grid-template-columns: 2.6rem 1fr auto 1rem;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto 0.9rem;
   align-items: center;
-  gap: 0.55rem;
+  column-gap: 0.7rem;
   width: 100%;
-  padding: 0.6rem 0.55rem;
+  padding: 0.65rem 0.5rem;
   background: none;
   border: none;
   text-align: left;
@@ -668,18 +668,25 @@ select option { background: var(--surface); color: var(--text-primary); }
 .rpt-led-row:hover { background: rgba(15, 61, 36, 0.03); border-radius: var(--radius-sm); }
 
 .rpt-led-date {
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   font-weight: 700;
   color: var(--text-muted);
   text-align: center;
-  line-height: 1.05;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.rpt-led-date small { display: block; font-size: 0.58rem; font-weight: 600; opacity: 0.75; }
+.rpt-led-date small { display: block; font-size: 0.58rem; font-weight: 600; opacity: 0.75; text-transform: uppercase; }
 
-.rpt-led-desc { min-width: 0; }
+.rpt-led-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
 .rpt-led-desc-main {
-  font-size: 0.85rem;
+  display: block;
+  max-width: 100%;
+  font-size: 0.86rem;
   font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
@@ -687,6 +694,8 @@ select option { background: var(--surface); color: var(--text-primary); }
   white-space: nowrap;
 }
 .rpt-led-desc-sub {
+  display: block;
+  max-width: 100%;
   font-size: 0.7rem;
   color: var(--text-muted);
   overflow: hidden;
@@ -694,10 +703,11 @@ select option { background: var(--surface); color: var(--text-primary); }
   white-space: nowrap;
 }
 .rpt-led-amt {
-  font-size: 0.9rem;
-  font-weight: 750;
+  font-size: 0.86rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  white-space: nowrap;
 }
 .rpt-led-chev {
   color: var(--text-muted);
