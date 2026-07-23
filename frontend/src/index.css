@@ -605,52 +605,25 @@ select option { background: var(--surface); color: var(--text-primary); }
   color: var(--green-700);
 }
 
-/* ── Dashboard welcome card ──────────────────────────────────────── */
-.welcome-card {
-  position: relative;
-  overflow: hidden;
-  margin-bottom: 1rem;
-  padding: 1.15rem 1.2rem 1.25rem;
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(245, 250, 246, 0.55)),
-    linear-gradient(160deg, #0f3d24 0%, transparent 42%);
-  border: 1px solid rgba(255, 255, 255, 0.75);
-  box-shadow: 0 10px 28px rgba(15, 61, 36, 0.08);
+/* ── Dashboard welcome (sleek single line) ───────────────────────── */
+.welcome-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.15rem 0 0.85rem;
 }
-.welcome-card-glow {
-  position: absolute;
-  right: -20%;
-  top: -40%;
-  width: 55%;
-  height: 140%;
-  background: radial-gradient(circle, rgba(52, 168, 98, 0.22), transparent 68%);
-  pointer-events: none;
-}
-.welcome-eyebrow {
-  position: relative;
-  margin: 0 0 0.25rem;
-  font-size: 0.7rem;
-  font-weight: 650;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--primary-light);
+.welcome-hi {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 .welcome-name {
-  position: relative;
-  margin: 0;
   font-family: var(--font-heading);
-  font-size: clamp(1.55rem, 4.5vw, 2rem);
-  font-weight: 750;
-  letter-spacing: -0.02em;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
-  line-height: 1.15;
-}
-.welcome-sub {
-  position: relative;
-  margin: 0.4rem 0 0;
-  font-size: 0.84rem;
-  color: var(--text-secondary);
 }
 
 /* ── Wallet ledger (Reports) ─────────────────────────────────────── */

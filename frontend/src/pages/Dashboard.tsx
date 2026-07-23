@@ -74,13 +74,11 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <div className="welcome-card">
-        <div className="welcome-card-glow" aria-hidden />
-        <p className="welcome-eyebrow">Welcome back</p>
-        <h1 className="welcome-name">
+      <div className="welcome-row">
+        <span className="welcome-hi">Welcome back,</span>
+        <span className="welcome-name">
           {[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || 'there'}
-        </h1>
-        <p className="welcome-sub">Your financial snapshot for {monthName}</p>
+        </span>
       </div>
 
       {/* ── Hero balance card ── */}
