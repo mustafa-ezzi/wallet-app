@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
+import AppUpdateGate from './hooks/AppUpdateGate'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
@@ -8,6 +9,7 @@ import Projects from './pages/Projects'
 import Accounts from './pages/Accounts'
 import Expenses from './pages/Expenses'
 import Reports from './pages/Reports'
+import Settings from './pages/Settings'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -37,6 +39,7 @@ function AppRoutes() {
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -47,7 +50,9 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AppRoutes />
+        <AppUpdateGate>
+          <AppRoutes />
+        </AppUpdateGate>
       </BrowserRouter>
     </AuthProvider>
   )

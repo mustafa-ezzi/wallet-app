@@ -56,6 +56,17 @@ class MeView(APIView):
         if 'email' in data:
             user.email = data['email']
         if 'password' in data and data['password']:
+            current = data.get('current_password') or data.get('old_password') or ''
+            if not current or not user.check_password(current):
+                return Response(
+                    {'detail': 'Current password is incorrect.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if len(str(data['password'])) < 6:
+                return Response(
+                    {'detail': 'New password must be at least 6 characters.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             user.set_password(data['password'])
         user.save()
         if 'currency' in data:

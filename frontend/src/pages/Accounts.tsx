@@ -101,8 +101,8 @@ export default function Accounts() {
     e.preventDefault()
     if (editingAcc) {
       const ok = await confirm({
-        title: 'Save account?',
-        message: `Update account “${accForm.name || editingAcc.name}”?`,
+        title: 'Save wallet?',
+        message: `Update wallet “${accForm.name || editingAcc.name}”?`,
         confirmLabel: 'Save',
       })
       if (!ok) return
@@ -120,8 +120,8 @@ export default function Accounts() {
 
   const deleteAcc = async (id: number) => {
     const ok = await confirm({
-      title: 'Delete account?',
-      message: 'Delete this account? All its transactions will also be deleted.',
+      title: 'Delete wallet?',
+      message: 'Delete this wallet? All its transactions will also be deleted.',
       confirmLabel: 'Delete',
       danger: true,
     })
@@ -198,10 +198,10 @@ export default function Accounts() {
       {confirmDialog}
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Accounts</h1>
-          <p className="page-subtitle">Manage your bank and cash accounts.</p>
+          <h1>Wallets</h1>
+          <p className="page-subtitle">Manage your bank and cash wallets.</p>
         </div>
-        <button className="btn-primary" onClick={openAddAcc}>+ New Account</button>
+        <button className="btn-primary" onClick={openAddAcc}>+ Create Wallet</button>
       </div>
 
       {/* Combined balance strip */}
@@ -223,15 +223,15 @@ export default function Accounts() {
       ) : accounts.length === 0 ? (
         <div className="glass empty-state">
           <div className="empty-icon"><Wallet size={36} strokeWidth={1.5} /></div>
-          <p>No accounts yet.</p>
-          <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddAcc}>Add your first account</button>
+          <p>No wallets yet.</p>
+          <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddAcc}>Create your first wallet</button>
         </div>
       ) : (
         <>
           {banks.length > 0 && (
             <div style={{ marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                <Landmark size={16} strokeWidth={1.75} /><h3>Bank Accounts</h3>
+                <Landmark size={16} strokeWidth={1.75} /><h3>Bank Wallets</h3>
               </div>
               <div className="list">
                 {banks.map(acc => (
@@ -262,7 +262,7 @@ export default function Accounts() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowAccModal(false)}>
           <div className="modal-sheet">
             <div className="modal-header">
-              <h2>{editingAcc ? 'Edit Account' : 'New Account'}</h2>
+              <h2>{editingAcc ? 'Edit Wallet' : 'Create Wallet'}</h2>
               <button className="modal-close" onClick={() => setShowAccModal(false)} aria-label="Close">
                 <X size={18} strokeWidth={2} />
               </button>
@@ -287,7 +287,7 @@ export default function Accounts() {
                 </div>
               </div>
               <button type="submit" className="btn-primary" style={{ width: '100%', padding: '0.75rem' }} disabled={accSaving}>
-                {accSaving ? <span className="spinner" /> : editingAcc ? 'Save Changes' : 'Create Account'}
+                {accSaving ? <span className="spinner" /> : editingAcc ? 'Save Changes' : 'Create Wallet'}
               </button>
             </form>
           </div>

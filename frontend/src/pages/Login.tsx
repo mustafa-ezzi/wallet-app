@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
+  const location = useLocation()
+  const registered = Boolean((location.state as { registered?: boolean } | null)?.registered)
+  const prefillEmail = (location.state as { email?: string } | null)?.email ?? ''
+
+  const [email, setEmail] = useState(prefillEmail)
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -34,6 +38,11 @@ export default function Login() {
         <h2 style={{ marginBottom: '0.35rem' }}>Welcome back</h2>
         <p className="text-muted" style={{ marginBottom: '1.5rem' }}>Sign in to your account</p>
 
+        {registered && (
+          <div className="auth-success" style={{ marginBottom: '1rem' }}>
+            Account created. Sign in with your email and password.
+          </div>
+        )}
         {error && <div className="auth-error" style={{ marginBottom: '1rem' }}>{error}</div>}
 
         <form className="auth-form" onSubmit={handleSubmit}>

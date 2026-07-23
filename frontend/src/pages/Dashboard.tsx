@@ -74,11 +74,13 @@ export default function Dashboard() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>Dashboard</h1>
-          <p className="page-subtitle">Here is your financial snapshot right now.</p>
-        </div>
+      <div className="welcome-card">
+        <div className="welcome-card-glow" aria-hidden />
+        <p className="welcome-eyebrow">Welcome back</p>
+        <h1 className="welcome-name">
+          {[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || 'there'}
+        </h1>
+        <p className="welcome-sub">Your financial snapshot for {monthName}</p>
       </div>
 
       {/* ── Hero balance card ── */}
@@ -90,7 +92,7 @@ export default function Dashboard() {
           {fmtBalance(data?.total_balance ?? 0)}
         </div>
         <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)' }}>
-          Across {data?.accounts?.length ?? 0} account{(data?.accounts?.length ?? 0) !== 1 ? 's' : ''}
+          Across {data?.accounts?.length ?? 0} wallet{(data?.accounts?.length ?? 0) !== 1 ? 's' : ''}
         </p>
         <div className="balance-chips">
           <div className="balance-chip">
@@ -163,14 +165,14 @@ export default function Dashboard() {
       {/* ── Accounts ── */}
       <div style={{ marginBottom: '1rem' }}>
         <div className="section-row">
-          <h3>Accounts</h3>
+          <h3>Wallets</h3>
           <button className="section-link" onClick={() => navigate('/accounts')}>Manage →</button>
         </div>
         {!data?.accounts?.length ? (
           <div className="glass empty-state">
             <div className="empty-icon"><Wallet size={36} strokeWidth={1.5} /></div>
-            <p>No accounts yet.</p>
-            <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/accounts')}>Add account</button>
+            <p>No wallets yet.</p>
+            <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/accounts')}>Create wallet</button>
           </div>
         ) : (
           <div className="list">

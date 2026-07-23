@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi, apiErrorMessage } from '../api/client'
-import { useAuth } from '../context/AuthContext'
 
 export default function Signup() {
-  const { login } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', password: '', currency: 'PKR' })
   const [loading, setLoading] = useState(false)
@@ -18,8 +16,10 @@ export default function Signup() {
     setLoading(true); setError('')
     try {
       await authApi.register(form)
-      await login(form.email, form.password)
-      navigate('/')
+      navigate('/login', {
+        replace: true,
+        state: { registered: true, email: form.email },
+      })
     } catch (err: any) {
       setError(apiErrorMessage(err, 'Registration failed.'))
     } finally {

@@ -10,6 +10,7 @@ import {
   LogOut,
   Plus,
   Download,
+  Settings,
 } from 'lucide-react'
 import anime from 'animejs'
 import AddTransactionModal from './AddTransactionModal'
@@ -19,7 +20,7 @@ import { usePwaInstall } from '../hooks/usePwaInstall'
 
 const NAV: { path: string; label: string; short: string; tour: string; icon: ReactNode }[] = [
   { path: '/',          label: 'Overview', icon: <LayoutDashboard size={18} strokeWidth={1.75} />, short: 'Overview', tour: 'nav-overview' },
-  { path: '/accounts',  label: 'Accounts', icon: <Wallet size={18} strokeWidth={1.75} />, short: 'Accounts', tour: 'nav-accounts' },
+  { path: '/accounts',  label: 'Wallets',  icon: <Wallet size={18} strokeWidth={1.75} />, short: 'Wallets', tour: 'nav-accounts' },
   { path: '/income',    label: 'Income',   icon: <Coins size={18} strokeWidth={1.75} />, short: 'Income', tour: 'nav-income' },
   { path: '/expenses',  label: 'Bills',    icon: <Receipt size={18} strokeWidth={1.75} />, short: 'Bills', tour: 'nav-bills' },
   { path: '/reports',   label: 'Reports',  icon: <BarChart3 size={18} strokeWidth={1.75} />, short: 'Reports', tour: 'nav-reports' },
@@ -67,12 +68,21 @@ export default function Layout() {
           <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-sm" />
           <span className="mobile-header-title">CashTrail</span>
         </div>
-        {pwa.showInstallUi && (
-          <button className="mobile-header-install" onClick={openInstall} aria-label="Install app">
-            <Download size={16} strokeWidth={2} />
-            <span>Install</span>
+        <div className="mobile-header-actions">
+          {pwa.showInstallUi && (
+            <button className="mobile-header-install" onClick={openInstall} aria-label="Install app">
+              <Download size={16} strokeWidth={2} />
+              <span>Install</span>
+            </button>
+          )}
+          <button
+            className="mobile-header-settings"
+            onClick={() => navigate('/settings')}
+            aria-label="Settings"
+          >
+            <Settings size={18} strokeWidth={2} />
           </button>
-        )}
+        </div>
       </header>
 
       <aside className="sidebar">
@@ -110,6 +120,13 @@ export default function Layout() {
               Download app
             </button>
           )}
+          <button
+            className={`sidebar-nav-item ${location.pathname === '/settings' ? 'active' : ''}`}
+            onClick={() => navigate('/settings')}
+          >
+            <span className="nav-icon"><Settings size={18} strokeWidth={1.75} /></span>
+            Settings
+          </button>
           <div className="sidebar-user">
             <div className="sidebar-avatar">{initials}</div>
             <div>

@@ -5,6 +5,8 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+const LS_INSTALLED = 'cashtrail_pwa_installed'
+
 /** Module-level store — survives Layout remounts so the browser install
  *  event is not lost after the first fire. */
 let deferredPrompt: BeforeInstallPromptEvent | null = null
@@ -28,8 +30,11 @@ function getVersion() {
 
 function isStandalone(): boolean {
   if (typeof window === 'undefined') return false
+  const mq = window.matchMedia
   return (
-    window.matchMedia('(display-mode: standalone)').matches
+    mq('(display-mode: standalone)').matches
+    || mq('(display-mode: fullscreen)').matches
+    || mq('(display-mode: minimal-ui)').matches
     || ('standalone' in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
   )
 }
@@ -39,22 +44,45 @@ function isIos(): boolean {
   return /iphone|ipad|ipod/i.test(navigator.userAgent)
 }
 
+function readPersistedInstalled(): boolean {
+  try {
+    return localStorage.getItem(LS_INSTALLED) === '1'
+  } catch {
+    return false
+  }
+}
+
+function markInstalled() {
+  installedFlag = true
+  deferredPrompt = null
+  try {
+    localStorage.setItem(LS_INSTALLED, '1')
+  } catch { /* ignore */ }
+  emit()
+}
+
 let listening = false
 function ensureGlobalListeners() {
   if (listening || typeof window === 'undefined') return
   listening = true
-  installedFlag = isStandalone()
+
+  if (readPersistedInstalled() || isStandalone()) {
+    markInstalled()
+  }
 
   window.addEventListener('beforeinstallprompt', (e: Event) => {
     e.preventDefault()
+    // Already running as installed app — never re-show install UI
+    if (installedFlag || isStandalone()) {
+      markInstalled()
+      return
+    }
     deferredPrompt = e as BeforeInstallPromptEvent
     emit()
   })
 
   window.addEventListener('appinstalled', () => {
-    installedFlag = true
-    deferredPrompt = null
-    emit()
+    markInstalled()
   })
 }
 
@@ -64,18 +92,17 @@ export function usePwaInstall() {
 
   useEffect(() => {
     ensureGlobalListeners()
-    const next = isStandalone()
-    if (next !== installedFlag) {
-      installedFlag = next
-      emit()
+    if (isStandalone() || readPersistedInstalled()) {
+      markInstalled()
     }
   }, [])
 
   const ios = isIos()
   const canPrompt = Boolean(deferredPrompt)
-  const showInstallUi = !installedFlag
+  // Hide when installed / standalone. On refresh, only show if we can actually install
+  // (native prompt ready) or iOS (manual Add to Home Screen).
+  const showInstallUi = !installedFlag && !isStandalone() && (canPrompt || ios)
 
-  /** Prefer native Chrome/Edge install UI; fall back to instructions dialog. */
   const install = useCallback(async () => {
     const promptEvent = deferredPrompt
     if (promptEvent) {
@@ -84,16 +111,16 @@ export function usePwaInstall() {
         const { outcome } = await promptEvent.userChoice
         deferredPrompt = null
         if (outcome === 'accepted') {
-          installedFlag = true
+          markInstalled()
           setDialogOpen(false)
+        } else {
+          emit()
         }
-        emit()
       } catch {
         setDialogOpen(true)
       }
       return
     }
-    // No native prompt yet (iOS, Firefox, or criteria not met)
     setDialogOpen(true)
   }, [])
 

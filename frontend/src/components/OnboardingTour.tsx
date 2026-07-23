@@ -17,7 +17,7 @@ const STEPS: TourStep[] = [
     id: 'welcome',
     selector: '[data-tour="brand"]',
     title: 'Welcome to CashTrail',
-    body: 'A quick tour of where your money lives — accounts, income, bills, and reports.',
+    body: 'A quick tour of where your money lives — wallets, income, bills, and reports.',
     path: '/',
   },
   {
@@ -30,7 +30,7 @@ const STEPS: TourStep[] = [
   {
     id: 'accounts',
     selector: '[data-tour="nav-accounts"]',
-    title: 'Accounts',
+    title: 'Wallets',
     body: 'Bank and cash wallets. Add every place you keep money so balances stay accurate.',
     path: '/accounts',
   },
