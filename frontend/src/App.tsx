@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import AppUpdateGate from './hooks/AppUpdateGate'
+import { ThemeProvider } from './theme/ThemeProvider'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
@@ -48,12 +49,14 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppUpdateGate>
-          <AppRoutes />
-        </AppUpdateGate>
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppUpdateGate>
+            <AppRoutes />
+          </AppUpdateGate>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

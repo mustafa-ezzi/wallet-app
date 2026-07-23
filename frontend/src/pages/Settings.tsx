@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, LogOut, UserRound, X } from 'lucide-react'
+import { KeyRound, LogOut, Palette, UserRound, X } from 'lucide-react'
 import { authApi, apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useConfirm } from '../hooks/useConfirm'
+import { useTheme } from '../theme/ThemeProvider'
 
 export default function Settings() {
   const { user, refreshUser, logout } = useAuth()
+  const { themeId, themes, setTheme, transitioning } = useTheme()
   const navigate = useNavigate()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -101,7 +103,7 @@ export default function Settings() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Settings</h1>
-          <p className="page-subtitle">Profile and security.</p>
+          <p className="page-subtitle">Profile, theme, and security.</p>
         </div>
         <button className="btn-glass" style={{ fontSize: '0.82rem', padding: '0.5rem 0.9rem' }} onClick={() => navigate(-1)}>
           <X size={14} strokeWidth={2} /> Close
@@ -142,6 +144,42 @@ export default function Settings() {
             {nameSaving ? <span className="spinner" /> : 'Save name'}
           </button>
         </form>
+      </div>
+
+      <div className="glass" style={{ padding: '1.1rem 1.15rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
+          <Palette size={16} strokeWidth={1.75} color="var(--primary)" />
+          <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Theme</h3>
+        </div>
+        <p className="text-muted" style={{ fontSize: '0.78rem', marginBottom: '0.9rem' }}>
+          Soft color palettes — tap a circle to switch.
+        </p>
+        <div className="theme-swatch-row" role="radiogroup" aria-label="Color theme">
+          {themes.map(t => {
+            const selected = themeId === t.id
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={t.name}
+                className={`theme-swatch ${selected ? 'selected' : ''}`}
+                style={{ background: t.swatch, boxShadow: selected ? `0 0 0 2px var(--surface), 0 0 0 4px ${t.swatchEdge}` : undefined }}
+                onClick={() => setTheme(t.id)}
+                title={t.name}
+                disabled={transitioning}
+              >
+                {selected && <span className="theme-swatch-check" aria-hidden>✓</span>}
+              </button>
+            )
+          })}
+        </div>
+        <div className="theme-swatch-labels">
+          {themes.map(t => (
+            <span key={t.id} className={themeId === t.id ? 'active' : ''}>{t.name}</span>
+          ))}
+        </div>
       </div>
 
       <div className="glass" style={{ padding: '1.1rem 1.15rem', borderRadius: 'var(--radius-md)' }}>

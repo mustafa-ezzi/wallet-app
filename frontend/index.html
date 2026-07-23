@@ -5,13 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
     <title>CashTrail</title>
     <meta name="description" content="CashTrail — follow every rupee. Track accounts, projects, bills, and monthly forecasts." />
-    <meta name="theme-color" content="#0a2f2a" />
+    <meta name="theme-color" content="#1a5228" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="CashTrail" />
     <link rel="icon" type="image/png" href="/logo.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('cashtrail_theme') || 'forest';
+          if (!/^(forest|ocean|slate|blush|clay)$/.test(t)) t = 'forest';
+          document.documentElement.setAttribute('data-theme', t);
+          var colors = { forest: '#1a5228', ocean: '#2f6865', slate: '#3d5a6e', blush: '#9a606a', clay: '#866b4c' };
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', colors[t] || colors.forest);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
