@@ -101,6 +101,7 @@ export default function Reports() {
   // export period modal
   const [exportModal, setExportModal] = useState<'csv' | 'pdf' | null>(null)
   const [exportScope, setExportScope] = useState<'month' | 'custom' | 'all'>('month')
+  const [expMonth, setExpMonth] = useState(`${year}-${String(month).padStart(2, '0')}`)
   const [expFrom, setExpFrom] = useState(monthStart)
   const [expTo, setExpTo] = useState(monthEnd)
 
@@ -197,7 +198,11 @@ export default function Reports() {
     let txs = base
     let periodLabel = monthLabel
     if (exportScope === 'month') {
-      txs = base.filter(t => t.date >= monthStart && t.date <= monthEnd)
+      const [ey, em] = expMonth.split('-').map(Number)
+      const mStart = `${expMonth}-01`
+      const mEnd = `${expMonth}-${String(new Date(ey, em, 0).getDate()).padStart(2, '0')}`
+      txs = base.filter(t => t.date >= mStart && t.date <= mEnd)
+      periodLabel = `${MONTH_NAMES[em - 1]} ${ey}`
     } else if (exportScope === 'custom') {
       txs = base.filter(t => t.date >= expFrom && t.date <= expTo)
       periodLabel = `${expFrom} to ${expTo}`
@@ -228,8 +233,8 @@ export default function Reports() {
       income,
       expense,
       net: income - expense,
-      // Forecast numbers only make sense for the selected month
-      ...(exportScope === 'month'
+      // Forecast numbers only make sense for the month currently loaded on screen
+      ...(exportScope === 'month' && expMonth === `${year}-${String(month).padStart(2, '0')}`
         ? {
             expectedIncome: forecast?.total_expected_income ?? 0,
             expectedExpense: forecast?.total_expected_outgoing ?? 0,
@@ -243,6 +248,7 @@ export default function Reports() {
   const openExport = (format: 'csv' | 'pdf') => {
     setExportOpen(false)
     setExportScope('month')
+    setExpMonth(`${year}-${String(month).padStart(2, '0')}`)
     setExpFrom(monthStart)
     setExpTo(monthEnd)
     setExportModal(format)
@@ -558,7 +564,7 @@ export default function Reports() {
                   className={`rpt-chip ${exportScope === 'month' ? 'active' : ''}`}
                   onClick={() => setExportScope('month')}
                 >
-                  {monthLabel}
+                  Month
                 </button>
                 <button
                   className={`rpt-chip ${exportScope === 'custom' ? 'active' : ''}`}
@@ -574,6 +580,13 @@ export default function Reports() {
                 </button>
               </div>
             </div>
+
+            {exportScope === 'month' && (
+              <div className="form-group" style={{ marginBottom: '0.85rem' }}>
+                <label>Which month</label>
+                <input type="month" value={expMonth} onChange={e => setExpMonth(e.target.value)} />
+              </div>
+            )}
 
             {exportScope === 'custom' && (
               <div className="grid-2" style={{ marginBottom: '0.85rem' }}>
@@ -598,7 +611,11 @@ export default function Reports() {
               className="btn-primary"
               style={{ width: '100%', display: 'inline-flex', justifyContent: 'center', alignItems: 'center', gap: '0.45rem' }}
               onClick={runExport}
-              disabled={pdfBusy || (exportScope === 'custom' && (!expFrom || !expTo || expFrom > expTo))}
+              disabled={
+                pdfBusy
+                || (exportScope === 'month' && !/^\d{4}-\d{2}$/.test(expMonth))
+                || (exportScope === 'custom' && (!expFrom || !expTo || expFrom > expTo))
+              }
             >
               {pdfBusy ? <span className="spinner" /> : <Download size={15} strokeWidth={2} />}
               {pdfBusy ? 'Preparing…' : `Download ${exportModal.toUpperCase()}`}
