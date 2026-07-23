@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, UserRound, X } from 'lucide-react'
+import { KeyRound, LogOut, UserRound, X } from 'lucide-react'
 import { authApi, apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useConfirm } from '../hooks/useConfirm'
 
 export default function Settings() {
-  const { user, refreshUser } = useAuth()
+  const { user, refreshUser, logout } = useAuth()
   const navigate = useNavigate()
   const { confirm, dialog: confirmDialog } = useConfirm()
 
@@ -27,6 +27,18 @@ export default function Settings() {
   const [pwSaving, setPwSaving] = useState(false)
   const [pwError, setPwError] = useState('')
   const [pwOk, setPwOk] = useState('')
+
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title: 'Sign out?',
+      message: 'You will need to sign in again to access your CashTrail.',
+      confirmLabel: 'Sign out',
+      danger: true,
+    })
+    if (!ok) return
+    logout()
+    navigate('/login', { replace: true })
+  }
 
   const saveName = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -157,6 +169,15 @@ export default function Settings() {
           </button>
         </form>
       </div>
+
+      <button
+        className="btn-glass"
+        style={{ width: '100%', marginTop: '1rem', padding: '0.8rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--red-600)', borderColor: '#f5c4c0' }}
+        onClick={handleLogout}
+      >
+        <LogOut size={16} strokeWidth={2} />
+        Sign out
+      </button>
     </div>
   )
 }

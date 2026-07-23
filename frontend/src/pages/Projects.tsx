@@ -212,8 +212,11 @@ export default function Projects() {
     await projectsApi.remove(id); load()
   }
 
-  const activeProjects    = projects.filter(p => p.status === 'active')
-  const inactiveProjects  = projects.filter(p => p.status !== 'active')
+  // Paid-in-parts (one_time_installments) is money owed to you — it lives in
+  // Bills → "Money owed to you", so keep it out of the Income lists.
+  const visibleProjects   = projects.filter(p => p.income_type !== 'one_time_installments')
+  const activeProjects    = visibleProjects.filter(p => p.status === 'active')
+  const inactiveProjects  = visibleProjects.filter(p => p.status !== 'active')
   const showAdvance = form.income_type === 'one_time' || form.income_type === 'one_time_installments'
 
   return (
@@ -231,7 +234,7 @@ export default function Projects() {
         <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem 0' }}>
           <div className="spinner spinner-dark" style={{ width: '2rem', height: '2rem' }} />
         </div>
-      ) : projects.length === 0 ? (
+      ) : visibleProjects.length === 0 ? (
         <div className="glass empty-state">
           <div className="empty-icon"><Coins size={36} strokeWidth={1.5} /></div>
           <p>No income sources yet.</p>
