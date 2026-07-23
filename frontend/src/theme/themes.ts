@@ -3,9 +3,9 @@ export type ThemeId = 'forest' | 'ocean' | 'slate' | 'blush' | 'clay'
 export interface ThemeOption {
   id: ThemeId
   name: string
-  /** Soft preview color for the round swatch */
+  /** Swatch color for the round picker button */
   swatch: string
-  /** Darker ring / selected accent */
+  /** Darker ring / selected accent + reveal gradient end */
   swatchEdge: string
   /** Browser chrome / theme-color meta */
   themeColor: string
@@ -14,38 +14,38 @@ export interface ThemeOption {
 export const THEMES: ThemeOption[] = [
   {
     id: 'forest',
-    name: 'Forest',
-    swatch: '#1f6432',
-    swatchEdge: '#14401e',
-    themeColor: '#1a5228',
+    name: 'Emerald',
+    swatch: '#059669',
+    swatchEdge: '#047857',
+    themeColor: '#047857',
   },
   {
     id: 'ocean',
     name: 'Ocean',
-    swatch: '#3a7d7a',
-    swatchEdge: '#2a5c5a',
-    themeColor: '#2f6865',
+    swatch: '#0284c7',
+    swatchEdge: '#0369a1',
+    themeColor: '#0369a1',
   },
   {
     id: 'slate',
-    name: 'Slate',
-    swatch: '#4a6b82',
-    swatchEdge: '#334d5e',
-    themeColor: '#3d5a6e',
+    name: 'Violet',
+    swatch: '#7c3aed',
+    swatchEdge: '#6d28d9',
+    themeColor: '#6d28d9',
   },
   {
     id: 'blush',
-    name: 'Blush',
-    swatch: '#b0707a',
-    swatchEdge: '#8a555e',
-    themeColor: '#9a606a',
+    name: 'Rose',
+    swatch: '#e11d48',
+    swatchEdge: '#be123c',
+    themeColor: '#be123c',
   },
   {
     id: 'clay',
-    name: 'Clay',
-    swatch: '#9a7b5a',
-    swatchEdge: '#735a40',
-    themeColor: '#866b4c',
+    name: 'Amber',
+    swatch: '#ea580c',
+    swatchEdge: '#c2410c',
+    themeColor: '#c2410c',
   },
 ]
 

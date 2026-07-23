@@ -166,7 +166,7 @@ export default function Settings() {
                 aria-label={t.name}
                 className={`theme-swatch ${selected ? 'selected' : ''}`}
                 style={{ background: t.swatch, boxShadow: selected ? `0 0 0 2px var(--surface), 0 0 0 4px ${t.swatchEdge}` : undefined }}
-                onClick={() => setTheme(t.id)}
+                onClick={e => setTheme(t.id, { x: e.clientX, y: e.clientY })}
                 title={t.name}
                 disabled={transitioning}
               >

@@ -18,7 +18,7 @@
           var t = localStorage.getItem('cashtrail_theme') || 'forest';
           if (!/^(forest|ocean|slate|blush|clay)$/.test(t)) t = 'forest';
           document.documentElement.setAttribute('data-theme', t);
-          var colors = { forest: '#1a5228', ocean: '#2f6865', slate: '#3d5a6e', blush: '#9a606a', clay: '#866b4c' };
+          var colors = { forest: '#047857', ocean: '#0369a1', slate: '#6d28d9', blush: '#be123c', clay: '#c2410c' };
           var meta = document.querySelector('meta[name="theme-color"]');
           if (meta) meta.setAttribute('content', colors[t] || colors.forest);
         } catch (e) {}
