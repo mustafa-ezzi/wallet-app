@@ -501,6 +501,41 @@ export default function HouseholdPage() {
     ? `${window.location.origin}/household?code=${encodeURIComponent(invite.code)}`
     : ''
 
+  const inviterName = (
+    [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim()
+    || user?.email
+    || 'A CashTrail user'
+  )
+
+  const buildInviteMessage = () => {
+    const accountName = selected?.name || 'our shared account'
+    return (
+      `${inviterName} is inviting you to join the combined account “${accountName}” on CashTrail.\n\n` +
+      `Track shared home & family expenses together — your personal wallets stay private.\n\n` +
+      `Join with this link:\n${inviteUrl}`
+    )
+  }
+
+  const copyInviteMessage = async () => {
+    if (!inviteUrl) return
+    try {
+      await navigator.clipboard.writeText(buildInviteMessage())
+      await confirm({
+        title: 'Invite copied',
+        message: 'WhatsApp-ready message copied. Paste it in a chat to invite them.',
+        confirmLabel: 'OK',
+      })
+    } catch {
+      setError('Could not copy. Try again or share via WhatsApp.')
+    }
+  }
+
+  const shareInviteWhatsApp = () => {
+    if (!inviteUrl) return
+    const url = `https://wa.me/?text=${encodeURIComponent(buildInviteMessage())}`
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
   const refreshMembers = async () => {
     if (!selectedId) return
     const mRes = await householdsApi.members(selectedId)
@@ -1117,14 +1152,27 @@ export default function HouseholdPage() {
                   <p className="text-muted" style={{ fontSize: '0.72rem', textAlign: 'center', margin: 0 }}>
                     Scan to open join preview — only household name & member count are shown before Accept.
                   </p>
-                  <button
-                    type="button"
-                    className="btn-glass"
-                    style={{ fontSize: '0.72rem' }}
-                    onClick={async () => { try { await navigator.clipboard.writeText(inviteUrl) } catch { /* ignore */ } }}
-                  >
-                    Copy invite link
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{ fontSize: '0.78rem', flex: 1, minWidth: '8rem' }}
+                      onClick={shareInviteWhatsApp}
+                    >
+                      Share on WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-glass"
+                      style={{ fontSize: '0.78rem', flex: 1, minWidth: '8rem' }}
+                      onClick={copyInviteMessage}
+                    >
+                      Copy invite message
+                    </button>
+                  </div>
+                  <p className="text-muted" style={{ fontSize: '0.68rem', textAlign: 'center', margin: 0 }}>
+                    Copies a ready-to-paste invite: who invited them, account name, and the join link.
+                  </p>
                 </div>
                 <button className="btn-glass" style={{ marginTop: '0.65rem', fontSize: '0.78rem' }} onClick={regenInvite}>Regenerate code</button>
               </div>
