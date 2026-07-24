@@ -4,6 +4,7 @@ import { Copy, Home, Users, X } from 'lucide-react'
 import { householdsApi, accountsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt, fmtBalance } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
+import HouseholdReportPanel from '../components/HouseholdReportPanel'
 
 interface Household {
   id: number
@@ -88,6 +89,8 @@ export default function HouseholdPage() {
   const [saving, setSaving] = useState(false)
   const [myAccounts, setMyAccounts] = useState<{ id: number; name: string; current_balance: number }[]>([])
   const [summary, setSummary] = useState<LedgerSummary | null>(null)
+  const [viewMode, setViewMode] = useState<'feed' | 'report'>('feed')
+  const [reportRefresh, setReportRefresh] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -250,6 +253,7 @@ export default function HouseholdPage() {
       setExpenseOpen(false)
       setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
       await loadExpenses(activeLedger)
+      setReportRefresh(k => k + 1)
       if (selectedId) {
         const lRes = await householdsApi.ledgers(selectedId)
         const list = asList<Ledger>(lRes.data)
@@ -305,6 +309,7 @@ export default function HouseholdPage() {
       setLedgers(asList(lRes.data))
       setActiveLedger(updated)
       await loadExpenses(updated)
+      setReportRefresh(k => k + 1)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not close ledger.'))
     } finally { setSaving(false) }
@@ -325,6 +330,7 @@ export default function HouseholdPage() {
       setLedgers(asList(lRes.data))
       setActiveLedger(res.data)
       await loadExpenses(res.data)
+      setReportRefresh(k => k + 1)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not reopen.'))
     } finally { setSaving(false) }
@@ -483,6 +489,31 @@ export default function HouseholdPage() {
 
           {activeLedger && (
             <>
+              <div className="rpt-chips" style={{ marginBottom: '0.85rem' }}>
+                <button
+                  type="button"
+                  className={`rpt-chip ${viewMode === 'feed' ? 'active' : ''}`}
+                  onClick={() => setViewMode('feed')}
+                >
+                  Expenses
+                </button>
+                <button
+                  type="button"
+                  className={`rpt-chip ${viewMode === 'report' ? 'active' : ''}`}
+                  onClick={() => setViewMode('report')}
+                >
+                  Report
+                </button>
+              </div>
+
+              {viewMode === 'report' ? (
+                <HouseholdReportPanel
+                  ledger={activeLedger}
+                  householdName={selected.name}
+                  refreshKey={reportRefresh}
+                />
+              ) : (
+            <>
               <div className="grid-2" style={{ marginBottom: '1rem' }}>
                 <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
                   <div className="stat-label">
@@ -611,6 +642,8 @@ export default function HouseholdPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </>
               )}
             </>
           )}

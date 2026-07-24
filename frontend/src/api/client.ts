@@ -206,6 +206,8 @@ export const householdsApi = {
   closeLedger: (ledgerId: number) => api.post(`/household-ledgers/${ledgerId}/close/`),
   reopenLedger: (ledgerId: number) => api.post(`/household-ledgers/${ledgerId}/reopen/`),
   ledgerSummary: (ledgerId: number) => api.get(`/household-ledgers/${ledgerId}/summary/`),
+  ledgerReport: (ledgerId: number, params?: { year?: number; month?: number }) =>
+    api.get(`/household-ledgers/${ledgerId}/report/`, { params }),
   joinPreview: (data: { code?: string; token?: string }) => api.post('/households/join/preview/', data),
   join: (data: { code?: string; token?: string }) => api.post('/households/join/', data),
   pendingInvites: () => api.get('/households/invitations/pending/'),

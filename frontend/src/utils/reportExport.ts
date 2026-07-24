@@ -254,3 +254,55 @@ export async function downloadReportPDF(rows: LedgerRow[], meta: ReportMeta) {
 
   doc.save(`${safeName('CashTrail_' + meta.username + '_' + meta.monthLabel)}.pdf`)
 }
+
+/** ── Household shared-expense CSV ─────────────────────────────── */
+export interface HouseholdReportRow {
+  date: string
+  category: string
+  notes: string
+  paid_by: string
+  account: string
+  amount: number
+}
+
+export interface HouseholdReportMeta {
+  householdName: string
+  ledgerName: string
+  periodLabel: string
+  totalSpent: number
+  byMember: { name: string; amount: number }[]
+  byCategory: { name: string; amount: number }[]
+}
+
+export function downloadHouseholdReportCSV(rows: HouseholdReportRow[], meta: HouseholdReportMeta) {
+  const lines: string[] = []
+  lines.push('CashTrail — Household Report')
+  lines.push(`Household,${csvCell(meta.householdName)}`)
+  lines.push(`Ledger,${csvCell(meta.ledgerName)}`)
+  lines.push(`Period,${csvCell(meta.periodLabel)}`)
+  lines.push(`Generated,${csvCell(new Date().toLocaleString('en-PK'))}`)
+  lines.push(`Total spent,${meta.totalSpent}`)
+  lines.push('')
+  lines.push('By member')
+  lines.push('Member,Amount')
+  meta.byMember.forEach(m => lines.push(`${csvCell(m.name)},${m.amount}`))
+  lines.push('')
+  lines.push('By category')
+  lines.push('Category,Amount')
+  meta.byCategory.forEach(c => lines.push(`${csvCell(c.name)},${c.amount}`))
+  lines.push('')
+  lines.push(['Date', 'Category', 'Notes', 'Paid by', 'Wallet', 'Amount'].join(','))
+  rows.forEach(r => {
+    lines.push([
+      csvCell(r.date),
+      csvCell(r.category),
+      csvCell(r.notes),
+      csvCell(r.paid_by),
+      csvCell(r.account),
+      r.amount,
+    ].join(','))
+  })
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const label = safeName(`${meta.householdName}_${meta.ledgerName}_${meta.periodLabel}`)
+  triggerDownload(blob, `CashTrail_Household_${label}.csv`)
+}

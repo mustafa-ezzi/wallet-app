@@ -27,9 +27,8 @@ def _display_name(user):
     return full or user.username or user.email
 
 
-def ledger_summary(ledger):
-    """Totals + breakdowns for close screen / reports."""
-    rows = list(ledger.expenses.select_related('paid_by').all())
+def _expense_breakdown(rows):
+    """Totals + by-member / by-category from a list of HouseholdExpense rows."""
     total = sum(float(r.amount) for r in rows)
     by_member: dict[str, float] = {}
     by_category: dict[str, float] = {}
@@ -50,6 +49,84 @@ def ledger_summary(ledger):
             for k, v in sorted(by_category.items(), key=lambda x: -x[1])
         ],
     }
+
+
+def ledger_summary(ledger):
+    """Totals + breakdowns for close screen / reports (full ledger)."""
+    rows = list(ledger.expenses.select_related('paid_by').all())
+    return _expense_breakdown(rows)
+
+
+def ledger_report(ledger, year=None, month=None):
+    """
+    Complete breakdown for a period.
+    year+month → filter to that calendar month (ongoing monthly view).
+    Omit both → full history (events / closed / all-time).
+    """
+    qs = ledger.expenses.select_related('paid_by', 'linked_account').order_by('date', 'id')
+    period = 'all'
+    if year is not None and month is not None:
+        qs = qs.filter(date__year=int(year), date__month=int(month))
+        period = f'{int(year):04d}-{int(month):02d}'
+
+    rows = list(qs)
+    data = _expense_breakdown(rows)
+
+    # Daily timeline: one group per date with line items
+    by_day: dict[str, list] = {}
+    day_totals: dict[str, float] = {}
+    for r in rows:
+        key = r.date.isoformat()
+        day_totals[key] = day_totals.get(key, 0) + float(r.amount)
+        by_day.setdefault(key, []).append({
+            'id': r.id,
+            'amount': float(r.amount),
+            'category': r.category or 'Uncategorized',
+            'notes': r.notes or '',
+            'paid_by_name': _display_name(r.paid_by) or 'Unknown',
+            'account_name': r.linked_account.name if r.linked_account_id else None,
+        })
+
+    timeline = [
+        {
+            'date': d,
+            'total': day_totals[d],
+            'count': len(by_day[d]),
+            'items': by_day[d],
+        }
+        for d in sorted(by_day.keys(), reverse=True)
+    ]
+
+    data.update({
+        'period': period,
+        'year': int(year) if year is not None else None,
+        'month': int(month) if month is not None else None,
+        'timeline': timeline,
+        'ledger': {
+            'id': ledger.id,
+            'name': ledger.name,
+            'kind': ledger.kind,
+            'status': ledger.status,
+            'closed_total_expense': (
+                float(ledger.closed_total_expense)
+                if ledger.closed_total_expense is not None else None
+            ),
+        },
+    })
+
+    # Closed-event consistency: snapshot vs live full history
+    if ledger.status == 'closed' and period == 'all':
+        snap = float(ledger.closed_total_expense or 0)
+        live = data['total_spent']
+        data['snapshot_total'] = snap
+        data['live_total'] = live
+        data['snapshot_matches'] = abs(snap - live) < 0.01
+    else:
+        data['snapshot_total'] = None
+        data['live_total'] = None
+        data['snapshot_matches'] = None
+
+    return data
 
 def user_active_membership(user, household_id):
     return HouseholdMembership.objects.filter(
@@ -414,6 +491,30 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
         data = ledger_summary(ledger)
         data['ledger'] = HouseholdLedgerSerializer(ledger, context={'request': request}).data
         return Response(data)
+
+    @action(detail=True, methods=['get'])
+    def report(self, request, pk=None):
+        """
+        GET …/report/?year=&month=
+        - With year+month: that month's breakdown (ongoing ledgers).
+        - Without: full history (events / closed / all-time).
+        """
+        ledger = self.get_object()
+        m = require_active_member(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Not a member.'}, status=403)
+        year = request.query_params.get('year')
+        month = request.query_params.get('month')
+        y = int(year) if year else None
+        mo = int(month) if month else None
+        if (y is None) ^ (mo is None):
+            return Response(
+                {'detail': 'Provide both year and month, or neither for full history.'},
+                status=400,
+            )
+        if mo is not None and not (1 <= mo <= 12):
+            return Response({'detail': 'Invalid month.'}, status=400)
+        return Response(ledger_report(ledger, year=y, month=mo))
 
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):

@@ -758,15 +758,15 @@ P0 Research ──► P1 Foundation + MVP ──► P2 Dual link (bank + Househo
 
 **Backend**
 
-- [ ] `GET …/report/?year=&month=` → totals, by category, by `paid_by`, daily/timeline rows
-- [ ] Closed-event report uses snapshot + live history consistency checks
+- [x] `GET …/report/?year=&month=` → totals, by category, by `paid_by`, daily/timeline rows
+- [x] Closed-event report uses snapshot + live history consistency checks
 
 **Frontend**
 
-- [ ] Household report screen (or Reports tab section): month picker, category list, who-paid list, ledger table
-- [ ] Optional CSV/PDF export (reuse CashTrail export patterns if already solid)
+- [x] Household report screen (or Reports tab section): month picker, category list, who-paid list, ledger table
+- [x] Optional CSV/PDF export (reuse CashTrail export patterns if already solid) — CSV shipped
 
-**Exit criteria:** Family can answer “how much this month?”, “who paid most?”, “what on groceries?” without leaving the app.
+**Exit criteria:** Family can answer “how much this month?”, “who paid most?”, “what on groceries?” without leaving the app. ✅
 
 ---
 

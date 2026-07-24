@@ -546,3 +546,93 @@ class HouseholdPhase3EventCloseTests(TestCase):
             format="json",
         )
         self.assertEqual(again.status_code, 201, again.data)
+
+
+class HouseholdPhase4ReportTests(TestCase):
+    """P4: month report breakdown + closed snapshot consistency."""
+
+    def _auth(self, user):
+        client = APIClient()
+        token = RefreshToken.for_user(user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        return client
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="p4a@example.com", email="p4a@example.com", password="testpass123", first_name="Ali",
+        )
+        self.member = User.objects.create_user(
+            username="p4b@example.com", email="p4b@example.com", password="testpass123", first_name="Bina",
+        )
+        UserProfile.objects.get_or_create(user=self.owner, defaults={"currency": "PKR"})
+        UserProfile.objects.get_or_create(user=self.member, defaults={"currency": "PKR"})
+        self.owner_client = self._auth(self.owner)
+        self.member_client = self._auth(self.member)
+
+    def test_monthly_report_and_closed_event_snapshot(self):
+        h = self.owner_client.post("/api/households/", {"name": "Report house"}, format="json")
+        self.assertEqual(h.status_code, 201, h.data)
+        hid = h.data["id"]
+        code = self.owner_client.get(f"/api/households/{hid}/invites/").data["code"]
+        self.member_client.post("/api/households/join/", {"code": code}, format="json")
+
+        today = date.today()
+        ongoing_id = self.owner_client.get(f"/api/households/{hid}/ledgers/").data[0]["id"]
+
+        self.owner_client.post(
+            f"/api/household-ledgers/{ongoing_id}/expenses/",
+            {"amount": "1500", "category": "Groceries", "date": today.isoformat()},
+            format="json",
+        )
+        self.member_client.post(
+            f"/api/household-ledgers/{ongoing_id}/expenses/",
+            {"amount": "500", "category": "Utilities", "date": today.isoformat()},
+            format="json",
+        )
+
+        month_report = self.member_client.get(
+            f"/api/household-ledgers/{ongoing_id}/report/",
+            {"year": today.year, "month": today.month},
+        )
+        self.assertEqual(month_report.status_code, 200, month_report.data)
+        self.assertEqual(float(month_report.data["total_spent"]), 2000.0)
+        self.assertEqual(month_report.data["expense_count"], 2)
+        self.assertEqual(month_report.data["period"], f"{today.year:04d}-{today.month:02d}")
+        cats = {c["name"]: float(c["amount"]) for c in month_report.data["by_category"]}
+        self.assertEqual(cats["Groceries"], 1500.0)
+        self.assertEqual(cats["Utilities"], 500.0)
+        members = {m["name"]: float(m["amount"]) for m in month_report.data["by_member"]}
+        self.assertEqual(members["Ali"], 1500.0)
+        self.assertEqual(members["Bina"], 500.0)
+        self.assertTrue(len(month_report.data["timeline"]) >= 1)
+        day = next(d for d in month_report.data["timeline"] if d["date"] == today.isoformat())
+        self.assertEqual(float(day["total"]), 2000.0)
+        self.assertEqual(day["count"], 2)
+
+        # Bad params
+        bad = self.owner_client.get(f"/api/household-ledgers/{ongoing_id}/report/", {"year": today.year})
+        self.assertEqual(bad.status_code, 400)
+
+        # Event + close → full report with snapshot match
+        event = self.owner_client.post(
+            f"/api/households/{hid}/ledgers/",
+            {"name": "Wedding", "kind": "event", "start_date": today.isoformat()},
+            format="json",
+        )
+        eid = event.data["id"]
+        self.owner_client.post(
+            f"/api/household-ledgers/{eid}/expenses/",
+            {"amount": "10000", "category": "Hall", "date": today.isoformat()},
+            format="json",
+        )
+        closed = self.owner_client.post(f"/api/household-ledgers/{eid}/close/")
+        self.assertEqual(closed.status_code, 200)
+
+        full = self.member_client.get(f"/api/household-ledgers/{eid}/report/")
+        self.assertEqual(full.status_code, 200)
+        self.assertEqual(full.data["period"], "all")
+        self.assertEqual(float(full.data["total_spent"]), 10000.0)
+        self.assertEqual(float(full.data["snapshot_total"]), 10000.0)
+        self.assertTrue(full.data["snapshot_matches"])
+        self.assertEqual(full.data["by_category"][0]["name"], "Hall")
+        self.assertEqual(full.data["timeline"][0]["items"][0]["paid_by_name"], "Ali")
