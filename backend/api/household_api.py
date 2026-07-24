@@ -163,9 +163,25 @@ def simplify_debts(nets: dict[int, Decimal]) -> list[tuple[int, int, Decimal]]:
     return transfers
 
 
+def ledger_pot_stats(ledger, exclude_expense_id=None):
+    """Contributed / spent / remaining pot for a ledger."""
+    contributed = ledger.contributions.aggregate(total=Sum('amount'))['total'] or 0
+    spent_qs = ledger.expenses.all()
+    if exclude_expense_id:
+        spent_qs = spent_qs.exclude(pk=exclude_expense_id)
+    spent = spent_qs.aggregate(total=Sum('pot_amount'))['total'] or 0
+    contributed = _money(contributed)
+    spent = _money(spent)
+    return {
+        'pot_contributed': float(contributed),
+        'pot_spent': float(spent),
+        'pot_balance': float(_money(contributed - spent)),
+    }
+
+
 def compute_settlement(ledger):
     """
-    credit[m] = expenses paid_by m + contributions by m
+    credit[m] = wallet-paid expenses (amount − pot_amount) + contributions by m
     fair_share = total_expenses / N
     net[m] = credit[m] - fair_share
     """
@@ -182,13 +198,17 @@ def compute_settlement(ledger):
 
     total_expenses = _money(sum((e.amount for e in expenses), Decimal('0')))
     total_contributions = _money(sum((c.amount for c in contributions), Decimal('0')))
+    pot_stats = ledger_pot_stats(ledger)
     fair_share = _money(total_expenses / n) if n else Decimal('0.00')
 
     paid: dict[int, Decimal] = {uid: Decimal('0.00') for uid in user_ids}
     pot: dict[int, Decimal] = {uid: Decimal('0.00') for uid in user_ids}
     for e in expenses:
         if e.paid_by_id in paid:
-            paid[e.paid_by_id] = _money(paid[e.paid_by_id] + e.amount)
+            # Only personal outlay counts toward paid credit (pot portion already credited via contributions)
+            personal = _money(e.amount) - _money(e.pot_amount or 0)
+            if personal > 0:
+                paid[e.paid_by_id] = _money(paid[e.paid_by_id] + personal)
     for c in contributions:
         if c.contributed_by_id in pot:
             pot[c.contributed_by_id] = _money(pot[c.contributed_by_id] + c.amount)
@@ -259,6 +279,8 @@ def compute_settlement(ledger):
         'member_count': n,
         'total_expenses': float(total_expenses),
         'total_contributions': float(total_contributions),
+        'pot_spent': pot_stats['pot_spent'],
+        'pot_balance': pot_stats['pot_balance'],
         'fair_share': float(fair_share),
         'credits': credits,
         'transfers': transfers,
@@ -410,6 +432,9 @@ class HouseholdInviteSerializer(serializers.ModelSerializer):
 class HouseholdLedgerSerializer(serializers.ModelSerializer):
     total_spent = serializers.ReadOnlyField()
     month_spent = serializers.SerializerMethodField()
+    pot_contributed = serializers.ReadOnlyField()
+    pot_spent = serializers.ReadOnlyField()
+    pot_balance = serializers.ReadOnlyField()
     household_name = serializers.CharField(source='household.name', read_only=True)
     closed_by_name = serializers.SerializerMethodField()
 
@@ -418,7 +443,7 @@ class HouseholdLedgerSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'household', 'household_name', 'name', 'kind', 'status', 'start_date', 'end_date',
             'opening_float', 'notes', 'closed_at', 'closed_by', 'closed_by_name', 'closed_total_expense',
-            'total_spent', 'month_spent', 'created_at',
+            'total_spent', 'month_spent', 'pot_contributed', 'pot_spent', 'pot_balance', 'created_at',
         )
         read_only_fields = (
             'household', 'closed_at', 'closed_by', 'closed_total_expense', 'created_at',
@@ -445,11 +470,12 @@ class HouseholdExpenseSerializer(serializers.ModelSerializer):
     paid_by_name = serializers.SerializerMethodField()
     created_by_name = serializers.SerializerMethodField()
     account_name = serializers.SerializerMethodField()
+    personal_amount = serializers.ReadOnlyField()
 
     class Meta:
         model = HouseholdExpense
         fields = (
-            'id', 'ledger', 'amount', 'date', 'category', 'notes',
+            'id', 'ledger', 'amount', 'date', 'category', 'notes', 'pot_amount', 'personal_amount',
             'created_by', 'created_by_name', 'paid_by', 'paid_by_name',
             'linked_transaction', 'linked_account', 'account_name', 'created_at',
         )
@@ -457,6 +483,7 @@ class HouseholdExpenseSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'ledger': {'required': False},
             'paid_by': {'required': False},
+            'pot_amount': {'required': False},
         }
 
     def get_paid_by_name(self, obj):
@@ -917,6 +944,7 @@ class HouseholdLedgerViewSet(viewsets.ModelViewSet):
             return Response({
                 'results': HouseholdContributionSerializer(qs, many=True).data,
                 'total': float(total),
+                **ledger_pot_stats(ledger),
             })
 
         if ledger.status == 'closed':
@@ -1033,6 +1061,7 @@ class HouseholdLedgerViewSet(viewsets.ModelViewSet):
                 'limit': limit,
                 'offset': offset,
                 'has_more': offset + limit < count,
+                **ledger_pot_stats(ledger),
             })
 
         if ledger.status == 'closed':
@@ -1046,10 +1075,24 @@ class HouseholdLedgerViewSet(viewsets.ModelViewSet):
         ).exists():
             return Response({'paid_by': 'Must be an active household member.'}, status=400)
 
+        amount = _money(ser.validated_data['amount'])
+        pot_amount = _money(ser.validated_data.get('pot_amount') or 0)
+        if pot_amount < 0:
+            return Response({'pot_amount': 'Cannot be negative.'}, status=400)
+        if pot_amount > amount:
+            return Response({'pot_amount': 'Cannot exceed expense amount.'}, status=400)
+        pot_stats = ledger_pot_stats(ledger)
+        if pot_amount > _money(pot_stats['pot_balance']):
+            return Response(
+                {'pot_amount': f'Only {pot_stats["pot_balance"]:,.2f} left in the pot.'},
+                status=400,
+            )
+        personal = _money(amount - pot_amount)
+
         linked_account = ser.validated_data.get('linked_account')
         linked_tx = None
-        # Dual-link from household hub: wallet selected → personal expense + shared line
-        if linked_account:
+        # Wallet link only for the personal (non-pot) portion
+        if linked_account and personal > 0:
             if linked_account.user_id != request.user.id:
                 return Response(
                     {'linked_account': 'You can only pay from your own wallet.'},
@@ -1058,17 +1101,20 @@ class HouseholdLedgerViewSet(viewsets.ModelViewSet):
             linked_tx = Transaction.objects.create(
                 user=request.user,
                 type='expense',
-                amount=ser.validated_data['amount'],
+                amount=personal,
                 date=ser.validated_data['date'],
                 account=linked_account,
                 category=ser.validated_data.get('category') or '',
                 notes=ser.validated_data.get('notes') or f'Household: {ledger.name}',
             )
+        elif linked_account and personal <= 0:
+            linked_account = None
 
         expense = ser.save(
             ledger=ledger,
             created_by=request.user,
             paid_by=paid_by,
+            pot_amount=pot_amount,
             linked_transaction=linked_tx,
             linked_account=linked_account,
         )
@@ -1113,15 +1159,39 @@ class HouseholdExpenseViewSet(viewsets.ModelViewSet):
         serializer.validated_data.pop('ledger', None)
         serializer.validated_data.pop('paid_by', None)
         serializer.validated_data.pop('linked_account', None)
+
+        amount = _money(serializer.validated_data.get('amount', expense.amount))
+        pot_amount = _money(serializer.validated_data.get('pot_amount', expense.pot_amount or 0))
+        if pot_amount < 0:
+            return Response({'pot_amount': 'Cannot be negative.'}, status=400)
+        if pot_amount > amount:
+            return Response({'pot_amount': 'Cannot exceed expense amount.'}, status=400)
+        pot_stats = ledger_pot_stats(expense.ledger, exclude_expense_id=expense.id)
+        if pot_amount > _money(pot_stats['pot_balance']):
+            return Response(
+                {'pot_amount': f'Only {pot_stats["pot_balance"]:,.2f} left in the pot.'},
+                status=400,
+            )
+        serializer.validated_data['amount'] = amount
+        serializer.validated_data['pot_amount'] = pot_amount
         expense = serializer.save()
+        personal = _money(amount - pot_amount)
         tx = expense.linked_transaction
         if tx:
-            tx.amount = expense.amount
-            tx.date = expense.date
-            tx.category = expense.category or ''
-            if expense.notes:
-                tx.notes = expense.notes
-            tx.save(update_fields=['amount', 'date', 'category', 'notes'])
+            if personal > 0:
+                tx.amount = personal
+                tx.date = expense.date
+                tx.category = expense.category or ''
+                if expense.notes:
+                    tx.notes = expense.notes
+                tx.save(update_fields=['amount', 'date', 'category', 'notes'])
+            else:
+                # Fully covered by pot — remove wallet line
+                tx_id = tx.pk
+                expense.linked_transaction = None
+                expense.linked_account = None
+                expense.save(update_fields=['linked_transaction', 'linked_account'])
+                Transaction.objects.filter(pk=tx_id).delete()
         return Response(HouseholdExpenseSerializer(expense).data)
 
     def destroy(self, request, *args, **kwargs):

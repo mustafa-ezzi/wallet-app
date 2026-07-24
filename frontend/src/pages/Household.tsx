@@ -60,6 +60,9 @@ interface Ledger {
   status: string
   total_spent: number
   month_spent: number
+  pot_contributed?: number
+  pot_spent?: number
+  pot_balance?: number
   closed_total_expense: number | null
   closed_at: string | null
   closed_by_name: string | null
@@ -79,6 +82,8 @@ interface Expense {
   date: string
   category: string
   notes: string
+  pot_amount: number
+  personal_amount?: number
   paid_by_name: string
   created_by: number
   account_name: string | null
@@ -115,7 +120,9 @@ export default function HouseholdPage() {
   const [joinCode, setJoinCode] = useState('')
   const [preview, setPreview] = useState<{ household_name: string; member_count: number; code: string } | null>(null)
   const [emailInvite, setEmailInvite] = useState('')
-  const [expForm, setExpForm] = useState({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
+  const [expForm, setExpForm] = useState({
+    amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '', pot_amount: '',
+  })
   const [contribForm, setContribForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
   const [saving, setSaving] = useState(false)
   const [myAccounts, setMyAccounts] = useState<{ id: number; name: string; current_balance: number }[]>([])
@@ -127,6 +134,8 @@ export default function HouseholdPage() {
     contributed_by_name: string; created_by?: number; account_name: string | null
   }[]>([])
   const [contribTotal, setContribTotal] = useState(0)
+  const [potBalance, setPotBalance] = useState(0)
+  const [potSpent, setPotSpent] = useState(0)
   const [members, setMembers] = useState<MemberRow[]>([])
   const [notifications, setNotifications] = useState<HhNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -205,6 +214,9 @@ export default function HouseholdPage() {
     const rows = res.data?.results ?? []
     setExpenses(prev => reset ? rows : [...prev, ...rows])
     setExpenseTotal(Number(res.data?.total) || 0)
+    setPotBalance(Number(res.data?.pot_balance ?? ledger.pot_balance) || 0)
+    setPotSpent(Number(res.data?.pot_spent ?? ledger.pot_spent) || 0)
+    if (res.data?.pot_contributed != null) setContribTotal(Number(res.data.pot_contributed) || 0)
     const nextOffset = (reset ? 0 : expenseOffset) + rows.length
     setExpenseOffset(nextOffset)
     setExpenseHasMore(Boolean(res.data?.has_more))
@@ -212,10 +224,11 @@ export default function HouseholdPage() {
       try {
         const cRes = await householdsApi.ledgerContributions(ledger.id)
         setContributions(cRes.data?.results ?? [])
-        setContribTotal(Number(cRes.data?.total) || 0)
+        setContribTotal(Number(cRes.data?.total ?? cRes.data?.pot_contributed) || 0)
+        if (cRes.data?.pot_balance != null) setPotBalance(Number(cRes.data.pot_balance) || 0)
+        if (cRes.data?.pot_spent != null) setPotSpent(Number(cRes.data.pot_spent) || 0)
       } catch {
         setContributions([])
-        setContribTotal(0)
       }
       if (ledger.status === 'closed' || ledger.kind === 'event') {
         try {
@@ -343,23 +356,28 @@ export default function HouseholdPage() {
     if (!activeLedger) return
     setSaving(true); setError('')
     try {
+      const amount = parseFloat(expForm.amount)
+      const potAmt = parseFloat(expForm.pot_amount || '0') || 0
       const payload = {
-        amount: parseFloat(expForm.amount),
+        amount,
         category: expForm.category,
         date: expForm.date,
         notes: expForm.notes,
+        pot_amount: potAmt,
       }
       if (editingExpense) {
         await householdsApi.updateExpense(editingExpense.id, payload)
       } else {
         await householdsApi.addExpense(activeLedger.id, {
           ...payload,
-          ...(expForm.linked_account ? { linked_account: parseInt(expForm.linked_account) } : {}),
+          ...(expForm.linked_account && potAmt < amount
+            ? { linked_account: parseInt(expForm.linked_account) }
+            : {}),
         })
       }
       setExpenseOpen(false)
       setEditingExpense(null)
-      setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
+      setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '', pot_amount: '' })
       await loadExpenses(activeLedger, true)
       setReportRefresh(k => k + 1)
       if (selectedId) {
@@ -382,6 +400,7 @@ export default function HouseholdPage() {
       date: e.date,
       notes: e.notes || '',
       linked_account: '',
+      pot_amount: String(e.pot_amount || 0),
     })
     setExpenseOpen(true)
     setError('')
@@ -1005,21 +1024,28 @@ export default function HouseholdPage() {
                   </div>
                 </div>
                 <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
-                  <div className="stat-label">Status</div>
-                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
-                    <span className={`badge ${activeLedger.kind === 'event' ? 'badge-blue' : 'badge-green'}`}>
-                      {activeLedger.kind === 'event' ? 'Event' : 'Monthly'}
-                    </span>
-                    <span className={`badge ${activeLedger.status === 'closed' ? 'badge-red' : 'badge-green'}`}>
-                      {activeLedger.status === 'closed' ? 'Closed' : 'Open'}
-                    </span>
-                  </div>
-                  <div className="stat-sub" style={{ marginTop: '0.5rem' }}>
-                    {activeLedger.status === 'closed' && activeLedger.closed_at
-                      ? `Closed ${new Date(activeLedger.closed_at).toLocaleDateString()}${activeLedger.closed_by_name ? ` by ${activeLedger.closed_by_name}` : ''}`
-                      : `All-time ${fmt(activeLedger.total_spent)}`}
+                  <div className="stat-label">Pot balance</div>
+                  <div className={`stat-value ${potBalance > 0 ? 'amt-positive' : ''}`}>{fmt(potBalance)}</div>
+                  <div className="stat-sub">
+                    {contribTotal > 0
+                      ? `In ${fmt(contribTotal)}${potSpent > 0 ? ` · used ${fmt(potSpent)}` : ''}`
+                      : 'Contribute to build the pot'}
                   </div>
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginBottom: '1rem', alignItems: 'center' }}>
+                <span className={`badge ${activeLedger.kind === 'event' ? 'badge-blue' : 'badge-green'}`}>
+                  {activeLedger.kind === 'event' ? 'Event' : 'Monthly'}
+                </span>
+                <span className={`badge ${activeLedger.status === 'closed' ? 'badge-red' : 'badge-green'}`}>
+                  {activeLedger.status === 'closed' ? 'Closed' : 'Open'}
+                </span>
+                <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                  {activeLedger.status === 'closed' && activeLedger.closed_at
+                    ? `Closed ${new Date(activeLedger.closed_at).toLocaleDateString()}${activeLedger.closed_by_name ? ` by ${activeLedger.closed_by_name}` : ''}`
+                    : `All-time spent ${fmt(activeLedger.total_spent)}`}
+                </span>
               </div>
 
               {summary && (activeLedger.status === 'closed' || activeLedger.kind === 'event') && (
@@ -1067,7 +1093,7 @@ export default function HouseholdPage() {
                       style={{ fontSize: '0.82rem' }}
                       onClick={() => {
                         setEditingExpense(null)
-                        setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
+                        setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '', pot_amount: '' })
                         setExpenseOpen(true)
                       }}
                     >
@@ -1098,11 +1124,15 @@ export default function HouseholdPage() {
                 </p>
               )}
 
-              {contributions.length > 0 && (
+              {contributions.length > 0 ? (
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Pot contributions</h3>
-                    <span className="text-muted" style={{ fontSize: '0.78rem' }}>Total {fmt(contribTotal)}</span>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Pot</h3>
+                    <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                      Balance <strong className={potBalance > 0 ? 'amt-positive' : undefined}>{fmt(potBalance)}</strong>
+                      {' · '}in {fmt(contribTotal)}
+                      {potSpent > 0 ? ` · used ${fmt(potSpent)}` : ''}
+                    </span>
                   </div>
                   <div className="list">
                     {contributions.map(c => (
@@ -1139,7 +1169,7 @@ export default function HouseholdPage() {
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {expenses.length === 0 ? (
                 <div className="glass empty-state">
@@ -1156,6 +1186,11 @@ export default function HouseholdPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 600 }}>{e.category || 'Expense'}</span>
+                          {Number(e.pot_amount) > 0 && (
+                            <span className="badge badge-green" style={{ fontSize: '0.62rem' }}>
+                              Pot {fmt(e.pot_amount)}
+                            </span>
+                          )}
                           {e.account_name && (
                             <span className="badge badge-blue" style={{ fontSize: '0.62rem' }}>
                               Paid from {e.account_name}
@@ -1472,10 +1507,8 @@ export default function HouseholdPage() {
             </div>
             <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.85rem' }}>
               {editingExpense
-                ? (editingExpense.linked_transaction
-                  ? 'Changing the amount also updates the linked wallet transaction.'
-                  : 'Update this line on the shared household book.')
-                : 'Optionally link to your wallet so your balance drops. The line still shows on the household book for all members.'}
+                ? 'Update this line. Pot and wallet portions stay in sync with the shared book.'
+                : 'Pay from the pot, your wallet, or both. Pot-funded amounts reduce the pot balance.'}
             </p>
             <form onSubmit={addExpense} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div className="grid-2">
@@ -1488,9 +1521,63 @@ export default function HouseholdPage() {
                   <input type="date" value={expForm.date} onChange={e => setExpForm(f => ({ ...f, date: e.target.value }))} required />
                 </div>
               </div>
-              {!editingExpense && (
+              {(contribTotal > 0 || Number(editingExpense?.pot_amount) > 0 || Number(expForm.pot_amount) > 0) && (
                 <div className="form-group">
-                  <label>Link to bank (recommended)</label>
+                  <label>
+                    Use from pot
+                    <span className="text-muted" style={{ fontWeight: 400, marginLeft: '0.35rem' }}>
+                      (available {fmt(
+                        potBalance + (editingExpense ? Number(editingExpense.pot_amount) || 0 : 0),
+                      )})
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={expForm.pot_amount}
+                    onChange={e => setExpForm(f => ({ ...f, pot_amount: e.target.value }))}
+                    placeholder="0"
+                  />
+                  <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn-glass"
+                      style={{ fontSize: '0.72rem' }}
+                      onClick={() => {
+                        const avail = potBalance + (editingExpense ? Number(editingExpense.pot_amount) || 0 : 0)
+                        const amt = parseFloat(expForm.amount) || 0
+                        setExpForm(f => ({ ...f, pot_amount: String(Math.min(avail, amt) || 0) }))
+                      }}
+                    >
+                      Use max pot
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-glass"
+                      style={{ fontSize: '0.72rem' }}
+                      onClick={() => setExpForm(f => ({ ...f, pot_amount: '0' }))}
+                    >
+                      Clear pot
+                    </button>
+                  </div>
+                  {(() => {
+                    const amt = parseFloat(expForm.amount) || 0
+                    const pot = parseFloat(expForm.pot_amount || '0') || 0
+                    const personal = Math.max(0, amt - pot)
+                    if (!amt) return null
+                    return (
+                      <p className="text-muted" style={{ fontSize: '0.72rem', marginTop: '0.35rem' }}>
+                        {pot > 0 ? `${fmt(pot)} from pot` : 'No pot'}
+                        {personal > 0 ? ` · ${fmt(personal)} from wallet / personal` : ' · fully covered by pot'}
+                      </p>
+                    )
+                  })()}
+                </div>
+              )}
+              {!editingExpense && (parseFloat(expForm.amount) || 0) > (parseFloat(expForm.pot_amount || '0') || 0) && (
+                <div className="form-group">
+                  <label>Link to bank (personal portion)</label>
                   <select value={expForm.linked_account} onChange={e => setExpForm(f => ({ ...f, linked_account: e.target.value }))}>
                     <option value="">Shared book only — wallet unchanged</option>
                     {myAccounts.map(a => (

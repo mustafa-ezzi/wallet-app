@@ -352,6 +352,20 @@ class HouseholdLedger(models.Model):
         total = self.expenses.aggregate(total=Sum('amount'))['total'] or 0
         return float(total)
 
+    @property
+    def pot_contributed(self):
+        total = self.contributions.aggregate(total=Sum('amount'))['total'] or 0
+        return float(total)
+
+    @property
+    def pot_spent(self):
+        total = self.expenses.aggregate(total=Sum('pot_amount'))['total'] or 0
+        return float(total)
+
+    @property
+    def pot_balance(self):
+        return round(self.pot_contributed - self.pot_spent, 2)
+
 
 class HouseholdExpense(models.Model):
     ledger = models.ForeignKey(HouseholdLedger, on_delete=models.CASCADE, related_name='expenses')
@@ -361,6 +375,8 @@ class HouseholdExpense(models.Model):
     notes = models.TextField(blank=True, default='')
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='household_expenses_created')
     paid_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='household_expenses_paid')
+    # Portion of this expense funded from the shared pot (reduces pot balance)
+    pot_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     linked_transaction = models.ForeignKey(
         'Transaction', null=True, blank=True, on_delete=models.SET_NULL, related_name='household_expenses')
     linked_account = models.ForeignKey(
@@ -375,6 +391,13 @@ class HouseholdExpense(models.Model):
 
     def __str__(self):
         return f"{self.amount} on {self.date} ({self.ledger.name})"
+
+    @property
+    def personal_amount(self):
+        """Amount paid from someone's wallet (not the pot)."""
+        from decimal import Decimal
+        pot = self.pot_amount or Decimal('0')
+        return float(self.amount) - float(pot)
 
 
 class HouseholdContribution(models.Model):
