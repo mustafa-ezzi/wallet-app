@@ -704,17 +704,18 @@ P0 Research ──► P1 Foundation + MVP ──► P2 Dual link (bank + Househo
 
 **Backend**
 
-- [ ] `Transaction` create accepts optional `household_ledger` → creates personal expense + linked `HouseholdExpense`
-- [ ] Edit/delete linked pair with confirmation (update both sides or block)
-- [ ] Do **not** prioritize household-only entries (no wallet) — deferred per product decision
+- [x] `Transaction` create accepts optional `household_ledger` → creates personal expense + linked `HouseholdExpense`
+- [x] Edit/delete linked pair (tx update syncs household line; delete removes both sides when safe)
+- [x] Household hub add with `linked_account` also creates personal wallet expense
+- [x] Do **not** prioritize household-only as default — wallet link recommended in UI
 
 **Frontend**
 
-- [ ] FAB / Add Transaction: **Link to bank** (existing) + **Link to Household account** (new optional picker of open ledgers)
-- [ ] Household feed: show “Paid from [wallet name]” / badge when backed by a personal transaction
-- [ ] Clear copy: linking household does not move money between members’ banks — only shares the expense line
+- [x] FAB / Add Transaction: **Link to bank** + optional **Link to Household**
+- [x] Household feed: “Paid from [wallet]” badge when dual-linked
+- [x] Clear copy: linking household does not move money between members’ banks
 
-**Exit criteria:** X spends 5,000 from Meezan linked to “Family home” → Meezan −5,000 for X only; W/Y/Z see the household line; without household link, spend stays personal-only.
+**Exit criteria:** ✅ `HouseholdPhase2DualLinkTests` — Meezan −5,000 + shared line visible to other member; without link stays personal-only.
 
 ---
 

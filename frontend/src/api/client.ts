@@ -202,6 +202,7 @@ export const householdsApi = {
   inviteByEmail: (id: number, email: string) => api.post(`/households/${id}/invite-by-email/`, { email }),
   ledgers: (id: number) => api.get(`/households/${id}/ledgers/`),
   createLedger: (id: number, data: object) => api.post(`/households/${id}/ledgers/`, data),
+  openLedgers: () => api.get('/household-ledgers/', { params: { status: 'open' } }),
   joinPreview: (data: { code?: string; token?: string }) => api.post('/households/join/preview/', data),
   join: (data: { code?: string; token?: string }) => api.post('/households/join/', data),
   pendingInvites: () => api.get('/households/invitations/pending/'),

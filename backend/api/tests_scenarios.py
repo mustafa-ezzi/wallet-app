@@ -375,3 +375,71 @@ class HouseholdPhase1ScenarioTests(TestCase):
         stranger_client = self._auth(stranger)
         denied = stranger_client.get(f"/api/household-ledgers/{ledger_id}/expenses/")
         self.assertIn(denied.status_code, (403, 404))
+
+class HouseholdPhase2DualLinkTests(TestCase):
+    """P2: expense with household_ledger drops wallet and appears on shared ledger."""
+
+    def _auth(self, user):
+        client = APIClient()
+        token = RefreshToken.for_user(user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        return client
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="x@example.com", email="x@example.com", password="testpass123", first_name="X",
+        )
+        self.other = User.objects.create_user(
+            username="y@example.com", email="y@example.com", password="testpass123", first_name="Y",
+        )
+        UserProfile.objects.get_or_create(user=self.owner, defaults={"currency": "PKR"})
+        UserProfile.objects.get_or_create(user=self.other, defaults={"currency": "PKR"})
+        self.owner_client = self._auth(self.owner)
+        self.other_client = self._auth(self.other)
+        self.meezan = Account.objects.create(
+            user=self.owner, name="Meezan", type="bank", opening_balance=Decimal("20000"),
+        )
+
+    def test_fab_dual_link_drops_balance_and_shares(self):
+        h = self.owner_client.post("/api/households/", {"name": "Family home"}, format="json")
+        self.assertEqual(h.status_code, 201, h.data)
+        hid = h.data["id"]
+        code = self.owner_client.get(f"/api/households/{hid}/invites/").data["code"]
+        self.other_client.post("/api/households/join/", {"code": code}, format="json")
+        ledger_id = self.owner_client.get(f"/api/households/{hid}/ledgers/").data[0]["id"]
+
+        before = float(self.owner_client.get("/api/accounts/").data[0]["current_balance"])
+        self.assertEqual(before, 20000.0)
+
+        tx = self.owner_client.post("/api/transactions/", {
+            "type": "expense",
+            "amount": "5000",
+            "date": date.today().isoformat(),
+            "account": self.meezan.id,
+            "category": "Groceries",
+            "notes": "Family shop",
+            "household_ledger": ledger_id,
+        }, format="json")
+        self.assertEqual(tx.status_code, 201, tx.data)
+        self.assertIsNotNone(tx.data.get("household_expense_id"))
+
+        after = float(self.owner_client.get("/api/accounts/").data[0]["current_balance"])
+        self.assertEqual(after, 15000.0)
+
+        shared = self.other_client.get(f"/api/household-ledgers/{ledger_id}/expenses/")
+        self.assertEqual(shared.status_code, 200)
+        self.assertEqual(len(shared.data["results"]), 1)
+        self.assertEqual(float(shared.data["total"]), 5000.0)
+        self.assertEqual(shared.data["results"][0]["account_name"], "Meezan")
+
+        # Without household link — personal only
+        tx2 = self.owner_client.post("/api/transactions/", {
+            "type": "expense",
+            "amount": "100",
+            "date": date.today().isoformat(),
+            "account": self.meezan.id,
+            "category": "Food",
+        }, format="json")
+        self.assertEqual(tx2.status_code, 201)
+        shared2 = self.other_client.get(f"/api/household-ledgers/{ledger_id}/expenses/")
+        self.assertEqual(len(shared2.data["results"]), 1)

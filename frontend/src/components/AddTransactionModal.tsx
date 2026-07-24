@@ -6,7 +6,7 @@ import {
   ArrowUpRight,
   X,
 } from 'lucide-react'
-import { accountsApi, transactionsApi, asList } from '../api/client'
+import { accountsApi, transactionsApi, householdsApi, asList } from '../api/client'
 import { fmtBalance } from '../utils/format'
 
 interface Props {
@@ -16,10 +16,17 @@ interface Props {
 
 const EXPENSE_CATEGORIES = [
   'Utilities', 'Server Charges', 'Rent', 'Food', 'Transport',
-  'Salary', 'Miscellaneous',
+  'Salary', 'Miscellaneous', 'Groceries',
 ]
 
 type TxType = 'income' | 'expense' | 'transfer'
+
+interface OpenLedger {
+  id: number
+  name: string
+  household: number
+  household_name: string
+}
 
 export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const [type, setType] = useState<TxType>('income')
@@ -32,18 +39,23 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
   const [accountId, setAccountId] = useState('')
   const [category, setCategory]   = useState('')
+  const [householdLedgerId, setHouseholdLedgerId] = useState('')
 
   const [fromAccountId, setFromAccountId] = useState('')
   const [toAccountId, setToAccountId]     = useState('')
 
   const [accounts, setAccounts] = useState<any[]>([])
+  const [openLedgers, setOpenLedgers] = useState<OpenLedger[]>([])
 
   useEffect(() => {
     accountsApi.list().then(r => setAccounts(asList(r.data)))
+    householdsApi.openLedgers()
+      .then(r => setOpenLedgers(asList(r.data)))
+      .catch(() => setOpenLedgers([]))
   }, [])
 
   const switchType = (t: TxType) => {
-    setType(t); setError(''); setCategory('')
+    setType(t); setError(''); setCategory(''); setHouseholdLedgerId('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,17 +103,27 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
     setLoading(true)
     try {
-      await transactionsApi.create({
+      const payload: Record<string, unknown> = {
         type,
         amount: parseFloat(amount),
         date,
         account: parseInt(accountId),
         category,
         notes,
-      })
+      }
+      if (type === 'expense' && householdLedgerId) {
+        payload.household_ledger = parseInt(householdLedgerId)
+      }
+      await transactionsApi.create(payload)
       onAdded()
     } catch (err: any) {
-      setError(err.response?.data?.detail ?? 'Something went wrong.')
+      const data = err.response?.data
+      const msg = typeof data?.household_ledger === 'string'
+        ? data.household_ledger
+        : Array.isArray(data?.household_ledger)
+          ? data.household_ledger.join(' ')
+          : data?.detail ?? 'Something went wrong.'
+      setError(msg)
     } finally {
       setLoading(false)
     }
@@ -237,9 +259,9 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
               </div>
 
               <div className="form-group">
-                <label>Account</label>
+                <label>Link to bank</label>
                 <select value={accountId} onChange={e => setAccountId(e.target.value)} required>
-                  <option value="">Select account…</option>
+                  <option value="">Select wallet…</option>
                   {accounts.map((a: any) => (
                     <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
                   ))}
@@ -253,6 +275,23 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                     <option value="">Select category…</option>
                     {EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
                   </select>
+                </div>
+              )}
+
+              {type === 'expense' && openLedgers.length > 0 && (
+                <div className="form-group">
+                  <label>Link to Household (optional)</label>
+                  <select value={householdLedgerId} onChange={e => setHouseholdLedgerId(e.target.value)}>
+                    <option value="">Personal only — not shared</option>
+                    {openLedgers.map(l => (
+                      <option key={l.id} value={l.id}>
+                        {l.household_name} — {l.name}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-muted" style={{ fontSize: '0.72rem', marginTop: '0.3rem', display: 'block' }}>
+                    Your wallet balance still drops. Household only shares the expense line with members — it does not move money between banks.
+                  </span>
                 </div>
               )}
 

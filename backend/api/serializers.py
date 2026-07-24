@@ -3,7 +3,8 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
     UserProfile, Account, Project, Transaction,
-    RecurringExpense, ReceivableInstallment, PayableInstallment
+    RecurringExpense, ReceivableInstallment, PayableInstallment,
+    HouseholdLedger, HouseholdExpense, HouseholdMembership,
 )
 
 
@@ -104,13 +105,22 @@ class ProjectSerializer(serializers.ModelSerializer):
 class TransactionSerializer(serializers.ModelSerializer):
     account_name = serializers.SerializerMethodField()
     project_name = serializers.SerializerMethodField()
+    household_ledger = serializers.PrimaryKeyRelatedField(
+        queryset=HouseholdLedger.objects.all(),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+    household_expense_id = serializers.SerializerMethodField()
+    household_ledger_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Transaction
         fields = (
             'id', 'type', 'amount', 'date', 'account', 'account_name',
             'linked_project', 'project_name', 'linked_receivable', 'linked_payable',
-            'category', 'notes', 'created_at'
+            'category', 'notes', 'created_at',
+            'household_ledger', 'household_expense_id', 'household_ledger_name',
         )
         read_only_fields = ('created_at',)
 
@@ -119,6 +129,72 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     def get_project_name(self, obj):
         return obj.linked_project.name if obj.linked_project else None
+
+    def get_household_expense_id(self, obj):
+        he = obj.household_expenses.first()
+        return he.id if he else None
+
+    def get_household_ledger_name(self, obj):
+        he = obj.household_expenses.select_related('ledger').first()
+        return he.ledger.name if he else None
+
+    def validate_household_ledger(self, ledger):
+        if ledger is None:
+            return ledger
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            raise serializers.ValidationError('Authentication required.')
+        if ledger.status == 'closed':
+            raise serializers.ValidationError('This household ledger is closed.')
+        if not HouseholdMembership.objects.filter(
+            household=ledger.household, user=request.user, status='active',
+        ).exists():
+            raise serializers.ValidationError('You are not a member of this household.')
+        return ledger
+
+    def validate(self, attrs):
+        ledger = attrs.get('household_ledger')
+        if ledger and attrs.get('type', getattr(self.instance, 'type', None)) != 'expense':
+            raise serializers.ValidationError({
+                'household_ledger': 'Only expenses can be linked to a household ledger.',
+            })
+        if ledger and attrs.get('category') == 'Bank Transfer':
+            raise serializers.ValidationError({
+                'household_ledger': 'Bank transfers cannot be linked to a household.',
+            })
+        return attrs
+
+    def create(self, validated_data):
+        ledger = validated_data.pop('household_ledger', None)
+        tx = Transaction.objects.create(**validated_data)
+        if ledger and tx.type == 'expense':
+            HouseholdExpense.objects.create(
+                ledger=ledger,
+                amount=tx.amount,
+                date=tx.date,
+                category=tx.category or '',
+                notes=tx.notes or '',
+                created_by=tx.user,
+                paid_by=tx.user,
+                linked_transaction=tx,
+                linked_account=tx.account,
+            )
+        return tx
+
+    def update(self, instance, validated_data):
+        # household_ledger on update: only allow clearing or keep; linking new via PATCH is rare
+        validated_data.pop('household_ledger', None)
+        instance = super().update(instance, validated_data)
+        for he in instance.household_expenses.all():
+            if he.ledger.status == 'closed':
+                continue
+            he.amount = instance.amount
+            he.date = instance.date
+            he.category = instance.category or ''
+            he.notes = instance.notes or ''
+            he.linked_account = instance.account
+            he.save(update_fields=['amount', 'date', 'category', 'notes', 'linked_account'])
+        return instance
 
 
 class RecurringExpenseSerializer(serializers.ModelSerializer):

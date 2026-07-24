@@ -137,6 +137,15 @@ class TransactionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+    def perform_destroy(self, instance):
+        # Dual-link: remove matching household lines when personal expense is deleted
+        for he in list(instance.household_expenses.all()):
+            if he.ledger.status == 'closed':
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError('Cannot delete — linked household ledger is closed.')
+            he.delete()
+        instance.delete()
+
 
 class RecurringExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = RecurringExpenseSerializer

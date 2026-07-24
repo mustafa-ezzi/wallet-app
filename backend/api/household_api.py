@@ -12,6 +12,7 @@ from rest_framework.views import APIView
 
 from .models import (
     Household, HouseholdMembership, HouseholdInvite, HouseholdLedger, HouseholdExpense,
+    Account, Transaction,
     generate_household_invite_code, generate_invite_token,
 )
 
@@ -129,11 +130,12 @@ class HouseholdInviteSerializer(serializers.ModelSerializer):
 class HouseholdLedgerSerializer(serializers.ModelSerializer):
     total_spent = serializers.ReadOnlyField()
     month_spent = serializers.SerializerMethodField()
+    household_name = serializers.CharField(source='household.name', read_only=True)
 
     class Meta:
         model = HouseholdLedger
         fields = (
-            'id', 'household', 'name', 'kind', 'status', 'start_date', 'end_date',
+            'id', 'household', 'household_name', 'name', 'kind', 'status', 'start_date', 'end_date',
             'opening_float', 'notes', 'closed_at', 'closed_by', 'closed_total_expense',
             'total_spent', 'month_spent', 'created_at',
         )
@@ -366,10 +368,14 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return HouseholdLedger.objects.filter(
+        qs = HouseholdLedger.objects.filter(
             household__memberships__user=self.request.user,
             household__memberships__status='active',
-        ).distinct()
+        ).distinct().select_related('household')
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs
 
     @action(detail=True, methods=['get', 'post'])
     def expenses(self, request, pk=None):
@@ -400,10 +406,32 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             household=ledger.household, user=paid_by, status='active',
         ).exists():
             return Response({'paid_by': 'Must be an active household member.'}, status=400)
+
+        linked_account = ser.validated_data.get('linked_account')
+        linked_tx = None
+        # Dual-link from household hub: wallet selected → personal expense + shared line
+        if linked_account:
+            if linked_account.user_id != request.user.id:
+                return Response(
+                    {'linked_account': 'You can only pay from your own wallet.'},
+                    status=400,
+                )
+            linked_tx = Transaction.objects.create(
+                user=request.user,
+                type='expense',
+                amount=ser.validated_data['amount'],
+                date=ser.validated_data['date'],
+                account=linked_account,
+                category=ser.validated_data.get('category') or '',
+                notes=ser.validated_data.get('notes') or f'Household: {ledger.name}',
+            )
+
         expense = ser.save(
             ledger=ledger,
             created_by=request.user,
             paid_by=paid_by,
+            linked_transaction=linked_tx,
+            linked_account=linked_account,
         )
         return Response(HouseholdExpenseSerializer(expense).data, status=201)
 
@@ -439,7 +467,16 @@ class HouseholdExpenseViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'You can only delete your own expenses.'}, status=403)
         if expense.ledger.status == 'closed':
             return Response({'detail': 'This ledger is closed.'}, status=400)
-        return super().destroy(request, *args, **kwargs)
+        # Dual-link: also remove personal wallet transaction
+        tx = expense.linked_transaction
+        expense.delete()
+        if tx and tx.user_id == request.user.id:
+            # Avoid recursion through Transaction.perform_destroy household cascade
+            Transaction.objects.filter(pk=tx.pk).delete()
+        elif tx:
+            # Expense created by member but somehow linked to another's tx — leave wallet alone
+            pass
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class JoinPreviewView(APIView):

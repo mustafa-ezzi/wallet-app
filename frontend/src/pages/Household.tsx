@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Copy, Home, Users, X } from 'lucide-react'
-import { householdsApi, asList, apiErrorMessage } from '../api/client'
-import { fmt } from '../utils/format'
+import { householdsApi, accountsApi, asList, apiErrorMessage } from '../api/client'
+import { fmt, fmtBalance } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
 
 interface Household {
@@ -45,6 +45,8 @@ interface Expense {
   category: string
   notes: string
   paid_by_name: string
+  account_name: string | null
+  linked_transaction: number | null
 }
 
 export default function HouseholdPage() {
@@ -69,18 +71,21 @@ export default function HouseholdPage() {
   const [joinCode, setJoinCode] = useState('')
   const [preview, setPreview] = useState<{ household_name: string; member_count: number; code: string } | null>(null)
   const [emailInvite, setEmailInvite] = useState('')
-  const [expForm, setExpForm] = useState({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '' })
+  const [expForm, setExpForm] = useState({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
   const [saving, setSaving] = useState(false)
+  const [myAccounts, setMyAccounts] = useState<{ id: number; name: string; current_balance: number }[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [hRes, pRes] = await Promise.all([
+      const [hRes, pRes, aRes] = await Promise.all([
         householdsApi.list(),
         householdsApi.pendingInvites(),
+        accountsApi.list(),
       ])
       setHouseholds(asList(hRes.data))
       setPending(asList(pRes.data))
+      setMyAccounts(asList(aRes.data))
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not load households.'))
     } finally {
@@ -213,9 +218,10 @@ export default function HouseholdPage() {
         category: expForm.category,
         date: expForm.date,
         notes: expForm.notes,
+        ...(expForm.linked_account ? { linked_account: parseInt(expForm.linked_account) } : {}),
       })
       setExpenseOpen(false)
-      setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '' })
+      setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
       await loadExpenses(activeLedger.id)
       if (selectedId) {
         const lRes = await householdsApi.ledgers(selectedId)
@@ -380,7 +386,14 @@ export default function HouseholdPage() {
                   {expenses.map(e => (
                     <div key={e.id} className="list-item glass" style={{ borderRadius: 'var(--radius-md)' }}>
                       <div>
-                        <div style={{ fontWeight: 600 }}>{e.category || 'Expense'}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600 }}>{e.category || 'Expense'}</span>
+                          {e.account_name && (
+                            <span className="badge badge-blue" style={{ fontSize: '0.62rem' }}>
+                              Paid from {e.account_name}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>{e.date} · paid by {e.paid_by_name}</div>
                       </div>
                       <div className="amt-negative" style={{ fontWeight: 800 }}>{fmt(e.amount)}</div>
@@ -492,7 +505,7 @@ export default function HouseholdPage() {
               <button className="modal-close" onClick={() => setExpenseOpen(false)} aria-label="Close"><X size={18} /></button>
             </div>
             <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.85rem' }}>
-              Logged on the household book. Linking to your bank (so your balance drops) comes in the next phase — for now this is shared visibility.
+              Optionally link to your wallet so your balance drops. The line still shows on the household book for all members.
             </p>
             <form onSubmit={addExpense} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div className="grid-2">
@@ -504,6 +517,15 @@ export default function HouseholdPage() {
                   <label>Date</label>
                   <input type="date" value={expForm.date} onChange={e => setExpForm(f => ({ ...f, date: e.target.value }))} required />
                 </div>
+              </div>
+              <div className="form-group">
+                <label>Link to bank (recommended)</label>
+                <select value={expForm.linked_account} onChange={e => setExpForm(f => ({ ...f, linked_account: e.target.value }))}>
+                  <option value="">Shared book only — wallet unchanged</option>
+                  {myAccounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
+                  ))}
+                </select>
               </div>
               <div className="form-group">
                 <label>Category</label>
