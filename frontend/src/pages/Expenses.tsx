@@ -68,7 +68,7 @@ export default function Expenses() {
   const [expModal, setExpModal] = useState(false)
   const [payModal, setPayModal] = useState(false)
   const [recModal, setRecModal] = useState(false)
-  const [recordPayModal, setRecordPayModal] = useState<{ type: 'payable' | 'receivable' | 'recurring_expense'; id: number; name: string; amount: number; defaultAccount?: string } | null>(null)
+  const [recordPayModal, setRecordPayModal] = useState<{ type: 'payable' | 'receivable' | 'recurring_expense' | 'one_time_project'; id: number; name: string; amount: number; defaultAccount?: string } | null>(null)
 
   // ── editing ──
   const [editingExp, setEditingExp] = useState<RecurringExpense | null>(null)
@@ -296,7 +296,7 @@ export default function Expenses() {
     setSaving(true); setError('')
     try {
       const payload: any = {
-        type: recordPayModal.type === 'receivable' ? 'income' : 'expense',
+        type: (recordPayModal.type === 'receivable' || recordPayModal.type === 'one_time_project') ? 'income' : 'expense',
         amount: parseFloat(recordAmount),
         date: recordDate,
         account: parseInt(recordAccount),
@@ -307,6 +307,10 @@ export default function Expenses() {
       } else if (recordPayModal.type === 'receivable') {
         payload.linked_receivable = recordPayModal.id
         payload.category = 'Installment Receipt'
+      } else if (recordPayModal.type === 'one_time_project') {
+        payload.linked_project = recordPayModal.id
+        payload.category = 'One-time Income'
+        payload.notes = `One-time payment: ${recordPayModal.name}`
       } else {
         // recurring_expense — just a regular expense transaction tagged by name
         payload.category = recordPayModal.name
@@ -318,6 +322,22 @@ export default function Expenses() {
     finally { setSaving(false) }
   }
 
+  const deleteOneTimeProject = async (p: { id: number; name: string }) => {
+    const ok = await confirm({
+      title: 'Delete one-time payment?',
+      message: `Delete “${p.name}”? Past transactions stay in your wallets.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await projectsApi.remove(p.id)
+      load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not delete.'))
+    }
+  }
+
   // ── computed summaries (coerce Decimals — API often returns strings) ──
   const monthlyExpTotal = sumMoney(
     expenses.filter(e => e.active && e.frequency === 'monthly'),
@@ -327,10 +347,13 @@ export default function Expenses() {
     payables.filter(p => p.status === 'ongoing'),
     p => p.monthly_amount,
   )
-  const totalRecRemaining = sumMoney(
-    receivables.filter(r => r.status !== 'completed'),
-    r => r.remaining_amount,
+  // Money owed to you = remaining one-time payments + installment receivables
+  const oneTimeOwed = projects.filter(
+    (p: any) => p.income_type === 'one_time' && p.status !== 'completed',
   )
+  const totalRecRemaining =
+    sumMoney(receivables.filter(r => r.status !== 'completed'), r => r.remaining_amount)
+    + sumMoney(oneTimeOwed, (p: any) => p.remaining_amount)
 
   if (loading) return (
     <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
@@ -363,7 +386,7 @@ export default function Expenses() {
         <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
           <div className="stat-label">Still Owed to Me</div>
           <div className="stat-value amt-positive">{fmt(totalRecRemaining)}</div>
-          <div className="stat-sub">remaining receivable</div>
+          <div className="stat-sub">one-time + installments</div>
         </div>
       </div>
 
@@ -631,26 +654,102 @@ export default function Expenses() {
       )}
 
       {/* ══════════════════════════════════════
-          TAB 3 — Receivables
+          TAB 3 — Money owed to you
       ══════════════════════════════════════ */}
-      {tab === 'receivables' && (
+      {tab === 'receivables' && (() => {
+        const oneTimeList = projects.filter((p: any) => p.income_type === 'one_time')
+        const hasAny = oneTimeList.length > 0 || receivables.length > 0
+        return (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <h3>Receivable Installments</h3>
-            <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '0.5rem 0.9rem' }} onClick={openAddRec}>+ Add</button>
+            <h3>Money owed to you</h3>
+            <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '0.5rem 0.9rem' }} onClick={openAddRec}>+ Add installment</button>
           </div>
           <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.85rem' }}>
-            Money clients owe you, being paid in installments.
+            One-time payments and installment plans clients still owe you. Create one-time / paid-in-parts from Income → Add Income — they appear here, not in the Income list.
           </p>
 
-          {receivables.length === 0 ? (
+          {!hasAny ? (
             <div className="glass empty-state">
               <div className="empty-icon"><CircleDollarSign size={36} strokeWidth={1.5} /></div>
-              <p>No receivable installments yet.</p>
-              <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddRec}>Add receivable</button>
+              <p>Nothing owed to you yet.</p>
+              <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={openAddRec}>Add installment plan</button>
             </div>
           ) : (
             <div className="list">
+              {/* One-time payments */}
+              {oneTimeList.map((p: any) => {
+                const rem = Number(p.remaining_amount) || 0
+                const advance = Number(p.advance_amount) || 0
+                const done = p.status === 'completed' || rem <= 0.01
+                return (
+                  <div key={`ot-${p.id}`} className="glass" style={{ padding: '0.9rem 1rem', borderRadius: 'var(--radius-md)', opacity: done ? 0.6 : 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{p.name}</span>
+                          <span className={done ? 'badge badge-green' : 'badge badge-blue'}>
+                            {done ? 'completed' : p.status}
+                          </span>
+                          <span className="badge badge-blue" style={{ fontSize: '0.62rem' }}>One-time payment</span>
+                        </div>
+                        <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                          Total {fmt(p.amount)}
+                          {advance > 0 ? ` · advance ${fmt(advance)}` : ''}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--success)' }}>
+                          {fmt(rem)}
+                        </div>
+                        <div className="text-muted" style={{ fontSize: '0.72rem' }}>remaining</div>
+                      </div>
+                    </div>
+
+                    <div className="divider" style={{ margin: '0.55rem 0 0.45rem' }} />
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      {!done && (
+                        <button
+                          className="btn-primary"
+                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
+                          onClick={() => {
+                            setRecordPayModal({
+                              type: 'one_time_project',
+                              id: p.id,
+                              name: p.name,
+                              amount: rem,
+                              defaultAccount: p.default_account ? String(p.default_account) : '',
+                            })
+                            setRecordAmount(String(rem))
+                            setRecordAccount(p.default_account ? String(p.default_account) : '')
+                            setError('')
+                          }}
+                        >
+                          Record Receipt
+                        </button>
+                      )}
+                      {done && (
+                        <button
+                          className="btn-glass"
+                          disabled
+                          style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem', opacity: 0.65, cursor: 'not-allowed', color: 'var(--success)', borderColor: 'rgba(52,211,153,0.35)' }}
+                        >
+                          ✓ Fully received
+                        </button>
+                      )}
+                      <button
+                        className="btn-glass"
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: 'var(--red-600)', borderColor: '#f5c4c0' }}
+                        onClick={() => deleteOneTimeProject(p)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Installment receivables */}
               {receivables.map(r => {
                 const prog = r.total_installments > 0 ? (r.installments_received / r.total_installments) * 100 : 0
                 const amtReceived = r.installments_received * r.monthly_amount
@@ -667,6 +766,7 @@ export default function Expenses() {
                           }>
                             {r.status}
                           </span>
+                          <span className="badge badge-blue" style={{ fontSize: '0.62rem' }}>Installments</span>
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>
                           {r.installments_received} of {r.total_installments} received · PKR {fmtNum(amtReceived)} received so far
@@ -748,7 +848,8 @@ export default function Expenses() {
             </div>
           )}
         </>
-      )}
+        )
+      })()}
 
       {/* ══════════════════════════════════════
           MODAL — Add/Edit Recurring Expense
@@ -905,11 +1006,11 @@ export default function Expenses() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setRecordPayModal(null)}>
           <div className="modal-sheet">
             <div className="modal-header">
-              <h2>{recordPayModal.type === 'receivable' ? 'Record Receipt' : 'Record Payment'}</h2>
+              <h2>{recordPayModal.type === 'receivable' || recordPayModal.type === 'one_time_project' ? 'Record Receipt' : 'Record Payment'}</h2>
               <button className="modal-close" onClick={() => setRecordPayModal(null)} aria-label="Close"><X size={18} strokeWidth={2} /></button>
             </div>
             <p className="text-muted" style={{ marginBottom: '1rem', fontSize: '0.85rem' }}>
-              {recordPayModal.type === 'receivable' ? 'Receipt from' : 'Payment for'}: <strong>{recordPayModal.name}</strong>
+              {recordPayModal.type === 'receivable' || recordPayModal.type === 'one_time_project' ? 'Receipt from' : 'Payment for'}: <strong>{recordPayModal.name}</strong>
             </p>
             {error && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}
             <form onSubmit={submitRecordPayment} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -931,7 +1032,7 @@ export default function Expenses() {
                 </select>
               </div>
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? <span className="spinner" /> : recordPayModal.type === 'receivable' ? 'Record Receipt' : 'Record Payment'}
+                {saving ? <span className="spinner" /> : (recordPayModal.type === 'receivable' || recordPayModal.type === 'one_time_project') ? 'Record Receipt' : 'Record Payment'}
               </button>
             </form>
           </div>

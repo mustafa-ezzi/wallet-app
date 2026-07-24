@@ -33,8 +33,8 @@ const TYPE_LABELS: Record<string, string> = {
 const TYPE_HINTS: Record<string, string> = {
   recurring_monthly:      'Salary, retainer, or anything that lands each month',
   contract_monthly:       'A fixed monthly amount from a client or deal',
-  one_time:               'A single payment — add any advance already received',
-  one_time_installments:  'Total due, collected in smaller payments over time',
+  one_time:               'A single payment still owed to you — appears under Bills → Money owed to you',
+  one_time_installments:  'Total due in smaller payments — appears under Bills → Money owed to you',
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -212,9 +212,10 @@ export default function Projects() {
     await projectsApi.remove(id); load()
   }
 
-  // Paid-in-parts (one_time_installments) is money owed to you — it lives in
-  // Bills → "Money owed to you", so keep it out of the Income lists.
-  const visibleProjects   = projects.filter(p => p.income_type !== 'one_time_installments')
+  // One-time + paid-in-parts are money owed to you — they live in
+  // Bills → "Money owed to you", so keep them out of the Income lists.
+  const OWED_TYPES = new Set(['one_time', 'one_time_installments'])
+  const visibleProjects   = projects.filter(p => !OWED_TYPES.has(p.income_type))
   const activeProjects    = visibleProjects.filter(p => p.status === 'active')
   const inactiveProjects  = visibleProjects.filter(p => p.status !== 'active')
   const showAdvance = form.income_type === 'one_time' || form.income_type === 'one_time_installments'
@@ -225,7 +226,7 @@ export default function Projects() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Income</h1>
-          <p className="page-subtitle">Where your money comes from — salary, clients, deals, and more.</p>
+          <p className="page-subtitle">Monthly income — salary, retainers, and recurring clients. One-time &amp; installment amounts live under Bills → Money owed to you.</p>
         </div>
         <button className="btn-primary" onClick={openAdd} data-tour="income-add">+ Add Income</button>
       </div>
