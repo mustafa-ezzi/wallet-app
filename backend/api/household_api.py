@@ -1039,7 +1039,23 @@ class HouseholdExpenseViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'You can only edit your own expenses.'}, status=403)
         if expense.ledger.status == 'closed':
             return Response({'detail': 'This ledger is closed.'}, status=400)
-        return super().update(request, *args, **kwargs)
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(expense, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        # Don't allow reassigning ledger / paid_by via casual edit
+        serializer.validated_data.pop('ledger', None)
+        serializer.validated_data.pop('paid_by', None)
+        serializer.validated_data.pop('linked_account', None)
+        expense = serializer.save()
+        tx = expense.linked_transaction
+        if tx:
+            tx.amount = expense.amount
+            tx.date = expense.date
+            tx.category = expense.category or ''
+            if expense.notes:
+                tx.notes = expense.notes
+            tx.save(update_fields=['amount', 'date', 'category', 'notes'])
+        return Response(HouseholdExpenseSerializer(expense).data)
 
     def destroy(self, request, *args, **kwargs):
         expense = self.get_object()
@@ -1053,12 +1069,8 @@ class HouseholdExpenseViewSet(viewsets.ModelViewSet):
         # Dual-link: also remove personal wallet transaction
         tx = expense.linked_transaction
         expense.delete()
-        if tx and tx.user_id == request.user.id:
-            # Avoid recursion through Transaction.perform_destroy household cascade
+        if tx:
             Transaction.objects.filter(pk=tx.pk).delete()
-        elif tx:
-            # Expense created by member but somehow linked to another's tx — leave wallet alone
-            pass
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -1084,7 +1096,7 @@ class HouseholdContributionViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'This ledger is closed.'}, status=400)
         tx = contrib.linked_transaction
         contrib.delete()
-        if tx and tx.user_id == request.user.id:
+        if tx:
             Transaction.objects.filter(pk=tx.pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

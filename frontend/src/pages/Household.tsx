@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Copy, Home, Users, X } from 'lucide-react'
+import { Copy, Home, Pencil, Trash2, Users, X } from 'lucide-react'
 import { householdsApi, accountsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt, fmtBalance } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
+import { useAuth } from '../context/AuthContext'
 import HouseholdReportPanel from '../components/HouseholdReportPanel'
 import InviteQr from '../components/InviteQr'
 
@@ -79,11 +80,13 @@ interface Expense {
   category: string
   notes: string
   paid_by_name: string
+  created_by: number
   account_name: string | null
   linked_transaction: number | null
 }
 
 export default function HouseholdPage() {
+  const { user } = useAuth()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const [searchParams, setSearchParams] = useSearchParams()
   const [households, setHouseholds] = useState<Household[]>([])
@@ -103,6 +106,7 @@ export default function HouseholdPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
   const [expenseOpen, setExpenseOpen] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
   const [contribOpen, setContribOpen] = useState(false)
   const [name, setName] = useState('')
   const [ledgerForm, setLedgerForm] = useState({ name: '', kind: 'ongoing', start_date: new Date().toISOString().slice(0, 10) })
@@ -118,7 +122,7 @@ export default function HouseholdPage() {
   const [reportRefresh, setReportRefresh] = useState(0)
   const [contributions, setContributions] = useState<{
     id: number; amount: number; date: string; notes: string
-    contributed_by_name: string; account_name: string | null
+    contributed_by_name: string; created_by?: number; account_name: string | null
   }[]>([])
   const [contribTotal, setContribTotal] = useState(0)
   const [members, setMembers] = useState<MemberRow[]>([])
@@ -302,16 +306,24 @@ export default function HouseholdPage() {
     if (!activeLedger) return
     setSaving(true); setError('')
     try {
-      await householdsApi.addExpense(activeLedger.id, {
+      const payload = {
         amount: parseFloat(expForm.amount),
         category: expForm.category,
         date: expForm.date,
         notes: expForm.notes,
-        ...(expForm.linked_account ? { linked_account: parseInt(expForm.linked_account) } : {}),
-      })
+      }
+      if (editingExpense) {
+        await householdsApi.updateExpense(editingExpense.id, payload)
+      } else {
+        await householdsApi.addExpense(activeLedger.id, {
+          ...payload,
+          ...(expForm.linked_account ? { linked_account: parseInt(expForm.linked_account) } : {}),
+        })
+      }
       setExpenseOpen(false)
+      setEditingExpense(null)
       setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
-      await loadExpenses(activeLedger)
+      await loadExpenses(activeLedger, true)
       setReportRefresh(k => k + 1)
       if (selectedId) {
         const lRes = await householdsApi.ledgers(selectedId)
@@ -321,8 +333,73 @@ export default function HouseholdPage() {
         if (updated) setActiveLedger(updated)
       }
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not add expense.'))
+      setError(apiErrorMessage(err, editingExpense ? 'Could not update expense.' : 'Could not add expense.'))
     } finally { setSaving(false) }
+  }
+
+  const openEditExpense = (e: Expense) => {
+    setEditingExpense(e)
+    setExpForm({
+      amount: String(e.amount),
+      category: e.category || '',
+      date: e.date,
+      notes: e.notes || '',
+      linked_account: '',
+    })
+    setExpenseOpen(true)
+    setError('')
+  }
+
+  const deleteExpense = async (e: Expense) => {
+    if (!activeLedger) return
+    const ok = await confirm({
+      title: 'Delete expense?',
+      message: `Remove ${fmt(e.amount)} (${e.category || 'Expense'}) from the shared book?${e.linked_transaction ? ' The linked wallet transaction will also be deleted.' : ''}`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    setSaving(true); setError('')
+    try {
+      await householdsApi.removeExpense(e.id)
+      await loadExpenses(activeLedger, true)
+      setReportRefresh(k => k + 1)
+      if (selectedId) {
+        const lRes = await householdsApi.ledgers(selectedId)
+        const list = asList<Ledger>(lRes.data)
+        setLedgers(list)
+        const updated = list.find(l => l.id === activeLedger.id)
+        if (updated) setActiveLedger(updated)
+      }
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not delete expense.'))
+    } finally { setSaving(false) }
+  }
+
+  const deleteContribution = async (c: { id: number; amount: number }) => {
+    if (!activeLedger) return
+    const ok = await confirm({
+      title: 'Delete contribution?',
+      message: `Remove pot contribution of ${fmt(c.amount)}? If it was linked to a wallet, that transaction is removed too.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    setSaving(true); setError('')
+    try {
+      await householdsApi.removeContribution(c.id)
+      await loadExpenses(activeLedger, true)
+      setReportRefresh(k => k + 1)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not delete contribution.'))
+    } finally { setSaving(false) }
+  }
+
+  const canManageLine = (createdBy?: number) => {
+    if (activeLedger?.status === 'closed') return false
+    if (!user) return false
+    if (createdBy === user.id) return true
+    return selected?.my_role === 'owner' || selected?.my_role === 'admin'
   }
 
   const addContribution = async (ev: React.FormEvent) => {
@@ -811,7 +888,17 @@ export default function HouseholdPage() {
                 <h3 style={{ margin: 0 }}>Expenses</h3>
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {activeLedger.status === 'open' && (
-                    <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => setExpenseOpen(true)}>+ Add</button>
+                    <button
+                      className="btn-primary"
+                      style={{ fontSize: '0.82rem' }}
+                      onClick={() => {
+                        setEditingExpense(null)
+                        setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
+                        setExpenseOpen(true)
+                      }}
+                    >
+                      + Add
+                    </button>
                   )}
                   {activeLedger.status === 'open' && (
                     <button className="btn-glass" style={{ fontSize: '0.82rem' }} onClick={() => { setContribOpen(true); setError('') }}>
@@ -846,7 +933,7 @@ export default function HouseholdPage() {
                   <div className="list">
                     {contributions.map(c => (
                       <div key={c.id} className="list-item glass" style={{ borderRadius: 'var(--radius-md)' }}>
-                        <div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                             <span style={{ fontWeight: 600 }}>Pot contribution</span>
                             {c.account_name && (
@@ -860,7 +947,20 @@ export default function HouseholdPage() {
                             {c.notes ? ` · ${c.notes}` : ''}
                           </div>
                         </div>
-                        <div className="amt-positive" style={{ fontWeight: 800 }}>+{fmt(c.amount)}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                          <div className="amt-positive" style={{ fontWeight: 800 }}>+{fmt(c.amount)}</div>
+                          {canManageLine(c.created_by) && (
+                            <button
+                              type="button"
+                              className="btn-icon"
+                              aria-label="Delete contribution"
+                              title="Delete"
+                              onClick={() => deleteContribution(c)}
+                            >
+                              <Trash2 size={14} strokeWidth={2} />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -879,7 +979,7 @@ export default function HouseholdPage() {
                 <div className="list">
                   {expenses.map(e => (
                     <div key={e.id} className="list-item glass" style={{ borderRadius: 'var(--radius-md)' }}>
-                      <div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 600 }}>{e.category || 'Expense'}</span>
                           {e.account_name && (
@@ -890,7 +990,31 @@ export default function HouseholdPage() {
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>{e.date} · paid by {e.paid_by_name}</div>
                       </div>
-                      <div className="amt-negative" style={{ fontWeight: 800 }}>{fmt(e.amount)}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
+                        <div className="amt-negative" style={{ fontWeight: 800 }}>{fmt(e.amount)}</div>
+                        {canManageLine(e.created_by) && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn-icon"
+                              aria-label="Edit expense"
+                              title="Edit"
+                              onClick={() => openEditExpense(e)}
+                            >
+                              <Pencil size={14} strokeWidth={2} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-icon"
+                              aria-label="Delete expense"
+                              title="Delete"
+                              onClick={() => deleteExpense(e)}
+                            >
+                              <Trash2 size={14} strokeWidth={2} />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1127,16 +1251,20 @@ export default function HouseholdPage() {
         </div>
       )}
 
-      {/* Add expense */}
+      {/* Add / edit expense */}
       {expenseOpen && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setExpenseOpen(false)}>
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && (setExpenseOpen(false), setEditingExpense(null))}>
           <div className="modal-sheet">
             <div className="modal-header">
-              <h2>Add shared expense</h2>
-              <button className="modal-close" onClick={() => setExpenseOpen(false)} aria-label="Close"><X size={18} /></button>
+              <h2>{editingExpense ? 'Edit expense' : 'Add shared expense'}</h2>
+              <button className="modal-close" onClick={() => { setExpenseOpen(false); setEditingExpense(null) }} aria-label="Close"><X size={18} /></button>
             </div>
             <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.85rem' }}>
-              Optionally link to your wallet so your balance drops. The line still shows on the household book for all members.
+              {editingExpense
+                ? (editingExpense.linked_transaction
+                  ? 'Changing the amount also updates the linked wallet transaction.'
+                  : 'Update this line on the shared household book.')
+                : 'Optionally link to your wallet so your balance drops. The line still shows on the household book for all members.'}
             </p>
             <form onSubmit={addExpense} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div className="grid-2">
@@ -1149,15 +1277,17 @@ export default function HouseholdPage() {
                   <input type="date" value={expForm.date} onChange={e => setExpForm(f => ({ ...f, date: e.target.value }))} required />
                 </div>
               </div>
-              <div className="form-group">
-                <label>Link to bank (recommended)</label>
-                <select value={expForm.linked_account} onChange={e => setExpForm(f => ({ ...f, linked_account: e.target.value }))}>
-                  <option value="">Shared book only — wallet unchanged</option>
-                  {myAccounts.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
-                  ))}
-                </select>
-              </div>
+              {!editingExpense && (
+                <div className="form-group">
+                  <label>Link to bank (recommended)</label>
+                  <select value={expForm.linked_account} onChange={e => setExpForm(f => ({ ...f, linked_account: e.target.value }))}>
+                    <option value="">Shared book only — wallet unchanged</option>
+                    {myAccounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="form-group">
                 <label>Category</label>
                 <input value={expForm.category} onChange={e => setExpForm(f => ({ ...f, category: e.target.value }))} placeholder="Groceries, Utilities…" />
@@ -1166,7 +1296,9 @@ export default function HouseholdPage() {
                 <label>Notes</label>
                 <input value={expForm.notes} onChange={e => setExpForm(f => ({ ...f, notes: e.target.value }))} />
               </div>
-              <button type="submit" className="btn-primary" disabled={saving}>{saving ? <span className="spinner" /> : 'Add expense'}</button>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? <span className="spinner" /> : editingExpense ? 'Save changes' : 'Add expense'}
+              </button>
             </form>
           </div>
         </div>
