@@ -13,6 +13,7 @@ router.register('payables', views.PayableViewSet, basename='payable')
 router.register('households', household_api.HouseholdViewSet, basename='household')
 router.register('household-ledgers', household_api.HouseholdLedgerViewSet, basename='household-ledger')
 router.register('household-expenses', household_api.HouseholdExpenseViewSet, basename='household-expense')
+router.register('household-contributions', household_api.HouseholdContributionViewSet, basename='household-contribution')
 
 urlpatterns = [
     path('auth/register/', views.RegisterView.as_view(), name='register'),

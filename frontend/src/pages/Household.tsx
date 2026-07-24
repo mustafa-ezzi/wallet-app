@@ -80,17 +80,24 @@ export default function HouseholdPage() {
   const [joinOpen, setJoinOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [expenseOpen, setExpenseOpen] = useState(false)
+  const [contribOpen, setContribOpen] = useState(false)
   const [name, setName] = useState('')
   const [ledgerForm, setLedgerForm] = useState({ name: '', kind: 'ongoing', start_date: new Date().toISOString().slice(0, 10) })
   const [joinCode, setJoinCode] = useState('')
   const [preview, setPreview] = useState<{ household_name: string; member_count: number; code: string } | null>(null)
   const [emailInvite, setEmailInvite] = useState('')
   const [expForm, setExpForm] = useState({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
+  const [contribForm, setContribForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
   const [saving, setSaving] = useState(false)
   const [myAccounts, setMyAccounts] = useState<{ id: number; name: string; current_balance: number }[]>([])
   const [summary, setSummary] = useState<LedgerSummary | null>(null)
   const [viewMode, setViewMode] = useState<'feed' | 'report'>('feed')
   const [reportRefresh, setReportRefresh] = useState(0)
+  const [contributions, setContributions] = useState<{
+    id: number; amount: number; date: string; notes: string
+    contributed_by_name: string; account_name: string | null
+  }[]>([])
+  const [contribTotal, setContribTotal] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -153,6 +160,14 @@ export default function HouseholdPage() {
     const res = await householdsApi.ledgerExpenses(ledger.id, params)
     setExpenses(res.data?.results ?? [])
     setExpenseTotal(Number(res.data?.total) || 0)
+    try {
+      const cRes = await householdsApi.ledgerContributions(ledger.id)
+      setContributions(cRes.data?.results ?? [])
+      setContribTotal(Number(cRes.data?.total) || 0)
+    } catch {
+      setContributions([])
+      setContribTotal(0)
+    }
     if (ledger.status === 'closed' || ledger.kind === 'event') {
       try {
         const s = await householdsApi.ledgerSummary(ledger.id)
@@ -263,6 +278,26 @@ export default function HouseholdPage() {
       }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not add expense.'))
+    } finally { setSaving(false) }
+  }
+
+  const addContribution = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!activeLedger) return
+    setSaving(true); setError('')
+    try {
+      await householdsApi.addContribution(activeLedger.id, {
+        amount: parseFloat(contribForm.amount),
+        date: contribForm.date,
+        notes: contribForm.notes,
+        ...(contribForm.linked_account ? { linked_account: parseInt(contribForm.linked_account) } : {}),
+      })
+      setContribOpen(false)
+      setContribForm({ amount: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
+      await loadExpenses(activeLedger)
+      setReportRefresh(k => k + 1)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not add contribution.'))
     } finally { setSaving(false) }
   }
 
@@ -596,6 +631,11 @@ export default function HouseholdPage() {
                   {activeLedger.status === 'open' && (
                     <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => setExpenseOpen(true)}>+ Add</button>
                   )}
+                  {activeLedger.status === 'open' && (
+                    <button className="btn-glass" style={{ fontSize: '0.82rem' }} onClick={() => { setContribOpen(true); setError('') }}>
+                      Contribute to pot
+                    </button>
+                  )}
                   {(selected.my_role === 'owner' || selected.my_role === 'admin') && activeLedger.status === 'open' && (
                     <button className="btn-glass" style={{ fontSize: '0.82rem' }} disabled={saving} onClick={closeLedger}>
                       Close & lock
@@ -613,6 +653,36 @@ export default function HouseholdPage() {
                 <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.65rem' }}>
                   This ledger is locked. History stays visible; new expenses are blocked until an owner reopens it.
                 </p>
+              )}
+
+              {contributions.length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.5rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Pot contributions</h3>
+                    <span className="text-muted" style={{ fontSize: '0.78rem' }}>Total {fmt(contribTotal)}</span>
+                  </div>
+                  <div className="list">
+                    {contributions.map(c => (
+                      <div key={c.id} className="list-item glass" style={{ borderRadius: 'var(--radius-md)' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 600 }}>Pot contribution</span>
+                            {c.account_name && (
+                              <span className="badge badge-blue" style={{ fontSize: '0.62rem' }}>
+                                From {c.account_name}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                            {c.date} · {c.contributed_by_name}
+                            {c.notes ? ` · ${c.notes}` : ''}
+                          </div>
+                        </div>
+                        <div className="amt-positive" style={{ fontWeight: 800 }}>+{fmt(c.amount)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {expenses.length === 0 ? (
@@ -841,6 +911,49 @@ export default function HouseholdPage() {
                 <input value={expForm.notes} onChange={e => setExpForm(f => ({ ...f, notes: e.target.value }))} />
               </div>
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? <span className="spinner" /> : 'Add expense'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Contribute to pot */}
+      {contribOpen && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setContribOpen(false)}>
+          <div className="modal-sheet">
+            <div className="modal-header">
+              <h2>Contribute to pot</h2>
+              <button className="modal-close" onClick={() => setContribOpen(false)} aria-label="Close"><X size={18} /></button>
+            </div>
+            <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.85rem' }}>
+              Puts money toward the shared pot. Counts as your credit on Split equal. Link a wallet to drop your balance.
+            </p>
+            <form onSubmit={addContribution} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label>Amount (PKR)</label>
+                  <input type="number" min="0" step="any" value={contribForm.amount} onChange={e => setContribForm(f => ({ ...f, amount: e.target.value }))} required />
+                </div>
+                <div className="form-group">
+                  <label>Date</label>
+                  <input type="date" value={contribForm.date} onChange={e => setContribForm(f => ({ ...f, date: e.target.value }))} required />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Link to bank (recommended)</label>
+                <select value={contribForm.linked_account} onChange={e => setContribForm(f => ({ ...f, linked_account: e.target.value }))}>
+                  <option value="">Pot credit only — wallet unchanged</option>
+                  {myAccounts.map(a => (
+                    <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Notes</label>
+                <input value={contribForm.notes} onChange={e => setContribForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" />
+              </div>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? <span className="spinner" /> : 'Add contribution'}
+              </button>
             </form>
           </div>
         </div>

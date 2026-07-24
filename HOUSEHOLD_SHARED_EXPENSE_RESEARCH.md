@@ -782,18 +782,18 @@ P0 Research ──► P1 Foundation + MVP ──► P2 Dual link (bank + Househo
 
 **Backend**
 
-- [ ] `HouseholdContribution` (or expense `kind=contribution`): amount, contributed_by, optional linked personal tx/wallet
-- [ ] Settlement: `credit = paid_expenses + contributions`, `fair_share = total_expenses / N`, `net = credit − fair_share`, simplify debts
-- [ ] Optional: mark settlement pairs “settled” (notes only — no bank move)
+- [x] `HouseholdContribution` (or expense `kind=contribution`): amount, contributed_by, optional linked personal tx/wallet
+- [x] Settlement: `credit = paid_expenses + contributions`, `fair_share = total_expenses / N`, `net = credit − fair_share`, simplify debts
+- [x] Optional: mark settlement pairs “settled” (notes only — no bank move)
 
 **Frontend**
 
-- [ ] Event ledger: **Contribute to pot** (pick my wallet + amount) — same dual-link idea as expenses
-- [ ] Show each member’s credit (paid + pot) on report / close screen
-- [ ] **Split equal** button → who owes whom (optional)
-- [ ] Disclaimer: suggestions only — CashTrail does not move bank money
+- [x] Event ledger: **Contribute to pot** (pick my wallet + amount) — same dual-link idea as expenses
+- [x] Show each member’s credit (paid + pot) on report / close screen
+- [x] **Split equal** button → who owes whom (optional)
+- [x] Disclaimer: suggestions only — CashTrail does not move bank money
 
-**Exit criteria:** Balochistan-style demo: Hussain contributes 10k, you pay 25k of 30k total expenses, 3 members → Hussain net 0, you owed, Idrees owes (see §13).
+**Exit criteria:** Balochistan-style demo: Hussain contributes 10k, you pay 25k of 30k total expenses, 3 members → Hussain net 0, you owed, Idrees owes (see §13). ✅
 
 ---
 

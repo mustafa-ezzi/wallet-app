@@ -372,3 +372,45 @@ class HouseholdExpense(models.Model):
 
     def __str__(self):
         return f"{self.amount} on {self.date} ({self.ledger.name})"
+
+
+class HouseholdContribution(models.Model):
+    """Money a member puts into the event/household pot (counts as credit on Split equal)."""
+    ledger = models.ForeignKey(HouseholdLedger, on_delete=models.CASCADE, related_name='contributions')
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    date = models.DateField()
+    notes = models.TextField(blank=True, default='')
+    contributed_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='household_contributions')
+    created_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='household_contributions_created')
+    linked_transaction = models.ForeignKey(
+        'Transaction', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='household_contributions')
+    linked_account = models.ForeignKey(
+        Account, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='household_contributions')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-id']
+
+    def __str__(self):
+        return f"+{self.amount} pot ({self.ledger.name})"
+
+
+class HouseholdSettlementMark(models.Model):
+    """Optional note that a suggested settlement pair was settled outside CashTrail."""
+    ledger = models.ForeignKey(HouseholdLedger, on_delete=models.CASCADE, related_name='settlement_marks')
+    from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='settlement_marks_from')
+    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='settlement_marks_to')
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    note = models.CharField(max_length=255, blank=True, default='')
+    marked_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='settlement_marks_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.from_user_id} → {self.to_user_id}: {self.amount}"

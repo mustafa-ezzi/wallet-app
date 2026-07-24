@@ -208,6 +208,14 @@ export const householdsApi = {
   ledgerSummary: (ledgerId: number) => api.get(`/household-ledgers/${ledgerId}/summary/`),
   ledgerReport: (ledgerId: number, params?: { year?: number; month?: number }) =>
     api.get(`/household-ledgers/${ledgerId}/report/`, { params }),
+  ledgerContributions: (ledgerId: number) =>
+    api.get(`/household-ledgers/${ledgerId}/contributions/`),
+  addContribution: (ledgerId: number, data: object) =>
+    api.post(`/household-ledgers/${ledgerId}/contributions/`, data),
+  removeContribution: (id: number) => api.delete(`/household-contributions/${id}/`),
+  settlement: (ledgerId: number) => api.get(`/household-ledgers/${ledgerId}/settlement/`),
+  markSettlement: (ledgerId: number, data: object) =>
+    api.post(`/household-ledgers/${ledgerId}/settlement/mark/`, data),
   joinPreview: (data: { code?: string; token?: string }) => api.post('/households/join/preview/', data),
   join: (data: { code?: string; token?: string }) => api.post('/households/join/', data),
   pendingInvites: () => api.get('/households/invitations/pending/'),

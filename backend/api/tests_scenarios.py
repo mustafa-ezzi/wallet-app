@@ -12,6 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from api.models import (
     Account, Project, Transaction, RecurringExpense,
     PayableInstallment, ReceivableInstallment, UserProfile,
+    HouseholdExpense,
 )
 
 
@@ -636,3 +637,146 @@ class HouseholdPhase4ReportTests(TestCase):
         self.assertTrue(full.data["snapshot_matches"])
         self.assertEqual(full.data["by_category"][0]["name"], "Hall")
         self.assertEqual(full.data["timeline"][0]["items"][0]["paid_by_name"], "Ali")
+
+
+class HouseholdPhase5PotSplitTests(TestCase):
+    """P5: Balochistan-style pot contribution + Split equal credits."""
+
+    def _auth(self, user):
+        client = APIClient()
+        token = RefreshToken.for_user(user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        return client
+
+    def setUp(self):
+        self.you = User.objects.create_user(
+            username="you@example.com", email="you@example.com", password="testpass123", first_name="You",
+        )
+        self.hussain = User.objects.create_user(
+            username="hussain@example.com", email="hussain@example.com", password="testpass123", first_name="Hussain",
+        )
+        self.idrees = User.objects.create_user(
+            username="idrees@example.com", email="idrees@example.com", password="testpass123", first_name="Idrees",
+        )
+        for u in (self.you, self.hussain, self.idrees):
+            UserProfile.objects.get_or_create(user=u, defaults={"currency": "PKR"})
+        self.you_client = self._auth(self.you)
+        self.hussain_client = self._auth(self.hussain)
+        self.idrees_client = self._auth(self.idrees)
+        self.hussain_wallet = Account.objects.create(
+            user=self.hussain, name="HBL", type="bank", opening_balance=Decimal("50000"),
+        )
+
+    def test_balochistan_split_equal(self):
+        h = self.you_client.post("/api/households/", {"name": "Trip crew"}, format="json")
+        self.assertEqual(h.status_code, 201, h.data)
+        hid = h.data["id"]
+        code = self.you_client.get(f"/api/households/{hid}/invites/").data["code"]
+        self.hussain_client.post("/api/households/join/", {"code": code}, format="json")
+        # refresh invite if single-use? code should still work for multiple joins
+        code2 = self.you_client.get(f"/api/households/{hid}/invites/").data["code"]
+        self.idrees_client.post("/api/households/join/", {"code": code2}, format="json")
+
+        today = date.today().isoformat()
+        event = self.you_client.post(
+            f"/api/households/{hid}/ledgers/",
+            {"name": "Balochistan trip", "kind": "event", "start_date": today},
+            format="json",
+        )
+        self.assertEqual(event.status_code, 201, event.data)
+        lid = event.data["id"]
+
+        # Hussain puts 10,000 into the pot (wallet linked)
+        before = float(self.hussain_client.get("/api/accounts/").data[0]["current_balance"])
+        pot = self.hussain_client.post(
+            f"/api/household-ledgers/{lid}/contributions/",
+            {
+                "amount": "10000",
+                "date": today,
+                "notes": "Trip pot",
+                "linked_account": self.hussain_wallet.id,
+            },
+            format="json",
+        )
+        self.assertEqual(pot.status_code, 201, pot.data)
+        after = float(self.hussain_client.get("/api/accounts/").data[0]["current_balance"])
+        self.assertEqual(after, before - 10000.0)
+
+        # You pay 25,000 of trip expenses
+        e1 = self.you_client.post(
+            f"/api/household-ledgers/{lid}/expenses/",
+            {"amount": "25000", "category": "Hotel", "date": today},
+            format="json",
+        )
+        self.assertEqual(e1.status_code, 201, e1.data)
+
+        # Remaining 5,000 of the 30k total — paid outside member credits (float/vendor line)
+        # so the §13 table matches: You 25k, Hussain pot 10k, Idrees 0.
+        HouseholdExpense.objects.create(
+            ledger_id=lid,
+            amount=Decimal("5000"),
+            date=date.today(),
+            category="Fuel (pot)",
+            notes="Paid from group float",
+            created_by=self.you,
+            paid_by=self.you,  # will temporarily make You 30k — fix below
+        )
+        # Re-attribute the 5k to a non-member so member credits match the research table
+        ghost = User.objects.create_user(
+            username="float@example.com", email="float@example.com", password="x", first_name="Float",
+        )
+        HouseholdExpense.objects.filter(ledger_id=lid, category="Fuel (pot)").update(paid_by=ghost)
+
+        settle = self.you_client.get(f"/api/household-ledgers/{lid}/settlement/")
+        self.assertEqual(settle.status_code, 200, settle.data)
+        self.assertEqual(float(settle.data["total_expenses"]), 30000.0)
+        self.assertEqual(float(settle.data["total_contributions"]), 10000.0)
+        self.assertEqual(float(settle.data["fair_share"]), 10000.0)
+        self.assertEqual(settle.data["member_count"], 3)
+        self.assertIn("does not move bank money", settle.data["disclaimer"].lower())
+
+        by_name = {c["name"]: c for c in settle.data["credits"]}
+        self.assertEqual(float(by_name["You"]["credit"]), 25000.0)
+        self.assertEqual(float(by_name["You"]["net"]), 15000.0)
+        self.assertEqual(by_name["You"]["meaning"], "owed")
+        self.assertEqual(float(by_name["Hussain"]["contributions"]), 10000.0)
+        self.assertEqual(float(by_name["Hussain"]["net"]), 0.0)
+        self.assertEqual(by_name["Hussain"]["meaning"], "settled")
+        self.assertEqual(float(by_name["Idrees"]["credit"]), 0.0)
+        self.assertEqual(float(by_name["Idrees"]["net"]), -10000.0)
+        self.assertEqual(by_name["Idrees"]["meaning"], "owes")
+
+        transfers = settle.data["transfers"]
+        self.assertTrue(any(
+            t["from_name"] == "Idrees" and t["to_name"] == "You" and float(t["amount"]) == 10000.0
+            for t in transfers
+        ))
+
+        # Mark settled
+        t0 = next(t for t in transfers if t["from_name"] == "Idrees" and t["to_name"] == "You")
+        marked = self.you_client.post(
+            f"/api/household-ledgers/{lid}/settlement/mark/",
+            {
+                "from_user_id": t0["from_user_id"],
+                "to_user_id": t0["to_user_id"],
+                "amount": t0["amount"],
+                "note": "Paid in cash",
+            },
+            format="json",
+        )
+        self.assertEqual(marked.status_code, 201, marked.data)
+        again = self.you_client.get(f"/api/household-ledgers/{lid}/settlement/")
+        match = next(
+            t for t in again.data["transfers"]
+            if t["from_name"] == "Idrees" and t["to_name"] == "You"
+        )
+        self.assertTrue(match["settled"])
+
+        # Closed ledger rejects new contributions
+        self.you_client.post(f"/api/household-ledgers/{lid}/close/")
+        blocked = self.hussain_client.post(
+            f"/api/household-ledgers/{lid}/contributions/",
+            {"amount": "100", "date": today},
+            format="json",
+        )
+        self.assertEqual(blocked.status_code, 400)

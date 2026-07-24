@@ -1,5 +1,6 @@
-"""Household sharing API — Phase 1 MVP."""
+"""Household sharing API — Phase 1–5."""
 from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib.auth.models import User
 from django.db.models import Sum, Q
@@ -12,6 +13,7 @@ from rest_framework.views import APIView
 
 from .models import (
     Household, HouseholdMembership, HouseholdInvite, HouseholdLedger, HouseholdExpense,
+    HouseholdContribution, HouseholdSettlementMark,
     Account, Transaction,
     generate_household_invite_code, generate_invite_token,
 )
@@ -127,6 +129,142 @@ def ledger_report(ledger, year=None, month=None):
         data['snapshot_matches'] = None
 
     return data
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def simplify_debts(nets: dict[int, Decimal]) -> list[tuple[int, int, Decimal]]:
+    """
+    Turn member nets into suggested transfers (from_id, to_id, amount).
+    net > 0 → owed money; net < 0 → owes money.
+    """
+    debtors = [(uid, -n) for uid, n in nets.items() if n < 0]
+    creditors = [(uid, n) for uid, n in nets.items() if n > 0]
+    debtors.sort(key=lambda x: -x[1])
+    creditors.sort(key=lambda x: -x[1])
+    transfers = []
+    i = j = 0
+    while i < len(debtors) and j < len(creditors):
+        d_id, d_amt = debtors[i]
+        c_id, c_amt = creditors[j]
+        pay = min(d_amt, c_amt)
+        if pay > 0:
+            transfers.append((d_id, c_id, _money(pay)))
+        d_amt -= pay
+        c_amt -= pay
+        debtors[i] = (d_id, d_amt)
+        creditors[j] = (c_id, c_amt)
+        if d_amt <= Decimal('0.001'):
+            i += 1
+        if c_amt <= Decimal('0.001'):
+            j += 1
+    return transfers
+
+
+def compute_settlement(ledger):
+    """
+    credit[m] = expenses paid_by m + contributions by m
+    fair_share = total_expenses / N
+    net[m] = credit[m] - fair_share
+    """
+    members = list(
+        ledger.household.memberships.filter(status='active', user__isnull=False)
+        .select_related('user')
+    )
+    n = len(members)
+    users = [m.user for m in members]
+    user_ids = [u.id for u in users]
+
+    expenses = list(ledger.expenses.select_related('paid_by'))
+    contributions = list(ledger.contributions.select_related('contributed_by'))
+
+    total_expenses = _money(sum((e.amount for e in expenses), Decimal('0')))
+    total_contributions = _money(sum((c.amount for c in contributions), Decimal('0')))
+    fair_share = _money(total_expenses / n) if n else Decimal('0.00')
+
+    paid: dict[int, Decimal] = {uid: Decimal('0.00') for uid in user_ids}
+    pot: dict[int, Decimal] = {uid: Decimal('0.00') for uid in user_ids}
+    for e in expenses:
+        if e.paid_by_id in paid:
+            paid[e.paid_by_id] = _money(paid[e.paid_by_id] + e.amount)
+    for c in contributions:
+        if c.contributed_by_id in pot:
+            pot[c.contributed_by_id] = _money(pot[c.contributed_by_id] + c.amount)
+
+    credits = []
+    nets: dict[int, Decimal] = {}
+    for u in users:
+        p = paid.get(u.id, Decimal('0.00'))
+        pot_amt = pot.get(u.id, Decimal('0.00'))
+        credit = _money(p + pot_amt)
+        net = _money(credit - fair_share)
+        nets[u.id] = net
+        if net > 0:
+            meaning = 'owed'
+        elif net < 0:
+            meaning = 'owes'
+        else:
+            meaning = 'settled'
+        credits.append({
+            'user_id': u.id,
+            'name': _display_name(u),
+            'expenses_paid': float(p),
+            'contributions': float(pot_amt),
+            'credit': float(credit),
+            'fair_share': float(fair_share),
+            'net': float(net),
+            'meaning': meaning,
+        })
+    credits.sort(key=lambda x: -x['credit'])
+
+    transfers_raw = simplify_debts(nets)
+    marks = list(
+        ledger.settlement_marks.select_related('from_user', 'to_user', 'marked_by').all()
+    )
+
+    def mark_key(a, b, amount):
+        return (a, b, float(_money(amount)))
+
+    marked_set = {
+        mark_key(m.from_user_id, m.to_user_id, m.amount): m
+        for m in marks
+    }
+
+    transfers = []
+    for from_id, to_id, amount in transfers_raw:
+        key = mark_key(from_id, to_id, amount)
+        mark = marked_set.get(key)
+        # Also match if any mark exists for same pair with same amount (float tolerance)
+        if not mark:
+            for mk, mv in marked_set.items():
+                if mk[0] == from_id and mk[1] == to_id and abs(mk[2] - float(amount)) < 0.02:
+                    mark = mv
+                    break
+        from_user = next(u for u in users if u.id == from_id)
+        to_user = next(u for u in users if u.id == to_id)
+        transfers.append({
+            'from_user_id': from_id,
+            'from_name': _display_name(from_user),
+            'to_user_id': to_id,
+            'to_name': _display_name(to_user),
+            'amount': float(amount),
+            'settled': mark is not None,
+            'mark_id': mark.id if mark else None,
+            'mark_note': mark.note if mark else '',
+        })
+
+    return {
+        'member_count': n,
+        'total_expenses': float(total_expenses),
+        'total_contributions': float(total_contributions),
+        'fair_share': float(fair_share),
+        'credits': credits,
+        'transfers': transfers,
+        'disclaimer': 'Suggestions only — CashTrail does not move bank money.',
+    }
+
 
 def user_active_membership(user, household_id):
     return HouseholdMembership.objects.filter(
@@ -282,6 +420,33 @@ class HouseholdExpenseSerializer(serializers.ModelSerializer):
 
     def get_paid_by_name(self, obj):
         return _display_name(obj.paid_by)
+
+    def get_created_by_name(self, obj):
+        return _display_name(obj.created_by)
+
+    def get_account_name(self, obj):
+        return obj.linked_account.name if obj.linked_account_id else None
+
+
+class HouseholdContributionSerializer(serializers.ModelSerializer):
+    contributed_by_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    account_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HouseholdContribution
+        fields = (
+            'id', 'ledger', 'amount', 'date', 'notes',
+            'contributed_by', 'contributed_by_name', 'created_by', 'created_by_name',
+            'linked_transaction', 'linked_account', 'account_name', 'created_at',
+        )
+        read_only_fields = ('created_by', 'created_at', 'linked_transaction', 'contributed_by')
+        extra_kwargs = {
+            'ledger': {'required': False},
+        }
+
+    def get_contributed_by_name(self, obj):
+        return _display_name(obj.contributed_by)
 
     def get_created_by_name(self, obj):
         return _display_name(obj.created_by)
@@ -516,6 +681,103 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({'detail': 'Invalid month.'}, status=400)
         return Response(ledger_report(ledger, year=y, month=mo))
 
+    @action(detail=True, methods=['get'])
+    def settlement(self, request, pk=None):
+        """Split-equal credits + suggested who-owes-whom transfers."""
+        ledger = self.get_object()
+        m = require_active_member(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Not a member.'}, status=403)
+        data = compute_settlement(ledger)
+        data['ledger'] = HouseholdLedgerSerializer(ledger, context={'request': request}).data
+        return Response(data)
+
+    @action(detail=True, methods=['post'], url_path='settlement/mark')
+    def settlement_mark(self, request, pk=None):
+        """Mark a suggested transfer as settled outside the app (notes only)."""
+        ledger = self.get_object()
+        m = require_active_member(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Not a member.'}, status=403)
+        try:
+            from_user_id = int(request.data.get('from_user_id'))
+            to_user_id = int(request.data.get('to_user_id'))
+            amount = _money(request.data.get('amount'))
+        except (TypeError, ValueError):
+            return Response({'detail': 'from_user_id, to_user_id, and amount are required.'}, status=400)
+        if amount <= 0:
+            return Response({'amount': 'Must be positive.'}, status=400)
+        active_ids = set(
+            ledger.household.memberships.filter(status='active', user__isnull=False)
+            .values_list('user_id', flat=True)
+        )
+        if from_user_id not in active_ids or to_user_id not in active_ids:
+            return Response({'detail': 'Both users must be active members.'}, status=400)
+        note = (request.data.get('note') or '')[:255]
+        mark = HouseholdSettlementMark.objects.create(
+            ledger=ledger,
+            from_user_id=from_user_id,
+            to_user_id=to_user_id,
+            amount=amount,
+            note=note,
+            marked_by=request.user,
+        )
+        return Response({
+            'id': mark.id,
+            'from_user_id': from_user_id,
+            'to_user_id': to_user_id,
+            'amount': float(amount),
+            'note': note,
+            'settlement': compute_settlement(ledger),
+        }, status=201)
+
+    @action(detail=True, methods=['get', 'post'])
+    def contributions(self, request, pk=None):
+        ledger = self.get_object()
+        m = require_active_member(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Not a member.'}, status=403)
+
+        if request.method == 'GET':
+            qs = ledger.contributions.select_related('contributed_by', 'created_by', 'linked_account')
+            total = qs.aggregate(total=Sum('amount'))['total'] or 0
+            return Response({
+                'results': HouseholdContributionSerializer(qs, many=True).data,
+                'total': float(total),
+            })
+
+        if ledger.status == 'closed':
+            return Response({'detail': 'This ledger is closed.'}, status=400)
+
+        ser = HouseholdContributionSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        linked_account = ser.validated_data.get('linked_account')
+        linked_tx = None
+        if linked_account:
+            if linked_account.user_id != request.user.id:
+                return Response(
+                    {'linked_account': 'You can only contribute from your own wallet.'},
+                    status=400,
+                )
+            linked_tx = Transaction.objects.create(
+                user=request.user,
+                type='expense',
+                amount=ser.validated_data['amount'],
+                date=ser.validated_data['date'],
+                account=linked_account,
+                category='Household pot',
+                notes=ser.validated_data.get('notes') or f'Pot contribution: {ledger.name}',
+            )
+
+        contrib = ser.save(
+            ledger=ledger,
+            created_by=request.user,
+            contributed_by=request.user,
+            linked_transaction=linked_tx,
+            linked_account=linked_account,
+        )
+        return Response(HouseholdContributionSerializer(contrib).data, status=201)
+
     @action(detail=True, methods=['post'])
     def close(self, request, pk=None):
         ledger = self.get_object()
@@ -657,6 +919,33 @@ class HouseholdExpenseViewSet(viewsets.ModelViewSet):
         elif tx:
             # Expense created by member but somehow linked to another's tx — leave wallet alone
             pass
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class HouseholdContributionViewSet(viewsets.ModelViewSet):
+    serializer_class = HouseholdContributionSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'delete', 'head', 'options']
+
+    def get_queryset(self):
+        return HouseholdContribution.objects.filter(
+            ledger__household__memberships__user=self.request.user,
+            ledger__household__memberships__status='active',
+        ).distinct()
+
+    def destroy(self, request, *args, **kwargs):
+        contrib = self.get_object()
+        m = require_active_member(request.user, contrib.ledger.household_id)
+        if not m:
+            return Response({'detail': 'Not a member.'}, status=403)
+        if contrib.created_by_id != request.user.id and m.role not in ('owner', 'admin'):
+            return Response({'detail': 'You can only delete your own contributions.'}, status=403)
+        if contrib.ledger.status == 'closed':
+            return Response({'detail': 'This ledger is closed.'}, status=400)
+        tx = contrib.linked_transaction
+        contrib.delete()
+        if tx and tx.user_id == request.user.id:
+            Transaction.objects.filter(pk=tx.pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
