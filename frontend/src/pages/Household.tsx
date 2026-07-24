@@ -5,6 +5,7 @@ import { householdsApi, accountsApi, asList, apiErrorMessage } from '../api/clie
 import { fmt, fmtBalance } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
 import HouseholdReportPanel from '../components/HouseholdReportPanel'
+import InviteQr from '../components/InviteQr'
 
 interface Household {
   id: number
@@ -28,6 +29,27 @@ interface InviteInfo {
   expires_at: string
   join_path: string
   is_valid: boolean
+}
+
+interface MemberRow {
+  id: number
+  user: number | null
+  display_name: string
+  email: string
+  role: string
+  status: string
+}
+
+interface HhNotification {
+  id: number
+  household: number
+  household_name: string
+  title: string
+  body: string
+  kind: string
+  is_read: boolean
+  created_at: string
+  actor_name: string
 }
 
 interface Ledger {
@@ -79,6 +101,7 @@ export default function HouseholdPage() {
   const [ledgerOpen, setLedgerOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [membersOpen, setMembersOpen] = useState(false)
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [contribOpen, setContribOpen] = useState(false)
   const [name, setName] = useState('')
@@ -98,18 +121,28 @@ export default function HouseholdPage() {
     contributed_by_name: string; account_name: string | null
   }[]>([])
   const [contribTotal, setContribTotal] = useState(0)
+  const [members, setMembers] = useState<MemberRow[]>([])
+  const [notifications, setNotifications] = useState<HhNotification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [expenseHasMore, setExpenseHasMore] = useState(false)
+  const [expenseOffset, setExpenseOffset] = useState(0)
+  const EXPENSE_PAGE = 50
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [hRes, pRes, aRes] = await Promise.all([
+      const [hRes, pRes, aRes, nRes, uRes] = await Promise.all([
         householdsApi.list(),
         householdsApi.pendingInvites(),
         accountsApi.list(),
+        householdsApi.notifications({ limit: 20 }).catch(() => ({ data: [] })),
+        householdsApi.unreadNotificationCount().catch(() => ({ data: { count: 0 } })),
       ])
       setHouseholds(asList(hRes.data))
       setPending(asList(pRes.data))
       setMyAccounts(asList(aRes.data))
+      setNotifications(asList(nRes.data))
+      setUnreadCount(Number(uRes.data?.count) || 0)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not load households.'))
     } finally {
@@ -133,24 +166,29 @@ export default function HouseholdPage() {
     setSelectedId(id)
     setError('')
     try {
-      const [lRes, iRes] = await Promise.all([
+      const [lRes, iRes, mRes] = await Promise.all([
         householdsApi.ledgers(id),
         householdsApi.getInvite(id).catch(() => ({ data: null })),
+        householdsApi.members(id).catch(() => ({ data: [] })),
       ])
       const list = asList<Ledger>(lRes.data)
       setLedgers(list)
       setInvite(iRes.data && iRes.data.code ? iRes.data : null)
+      setMembers(asList(mRes.data))
       const first = list.find(l => l.status === 'open') || list[0] || null
       setActiveLedger(first)
-      if (first) await loadExpenses(first)
-      else { setExpenses([]); setExpenseTotal(0); setSummary(null) }
+      if (first) await loadExpenses(first, true)
+      else { setExpenses([]); setExpenseTotal(0); setSummary(null); setExpenseHasMore(false) }
     } catch (err) {
       setError(apiErrorMessage(err))
     }
   }
 
-  const loadExpenses = async (ledger: Ledger) => {
-    const params: Record<string, number> = {}
+  const loadExpenses = async (ledger: Ledger, reset = true) => {
+    const params: Record<string, number> = {
+      limit: EXPENSE_PAGE,
+      offset: reset ? 0 : expenseOffset,
+    }
     // Ongoing open ledgers: month filter. Events / closed: full history.
     if (ledger.kind === 'ongoing' && ledger.status === 'open') {
       const now = new Date()
@@ -158,25 +196,31 @@ export default function HouseholdPage() {
       params.month = now.getMonth() + 1
     }
     const res = await householdsApi.ledgerExpenses(ledger.id, params)
-    setExpenses(res.data?.results ?? [])
+    const rows = res.data?.results ?? []
+    setExpenses(prev => reset ? rows : [...prev, ...rows])
     setExpenseTotal(Number(res.data?.total) || 0)
-    try {
-      const cRes = await householdsApi.ledgerContributions(ledger.id)
-      setContributions(cRes.data?.results ?? [])
-      setContribTotal(Number(cRes.data?.total) || 0)
-    } catch {
-      setContributions([])
-      setContribTotal(0)
-    }
-    if (ledger.status === 'closed' || ledger.kind === 'event') {
+    const nextOffset = (reset ? 0 : expenseOffset) + rows.length
+    setExpenseOffset(nextOffset)
+    setExpenseHasMore(Boolean(res.data?.has_more))
+    if (reset) {
       try {
-        const s = await householdsApi.ledgerSummary(ledger.id)
-        setSummary(s.data)
+        const cRes = await householdsApi.ledgerContributions(ledger.id)
+        setContributions(cRes.data?.results ?? [])
+        setContribTotal(Number(cRes.data?.total) || 0)
       } catch {
+        setContributions([])
+        setContribTotal(0)
+      }
+      if (ledger.status === 'closed' || ledger.kind === 'event') {
+        try {
+          const s = await householdsApi.ledgerSummary(ledger.id)
+          setSummary(s.data)
+        } catch {
+          setSummary(null)
+        }
+      } else {
         setSummary(null)
       }
-    } else {
-      setSummary(null)
     }
   }
 
@@ -376,6 +420,91 @@ export default function HouseholdPage() {
     try { await navigator.clipboard.writeText(invite.code) } catch { /* ignore */ }
   }
 
+  const inviteUrl = invite
+    ? `${window.location.origin}/household?code=${encodeURIComponent(invite.code)}`
+    : ''
+
+  const refreshMembers = async () => {
+    if (!selectedId) return
+    const mRes = await householdsApi.members(selectedId)
+    setMembers(asList(mRes.data))
+  }
+
+  const leaveHousehold = async () => {
+    if (!selectedId || !selected) return
+    const ok = await confirm({
+      title: 'Leave household?',
+      message: selected.my_role === 'owner'
+        ? 'You are the only member — leaving will delete this household.'
+        : `Leave “${selected.name}”? Shared history stays for others.`,
+      confirmLabel: 'Leave',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await householdsApi.leave(selectedId)
+      setSelectedId(null)
+      setActiveLedger(null)
+      await load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not leave.'))
+    }
+  }
+
+  const removeMember = async (m: MemberRow) => {
+    if (!selectedId) return
+    const ok = await confirm({
+      title: 'Remove member?',
+      message: `Remove ${m.display_name} from this household? Their past expenses stay in the history.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await householdsApi.removeMember(selectedId, m.id)
+      await refreshMembers()
+      await load()
+    } catch (err) {
+      setError(apiErrorMessage(err))
+    }
+  }
+
+  const setRole = async (m: MemberRow, role: string) => {
+    if (!selectedId) return
+    const label = role === 'owner' ? 'Transfer ownership' : role === 'admin' ? 'Promote to admin' : 'Demote to member'
+    const ok = await confirm({
+      title: `${label}?`,
+      message: role === 'owner'
+        ? `${m.display_name} will become owner. You will become an admin.`
+        : `Change ${m.display_name} to ${role}?`,
+      confirmLabel: label,
+    })
+    if (!ok) return
+    try {
+      await householdsApi.setMemberRole(selectedId, m.id, role)
+      await refreshMembers()
+      await load()
+      if (selectedId) openHousehold(selectedId)
+    } catch (err) {
+      setError(apiErrorMessage(err))
+    }
+  }
+
+  const markNotifRead = async (n: HhNotification) => {
+    if (n.is_read) return
+    try {
+      await householdsApi.markNotificationRead(n.id)
+      setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+      setUnreadCount(c => Math.max(0, c - 1))
+    } catch { /* ignore */ }
+  }
+
+  const markAllRead = async () => {
+    await householdsApi.markAllNotificationsRead()
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+    setUnreadCount(0)
+  }
+
   const selected = households.find(h => h.id === selectedId) || null
   const now = new Date()
   const monthLabel = now.toLocaleString('en', { month: 'long', year: 'numeric' })
@@ -403,11 +532,54 @@ export default function HouseholdPage() {
           </div>
         )}
         {selected && (
-          <button className="btn-glass" onClick={() => { setSelectedId(null); setActiveLedger(null) }}>← All households</button>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button className="btn-glass" onClick={() => { setSelectedId(null); setActiveLedger(null) }}>← All households</button>
+          </div>
         )}
       </div>
 
       {error && <div className="auth-error" style={{ marginBottom: '0.85rem' }}>{error}</div>}
+
+      {/* In-app notifications */}
+      {!selected && notifications.length > 0 && (
+        <div className="glass" style={{ padding: '1rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', gap: '0.5rem' }}>
+            <h3 style={{ margin: 0 }}>
+              Activity
+              {unreadCount > 0 && (
+                <span className="badge badge-red" style={{ marginLeft: '0.45rem', fontSize: '0.68rem' }}>{unreadCount} new</span>
+              )}
+            </h3>
+            {unreadCount > 0 && (
+              <button type="button" className="btn-glass" style={{ fontSize: '0.72rem' }} onClick={markAllRead}>
+                Mark all read
+              </button>
+            )}
+          </div>
+          <div className="list">
+            {notifications.slice(0, 8).map(n => (
+              <button
+                key={n.id}
+                type="button"
+                className="list-item"
+                style={{
+                  width: '100%', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer',
+                  opacity: n.is_read ? 0.7 : 1,
+                }}
+                onClick={() => { markNotifRead(n); openHousehold(n.household) }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: n.is_read ? 500 : 700, fontSize: '0.88rem' }}>{n.title}</div>
+                  <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                    {n.household_name}{n.body ? ` · ${n.body}` : ''}
+                  </div>
+                </div>
+                {!n.is_read && <span className="badge badge-green" style={{ fontSize: '0.62rem' }}>New</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Pending invites */}
       {!selected && pending.length > 0 && (
@@ -475,8 +647,18 @@ export default function HouseholdPage() {
                 </p>
               </div>
               {(selected.my_role === 'owner' || selected.my_role === 'admin') && (
-                <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => { setInviteOpen(true); if (!invite) regenInvite() }}>
-                  Invite
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  <button className="btn-glass" style={{ fontSize: '0.82rem' }} onClick={() => setMembersOpen(true)}>
+                    Members
+                  </button>
+                  <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => { setInviteOpen(true); if (!invite) regenInvite() }}>
+                    Invite
+                  </button>
+                </div>
+              )}
+              {selected.my_role === 'member' && (
+                <button className="btn-glass" style={{ fontSize: '0.82rem' }} onClick={() => setMembersOpen(true)}>
+                  Members
                 </button>
               )}
             </div>
@@ -500,7 +682,7 @@ export default function HouseholdPage() {
                   <button
                     key={l.id}
                     className={`rpt-chip ${activeLedger?.id === l.id ? 'active' : ''}`}
-                    onClick={async () => { setActiveLedger(l); await loadExpenses(l) }}
+                    onClick={async () => { setActiveLedger(l); await loadExpenses(l, true) }}
                   >
                     {l.name}
                     <span style={{ marginLeft: '0.35rem', opacity: 0.75, fontSize: '0.68rem' }}>
@@ -713,6 +895,16 @@ export default function HouseholdPage() {
                   ))}
                 </div>
               )}
+              {expenseHasMore && activeLedger && (
+                <button
+                  type="button"
+                  className="btn-glass"
+                  style={{ width: '100%', marginTop: '0.65rem', fontSize: '0.82rem' }}
+                  onClick={() => loadExpenses(activeLedger, false)}
+                >
+                  Load more
+                </button>
+              )}
             </>
               )}
             </>
@@ -796,6 +988,20 @@ export default function HouseholdPage() {
                 <div className="text-muted" style={{ fontSize: '0.72rem', marginTop: '0.35rem' }}>
                   Expires {new Date(invite.expires_at).toLocaleString()}
                 </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', marginTop: '0.85rem' }}>
+                  <InviteQr value={inviteUrl} size={148} />
+                  <p className="text-muted" style={{ fontSize: '0.72rem', textAlign: 'center', margin: 0 }}>
+                    Scan to open join preview — only household name & member count are shown before Accept.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn-glass"
+                    style={{ fontSize: '0.72rem' }}
+                    onClick={async () => { try { await navigator.clipboard.writeText(inviteUrl) } catch { /* ignore */ } }}
+                  >
+                    Copy invite link
+                  </button>
+                </div>
                 <button className="btn-glass" style={{ marginTop: '0.65rem', fontSize: '0.78rem' }} onClick={regenInvite}>Regenerate code</button>
               </div>
             )}
@@ -806,6 +1012,56 @@ export default function HouseholdPage() {
               </div>
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? <span className="spinner" /> : 'Send invite'}</button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Members management */}
+      {membersOpen && selected && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setMembersOpen(false)}>
+          <div className="modal-sheet">
+            <div className="modal-header">
+              <h2>Members</h2>
+              <button className="modal-close" onClick={() => setMembersOpen(false)} aria-label="Close"><X size={18} /></button>
+            </div>
+            <div className="list" style={{ marginBottom: '1rem' }}>
+              {members.filter(m => m.status === 'active').map(m => (
+                <div key={m.id} className="list-item" style={{ flexWrap: 'wrap', gap: '0.4rem', alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1, minWidth: 120 }}>
+                    <div style={{ fontWeight: 700 }}>{m.display_name}</div>
+                    <div className="text-muted" style={{ fontSize: '0.75rem' }}>{m.email}</div>
+                    <span className="badge badge-green" style={{ fontSize: '0.62rem', marginTop: '0.25rem' }}>{m.role}</span>
+                  </div>
+                  {selected.my_role === 'owner' && m.role !== 'owner' && (
+                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                      {m.role === 'member' ? (
+                        <button type="button" className="btn-glass" style={{ fontSize: '0.7rem' }} onClick={() => setRole(m, 'admin')}>
+                          Make admin
+                        </button>
+                      ) : (
+                        <button type="button" className="btn-glass" style={{ fontSize: '0.7rem' }} onClick={() => setRole(m, 'member')}>
+                          Demote
+                        </button>
+                      )}
+                      <button type="button" className="btn-glass" style={{ fontSize: '0.7rem' }} onClick={() => setRole(m, 'owner')}>
+                        Make owner
+                      </button>
+                      <button type="button" className="btn-glass" style={{ fontSize: '0.7rem' }} onClick={() => removeMember(m)}>
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  {selected.my_role === 'admin' && m.role === 'member' && (
+                    <button type="button" className="btn-glass" style={{ fontSize: '0.7rem' }} onClick={() => removeMember(m)}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button type="button" className="btn-glass" style={{ width: '100%', color: 'var(--red-600, #c53030)' }} onClick={leaveHousehold}>
+              Leave household
+            </button>
           </div>
         </div>
       )}

@@ -196,6 +196,11 @@ export const householdsApi = {
   get: (id: number) => api.get(`/households/${id}/`),
   remove: (id: number) => api.delete(`/households/${id}/`),
   members: (id: number) => api.get(`/households/${id}/members/`),
+  leave: (id: number) => api.post(`/households/${id}/leave/`),
+  removeMember: (householdId: number, memberId: number) =>
+    api.post(`/households/${householdId}/members/${memberId}/remove/`),
+  setMemberRole: (householdId: number, memberId: number, role: string) =>
+    api.post(`/households/${householdId}/members/${memberId}/set-role/`, { role }),
   getInvite: (id: number) => api.get(`/households/${id}/invites/`),
   regenerateInvite: (id: number) => api.post(`/households/${id}/invites/`),
   revokeInvite: (id: number) => api.post(`/households/${id}/invites/revoke/`),
@@ -227,5 +232,9 @@ export const householdsApi = {
     api.post(`/household-ledgers/${ledgerId}/expenses/`, data),
   updateExpense: (id: number, data: object) => api.patch(`/household-expenses/${id}/`, data),
   removeExpense: (id: number) => api.delete(`/household-expenses/${id}/`),
+  notifications: (params?: object) => api.get('/household-notifications/', { params }),
+  unreadNotificationCount: () => api.get('/household-notifications/unread_count/'),
+  markNotificationRead: (id: number) => api.post(`/household-notifications/${id}/mark_read/`),
+  markAllNotificationsRead: () => api.post('/household-notifications/mark_all_read/'),
 }
 

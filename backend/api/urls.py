@@ -14,6 +14,7 @@ router.register('households', household_api.HouseholdViewSet, basename='househol
 router.register('household-ledgers', household_api.HouseholdLedgerViewSet, basename='household-ledger')
 router.register('household-expenses', household_api.HouseholdExpenseViewSet, basename='household-expense')
 router.register('household-contributions', household_api.HouseholdContributionViewSet, basename='household-contribution')
+router.register('household-notifications', household_api.HouseholdNotificationViewSet, basename='household-notification')
 
 urlpatterns = [
     path('auth/register/', views.RegisterView.as_view(), name='register'),

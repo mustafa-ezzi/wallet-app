@@ -780,3 +780,97 @@ class HouseholdPhase5PotSplitTests(TestCase):
             format="json",
         )
         self.assertEqual(blocked.status_code, 400)
+
+
+class HouseholdPhase6PolishTests(TestCase):
+    """P6: notifications, roles, leave/remove, expense pagination."""
+
+    def _auth(self, user):
+        client = APIClient()
+        token = RefreshToken.for_user(user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        return client
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="p6o@example.com", email="p6o@example.com", password="testpass123", first_name="Owner",
+        )
+        self.admin = User.objects.create_user(
+            username="p6a@example.com", email="p6a@example.com", password="testpass123", first_name="Admin",
+        )
+        self.member = User.objects.create_user(
+            username="p6m@example.com", email="p6m@example.com", password="testpass123", first_name="Member",
+        )
+        for u in (self.owner, self.admin, self.member):
+            UserProfile.objects.get_or_create(user=u, defaults={"currency": "PKR"})
+        self.owner_client = self._auth(self.owner)
+        self.admin_client = self._auth(self.admin)
+        self.member_client = self._auth(self.member)
+
+    def test_notify_roles_leave_and_pagination(self):
+        h = self.owner_client.post("/api/households/", {"name": "Polish house"}, format="json")
+        self.assertEqual(h.status_code, 201, h.data)
+        hid = h.data["id"]
+        code = self.owner_client.get(f"/api/households/{hid}/invites/").data["code"]
+        self.admin_client.post("/api/households/join/", {"code": code}, format="json")
+        code2 = self.owner_client.get(f"/api/households/{hid}/invites/").data["code"]
+        self.member_client.post("/api/households/join/", {"code": code2}, format="json")
+
+        members = self.owner_client.get(f"/api/households/{hid}/members/").data
+        by_name = {m["display_name"]: m for m in members if m["status"] == "active"}
+        admin_mem = by_name["Admin"]
+        member_mem = by_name["Member"]
+
+        # Promote to admin
+        promo = self.owner_client.post(
+            f"/api/households/{hid}/members/{admin_mem['id']}/set-role/",
+            {"role": "admin"},
+            format="json",
+        )
+        self.assertEqual(promo.status_code, 200, promo.data)
+        self.assertEqual(promo.data["role"], "admin")
+
+        lid = self.owner_client.get(f"/api/households/{hid}/ledgers/").data[0]["id"]
+        today = date.today().isoformat()
+        exp = self.owner_client.post(
+            f"/api/household-ledgers/{lid}/expenses/",
+            {"amount": "750", "category": "Milk", "date": today},
+            format="json",
+        )
+        self.assertEqual(exp.status_code, 201, exp.data)
+
+        # Other members get a notification; actor does not
+        unread_m = self.member_client.get("/api/household-notifications/unread_count/")
+        self.assertEqual(unread_m.status_code, 200)
+        self.assertGreaterEqual(unread_m.data["count"], 1)
+        unread_o = self.owner_client.get("/api/household-notifications/unread_count/")
+        self.assertEqual(unread_o.data["count"], 0)
+
+        notifs = self.member_client.get("/api/household-notifications/")
+        self.assertEqual(notifs.status_code, 200)
+        rows = notifs.data if isinstance(notifs.data, list) else notifs.data.get("results", [])
+        self.assertTrue(any("Milk" in n["title"] or "Milk" in n.get("body", "") for n in rows))
+
+        # Soft-remove member
+        rem = self.admin_client.post(f"/api/households/{hid}/members/{member_mem['id']}/remove/")
+        self.assertEqual(rem.status_code, 200, rem.data)
+        left_list = self.owner_client.get(f"/api/households/{hid}/members/").data
+        self.assertFalse(any(m["display_name"] == "Member" and m["status"] == "active" for m in left_list))
+
+        # Admin can leave
+        leave = self.admin_client.post(f"/api/households/{hid}/leave/")
+        self.assertEqual(leave.status_code, 200, leave.data)
+
+        # Owner cannot leave while others... wait admin left, only owner remains
+        # Add someone back then try owner leave
+        code3 = self.owner_client.get(f"/api/households/{hid}/invites/").data["code"]
+        self.member_client.post("/api/households/join/", {"code": code3}, format="json")
+        owner_leave = self.owner_client.post(f"/api/households/{hid}/leave/")
+        self.assertEqual(owner_leave.status_code, 400)
+
+        # Pagination keys on expenses
+        page = self.owner_client.get(f"/api/household-ledgers/{lid}/expenses/", {"limit": 1, "offset": 0})
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("has_more", page.data)
+        self.assertEqual(page.data["limit"], 1)
+        self.assertEqual(len(page.data["results"]), 1)

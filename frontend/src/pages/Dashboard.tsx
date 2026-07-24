@@ -10,7 +10,7 @@ import {
   FileText,
   Users,
 } from 'lucide-react'
-import { dashboardApi, forecastApi } from '../api/client'
+import { dashboardApi, forecastApi, householdsApi } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { fmt, fmtBalance } from '../utils/format'
 
@@ -43,13 +43,15 @@ export default function Dashboard() {
   const [data, setData]         = useState<DashboardData | null>(null)
   const [forecast, setForecast] = useState<Forecast | null>(null)
   const [loading, setLoading]   = useState(true)
+  const [hhUnread, setHhUnread] = useState(0)
 
   useEffect(() => {
     const now = new Date()
     Promise.all([
       dashboardApi.get(),
       forecastApi.get(now.getFullYear(), now.getMonth() + 1),
-    ]).then(([dRes, fRes]) => {
+      householdsApi.unreadNotificationCount().catch(() => ({ data: { count: 0 } })),
+    ]).then(([dRes, fRes, uRes]) => {
       const d = dRes.data ?? {}
       setData({
         ...d,
@@ -57,6 +59,7 @@ export default function Dashboard() {
         recent_transactions: Array.isArray(d.recent_transactions) ? d.recent_transactions : [],
       })
       setForecast(fRes.data ?? null)
+      setHhUnread(Number(uRes.data?.count) || 0)
     }).catch(() => {
       setData(null)
       setForecast(null)
@@ -175,8 +178,15 @@ export default function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div className="account-icon account-icon-bank"><Users size={16} strokeWidth={1.75} /></div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>Household</div>
-            <div className="text-muted" style={{ fontSize: '0.78rem' }}>Shared expenses with family or friends</div>
+            <div style={{ fontWeight: 700, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              Household
+              {hhUnread > 0 && (
+                <span className="badge badge-red" style={{ fontSize: '0.62rem' }}>{hhUnread} new</span>
+              )}
+            </div>
+            <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+              {hhUnread > 0 ? 'Someone posted a shared expense' : 'Shared expenses with family or friends'}
+            </div>
           </div>
         </div>
         <span className="section-link">Open →</span>

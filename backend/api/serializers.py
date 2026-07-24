@@ -168,7 +168,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         ledger = validated_data.pop('household_ledger', None)
         tx = Transaction.objects.create(**validated_data)
         if ledger and tx.type == 'expense':
-            HouseholdExpense.objects.create(
+            he = HouseholdExpense.objects.create(
                 ledger=ledger,
                 amount=tx.amount,
                 date=tx.date,
@@ -178,6 +178,17 @@ class TransactionSerializer(serializers.ModelSerializer):
                 paid_by=tx.user,
                 linked_transaction=tx,
                 linked_account=tx.account,
+            )
+            from .household_api import notify_household_members, _display_name
+            cat = he.category or 'Expense'
+            notify_household_members(
+                household=ledger.household,
+                actor=tx.user,
+                kind='expense',
+                title=f'{_display_name(tx.user)} added {cat}',
+                body=f'{float(he.amount):,.0f} on {ledger.name}',
+                ledger=ledger,
+                expense=he,
             )
         return tx
 

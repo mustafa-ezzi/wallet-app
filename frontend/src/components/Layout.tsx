@@ -38,10 +38,25 @@ export default function Layout() {
   const navigate = useNavigate()
   const [showAdd, setShowAdd] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [hhUnread, setHhUnread] = useState(0)
   const pwa = usePwaInstall()
   const fabRef = useRef<HTMLButtonElement>(null)
 
   const handleAdded = () => { setShowAdd(false); setRefreshKey(k => k + 1) }
+
+  useEffect(() => {
+    let cancelled = false
+    const tick = () => {
+      import('../api/client').then(({ householdsApi }) =>
+        householdsApi.unreadNotificationCount()
+          .then(res => { if (!cancelled) setHhUnread(Number(res.data?.count) || 0) })
+          .catch(() => { if (!cancelled) setHhUnread(0) }),
+      )
+    }
+    tick()
+    const id = window.setInterval(tick, 60000)
+    return () => { cancelled = true; window.clearInterval(id) }
+  }, [location.pathname, refreshKey])
 
   const initials = user
     ? (
@@ -125,6 +140,11 @@ export default function Layout() {
             >
               <span className="nav-icon">{n.icon}</span>
               {n.label}
+              {n.path === '/household' && hhUnread > 0 && (
+                <span className="badge badge-red" style={{ marginLeft: 'auto', fontSize: '0.65rem' }}>
+                  {hhUnread > 9 ? '9+' : hhUnread}
+                </span>
+              )}
             </button>
           ))}
         </nav>

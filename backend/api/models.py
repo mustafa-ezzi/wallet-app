@@ -369,6 +369,9 @@ class HouseholdExpense(models.Model):
 
     class Meta:
         ordering = ['-date', '-id']
+        indexes = [
+            models.Index(fields=['ledger', '-date'], name='hh_exp_ledger_date_idx'),
+        ]
 
     def __str__(self):
         return f"{self.amount} on {self.date} ({self.ledger.name})"
@@ -414,3 +417,42 @@ class HouseholdSettlementMark(models.Model):
 
     def __str__(self):
         return f"{self.from_user_id} → {self.to_user_id}: {self.amount}"
+
+
+class HouseholdNotification(models.Model):
+    """In-app alert when another member posts to a shared ledger."""
+    KINDS = [
+        ('expense', 'Expense'),
+        ('contribution', 'Contribution'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='household_notifications')
+    household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name='notifications')
+    ledger = models.ForeignKey(
+        HouseholdLedger, null=True, blank=True, on_delete=models.CASCADE, related_name='notifications')
+    expense = models.ForeignKey(
+        HouseholdExpense, null=True, blank=True, on_delete=models.CASCADE, related_name='notifications')
+    contribution = models.ForeignKey(
+        HouseholdContribution, null=True, blank=True, on_delete=models.CASCADE,
+        related_name='notifications')
+    actor = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='household_notifications_sent')
+    kind = models.CharField(max_length=20, choices=KINDS, default='expense')
+    title = models.CharField(max_length=160)
+    body = models.CharField(max_length=255, blank=True, default='')
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at'], name='hh_notif_user_created_idx'),
+            models.Index(fields=['user', 'read_at'], name='hh_notif_user_read_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.title} → {self.user_id}"
+
+    @property
+    def is_read(self):
+        return self.read_at is not None

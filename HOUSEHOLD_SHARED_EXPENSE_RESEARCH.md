@@ -809,15 +809,15 @@ P0 Research ──► P1 Foundation + MVP ──► P2 Dual link (bank + Househo
 
 **Ship as small slices**
 
-- [ ] Roles UX: promote/demote admin; leave household; soft-remove member (keep history)
-- [ ] **Notifications (LOCKED):** in-app badge/alert when a member posts a household expense; push later if infra exists
-- [ ] QR code for invite link
-- [ ] Empty states, tour tip, confirm dialogs for destructive household actions
-- [ ] Performance: paginate expense feed; indexes on `(ledger, date)`
-- [ ] PWA: household screens work offline-read where feasible (optional)
-- [ ] Finalize nav vs Dashboard button after trying fit on mobile bottom nav
+- [x] Roles UX: promote/demote admin; leave household; soft-remove member (keep history)
+- [x] **Notifications (LOCKED):** in-app badge/alert when a member posts a household expense; push later if infra exists
+- [x] QR code for invite link
+- [x] Empty states, tour tip, confirm dialogs for destructive household actions
+- [x] Performance: paginate expense feed; indexes on `(ledger, date)`
+- [ ] PWA: household screens work offline-read where feasible (optional — deferred)
+- [x] Finalize nav vs Dashboard button after trying fit on mobile bottom nav — **locked:** Household stays sidebar + Dashboard card (bottom nav remains 5 items)
 
-**Exit criteria:** Owner can manage members safely; members get a clear signal when the book changes; no privacy leaks in invite preview.
+**Exit criteria:** Owner can manage members safely; members get a clear signal when the book changes; no privacy leaks in invite preview. ✅
 
 ---
 

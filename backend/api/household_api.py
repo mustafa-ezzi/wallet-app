@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 
 from .models import (
     Household, HouseholdMembership, HouseholdInvite, HouseholdLedger, HouseholdExpense,
-    HouseholdContribution, HouseholdSettlementMark,
+    HouseholdContribution, HouseholdSettlementMark, HouseholdNotification,
     Account, Transaction,
     generate_household_invite_code, generate_invite_token,
 )
@@ -304,6 +304,31 @@ def create_invite_for(household, user):
     )
 
 
+def notify_household_members(*, household, actor, kind, title, body='', ledger=None, expense=None, contribution=None):
+    """Fan-out in-app notifications to other active members (not the actor)."""
+    recipient_ids = list(
+        household.memberships.filter(status='active', user__isnull=False)
+        .exclude(user=actor)
+        .values_list('user_id', flat=True)
+    )
+    if not recipient_ids:
+        return
+    HouseholdNotification.objects.bulk_create([
+        HouseholdNotification(
+            user_id=uid,
+            household=household,
+            ledger=ledger,
+            expense=expense,
+            contribution=contribution,
+            actor=actor,
+            kind=kind,
+            title=title[:160],
+            body=(body or '')[:255],
+        )
+        for uid in recipient_ids
+    ])
+
+
 # ── Serializers ──────────────────────────────────────────────────────────────
 
 class HouseholdMemberSerializer(serializers.ModelSerializer):
@@ -322,6 +347,22 @@ class HouseholdMemberSerializer(serializers.ModelSerializer):
 
     def get_email(self, obj):
         return obj.user.email if obj.user_id else obj.invited_email
+
+
+class HouseholdNotificationSerializer(serializers.ModelSerializer):
+    household_name = serializers.CharField(source='household.name', read_only=True)
+    actor_name = serializers.SerializerMethodField()
+    is_read = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = HouseholdNotification
+        fields = (
+            'id', 'household', 'household_name', 'ledger', 'expense', 'contribution',
+            'actor', 'actor_name', 'kind', 'title', 'body', 'read_at', 'is_read', 'created_at',
+        )
+
+    def get_actor_name(self, obj):
+        return _display_name(obj.actor) if obj.actor_id else ''
 
 
 class HouseholdSerializer(serializers.ModelSerializer):
@@ -525,6 +566,71 @@ class HouseholdViewSet(viewsets.ModelViewSet):
         household = self.get_object()
         qs = household.memberships.filter(status__in=['active', 'invited']).select_related('user')
         return Response(HouseholdMemberSerializer(qs, many=True).data)
+
+    @action(detail=True, methods=['post'])
+    def leave(self, request, pk=None):
+        household = self.get_object()
+        m = require_active_member(request.user, household.id)
+        if not m:
+            return Response({'detail': 'Not a member.'}, status=403)
+        active_count = household.memberships.filter(status='active').count()
+        if m.role == 'owner':
+            if active_count > 1:
+                return Response(
+                    {'detail': 'Owner cannot leave while others remain. Promote another owner or remove members first.'},
+                    status=400,
+                )
+            household.delete()
+            return Response({'ok': True, 'deleted': True})
+        m.status = 'left'
+        m.save(update_fields=['status'])
+        return Response({'ok': True, 'deleted': False})
+
+    @action(detail=True, methods=['post'], url_path=r'members/(?P<member_id>[0-9]+)/remove')
+    def remove_member(self, request, pk=None, member_id=None):
+        household = self.get_object()
+        actor = require_owner_or_admin(request.user, household.id)
+        if not actor:
+            return Response({'detail': 'Only owner/admin can remove members.'}, status=403)
+        target = household.memberships.filter(pk=member_id).select_related('user').first()
+        if not target or target.status != 'active':
+            return Response({'detail': 'Member not found.'}, status=404)
+        if target.role == 'owner':
+            return Response({'detail': 'Cannot remove the owner.'}, status=400)
+        if target.user_id == request.user.id:
+            return Response({'detail': 'Use leave to exit the household.'}, status=400)
+        if actor.role == 'admin' and target.role == 'admin':
+            return Response({'detail': 'Admins cannot remove other admins.'}, status=403)
+        target.status = 'left'
+        target.save(update_fields=['status'])
+        return Response({'ok': True})
+
+    @action(detail=True, methods=['post'], url_path=r'members/(?P<member_id>[0-9]+)/set-role')
+    def set_member_role(self, request, pk=None, member_id=None):
+        household = self.get_object()
+        actor = require_active_member(request.user, household.id)
+        if not actor or actor.role != 'owner':
+            return Response({'detail': 'Only the owner can change roles.'}, status=403)
+        role = (request.data.get('role') or '').strip()
+        if role not in ('admin', 'member', 'owner'):
+            return Response({'role': 'Must be admin, member, or owner.'}, status=400)
+        target = household.memberships.filter(pk=member_id, status='active').select_related('user').first()
+        if not target:
+            return Response({'detail': 'Member not found.'}, status=404)
+        if target.user_id == request.user.id and role != 'owner':
+            return Response({'detail': 'Cannot demote yourself as owner. Transfer ownership first.'}, status=400)
+        if role == 'owner':
+            # Transfer ownership
+            actor.role = 'admin'
+            actor.save(update_fields=['role'])
+            target.role = 'owner'
+            target.save(update_fields=['role'])
+        else:
+            if target.role == 'owner':
+                return Response({'detail': 'Transfer ownership instead of demoting the owner.'}, status=400)
+            target.role = role
+            target.save(update_fields=['role'])
+        return Response(HouseholdMemberSerializer(target).data)
 
     @action(detail=True, methods=['get', 'post'])
     def invites(self, request, pk=None):
@@ -776,6 +882,15 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             linked_transaction=linked_tx,
             linked_account=linked_account,
         )
+        notify_household_members(
+            household=ledger.household,
+            actor=request.user,
+            kind='contribution',
+            title=f'{_display_name(request.user)} contributed to the pot',
+            body=f'{float(contrib.amount):,.0f} on {ledger.name}',
+            ledger=ledger,
+            contribution=contrib,
+        )
         return Response(HouseholdContributionSerializer(contrib).data, status=201)
 
     @action(detail=True, methods=['post'])
@@ -833,10 +948,24 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             # Closed / event ledgers: default to full history unless month explicitly requested
             if year and month:
                 qs = qs.filter(date__year=int(year), date__month=int(month))
-            total = qs.aggregate(total=Sum('amount'))['total'] or 0
+            total_amount = qs.aggregate(total=Sum('amount'))['total'] or 0
+            try:
+                limit = min(max(int(request.query_params.get('limit', 50)), 1), 200)
+            except (TypeError, ValueError):
+                limit = 50
+            try:
+                offset = max(int(request.query_params.get('offset', 0)), 0)
+            except (TypeError, ValueError):
+                offset = 0
+            count = qs.count()
+            page = qs[offset:offset + limit]
             return Response({
-                'results': HouseholdExpenseSerializer(qs, many=True).data,
-                'total': float(total),
+                'results': HouseholdExpenseSerializer(page, many=True).data,
+                'total': float(total_amount),
+                'count': count,
+                'limit': limit,
+                'offset': offset,
+                'has_more': offset + limit < count,
             })
 
         if ledger.status == 'closed':
@@ -875,6 +1004,17 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             paid_by=paid_by,
             linked_transaction=linked_tx,
             linked_account=linked_account,
+        )
+        amt = float(expense.amount)
+        cat = expense.category or 'Expense'
+        notify_household_members(
+            household=ledger.household,
+            actor=request.user,
+            kind='expense',
+            title=f'{_display_name(request.user)} added {cat}',
+            body=f'{amt:,.0f} on {ledger.name}',
+            ledger=ledger,
+            expense=expense,
         )
         return Response(HouseholdExpenseSerializer(expense).data, status=201)
 
@@ -947,6 +1087,34 @@ class HouseholdContributionViewSet(viewsets.ModelViewSet):
         if tx and tx.user_id == request.user.id:
             Transaction.objects.filter(pk=tx.pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class HouseholdNotificationViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = HouseholdNotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return HouseholdNotification.objects.filter(user=self.request.user).select_related(
+            'household', 'actor', 'ledger',
+        )
+
+    @action(detail=False, methods=['get'])
+    def unread_count(self, request):
+        count = self.get_queryset().filter(read_at__isnull=True).count()
+        return Response({'count': count})
+
+    @action(detail=False, methods=['post'])
+    def mark_all_read(self, request):
+        updated = self.get_queryset().filter(read_at__isnull=True).update(read_at=timezone.now())
+        return Response({'updated': updated})
+
+    @action(detail=True, methods=['post'])
+    def mark_read(self, request, pk=None):
+        n = self.get_object()
+        if not n.read_at:
+            n.read_at = timezone.now()
+            n.save(update_fields=['read_at'])
+        return Response(HouseholdNotificationSerializer(n).data)
 
 
 class JoinPreviewView(APIView):
