@@ -792,7 +792,8 @@ class HouseholdViewSet(viewsets.ModelViewSet):
 class HouseholdLedgerViewSet(viewsets.ModelViewSet):
     serializer_class = HouseholdLedgerSerializer
     permission_classes = [IsAuthenticated]
-    http_method_names = ['get', 'patch', 'delete', 'head', 'options']
+    # post required for detail actions: expenses, contributions, close, reopen, settlement/mark
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         qs = HouseholdLedger.objects.filter(
@@ -803,6 +804,12 @@ class HouseholdLedgerViewSet(viewsets.ModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
         return qs
+
+    def create(self, request, *args, **kwargs):
+        return Response(
+            {'detail': 'Create ledgers via POST /api/households/{id}/ledgers/.'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
 
     def update(self, request, *args, **kwargs):
         ledger = self.get_object()
