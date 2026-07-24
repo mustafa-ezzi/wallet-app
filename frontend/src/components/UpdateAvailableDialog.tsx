@@ -10,7 +10,7 @@ export default function UpdateAvailableDialog({ open, refreshing, onRefresh }: P
   if (!open) return null
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1300 }}>
+    <div className="modal-overlay" style={{ zIndex: 1300 }} onClick={e => e.stopPropagation()}>
       <div className="modal-sheet" style={{ maxWidth: 400 }} role="alertdialog" aria-modal="true" aria-labelledby="update-title">
         <div className="modal-header">
           <h2 id="update-title">Update available</h2>
@@ -25,11 +25,14 @@ export default function UpdateAvailableDialog({ open, refreshing, onRefresh }: P
           type="button"
           className="btn-primary"
           style={{ width: '100%', padding: '0.8rem', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}
-          onClick={onRefresh}
+          onClick={() => { if (!refreshing) onRefresh() }}
           disabled={refreshing}
         >
           {refreshing ? (
-            <span className="spinner" />
+            <>
+              <span className="spinner" />
+              Updating…
+            </>
           ) : (
             <>
               <RefreshCw size={16} strokeWidth={2.25} />
