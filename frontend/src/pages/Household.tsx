@@ -36,6 +36,17 @@ interface Ledger {
   status: string
   total_spent: number
   month_spent: number
+  closed_total_expense: number | null
+  closed_at: string | null
+  closed_by_name: string | null
+  end_date: string | null
+}
+
+interface LedgerSummary {
+  total_spent: number
+  expense_count: number
+  by_member: { name: string; amount: number }[]
+  by_category: { name: string; amount: number }[]
 }
 
 interface Expense {
@@ -64,16 +75,19 @@ export default function HouseholdPage() {
   const [expenseTotal, setExpenseTotal] = useState(0)
 
   const [createOpen, setCreateOpen] = useState(false)
+  const [ledgerOpen, setLedgerOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [name, setName] = useState('')
+  const [ledgerForm, setLedgerForm] = useState({ name: '', kind: 'ongoing', start_date: new Date().toISOString().slice(0, 10) })
   const [joinCode, setJoinCode] = useState('')
   const [preview, setPreview] = useState<{ household_name: string; member_count: number; code: string } | null>(null)
   const [emailInvite, setEmailInvite] = useState('')
   const [expForm, setExpForm] = useState({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
   const [saving, setSaving] = useState(false)
   const [myAccounts, setMyAccounts] = useState<{ id: number; name: string; current_balance: number }[]>([])
+  const [summary, setSummary] = useState<LedgerSummary | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -118,21 +132,34 @@ export default function HouseholdPage() {
       setInvite(iRes.data && iRes.data.code ? iRes.data : null)
       const first = list.find(l => l.status === 'open') || list[0] || null
       setActiveLedger(first)
-      if (first) await loadExpenses(first.id)
-      else { setExpenses([]); setExpenseTotal(0) }
+      if (first) await loadExpenses(first)
+      else { setExpenses([]); setExpenseTotal(0); setSummary(null) }
     } catch (err) {
       setError(apiErrorMessage(err))
     }
   }
 
-  const loadExpenses = async (ledgerId: number) => {
-    const now = new Date()
-    const res = await householdsApi.ledgerExpenses(ledgerId, {
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-    })
+  const loadExpenses = async (ledger: Ledger) => {
+    const params: Record<string, number> = {}
+    // Ongoing open ledgers: month filter. Events / closed: full history.
+    if (ledger.kind === 'ongoing' && ledger.status === 'open') {
+      const now = new Date()
+      params.year = now.getFullYear()
+      params.month = now.getMonth() + 1
+    }
+    const res = await householdsApi.ledgerExpenses(ledger.id, params)
     setExpenses(res.data?.results ?? [])
     setExpenseTotal(Number(res.data?.total) || 0)
+    if (ledger.status === 'closed' || ledger.kind === 'event') {
+      try {
+        const s = await householdsApi.ledgerSummary(ledger.id)
+        setSummary(s.data)
+      } catch {
+        setSummary(null)
+      }
+    } else {
+      setSummary(null)
+    }
   }
 
   const createHousehold = async (ev: React.FormEvent) => {
@@ -222,13 +249,84 @@ export default function HouseholdPage() {
       })
       setExpenseOpen(false)
       setExpForm({ amount: '', category: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
-      await loadExpenses(activeLedger.id)
+      await loadExpenses(activeLedger)
       if (selectedId) {
         const lRes = await householdsApi.ledgers(selectedId)
-        setLedgers(asList(lRes.data))
+        const list = asList<Ledger>(lRes.data)
+        setLedgers(list)
+        const updated = list.find(l => l.id === activeLedger.id)
+        if (updated) setActiveLedger(updated)
       }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not add expense.'))
+    } finally { setSaving(false) }
+  }
+
+  const createLedger = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!selectedId) return
+    setSaving(true); setError('')
+    try {
+      const res = await householdsApi.createLedger(selectedId, {
+        name: ledgerForm.name.trim(),
+        kind: ledgerForm.kind,
+        start_date: ledgerForm.start_date,
+      })
+      setLedgerOpen(false)
+      setLedgerForm({ name: '', kind: 'ongoing', start_date: new Date().toISOString().slice(0, 10) })
+      const lRes = await householdsApi.ledgers(selectedId)
+      const list = asList<Ledger>(lRes.data)
+      setLedgers(list)
+      if (res.data?.id) {
+        const created = list.find(l => l.id === res.data.id) || res.data
+        setActiveLedger(created)
+        await loadExpenses(created)
+      }
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not create ledger.'))
+    } finally { setSaving(false) }
+  }
+
+  const closeLedger = async () => {
+    if (!activeLedger || !selectedId) return
+    const total = activeLedger.total_spent
+    const ok = await confirm({
+      title: 'Close & lock ledger?',
+      message: `Close “${activeLedger.name}”? Total spent: ${fmt(total)}. No new expenses can be added until an owner reopens it.`,
+      confirmLabel: 'Close & lock',
+      danger: true,
+    })
+    if (!ok) return
+    setSaving(true); setError('')
+    try {
+      const res = await householdsApi.closeLedger(activeLedger.id)
+      const updated = res.data?.ledger ?? res.data
+      const lRes = await householdsApi.ledgers(selectedId)
+      setLedgers(asList(lRes.data))
+      setActiveLedger(updated)
+      await loadExpenses(updated)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not close ledger.'))
+    } finally { setSaving(false) }
+  }
+
+  const reopenLedger = async () => {
+    if (!activeLedger || !selectedId) return
+    const ok = await confirm({
+      title: 'Reopen ledger?',
+      message: `Reopen “${activeLedger.name}” so members can add expenses again?`,
+      confirmLabel: 'Reopen',
+    })
+    if (!ok) return
+    setSaving(true); setError('')
+    try {
+      const res = await householdsApi.reopenLedger(activeLedger.id)
+      const lRes = await householdsApi.ledgers(selectedId)
+      setLedgers(asList(lRes.data))
+      setActiveLedger(res.data)
+      await loadExpenses(res.data)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not reopen.'))
     } finally { setSaving(false) }
   }
 
@@ -343,17 +441,43 @@ export default function HouseholdPage() {
             </div>
           </div>
 
-          {ledgers.length > 0 && (
-            <div className="rpt-chips" style={{ marginBottom: '0.85rem' }}>
-              {ledgers.map(l => (
-                <button
-                  key={l.id}
-                  className={`rpt-chip ${activeLedger?.id === l.id ? 'active' : ''}`}
-                  onClick={async () => { setActiveLedger(l); await loadExpenses(l.id) }}
-                >
-                  {l.name}
+          {ledgers.length === 0 && (
+            <div className="glass empty-state" style={{ marginBottom: '1rem' }}>
+              <p>No ledgers yet. Create a monthly book or an event (trip, wedding).</p>
+              {(selected.my_role === 'owner' || selected.my_role === 'admin') && (
+                <button className="btn-primary" style={{ marginTop: '0.75rem' }} onClick={() => setLedgerOpen(true)}>
+                  + Create ledger
                 </button>
-              ))}
+              )}
+            </div>
+          )}
+
+          {ledgers.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+              <div className="rpt-chips" style={{ flex: 1, marginBottom: 0 }}>
+                {ledgers.map(l => (
+                  <button
+                    key={l.id}
+                    className={`rpt-chip ${activeLedger?.id === l.id ? 'active' : ''}`}
+                    onClick={async () => { setActiveLedger(l); await loadExpenses(l) }}
+                  >
+                    {l.name}
+                    <span style={{ marginLeft: '0.35rem', opacity: 0.75, fontSize: '0.68rem' }}>
+                      {l.kind === 'event' ? 'Event' : 'Monthly'}
+                      {l.status === 'closed' ? ' · Closed' : ''}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {(selected.my_role === 'owner' || selected.my_role === 'admin') && (
+                <button
+                  className="btn-glass"
+                  style={{ fontSize: '0.78rem' }}
+                  onClick={() => { setLedgerOpen(true); setError('') }}
+                >
+                  + Ledger
+                </button>
+              )}
             </div>
           )}
 
@@ -361,26 +485,113 @@ export default function HouseholdPage() {
             <>
               <div className="grid-2" style={{ marginBottom: '1rem' }}>
                 <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
-                  <div className="stat-label">{monthLabel}</div>
-                  <div className="stat-value amt-negative">{fmt(expenseTotal)}</div>
-                  <div className="stat-sub">shared this month</div>
+                  <div className="stat-label">
+                    {activeLedger.status === 'closed' || activeLedger.kind === 'event'
+                      ? 'Total spent'
+                      : monthLabel}
+                  </div>
+                  <div className="stat-value amt-negative">
+                    {fmt(
+                      activeLedger.status === 'closed' && activeLedger.closed_total_expense != null
+                        ? activeLedger.closed_total_expense
+                        : expenseTotal,
+                    )}
+                  </div>
+                  <div className="stat-sub">
+                    {activeLedger.status === 'closed'
+                      ? 'locked total'
+                      : activeLedger.kind === 'event'
+                        ? 'event so far'
+                        : 'shared this month'}
+                  </div>
                 </div>
                 <div className="glass stat-card" style={{ borderRadius: 'var(--radius-md)' }}>
-                  <div className="stat-label">All time</div>
-                  <div className="stat-value amt-negative">{fmt(activeLedger.total_spent)}</div>
-                  <div className="stat-sub">{activeLedger.kind} · {activeLedger.status}</div>
+                  <div className="stat-label">Status</div>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                    <span className={`badge ${activeLedger.kind === 'event' ? 'badge-blue' : 'badge-green'}`}>
+                      {activeLedger.kind === 'event' ? 'Event' : 'Monthly'}
+                    </span>
+                    <span className={`badge ${activeLedger.status === 'closed' ? 'badge-red' : 'badge-green'}`}>
+                      {activeLedger.status === 'closed' ? 'Closed' : 'Open'}
+                    </span>
+                  </div>
+                  <div className="stat-sub" style={{ marginTop: '0.5rem' }}>
+                    {activeLedger.status === 'closed' && activeLedger.closed_at
+                      ? `Closed ${new Date(activeLedger.closed_at).toLocaleDateString()}${activeLedger.closed_by_name ? ` by ${activeLedger.closed_by_name}` : ''}`
+                      : `All-time ${fmt(activeLedger.total_spent)}`}
+                  </div>
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
-                <h3>Expenses</h3>
-                {activeLedger.status === 'open' && (
-                  <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => setExpenseOpen(true)}>+ Add</button>
-                )}
+              {summary && (activeLedger.status === 'closed' || activeLedger.kind === 'event') && (
+                <div className="glass" style={{ padding: '1rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
+                  <h3 style={{ margin: '0 0 0.65rem', fontSize: '0.95rem' }}>
+                    {activeLedger.status === 'closed' ? 'Final summary' : 'Summary'}
+                  </h3>
+                  <div className="grid-2" style={{ gap: '0.85rem' }}>
+                    <div>
+                      <div className="text-muted" style={{ fontSize: '0.72rem', marginBottom: '0.35rem' }}>By member</div>
+                      {summary.by_member.length === 0 ? (
+                        <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>No expenses yet</p>
+                      ) : (
+                        summary.by_member.map(m => (
+                          <div key={m.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                            <span>{m.name}</span>
+                            <span className="amt-negative" style={{ fontWeight: 700 }}>{fmt(m.amount)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-muted" style={{ fontSize: '0.72rem', marginBottom: '0.35rem' }}>By category</div>
+                      {summary.by_category.length === 0 ? (
+                        <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>No expenses yet</p>
+                      ) : (
+                        summary.by_category.map(c => (
+                          <div key={c.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                            <span>{c.name}</span>
+                            <span className="amt-negative" style={{ fontWeight: 700 }}>{fmt(c.amount)}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0 }}>Expenses</h3>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                  {activeLedger.status === 'open' && (
+                    <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => setExpenseOpen(true)}>+ Add</button>
+                  )}
+                  {(selected.my_role === 'owner' || selected.my_role === 'admin') && activeLedger.status === 'open' && (
+                    <button className="btn-glass" style={{ fontSize: '0.82rem' }} disabled={saving} onClick={closeLedger}>
+                      Close & lock
+                    </button>
+                  )}
+                  {(selected.my_role === 'owner' || selected.my_role === 'admin') && activeLedger.status === 'closed' && (
+                    <button className="btn-glass" style={{ fontSize: '0.82rem' }} disabled={saving} onClick={reopenLedger}>
+                      Reopen
+                    </button>
+                  )}
+                </div>
               </div>
 
+              {activeLedger.status === 'closed' && (
+                <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.65rem' }}>
+                  This ledger is locked. History stays visible; new expenses are blocked until an owner reopens it.
+                </p>
+              )}
+
               {expenses.length === 0 ? (
-                <div className="glass empty-state"><p>No shared expenses this month yet.</p></div>
+                <div className="glass empty-state">
+                  <p>
+                    {activeLedger.kind === 'ongoing' && activeLedger.status === 'open'
+                      ? 'No shared expenses this month yet.'
+                      : 'No shared expenses yet.'}
+                  </p>
+                </div>
               ) : (
                 <div className="list">
                   {expenses.map(e => (
@@ -491,6 +702,67 @@ export default function HouseholdPage() {
                 <input type="email" value={emailInvite} onChange={e => setEmailInvite(e.target.value)} placeholder="family@email.com" required />
               </div>
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? <span className="spinner" /> : 'Send invite'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create ledger — Monthly vs Event */}
+      {ledgerOpen && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setLedgerOpen(false)}>
+          <div className="modal-sheet">
+            <div className="modal-header">
+              <h2>New ledger</h2>
+              <button className="modal-close" onClick={() => setLedgerOpen(false)} aria-label="Close"><X size={18} /></button>
+            </div>
+            <form onSubmit={createLedger} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div className="form-group">
+                <label>Name</label>
+                <input
+                  value={ledgerForm.name}
+                  onChange={e => setLedgerForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder={ledgerForm.kind === 'event' ? 'e.g. Balochistan trip' : 'e.g. Home expenses'}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Type</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className={ledgerForm.kind === 'ongoing' ? 'btn-primary' : 'btn-glass'}
+                    style={{ flex: 1, fontSize: '0.85rem' }}
+                    onClick={() => setLedgerForm(f => ({ ...f, kind: 'ongoing' }))}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    className={ledgerForm.kind === 'event' ? 'btn-primary' : 'btn-glass'}
+                    style={{ flex: 1, fontSize: '0.85rem' }}
+                    onClick={() => setLedgerForm(f => ({ ...f, kind: 'event' }))}
+                  >
+                    Event
+                  </button>
+                </div>
+                <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.4rem' }}>
+                  {ledgerForm.kind === 'event'
+                    ? 'Trip, wedding, Eid — close when done to lock the total.'
+                    : 'Ongoing shared book with a monthly view.'}
+                </p>
+              </div>
+              <div className="form-group">
+                <label>Start date</label>
+                <input
+                  type="date"
+                  value={ledgerForm.start_date}
+                  onChange={e => setLedgerForm(f => ({ ...f, start_date: e.target.value }))}
+                  required
+                />
+              </div>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? <span className="spinner" /> : 'Create ledger'}
+              </button>
             </form>
           </div>
         </div>

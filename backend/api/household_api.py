@@ -27,6 +27,30 @@ def _display_name(user):
     return full or user.username or user.email
 
 
+def ledger_summary(ledger):
+    """Totals + breakdowns for close screen / reports."""
+    rows = list(ledger.expenses.select_related('paid_by').all())
+    total = sum(float(r.amount) for r in rows)
+    by_member: dict[str, float] = {}
+    by_category: dict[str, float] = {}
+    for r in rows:
+        name = _display_name(r.paid_by) or 'Unknown'
+        by_member[name] = by_member.get(name, 0) + float(r.amount)
+        cat = r.category.strip() if r.category else 'Uncategorized'
+        by_category[cat] = by_category.get(cat, 0) + float(r.amount)
+    return {
+        'total_spent': total,
+        'expense_count': len(rows),
+        'by_member': [
+            {'name': k, 'amount': v}
+            for k, v in sorted(by_member.items(), key=lambda x: -x[1])
+        ],
+        'by_category': [
+            {'name': k, 'amount': v}
+            for k, v in sorted(by_category.items(), key=lambda x: -x[1])
+        ],
+    }
+
 def user_active_membership(user, household_id):
     return HouseholdMembership.objects.filter(
         household_id=household_id, user=user, status='active',
@@ -131,17 +155,21 @@ class HouseholdLedgerSerializer(serializers.ModelSerializer):
     total_spent = serializers.ReadOnlyField()
     month_spent = serializers.SerializerMethodField()
     household_name = serializers.CharField(source='household.name', read_only=True)
+    closed_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = HouseholdLedger
         fields = (
             'id', 'household', 'household_name', 'name', 'kind', 'status', 'start_date', 'end_date',
-            'opening_float', 'notes', 'closed_at', 'closed_by', 'closed_total_expense',
+            'opening_float', 'notes', 'closed_at', 'closed_by', 'closed_by_name', 'closed_total_expense',
             'total_spent', 'month_spent', 'created_at',
         )
         read_only_fields = (
             'household', 'closed_at', 'closed_by', 'closed_total_expense', 'created_at',
         )
+
+    def get_closed_by_name(self, obj):
+        return _display_name(obj.closed_by) if obj.closed_by_id else None
 
     def get_month_spent(self, obj):
         req = self.context.get('request')
@@ -371,11 +399,62 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
         qs = HouseholdLedger.objects.filter(
             household__memberships__user=self.request.user,
             household__memberships__status='active',
-        ).distinct().select_related('household')
+        ).distinct().select_related('household', 'closed_by')
         status_filter = self.request.query_params.get('status')
         if status_filter:
             qs = qs.filter(status=status_filter)
         return qs
+
+    @action(detail=True, methods=['get'])
+    def summary(self, request, pk=None):
+        ledger = self.get_object()
+        m = require_active_member(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Not a member.'}, status=403)
+        data = ledger_summary(ledger)
+        data['ledger'] = HouseholdLedgerSerializer(ledger, context={'request': request}).data
+        return Response(data)
+
+    @action(detail=True, methods=['post'])
+    def close(self, request, pk=None):
+        ledger = self.get_object()
+        m = require_owner_or_admin(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Only owner/admin can close a ledger.'}, status=403)
+        if ledger.status == 'closed':
+            return Response({'detail': 'Already closed.'}, status=400)
+        summary = ledger_summary(ledger)
+        today = timezone.localdate()
+        ledger.status = 'closed'
+        ledger.end_date = today
+        ledger.closed_at = timezone.now()
+        ledger.closed_by = request.user
+        ledger.closed_total_expense = summary['total_spent']
+        ledger.save(update_fields=[
+            'status', 'end_date', 'closed_at', 'closed_by', 'closed_total_expense',
+        ])
+        return Response({
+            'ledger': HouseholdLedgerSerializer(ledger, context={'request': request}).data,
+            'summary': summary,
+        })
+
+    @action(detail=True, methods=['post'])
+    def reopen(self, request, pk=None):
+        ledger = self.get_object()
+        m = require_owner_or_admin(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Only owner/admin can reopen a ledger.'}, status=403)
+        if ledger.status != 'closed':
+            return Response({'detail': 'Ledger is not closed.'}, status=400)
+        ledger.status = 'open'
+        ledger.end_date = None
+        ledger.closed_at = None
+        ledger.closed_by = None
+        ledger.closed_total_expense = None
+        ledger.save(update_fields=[
+            'status', 'end_date', 'closed_at', 'closed_by', 'closed_total_expense',
+        ])
+        return Response(HouseholdLedgerSerializer(ledger, context={'request': request}).data)
 
     @action(detail=True, methods=['get', 'post'])
     def expenses(self, request, pk=None):
@@ -388,6 +467,7 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
             qs = ledger.expenses.select_related('paid_by', 'created_by', 'linked_account')
             year = request.query_params.get('year')
             month = request.query_params.get('month')
+            # Closed / event ledgers: default to full history unless month explicitly requested
             if year and month:
                 qs = qs.filter(date__year=int(year), date__month=int(month))
             total = qs.aggregate(total=Sum('amount'))['total'] or 0

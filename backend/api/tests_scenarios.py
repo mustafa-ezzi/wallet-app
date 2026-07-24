@@ -443,3 +443,106 @@ class HouseholdPhase2DualLinkTests(TestCase):
         self.assertEqual(tx2.status_code, 201)
         shared2 = self.other_client.get(f"/api/household-ledgers/{ledger_id}/expenses/")
         self.assertEqual(len(shared2.data["results"]), 1)
+
+
+class HouseholdPhase3EventCloseTests(TestCase):
+    """P3: event ledger close blocks adds; reopen restores; summary snapshot."""
+
+    def _auth(self, user):
+        client = APIClient()
+        token = RefreshToken.for_user(user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        return client
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="p3a@example.com", email="p3a@example.com", password="testpass123", first_name="Ali",
+        )
+        self.member = User.objects.create_user(
+            username="p3b@example.com", email="p3b@example.com", password="testpass123", first_name="Bina",
+        )
+        UserProfile.objects.get_or_create(user=self.owner, defaults={"currency": "PKR"})
+        UserProfile.objects.get_or_create(user=self.member, defaults={"currency": "PKR"})
+        self.owner_client = self._auth(self.owner)
+        self.member_client = self._auth(self.member)
+
+    def test_event_close_blocks_adds_reopen_and_summary(self):
+        h = self.owner_client.post("/api/households/", {"name": "Trip crew"}, format="json")
+        self.assertEqual(h.status_code, 201, h.data)
+        hid = h.data["id"]
+        code = self.owner_client.get(f"/api/households/{hid}/invites/").data["code"]
+        self.member_client.post("/api/households/join/", {"code": code}, format="json")
+
+        event = self.owner_client.post(
+            f"/api/households/{hid}/ledgers/",
+            {"name": "Balochistan trip", "kind": "event", "start_date": date.today().isoformat()},
+            format="json",
+        )
+        self.assertEqual(event.status_code, 201, event.data)
+        self.assertEqual(event.data["kind"], "event")
+        self.assertEqual(event.data["status"], "open")
+        lid = event.data["id"]
+
+        e1 = self.owner_client.post(
+            f"/api/household-ledgers/{lid}/expenses/",
+            {"amount": "3000", "category": "Fuel", "date": date.today().isoformat()},
+            format="json",
+        )
+        self.assertEqual(e1.status_code, 201, e1.data)
+        e2 = self.member_client.post(
+            f"/api/household-ledgers/{lid}/expenses/",
+            {"amount": "2000", "category": "Food", "date": date.today().isoformat()},
+            format="json",
+        )
+        self.assertEqual(e2.status_code, 201, e2.data)
+
+        summary = self.owner_client.get(f"/api/household-ledgers/{lid}/summary/")
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(float(summary.data["total_spent"]), 5000.0)
+        self.assertEqual(summary.data["expense_count"], 2)
+        member_names = {m["name"] for m in summary.data["by_member"]}
+        self.assertIn("Ali", member_names)
+        self.assertIn("Bina", member_names)
+        cats = {c["name"]: float(c["amount"]) for c in summary.data["by_category"]}
+        self.assertEqual(cats.get("Fuel"), 3000.0)
+        self.assertEqual(cats.get("Food"), 2000.0)
+
+        # Member cannot close
+        denied = self.member_client.post(f"/api/household-ledgers/{lid}/close/")
+        self.assertEqual(denied.status_code, 403)
+
+        closed = self.owner_client.post(f"/api/household-ledgers/{lid}/close/")
+        self.assertEqual(closed.status_code, 200, closed.data)
+        self.assertEqual(closed.data["ledger"]["status"], "closed")
+        self.assertEqual(float(closed.data["ledger"]["closed_total_expense"]), 5000.0)
+        self.assertEqual(float(closed.data["summary"]["total_spent"]), 5000.0)
+
+        blocked = self.member_client.post(
+            f"/api/household-ledgers/{lid}/expenses/",
+            {"amount": "100", "category": "Snack", "date": date.today().isoformat()},
+            format="json",
+        )
+        self.assertEqual(blocked.status_code, 400)
+        self.assertIn("closed", blocked.data["detail"].lower())
+
+        # History still visible (full list, no month filter required)
+        hist = self.member_client.get(f"/api/household-ledgers/{lid}/expenses/")
+        self.assertEqual(hist.status_code, 200)
+        self.assertEqual(len(hist.data["results"]), 2)
+        self.assertEqual(float(hist.data["total"]), 5000.0)
+
+        # Member cannot reopen
+        reopen_denied = self.member_client.post(f"/api/household-ledgers/{lid}/reopen/")
+        self.assertEqual(reopen_denied.status_code, 403)
+
+        reopened = self.owner_client.post(f"/api/household-ledgers/{lid}/reopen/")
+        self.assertEqual(reopened.status_code, 200, reopened.data)
+        self.assertEqual(reopened.data["status"], "open")
+        self.assertIsNone(reopened.data["closed_total_expense"])
+
+        again = self.member_client.post(
+            f"/api/household-ledgers/{lid}/expenses/",
+            {"amount": "50", "category": "Snack", "date": date.today().isoformat()},
+            format="json",
+        )
+        self.assertEqual(again.status_code, 201, again.data)

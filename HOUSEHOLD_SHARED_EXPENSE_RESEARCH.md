@@ -731,18 +731,18 @@ P0 Research ──► P1 Foundation + MVP ──► P2 Dual link (bank + Househo
 
 **Backend**
 
-- [ ] Ledger `kind`: `ongoing` | `event`; `status`: `open` | `closed`
-- [ ] `POST …/close/` → snapshot totals, set `end_date` / `closed_by`; reject new expenses
-- [ ] Owner/admin reopen with confirm (optional but recommended)
+- [x] Ledger `kind`: `ongoing` | `event`; `status`: `open` | `closed`
+- [x] `POST …/close/` → snapshot totals, set `end_date` / `closed_by`; reject new expenses
+- [x] Owner/admin reopen with confirm (optional but recommended)
 
 **Frontend**
 
-- [ ] Create ledger: choose Monthly vs Event
-- [ ] Close event dialog: “Total spent: … Close & lock?”
-- [ ] Closed ledger UI: read-only feed + final summary (total, by member, by category — can be simple lists)
-- [ ] Clear open vs closed badges on hub
+- [x] Create ledger: choose Monthly vs Event
+- [x] Close event dialog: “Total spent: … Close & lock?”
+- [x] Closed ledger UI: read-only feed + final summary (total, by member, by category — can be simple lists)
+- [x] Clear open vs closed badges on hub
 
-**Exit criteria:** Event can be filled by all members, closed once, history remains visible, new adds blocked until reopen.
+**Exit criteria:** Event can be filled by all members, closed once, history remains visible, new adds blocked until reopen. ✅
 
 ---
 
