@@ -11,6 +11,7 @@ import {
   Plus,
   Download,
   Settings,
+  Users,
 } from 'lucide-react'
 import anime from 'animejs'
 import AddTransactionModal from './AddTransactionModal'
@@ -24,6 +25,11 @@ const NAV: { path: string; label: string; short: string; tour: string; icon: Rea
   { path: '/income',    label: 'Income',   icon: <Coins size={18} strokeWidth={1.75} />, short: 'Income', tour: 'nav-income' },
   { path: '/expenses',  label: 'Bills',    icon: <Receipt size={18} strokeWidth={1.75} />, short: 'Bills', tour: 'nav-bills' },
   { path: '/reports',   label: 'Reports',  icon: <BarChart3 size={18} strokeWidth={1.75} />, short: 'Reports', tour: 'nav-reports' },
+]
+
+/** Sidebar-only — keeps bottom nav at 5 items (Dashboard entry for Household on mobile). */
+const SIDE_EXTRA: { path: string; label: string; icon: ReactNode }[] = [
+  { path: '/household', label: 'Household', icon: <Users size={18} strokeWidth={1.75} /> },
 ]
 
 export default function Layout() {
@@ -104,6 +110,16 @@ export default function Layout() {
             <button
               key={n.path}
               data-tour={n.tour}
+              className={`sidebar-nav-item ${location.pathname === n.path ? 'active' : ''}`}
+              onClick={() => navigate(n.path)}
+            >
+              <span className="nav-icon">{n.icon}</span>
+              {n.label}
+            </button>
+          ))}
+          {SIDE_EXTRA.map(n => (
+            <button
+              key={n.path}
               className={`sidebar-nav-item ${location.pathname === n.path ? 'active' : ''}`}
               onClick={() => navigate(n.path)}
             >

@@ -189,3 +189,29 @@ export const dashboardApi = {
 export const forecastApi = {
   get: (year: number, month: number) => api.get(`/forecast/${year}/${month}/`),
 }
+
+export const householdsApi = {
+  list: () => api.get('/households/'),
+  create: (data: object) => api.post('/households/', data),
+  get: (id: number) => api.get(`/households/${id}/`),
+  remove: (id: number) => api.delete(`/households/${id}/`),
+  members: (id: number) => api.get(`/households/${id}/members/`),
+  getInvite: (id: number) => api.get(`/households/${id}/invites/`),
+  regenerateInvite: (id: number) => api.post(`/households/${id}/invites/`),
+  revokeInvite: (id: number) => api.post(`/households/${id}/invites/revoke/`),
+  inviteByEmail: (id: number, email: string) => api.post(`/households/${id}/invite-by-email/`, { email }),
+  ledgers: (id: number) => api.get(`/households/${id}/ledgers/`),
+  createLedger: (id: number, data: object) => api.post(`/households/${id}/ledgers/`, data),
+  joinPreview: (data: { code?: string; token?: string }) => api.post('/households/join/preview/', data),
+  join: (data: { code?: string; token?: string }) => api.post('/households/join/', data),
+  pendingInvites: () => api.get('/households/invitations/pending/'),
+  acceptInvite: (id: number) => api.post(`/households/invitations/${id}/accept/`),
+  declineInvite: (id: number) => api.post(`/households/invitations/${id}/decline/`),
+  ledgerExpenses: (ledgerId: number, params?: object) =>
+    api.get(`/household-ledgers/${ledgerId}/expenses/`, { params }),
+  addExpense: (ledgerId: number, data: object) =>
+    api.post(`/household-ledgers/${ledgerId}/expenses/`, data),
+  updateExpense: (id: number, data: object) => api.patch(`/household-expenses/${id}/`, data),
+  removeExpense: (id: number) => api.delete(`/household-expenses/${id}/`),
+}
+

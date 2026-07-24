@@ -313,3 +313,65 @@ class ForecastTenureScenarioTests(ScenarioBase):
         self.assertEqual(float(self.client.get('/api/forecast/2026/1/').data['total_expected_income']), 5000.0)
         self.assertEqual(float(self.client.get('/api/forecast/2026/2/').data['total_expected_income']), 5000.0)
         self.assertEqual(float(self.client.get('/api/forecast/2026/3/').data['total_expected_income']), 0.0)
+
+class HouseholdPhase1ScenarioTests(TestCase):
+    """P1: create → invite → join → add expense → other member sees it."""
+
+    def _auth(self, user):
+        client = APIClient()
+        token = RefreshToken.for_user(user)
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+        return client
+
+    def setUp(self):
+        self.owner = User.objects.create_user(
+            username="ali@example.com", email="ali@example.com", password="testpass123", first_name="Ali",
+        )
+        self.member = User.objects.create_user(
+            username="sara@example.com", email="sara@example.com", password="testpass123", first_name="Sara",
+        )
+        UserProfile.objects.get_or_create(user=self.owner, defaults={"currency": "PKR"})
+        UserProfile.objects.get_or_create(user=self.member, defaults={"currency": "PKR"})
+        self.owner_client = self._auth(self.owner)
+        self.member_client = self._auth(self.member)
+
+    def test_create_invite_join_expense_visible(self):
+        create = self.owner_client.post("/api/households/", {"name": "Khan Family"}, format="json")
+        self.assertEqual(create.status_code, 201, create.data)
+        hid = create.data["id"]
+
+        inv = self.owner_client.get(f"/api/households/{hid}/invites/")
+        self.assertEqual(inv.status_code, 200)
+        code = inv.data["code"]
+        self.assertTrue(code.startswith("HOME-"))
+
+        preview = self.member_client.post("/api/households/join/preview/", {"code": code}, format="json")
+        self.assertEqual(preview.status_code, 200, preview.data)
+        self.assertEqual(preview.data["household_name"], "Khan Family")
+
+        join = self.member_client.post("/api/households/join/", {"code": code}, format="json")
+        self.assertEqual(join.status_code, 200, join.data)
+
+        ledgers = self.owner_client.get(f"/api/households/{hid}/ledgers/")
+        self.assertEqual(ledgers.status_code, 200)
+        ledger_id = ledgers.data[0]["id"]
+
+        add = self.owner_client.post(f"/api/household-ledgers/{ledger_id}/expenses/", {
+            "amount": "2000",
+            "date": date.today().isoformat(),
+            "category": "Groceries",
+            "notes": "Milk",
+        }, format="json")
+        self.assertEqual(add.status_code, 201, add.data)
+
+        seen = self.member_client.get(f"/api/household-ledgers/{ledger_id}/expenses/")
+        self.assertEqual(seen.status_code, 200, seen.data)
+        self.assertEqual(len(seen.data["results"]), 1)
+        self.assertEqual(float(seen.data["total"]), 2000.0)
+        self.assertEqual(seen.data["results"][0]["category"], "Groceries")
+
+        stranger = User.objects.create_user(username="x@example.com", email="x@example.com", password="testpass123")
+        UserProfile.objects.get_or_create(user=stranger, defaults={"currency": "PKR"})
+        stranger_client = self._auth(stranger)
+        denied = stranger_client.get(f"/api/household-ledgers/{ledger_id}/expenses/")
+        self.assertIn(denied.status_code, (403, 404))

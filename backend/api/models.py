@@ -218,3 +218,157 @@ class PayableInstallment(models.Model):
 
     def __str__(self):
         return f"Payable: {self.name}"
+
+
+# ── Household sharing (see HOUSEHOLD_SHARED_EXPENSE_RESEARCH.md) ─────────────
+
+def generate_household_invite_code():
+    """Human-friendly code without ambiguous 0/O/1/I characters."""
+    import secrets
+    alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    body = ''.join(secrets.choice(alphabet) for _ in range(6))
+    return f'HOME-{body}'
+
+
+def generate_invite_token():
+    import secrets
+    return secrets.token_urlsafe(32)
+
+
+class Household(models.Model):
+    name = models.CharField(max_length=120)
+    currency = models.CharField(max_length=10, default='PKR')
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='households_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+    def active_members(self):
+        return self.memberships.filter(status='active')
+
+
+class HouseholdMembership(models.Model):
+    ROLES = [('owner', 'Owner'), ('admin', 'Admin'), ('member', 'Member')]
+    STATUSES = [
+        ('invited', 'Invited'),
+        ('active', 'Active'),
+        ('left', 'Left'),
+        ('declined', 'Declined'),
+    ]
+    VIA = [
+        ('create', 'Created'),
+        ('code', 'Invite code'),
+        ('email', 'Email'),
+        ('link', 'Invite link'),
+    ]
+
+    household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name='memberships')
+    user = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.CASCADE, related_name='household_memberships')
+    role = models.CharField(max_length=10, choices=ROLES, default='member')
+    status = models.CharField(max_length=10, choices=STATUSES, default='invited')
+    invited_via = models.CharField(max_length=10, choices=VIA, default='code')
+    invited_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='household_invites_sent')
+    invited_email = models.EmailField(blank=True, default='')
+    joined_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['household', 'user'],
+                condition=models.Q(user__isnull=False),
+                name='uniq_household_user_membership',
+            ),
+        ]
+
+    def __str__(self):
+        who = self.user.username if self.user_id else self.invited_email
+        return f"{who} @ {self.household.name} ({self.status})"
+
+
+class HouseholdInvite(models.Model):
+    household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name='invites')
+    code = models.CharField(max_length=16, unique=True)
+    token = models.CharField(max_length=64, unique=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='household_invites_created')
+    expires_at = models.DateTimeField()
+    max_uses = models.PositiveIntegerField(null=True, blank=True)
+    use_count = models.PositiveIntegerField(default=0)
+    revoked = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.code} → {self.household.name}"
+
+    @property
+    def is_valid(self):
+        from django.utils import timezone
+        if self.revoked:
+            return False
+        if self.expires_at and timezone.now() >= self.expires_at:
+            return False
+        if self.max_uses is not None and self.use_count >= self.max_uses:
+            return False
+        return True
+
+
+class HouseholdLedger(models.Model):
+    KINDS = [('ongoing', 'Ongoing'), ('event', 'Event')]
+    STATUSES = [('open', 'Open'), ('closed', 'Closed')]
+
+    household = models.ForeignKey(Household, on_delete=models.CASCADE, related_name='ledgers')
+    name = models.CharField(max_length=150)
+    kind = models.CharField(max_length=10, choices=KINDS, default='ongoing')
+    status = models.CharField(max_length=10, choices=STATUSES, default='open')
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    opening_float = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    notes = models.TextField(blank=True, default='')
+    closed_at = models.DateTimeField(null=True, blank=True)
+    closed_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='household_ledgers_closed')
+    closed_total_expense = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.household.name})"
+
+    @property
+    def total_spent(self):
+        total = self.expenses.aggregate(total=Sum('amount'))['total'] or 0
+        return float(total)
+
+
+class HouseholdExpense(models.Model):
+    ledger = models.ForeignKey(HouseholdLedger, on_delete=models.CASCADE, related_name='expenses')
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    date = models.DateField()
+    category = models.CharField(max_length=100, blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='household_expenses_created')
+    paid_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='household_expenses_paid')
+    linked_transaction = models.ForeignKey(
+        'Transaction', null=True, blank=True, on_delete=models.SET_NULL, related_name='household_expenses')
+    linked_account = models.ForeignKey(
+        Account, null=True, blank=True, on_delete=models.SET_NULL, related_name='household_expenses')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-id']
+
+    def __str__(self):
+        return f"{self.amount} on {self.date} ({self.ledger.name})"

@@ -1,8 +1,8 @@
 # Research: Household Combined / Shared Expenses
 
 **Product:** CashTrail  
-**Status:** Research / design proposal (not implemented)  
-**Date:** 2026-07-23  
+**Status:** Research / design proposal (not implemented) — development phases in §14  
+**Date:** 2026-07-24  
 **Goal:** Let multiple family members (each with their own CashTrail login) share one **household expense account/ledger**, so when anyone records a household expense, all members can see it, with monthly and event-based breakdowns, and the ability to close an event ledger with a final balance.
 
 ---
@@ -28,7 +28,7 @@ They create (or join) one **Household shared expense account**.
 - X buys groceries → logged against the household ledger → **W, X, Y, Z all see it**.
 - Y pays electricity → same shared ledger → everyone sees it.
 - At month end (or after an event like a wedding / trip), everyone sees a **complete expense breakdown** and totals.
-- Optionally, when recording a personal expense, the user can **link it to the household shared account** so that specific spend counts in the shared ledger (not only in their private wallet).
+- When recording a personal expense, the user can **link to bank** (balance drops) **and link to Household account** so that spend also appears on the shared ledger for all members.
 
 **Two modes of household ledgers:**
 
@@ -65,17 +65,17 @@ Recommended mental model:
 | **Household**                          | A *group* of members                               | All members    |
 | **Household ledger** (shared account)  | Shared expense book for that household             | All members    |
 | **Household transaction**              | A line in the shared book                          | All members    |
-| **Funding / settlement** (optional v2) | Who paid from which personal wallet, who owes whom | Members        |
+| **Funding / settlement** | Who paid expenses, who put money in the pot, who owes whom after Split equal | Members |
 
 
 Important distinction:
 
 - **Shared ledger visibility** ≠ automatically moving money between banks.
-- Recording “X spent 5,000 on groceries for the house” can mean:
-  - **A)** Only a shared bookkeeping entry (recommended for v1), and/or  
-  - **B)** Also a personal wallet expense on X’s Meezan (so X’s personal balance drops).
+- **Decided product rule (locked):** When X spends money, **X’s personal wallet balance must drop**. Recording a household spend works like today’s expense form with **two links**:
+  1. **Link to bank / wallet** (required for a real spend) → personal `Transaction` → X’s Meezan/JazzCash/cash balance falls.
+  2. **Link to Household ledger** (optional) → same spend also appears on the shared household book for all members.
 
-Most families want **both**: shared visibility + correct personal balance for the person who paid.
+Example: X buys groceries for 5,000 → chooses Meezan + “Family home” ledger → Meezan −5,000 (only X sees wallets) and the household feed shows “Groceries 5,000 paid by X” (everyone sees).
 
 ### 3.2 Household ledger types
 
@@ -172,26 +172,26 @@ User (existing)
 #### Household
 
 
-| Field                    | Notes                              |
-| ------------------------ | ---------------------------------- |
-| id                       |                                    |
-| name                     | e.g. “Khan Family”, “Flat 4B”      |
-| currency                 | Usually inherit creator’s currency |
-| created_by               | User                               |
+| Field                    | Notes                                            |
+| ------------------------ | ------------------------------------------------ |
+| id                       |                                                  |
+| name                     | e.g. “Khan Family”, “Flat 4B”                    |
+| currency                 | Usually inherit creator’s currency               |
+| created_by               | User                                             |
 | invite_code / join token | See §9 — unique invite code + link (recommended) |
-| created_at               |                                    |
+| created_at               |                                                  |
 
 
 #### HouseholdMembership
 
 
-| Field     | Notes                         |
-| --------- | ----------------------------- |
-| household | FK                            |
-| user      | FK                            |
-| role      | `owner` | `admin` | `member`  |
-| status    | `invited` | `active` | `left` |
-| joined_at |                               |
+| Field     | Notes     |
+| --------- | --------- |
+| household | FK        |
+| user      | FK        |
+| role      | `owner`   |
+| status    | `invited` |
+| joined_at |           |
 
 
 #### HouseholdLedger (“shared expense account”)
@@ -201,8 +201,8 @@ User (existing)
 | --------------------- | ----------------------------------------------- |
 | household             | FK                                              |
 | name                  | e.g. “Monthly home”, “Wedding 2026”             |
-| kind                  | `ongoing` | `event`                             |
-| status                | `open` | `closed`                               |
+| kind                  | `ongoing`                                       |
+| status                | `open`                                          |
 | start_date            |                                                 |
 | end_date              | Nullable; set when event closes                 |
 | opening_float         | Optional cash float (if they keep cash at home) |
@@ -224,7 +224,7 @@ User (existing)
 | created_by         | Who entered it                            |
 | paid_by            | Who paid (default = created_by)           |
 | linked_transaction | Optional FK → personal `Transaction`      |
-| linked_account     | Optional FK → personal wallet used to pay |
+| linked_account     | FK → personal wallet used to pay (decided: real spends always have this) |
 | created_at         |                                           |
 
 
@@ -244,23 +244,35 @@ breakdown by category, by paid_by member
 
 ---
 
-## 6. How “link expense to household” works
+## 6. How “link expense to household” works *(decided)*
 
-User flow when adding an expense (FAB or Bills):
+**Primary flow — same as linking a bank today:**
 
-1. Choose personal wallet (Meezan) — **money leaves this wallet** (existing behavior).
-2. Toggle / select: **Also add to household ledger** → pick ledger (“Monthly home” / “Wedding”).
+When adding an expense (FAB / Add Transaction):
+
+1. **Link to bank (wallet)** — choose Meezan / JazzCash / cash → **money leaves this wallet** (existing behavior; X’s balance drops).
+2. **Link to Household account (ledger)** — optional select: “Also show on household” → pick ledger (“Monthly home” / “Wedding”).
 3. System creates:
-  - Personal `Transaction` (expense on Meezan) — keeps personal balance correct.
-  - `HouseholdExpense` linked to that transaction — all members see it on the shared ledger.
+   - Personal `Transaction` (expense on the chosen wallet) — **always** when a wallet is selected.
+   - `HouseholdExpense` linked to that transaction — **only if** a household ledger was selected — all members see it.
+
+```
+[ Add expense ]
+   Amount: 5,000
+   Category: Groceries
+   Link to bank:        Meezan          ← balance drops for X
+   Link to Household:   Family home     ← visible to W, X, Y, Z
+```
 
 Rules:
 
-- If user only wants shared bookkeeping (cash from a joint drawer, no personal wallet hit), allow **household-only** entry (no personal transaction).
-- Editing/deleting should update both sides when linked (or block delete of one side without confirmation).
-- Closed event ledgers: reject new links.
+- **Spends that hit a wallet always reduce that member’s personal balance** — household link does not replace the bank link; it adds shared visibility.
+- Other members see the household line and who paid; they **never** see X’s other private wallet activity.
+- Editing/deleting a linked expense should update **both** sides (or require confirm before breaking the link).
+- Closed event ledgers: reject new household links.
+- **Household-only** (no personal wallet) is **not** the default path. Defer unless a later need appears (e.g. cash from a joint drawer with no personal wallet).
 
-This matches the request: *“link the expense with the household expense account so that specifically that expense will go to the household shared account.”*
+This matches: *“when spending, link to bank and link to Household account — bank balance drops, and if linked to Household it shows to the household.”*
 
 ---
 
@@ -304,13 +316,14 @@ When closing:
 4. Show close summary screen:
   - Total spent  
   - Per member paid  
-  - Optional settlement hint: “X paid 40k, Y paid 10k → if equal split 4 ways, Y owes X …” (**settlement math can be v2**)
+  - Optional **equal-split settlement** action: “Split equal among members → who owes whom” (see §13 / Phase 5 — product wants this option available)
 
 ### 8.3 Household home screen
 
 - List of ledgers (open / closed)  
 - This month’s combined household spend across ongoing ledgers  
 - Recent shared expenses (feed)
+- Badge / alert when another member posts an expense (**notifications — locked**, see §15)
 
 ---
 
@@ -345,28 +358,30 @@ When owner taps **Invite**:
 1. Server creates / refreshes a unique **invite**:
   - `code` — human-friendly, unique, e.g. 6–8 chars: `7K2Q9M` or `HOME-7K2Q`
   - `token` — long random for URL: `/join?t=…`
-  - `expires_at` — e.g. 7 days (or “until revoked”)
-  - `max_uses` — optional (e.g. 10) or unlimited until rotated
+  - `expires_at` — **LOCKED: 7 days** from creation/regeneration
+  - `max_uses` — optional (e.g. 10) or unlimited until rotated/expired
 2. Owner shares via WhatsApp:
   - Code: `Join our CashTrail household with code **HOME-7K2Q**`
   - Or link: `https://cashtrail…/join/HOME-7K2Q`
-3. Other member (already logged in) opens **Household → Join** → enters code (or opens link) → **Accept**.
+3. Other member (already logged in) opens **Household → Join** → enters code (or opens link) → sees **preview** (household name, member count — not private wallets) → taps **Accept**.
 4. Membership becomes `active`; they see shared ledgers immediately.
 
 **Uniqueness rules:**
 
 - Invite `code` unique among **active (non-expired) invites** (or globally unique forever — simpler).
 - Prefer **crockford base32 / no ambiguous chars** (`0/O`, `1/I`) so family can read it aloud.
-- Owner can **Regenerate code** (old code dies) if it leaks.
+- Owner can **Regenerate code** (old code dies; new code also gets a fresh 7-day expiry) if it leaks or expires.
 
 #### Path 2 — Invite by email / username (secondary)
 
 1. Owner enters family member’s **email** (unique in the system).
-2. If that user exists → create `HouseholdMembership` with status `invited`.
-3. Invitee sees **Pending invitations** on Household screen → Accept / Decline.
-4. If email not registered → show: “No CashTrail account with that email — ask them to sign up first, then invite again” (or store a pending email invite for later — v2).
+2. If that user **exists** → create `HouseholdMembership` with status `invited` → invitee sees **Pending invitations** → **Accept / Decline**.
+3. If email is **not registered** → **LOCKED: invite to register**:
+   - Store a pending email invite (`invited_email`, token, household).
+   - Share a signup/join link; after they **sign up with that email**, they see preview → **Accept** (or pending invite on first login).
+4. Never auto-join without Accept.
 
-This is useful when you don’t want a code sitting in a family WhatsApp group forever.
+This is useful when you don’t want a code sitting in a family WhatsApp group forever, and when some relatives don’t have CashTrail yet.
 
 ### 9.3 Suggested data fields
 
@@ -376,10 +391,11 @@ HouseholdInvite
   code               CharField unique   # e.g. HOME-7K2Q
   token              CharField unique   # for URL
   created_by         FK User
-  expires_at         DateTime (nullable = never)
+  expires_at         DateTime           # LOCKED: created_at + 7 days (refresh on regenerate)
   max_uses           Int (nullable = unlimited)
   use_count          Int default 0
   revoked            Bool default False
+  invited_email      EmailField null    # for invite-to-register path
 
 HouseholdMembership
   … (as before)
@@ -392,34 +408,36 @@ Also keep a stable unique id on the household itself (`id` / UUID) for APIs — 
 ### 9.4 Security & UX rules
 
 
-| Rule                                                  | Why                                    |
+| Rule                                                  | Why / decision                         |
 | ----------------------------------------------------- | -------------------------------------- |
-| Must be **logged in** to join                         | Household ties to their CashTrail user |
-| Show household **name** before Accept                 | Avoid joining the wrong family         |
+| Must be **logged in** to join (after signup if needed)| Household ties to their CashTrail user |
+| Show household **name** (+ member count) before Accept | **LOCKED:** preview + Accept — never auto-join |
 | Don’t reveal other members’ wallets on invite preview | Privacy                                |
 | Rate-limit join attempts by code                      | Stop brute-forcing short codes         |
 | Prefer 6+ character codes                             | Harder to guess than 4 digits          |
 | One active membership per user per household          | No duplicates                          |
-| Optional: owner **approves** joins from code          | Extra safety for public-ish codes      |
+| Invite codes **expire in 7 days**                     | **LOCKED** — owner can regenerate      |
+| No hard **max members** for now                       | **LOCKED** — revisit if abuse appears  |
+| Invite by email can target **unregistered** emails    | **LOCKED:** invite to register         |
 
 
 ### 9.5 Example: four family members
 
 1. Ali creates household **“Khan Family”** → gets code `KHAN-4F8R` + link.
 2. Ali WhatsApps the code to Sara, Omar, and Ayesha.
-3. Each opens CashTrail → Household → **Join with code** → enters `KHAN-4F8R` → Accept.
-4. Alternatively Ali taps **Invite by email** → `sara@…` → Sara accepts from pending list.
+3. Each opens CashTrail → Household → **Join with code** → enters `KHAN-4F8R` → **preview** → **Accept**.
+4. Alternatively Ali taps **Invite by email** → `sara@…` (even if Sara has not signed up yet — invite to register) → Sara signs up if needed → accepts from pending list.
 5. All four see the same shared expense ledger.
 
 ### 9.6 What we recommend shipping first
 
 
-| Priority  | Mechanism                                               |
-| --------- | ------------------------------------------------------- |
-| **P1**    | Unique **invite code** + same code in a **join link**   |
-| **P1b**   | **Invite by email** (username = email) + accept/decline |
-| **P2**    | QR of the join link                                     |
-| **Later** | Optional public slug only with owner approval           |
+| Priority  | Mechanism                                                                 |
+| --------- | ------------------------------------------------------------------------- |
+| **P1**    | Unique **invite code** (7-day expiry) + join link + **preview + Accept** |
+| **P1b**   | **Invite by email** + accept/decline; **invite to register** if no account |
+| **P6**    | QR of the join link; in-app notifications when someone posts an expense  |
+| **Later** | Optional public slug only with owner approval                             |
 
 
 **Bottom line:** Use a **unique invite code** (shareable, WhatsApp-friendly) as the main join key; support **unique email** invites as a precise alternative. Both identify the household uniquely without relying on non-unique names.
@@ -440,30 +458,36 @@ Also keep a stable unique id on the household itself (`id` / UUID) for APIs — 
 2. Preview household name → Accept.
 3. Membership `active` → shared ledgers visible.
 
-### Flow 3 — Join via email invite
+### Flow 3 — Join via email invite (including invite to register)
 
 1. Owner invites by email.
-2. Invitee opens Household → Pending → Accept.
-3. Same access as code join.
+2. If invitee already has an account → Household → Pending → preview → Accept.
+3. If not registered → they sign up with that email (invite held) → then preview → Accept.
+4. Same access as code join.
 
 ### Flow 4 — Existing four users
 
-All four already registered → one creates household → three join with code or email. Personal wallets stay separate; only the household ledger is shared.
+All four already registered → one creates household → three join with code or email (preview + Accept). Personal wallets stay separate; only the household ledger is shared.
+
+### Flow 5 — Relative without CashTrail yet
+
+Owner invites `uncle@…` → uncle receives / opens signup+join link → registers → Accept household preview → sees shared ledger.
 
 ---
 
 ## 11. UI sketch (CashTrail)
 
 
-| Surface              | Change                                                     |
-| -------------------- | ---------------------------------------------------------- |
-| Bottom nav / sidebar | New tab: **Household** (or under Wallets as “Shared”)      |
-| Household hub        | Households I’m in → **Invite** (code) / **Join with code** / pending email invites → ledgers → feed |
-| Create ledger        | Name, type (monthly / event), start date                   |
-| Add shared expense   | Amount, category, paid by, date; optional “from my wallet” |
-| FAB Add expense      | Optional “Link to household ledger”                        |
-| Reports              | Section: Household ledger report (month picker)            |
-| Event close          | Dialog: “Close Wedding 2026? Total spent: …”               |
+| Surface              | Change                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------- |
+| Entry point          | **LOCKED:** Prefer a **Household** item in bottom nav / sidebar if it fits without crowding; otherwise a **Household** button/card on the **Dashboard** that opens the same hub. Label: **Household**. |
+| Household hub        | Households I’m in → **Invite** (code, 7-day expiry) / **Join with code** (preview + Accept) / pending invites → ledgers → feed |
+| Create ledger        | Name, type (monthly / event), start date                                                            |
+| Add shared expense   | Prefer dual-link from FAB: bank + household (see §6)                                                |
+| FAB Add expense      | **Link to bank** + optional **Link to Household account**                                           |
+| Reports              | Section: Household ledger report (month picker) + optional **Split equal**                          |
+| Event close          | Dialog: “Close Wedding 2026? Total spent: …” then optional equal-split                              |
+| Notifications        | **LOCKED:** notify other members when someone posts a household expense (in-app first; push later)  |
 
 
 Keep personal **Wallets** page private; household is a separate space so users don’t confuse Meezan with “family book”.
@@ -513,59 +537,329 @@ Personal transaction create can accept:
 
 ---
 
-## 13. Settlement (phase 2 — optional)
+## 13. Contributions (family pot) + equal-split settlement *(locked)*
 
-Equal split among N active members:
+### 13.1 What “put money in the pot” means
+
+**LOCKED (Q5):** Event/trip ledgers support **contributions** — a member puts money into the shared pot. That amount counts as **their credit** toward the trip (same idea as “I already paid my share”), alongside any expenses they personally paid.
+
+Two kinds of lines on a household ledger:
+
+
+| Line type            | Example                                      | Effect on that member’s **credit**      | Personal wallet                                      |
+| -------------------- | -------------------------------------------- | --------------------------------------- | ---------------------------------------------------- |
+| **Contribution**     | Hussain puts 10,000 into Balochistan pot     | +10,000 credit for Hussain              | Link to Hussain’s bank → his balance drops 10,000    |
+| **Expense**          | You pay hotel/fuel 25,000 from your Meezan   | +25,000 credit for you (you paid out)   | Link to your bank → your balance drops 25,000        |
+
+
+**Credit** = money this member has already put toward the group (contributions + expenses they paid).  
+**Fair share** = total group expenses ÷ number of members.  
+**Net** = credit − fair share:
+
+- **net > 0** → group owes them (they overpaid)  
+- **net = 0** → settled — they pay nothing more  
+- **net < 0** → they still owe that amount  
 
 ```
-fair_share = total_spent / N
-owed[member] = fair_share - paid_by[member]
+total_expenses = SUM(all expense lines on the ledger)
+credit[m]      = SUM(expenses paid_by m) + SUM(contributions by m)
+fair_share     = total_expenses / N
+net[m]         = credit[m] - fair_share
 ```
 
-Show who should pay whom (simplify debts).  
-Unequal splits / custom ratios later.
+Then simplify nets into “who pays whom” (optional **Split equal** button).
 
-**v1 can skip settlement** and only show “who paid what” + totals — still valuable for families.
+CashTrail does **not** move bank money — it only shows the suggestion.
+
+### 13.2 Example — Balochistan trip
+
+1. You create event ledger **“Balochistan trip”** and invite **Hussain** and **Idrees** (preview + Accept).
+2. Three members: You, Hussain, Idrees (`N = 3`).
+3. Hussain **puts 10,000 into the pot** (contribution, linked to his wallet) → Hussain credit = **+10,000**.
+4. Trip expenses are logged (hotel, fuel, food, …). Suppose **total expenses = 30,000**, and **you paid 25,000** of those from your wallet → your credit = **+25,000**.  
+   (Other 5,000 of expenses may be paid by Idrees or anyone else — whatever was logged.)
+5. Tap **Split equal**:
+
+| Member   | Credit (paid + pot) | Fair share (30,000 ÷ 3) | Net        | Meaning                                      |
+| -------- | ------------------- | ----------------------- | ---------- | -------------------------------------------- |
+| You      | 25,000              | 10,000                  | **+15,000** | Overpaid — others should settle **to you** |
+| Hussain  | 10,000              | 10,000                  | **0**       | Settled — **Hussain pays nothing more**    |
+| Idrees   | 0*                  | 10,000                  | **−10,000** | Still owes **10,000**                      |
+
+\*If Idrees paid some of the remaining expenses, his credit rises and his owe shrinks.
+
+**Why Hussain doesn’t pay more:** he already brought 10,000 to the pot, which equals one fair share of the 30,000 trip.
+
+**Why you don’t “pay 7,500 more”:** you already paid 25,000 of expenses — you’re ahead. Settlement should show people **paying you**, not you paying again. (If a hand-calc suggested otherwise, use the table above as the source of truth.)
+
+### 13.3 Data sketch
+
+```
+HouseholdContribution   (or HouseholdExpense with kind=contribution)
+  ledger, amount, date, notes
+  contributed_by → User
+  linked_transaction → optional personal Transaction (bank link)
+  linked_account     → optional personal wallet
+```
+
+Settlement UI (Phase 5): totals + credits + optional **Split equal** debt list.
+
+### 13.4 When to build
+
+- **P1–P4:** expenses + dual-link + event close + reports (contributions can wait one beat).  
+- **P3 or P5:** add **Contribute to pot** on event ledgers + include contributions in Split equal math (recommended with **P5** so settlement is correct from day one of equal-split).
 
 ---
 
-## 14. Implementation phases
+## 14. Development phases (build roadmap)
+
+Ship household sharing in **ordered phases**. Each phase must be **demoable and usable on its own** before starting the next. Do not skip ahead (e.g. settlements before shared expenses exist).
+
+```
+P0 Research ──► P1 Foundation + MVP ──► P2 Dual link (bank + Household) ──► P3 Events
+                                                                              │
+                                                                              ▼
+                                                            P4 Reports ──► P5 Settlements ──► P6 Polish
+```
+
+**Rules across all phases**
+
+- Personal wallets, income, loans, and private transactions stay private.
+- Every household API checks **active membership** (never only `created_by`).
+- Prefer CashTrail UI patterns already in the app (confirm dialogs, glass cards, FAB).
+- Add/adjust backend scenario tests per phase before calling the phase done.
+
+---
+
+### Phase 0 — Research & schema lock *(current)*
 
 
-| Phase                               | Scope                                                                                                          | Outcome                      |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| **P0 — Research / schema**          | This doc + migrations design                                                                                   | Agreed model                 |
-| **P1 — MVP**                        | Household, members via **unique invite code + email invite**, one ongoing ledger, shared expenses CRUD, all members see feed + month total | Core “4 people see expenses” |
-| **P2 — Link from personal expense** | FAB / Bills: “also post to household ledger”                                                                   | Linked personal + shared     |
-| **P3 — Event ledgers**              | Create event, close with snapshot, read-only after close                                                       | Wedding / trip use case      |
-| **P4 — Reports**                    | Category + member breakdown, export optional                                                                   | “Complete expense breakdown” |
-| **P5 — Settlements**                | Equal-split suggestions                                                                                        | Reduce WhatsApp math         |
-| **P6 — Polish**                     | Push/email when someone adds expense, roles, leave household                                                   | Sticky engagement            |
+|            |                                                           |
+| ---------- | --------------------------------------------------------- |
+| **Goal**   | Agree the product model before writing production code    |
+| **Status** | ✅ Complete — schema locked (§19), requirements updated   |
+| **Effort** | Done when product owner signs off on open questions (§17) |
 
 
-Estimated effort (rough):
+**Deliverables**
 
-- P1: ~1–1.5 weeks  
-- P2–P3: ~1 week  
-- P4–P5: ~1 week
+- [x] Problem, Option B model, join strategy (invite code + email)
+- [x] Most §17 questions answered — including pot contributions + Split equal (§13)
+- [x] Final field list for migrations — see **§19 Schema lock (P0)**
+- [x] Update `My-Wallet requirments.md`: household sharing as an intentional exception to pure isolation
 
-Depends on polish level and mobile UX.
+**Exit criteria:** Model + join method approved; no blocking open questions for P1. ✅
+
+---
+
+### Phase 1 — Foundation + MVP shared ledger
+
+
+|                |                                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| **Goal**       | Four logged-in family members can share **one ongoing expense book** and all see the same lines |
+| **Effort**     | ~1–1.5 weeks                                                                                    |
+| **Depends on** | P0                                                                                              |
+
+
+**Backend**
+
+- [x] Models + migrations: `Household`, `HouseholdMembership`, `HouseholdInvite`, `HouseholdLedger`, `HouseholdExpense` (`0006`)
+- [x] Permissions: owner / admin / member; active membership required
+- [x] APIs: create/list households; create invite (code + join URL); join by code; invite by email; accept/decline pending; create one `ongoing` ledger; expenses CRUD; month filter
+- [x] Unique invite codes; regenerate/revoke invite (7-day expiry)
+- [x] Scenario tests: create → invite → join → add expense → other member sees it
+
+**Frontend**
+
+- [x] **Household** entry: sidebar + Dashboard card (bottom nav kept at 5)
+- [x] Hub: my households, create household, join with code (**preview + Accept**), pending invites (including invite-to-register)
+- [x] Invite screen: show code + copy + regenerate; note **expires in 7 days**
+- [x] Ledger detail: expense feed, add expense, month total
+- [x] No hard member cap
+
+**Out of scope for P1:** linking to personal wallet (P2), event close (P3), equal-split (P5), rich charts, push — but **design invite + Accept UX** now.
+
+**Exit criteria (demo):** ✅ Covered by `HouseholdPhase1ScenarioTests` + Household UI.
+
+**Exit criteria (demo):**
+
+1. User A creates “Khan Family” + ledger “Home monthly”.
+2. Users B/C/D join with code (or email accept).
+3. B adds groceries → A, C, D see it without refresh issues (or after soft reload).
+4. Month total matches the sum of shared lines.
+5. Non-members cannot open the household API/UI.
+
+---
+
+### Phase 2 — Dual link: bank + Household *(core spend UX)*
+
+
+|                |                                                                          |
+| -------------- | ------------------------------------------------------------------------ |
+| **Goal**       | Add expense form mirrors bank linking: **link to bank** (balance drops) **and link to Household** (family sees it) |
+| **Effort**     | ~3–5 days                                                                |
+| **Depends on** | P1                                                                       |
+
+
+**Backend**
+
+- [ ] `Transaction` create accepts optional `household_ledger` → creates personal expense + linked `HouseholdExpense`
+- [ ] Edit/delete linked pair with confirmation (update both sides or block)
+- [ ] Do **not** prioritize household-only entries (no wallet) — deferred per product decision
+
+**Frontend**
+
+- [ ] FAB / Add Transaction: **Link to bank** (existing) + **Link to Household account** (new optional picker of open ledgers)
+- [ ] Household feed: show “Paid from [wallet name]” / badge when backed by a personal transaction
+- [ ] Clear copy: linking household does not move money between members’ banks — only shares the expense line
+
+**Exit criteria:** X spends 5,000 from Meezan linked to “Family home” → Meezan −5,000 for X only; W/Y/Z see the household line; without household link, spend stays personal-only.
+
+---
+
+### Phase 3 — Event ledgers (open → close)
+
+
+|                |                                                        |
+| -------------- | ------------------------------------------------------ |
+| **Goal**       | Wedding / trip / Eid ledgers with a final locked total |
+| **Effort**     | ~3–5 days                                              |
+| **Depends on** | P1 (P2 nice-to-have but not required)                  |
+
+
+**Backend**
+
+- [ ] Ledger `kind`: `ongoing` | `event`; `status`: `open` | `closed`
+- [ ] `POST …/close/` → snapshot totals, set `end_date` / `closed_by`; reject new expenses
+- [ ] Owner/admin reopen with confirm (optional but recommended)
+
+**Frontend**
+
+- [ ] Create ledger: choose Monthly vs Event
+- [ ] Close event dialog: “Total spent: … Close & lock?”
+- [ ] Closed ledger UI: read-only feed + final summary (total, by member, by category — can be simple lists)
+- [ ] Clear open vs closed badges on hub
+
+**Exit criteria:** Event can be filled by all members, closed once, history remains visible, new adds blocked until reopen.
+
+---
+
+### Phase 4 — Household reports & breakdown
+
+
+|                |                                                              |
+| -------------- | ------------------------------------------------------------ |
+| **Goal**       | “Complete expense breakdown” for month and for closed events |
+| **Effort**     | ~3–5 days                                                    |
+| **Depends on** | P1 + P3 for event reports                                    |
+
+
+**Backend**
+
+- [ ] `GET …/report/?year=&month=` → totals, by category, by `paid_by`, daily/timeline rows
+- [ ] Closed-event report uses snapshot + live history consistency checks
+
+**Frontend**
+
+- [ ] Household report screen (or Reports tab section): month picker, category list, who-paid list, ledger table
+- [ ] Optional CSV/PDF export (reuse CashTrail export patterns if already solid)
+
+**Exit criteria:** Family can answer “how much this month?”, “who paid most?”, “what on groceries?” without leaving the app.
+
+---
+
+### Phase 5 — Pot contributions + Split equal
+
+
+|                |                                                                 |
+| -------------- | --------------------------------------------------------------- |
+| **Goal**       | “Put money in the pot” + optional **Split equal** using credits |
+| **Effort**     | ~4–6 days                                                       |
+| **Depends on** | P3 + P4                                                         |
+
+
+**Backend**
+
+- [ ] `HouseholdContribution` (or expense `kind=contribution`): amount, contributed_by, optional linked personal tx/wallet
+- [ ] Settlement: `credit = paid_expenses + contributions`, `fair_share = total_expenses / N`, `net = credit − fair_share`, simplify debts
+- [ ] Optional: mark settlement pairs “settled” (notes only — no bank move)
+
+**Frontend**
+
+- [ ] Event ledger: **Contribute to pot** (pick my wallet + amount) — same dual-link idea as expenses
+- [ ] Show each member’s credit (paid + pot) on report / close screen
+- [ ] **Split equal** button → who owes whom (optional)
+- [ ] Disclaimer: suggestions only — CashTrail does not move bank money
+
+**Exit criteria:** Balochistan-style demo: Hussain contributes 10k, you pay 25k of 30k total expenses, 3 members → Hussain net 0, you owed, Idrees owes (see §13).
+
+---
+
+### Phase 6 — Polish & engagement
+
+
+|                |                                        |
+| -------------- | -------------------------------------- |
+| **Goal**       | Sticky, safe, everyday use             |
+| **Effort**     | ~1 week (can ship items independently) |
+| **Depends on** | P1+                                    |
+
+
+**Ship as small slices**
+
+- [ ] Roles UX: promote/demote admin; leave household; soft-remove member (keep history)
+- [ ] **Notifications (LOCKED):** in-app badge/alert when a member posts a household expense; push later if infra exists
+- [ ] QR code for invite link
+- [ ] Empty states, tour tip, confirm dialogs for destructive household actions
+- [ ] Performance: paginate expense feed; indexes on `(ledger, date)`
+- [ ] PWA: household screens work offline-read where feasible (optional)
+- [ ] Finalize nav vs Dashboard button after trying fit on mobile bottom nav
+
+**Exit criteria:** Owner can manage members safely; members get a clear signal when the book changes; no privacy leaks in invite preview.
+
+---
+
+### Phase summary (at a glance)
+
+
+| Phase  | Name                   | Ships                                                                      | Rough effort |
+| ------ | ---------------------- | -------------------------------------------------------------------------- | ------------ |
+| **P0** | Research & schema lock | Agreed model + requirements update                                         | Sign-off     |
+| **P1** | Foundation + MVP       | Household, invite code/email, ongoing ledger, shared expenses, month total | 1–1.5 wk     |
+| **P2** | Dual link (bank + Household) | FAB: link to bank (balance drops) + link to Household (family sees) | 3–5 d        |
+| **P3** | Event ledgers          | Event create + close + read-only history                                   | 3–5 d        |
+| **P4** | Reports                | Category / member / timeline breakdown (+ optional export)                 | 3–5 d        |
+| **P5** | Pot + Split equal | Contributions to pot + credit-based equal split (Balochistan-style) | 4–6 d |
+| **P6** | Polish | Notifications, roles, QR, nav-or-dashboard entry polish | ~1 wk |
+
+
+**Suggested ship order for first real users:** **P1 → P2 → P3 → P4 → P5 (Split equal) → P6 (notifications)**.
+
+**Total to “useful family product” (P1–P4):** roughly **3–4 weeks** depending on polish and mobile UX.
 
 ---
 
 ## 15. Risks & decisions to lock early
 
 
-| Topic                                             | Recommendation                                                                            |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Does shared expense always hit a personal wallet? | **Optional** — “wallet + household” or “household only”                                   |
-| Can non-payers edit others’ lines?                | **No** — only own, unless admin                                                           |
-| Closed event reopen?                              | Owner/admin only, with confirm                                                            |
-| Multiple households per user?                     | **Yes** (e.g. parents’ home + flatmates)                                                  |
-| Currency mix                                      | One currency per household                                                                |
-| Delete member with history                        | Soft-leave; keep their past `paid_by` name                                                |
-| Requirements doc conflict                         | Update requirements: add optional **Household sharing** as an exception to pure isolation |
-
+| Topic                                      | Decision |
+| ------------------------------------------ | -------- |
+| Shared expense vs personal wallet          | **LOCKED:** Link to bank (balance drops) + optional link to Household (family sees). |
+| Equal-split settlement                     | **LOCKED:** Offer optional **Split equal** (Phase 5) — not forced. |
+| Max members per household                  | **LOCKED:** No max for now. |
+| Where Household lives in UI                | **LOCKED:** Prefer nav item if it fits; else Dashboard button. Label **Household**. |
+| Family pot / contributions                 | **LOCKED:** Yes — members can **put money in the pot**; that counts as **credit** in equal-split, same as expenses they paid (see §13 Balochistan example). |
+| Notifications on new household expense     | **LOCKED:** Yes (in-app; push later). |
+| Invite code expiry                         | **LOCKED:** **7 days**; owner can regenerate. |
+| Join UX                                    | **LOCKED:** Preview + **Accept** — never auto-join. |
+| Invite unregistered emails                 | **LOCKED:** **Invite to register** (hold invite until signup + Accept). |
+| Can non-payers edit others’ lines?         | **No** — only own, unless admin |
+| Closed event reopen?                       | Owner/admin only, with confirm |
+| Multiple households per user?              | **Yes** |
+| Currency mix                               | One currency per household |
+| Delete member with history                 | Soft-leave; keep past `paid_by` name |
+| Requirements doc                           | Update: household sharing as exception to pure isolation |
 
 ---
 
@@ -573,26 +867,47 @@ Depends on polish level and mobile UX.
 
 > 4 family members, each with CashTrail accounts, share one household expense account.
 
-1. One member creates **Household** + ledger **“Family home”** (`ongoing`) and gets unique code `KHAN-4F8R`.
-2. Other three join via that code (or email invite) — see §9.
-3. X adds expense 2,000 groceries → linked to X’s Meezan (optional) + household ledger.
-4. Y, Z, W open Household → see X’s line instantly.
-5. Month report: total, by category, by who paid.
-6. For a wedding: create ledger **“Wedding”** (`event`) → all log spends → **Close event** → final total locked; all four still view history.
+1. One member creates **Household** + ledger **“Family home”** (`ongoing`) and gets unique code `KHAN-4F8R` (expires in 7 days).
+2. Other three join via that code → **preview → Accept** (or email invite / invite-to-register) — see §9.
+3. X adds expense 2,000 groceries → **link to bank** (X’s Meezan) **and link to Household** (“Family home”) → Meezan balance drops; Y, Z, W get a **notification** and see the line on the household ledger.
+4. Y, Z, W open Household → see X’s line (they do not see X’s other private wallet activity).
+5. Month report: total, by category, by who paid; optional **Split equal**.
+6. For a wedding / trip: create event ledger → members **contribute to pot** and/or pay expenses (bank + household link) → **Close** → optional **Split equal** using credits (see §13 Balochistan example).
 
 ---
 
-## 17. Open questions for product owner
+## 17. Product decisions (Q&A)
 
-1. Should household expenses **always** reduce someone’s personal wallet, or allow shared-only entries?
-2. Equal split settlement in v1, or totals-only first?
-3. Max members per household?
-4. Nav label: **Household** vs **Shared** vs under **Wallets**?
-5. Should income into a family pot (contributions) be supported, or expense-only first?
-6. Notifications when a member posts an expense?
-7. Invite code: expire after N days, or until owner regenerates?
-8. Join by code: auto-join on enter, or show preview + **Accept**?
-9. Allow invite by email only for users who already signed up, or also “invite to register”?
+### Locked answers
+
+1. **Personal wallet on household spend?**  
+   **Yes.** Link to bank (balance drops) + optional link to Household (family sees). See §6.
+
+2. **Equal split?**  
+   **Yes — as an option.** Show totals always; offer **Split equal** for who-owes-whom (Phase 5).
+
+3. **Max members?**  
+   **No max for now.**
+
+4. **Nav placement?**  
+   Prefer **Household** in bottom nav / sidebar if it fits without crowding; otherwise a **Household** button/card on the **Dashboard**.
+
+5. **Family pot / contributions?**  
+   **Yes — locked.** Members can contribute cash to the event pot (linked to their bank so their balance drops). Contribution = **credit** toward the trip. On **Split equal**,  
+   `credit = expenses they paid + pot contributions`, `fair_share = total_expenses / N`, `net = credit − fair_share`.  
+   Example: Balochistan trip, total expenses 30,000, 3 people → fair share 10,000. Hussain puts 10k in pot → net 0 (pays nothing more). You paid 25k of expenses → net +15,000 (others settle to you). See **§13**.
+
+6. **Notifications when someone posts?**  
+   **Yes.** In-app first; push later if available (Phase 6).
+
+7. **Invite code expiry?**  
+   **7 days.** Owner can regenerate (new 7-day window).
+
+8. **Join by code?**  
+   **Preview + Accept** — never auto-join on enter.
+
+9. **Invite emails without an account?**  
+   **Yes — invite to register.** Hold the invite; after signup with that email → preview → Accept.
 
 ---
 
@@ -602,8 +917,86 @@ Build a **Household + HouseholdLedger + HouseholdExpense** layer beside personal
 
 - Do **not** overload personal `Account` as multi-owner.
 - Support **ongoing monthly** and **event** ledgers with close.
-- Let personal expenses optionally **link** into a household ledger so the payer’s wallet stays accurate and everyone sees the shared book.
-- **Join via unique invite code (+ link)** as primary; **invite by email** (unique login id) as secondary — never by first name alone.
-- Ship **P1 visibility + shared log + join code** first; then linking, event close, rich reports, settlements.
+- Spends use **dual link:** bank (balance drops) + optional Household (family sees).
+- Events support **pot contributions** (also bank-linked); contributions + paid expenses both count as **credit** for optional **Split equal**.
+- Join: **invite code (7-day expiry) + link**, **preview + Accept**; email invites including **invite to register**.
+- **Notify** members on new shared expenses; entry via **nav or Dashboard**.
+- Follow **§14 phases:** P0 → P1 → P2 dual-link → P3 events → P4 reports → **P5 contributions + Split equal** → P6 polish/notifications.
 
 This stays compatible with CashTrail’s private multi-tenant design while adding intentional, permissioned family sharing.
+
+---
+
+## 19. Schema lock (Phase 0) — final fields for migration `0006`
+
+Django app: `api`. All money fields: `DecimalField(max_digits=14, decimal_places=2)`.
+
+### Household
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| id | PK | |
+| name | CharField(120) | |
+| currency | CharField(10) default PKR | from creator profile |
+| created_by | FK User SET_NULL | |
+| created_at | DateTime auto | |
+
+### HouseholdMembership
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| household | FK Household CASCADE | |
+| user | FK User CASCADE null | null until invite-to-register accepts |
+| role | CharField | `owner` \| `admin` \| `member` |
+| status | CharField | `invited` \| `active` \| `left` \| `declined` |
+| invited_via | CharField | `code` \| `email` \| `link` \| `create` |
+| invited_by | FK User SET_NULL null | |
+| invited_email | EmailField blank | for invite-to-register |
+| joined_at | DateTime null | set when active |
+| created_at | DateTime auto | |
+| unique | (household, user) when user set | also unique pending (household, invited_email) |
+
+### HouseholdInvite
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| household | FK CASCADE | |
+| code | CharField(16) unique | e.g. `HOME-7K2Q` |
+| token | CharField(64) unique | URL token |
+| created_by | FK User | |
+| expires_at | DateTime | created + 7 days |
+| max_uses | Int null | unlimited if null |
+| use_count | Int default 0 | |
+| revoked | Bool default False | |
+| created_at | DateTime auto | |
+
+### HouseholdLedger
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| household | FK CASCADE | |
+| name | CharField(150) | |
+| kind | CharField | `ongoing` \| `event` (P1 uses ongoing) |
+| status | CharField | `open` \| `closed` |
+| start_date | Date | |
+| end_date | Date null | |
+| opening_float | Decimal default 0 | |
+| notes | Text blank | |
+| closed_at | DateTime null | |
+| closed_by | FK User SET_NULL null | |
+| closed_total_expense | Decimal null | snapshot |
+| created_at | DateTime auto | |
+
+### HouseholdExpense (P1)
+| Field | Type | Notes |
+| ----- | ---- | ----- |
+| ledger | FK CASCADE | |
+| amount | Decimal | |
+| date | Date | |
+| category | CharField(100) blank | |
+| notes | Text blank | |
+| created_by | FK User | |
+| paid_by | FK User | default created_by |
+| linked_transaction | FK Transaction SET_NULL null | P2 |
+| linked_account | FK Account SET_NULL null | optional in P1 hub; required path in P2 FAB |
+| created_at | DateTime auto | |
+
+**P1 does not ship** `HouseholdContribution` (Phase 5) or ledger close APIs (Phase 3) beyond model fields for `kind`/`status`.
+
+---

@@ -8,6 +8,7 @@ import {
   TrendingUp,
   Wallet,
   FileText,
+  Users,
 } from 'lucide-react'
 import { dashboardApi, forecastApi } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -159,6 +160,27 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* ── Household entry (nav crowded on mobile — card here) ── */}
+      <button
+        type="button"
+        className="glass glass-hover"
+        onClick={() => navigate('/household')}
+        style={{
+          width: '100%', marginBottom: '1rem', padding: '0.9rem 1rem', borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', textAlign: 'left',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="account-icon account-icon-bank"><Users size={16} strokeWidth={1.75} /></div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.92rem' }}>Household</div>
+            <div className="text-muted" style={{ fontSize: '0.78rem' }}>Shared expenses with family or friends</div>
+          </div>
+        </div>
+        <span className="section-link">Open →</span>
+      </button>
 
       {/* ── Accounts ── */}
       <div style={{ marginBottom: '1rem' }}>

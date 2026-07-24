@@ -8,7 +8,9 @@
 
 **Primary user (v1):** Single user (owner), using it for personal/business finance tracking.
 
-**Future direction (multi-tenant):** The app must be architected so it can later be opened up as a hosted product where multiple independent users sign up and each manages their own private financial data within the same app instance. Each user's accounts, projects, transactions, and installments are isolated — no user can see another user's data. This is **not** a shared/team workspace (one company's books shared by many people); it's many separate users, each with their own private CashTrail space, hosted on one app. The data model and auth system should be built with this in mind from the start, even though v1 may launch with just the owner as the only real user.
+**Future direction (multi-tenant):** The app must be architected so it can later be opened up as a hosted product where multiple independent users sign up and each manages their own private financial data within the same app instance. Each user's accounts, projects, transactions, and installments are isolated — no user can see another user's data by default. This is **not** a full company ERP; it's many separate users, each with their own private CashTrail space, hosted on one app.
+
+**Exception — Household sharing (intentional):** Users may optionally create or join a **Household** — a permissioned shared expense ledger with invite codes / email invites. Members see **only** that household’s shared expenses (and later contributions / settlements). They never see each other’s private wallets, income, loans, or unrelated personal transactions. See `HOUSEHOLD_SHARED_EXPENSE_RESEARCH.md` for the full model and phases.
 
 ---
 
@@ -21,7 +23,8 @@
 5. Track money the user owes that's being paid in installments (payables/loans).
 6. Generate a **monthly forecast report**: total expected income − total expected outgoing = net savings/loss for the month.
 7. Show actual recorded income/expense for the month vs. the forecast.
-8. Support multiple independent users on one hosted app instance in the future, each with completely private, isolated data (built into the architecture from day one, even if v1 ships with a single user).
+8. Support multiple independent users on one hosted app instance, each with completely private, isolated data by default.
+9. Optional **Household** shared expense ledgers: invite family/friends to a shared book; personal data stays private except lines posted to that household.
 
 ---
 
@@ -251,9 +254,10 @@ This is the core "smart" feature.
 
 ---
 
-## 7. Out of Scope (v1)
+## 7. Out of Scope (v1 personal product)
 
-- Team/shared workspaces — i.e. multiple people collaborating on *one* set of books with roles/permissions. (Multiple separate users each with their own private data **is** in scope and required, per Section 4.8 — this exclusion is only about shared/collaborative access to a single user's data.)
+- Full company/team ERP on one set of books with complex org roles.
+- ~~Team/shared workspaces~~ → **superseded:** intentional **Household** sharing is in scope (see Overview exception + `HOUSEHOLD_SHARED_EXPENSE_RESEARCH.md`). Household is invite-based shared *expense* ledgers only — not shared access to a member’s entire private CashTrail.
 - Invoicing or client-facing features.
 - Tax calculation.
 - Multi-currency support (single currency, PKR, for v1; per-user currency field exists for future flexibility).

@@ -11,6 +11,7 @@ import Accounts from './pages/Accounts'
 import Expenses from './pages/Expenses'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import HouseholdPage from './pages/Household'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -40,6 +41,7 @@ function AppRoutes() {
         <Route path="/accounts" element={<Accounts />} />
         <Route path="/expenses" element={<Expenses />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/household" element={<HouseholdPage />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

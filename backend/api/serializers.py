@@ -33,6 +33,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         UserProfile.objects.create(user=user, currency=currency)
+        # Attach any household "invite to register" rows for this email
+        from django.utils import timezone
+        from .models import HouseholdMembership
+        email = (user.email or '').strip()
+        if email:
+            HouseholdMembership.objects.filter(
+                status='invited', user__isnull=True, invited_email__iexact=email,
+            ).update(user=user)
         return user
 
 

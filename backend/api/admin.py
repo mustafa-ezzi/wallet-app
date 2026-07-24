@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     UserProfile, Account, Project, Transaction,
-    RecurringExpense, ReceivableInstallment, PayableInstallment
+    RecurringExpense, ReceivableInstallment, PayableInstallment,
+    Household, HouseholdMembership, HouseholdInvite, HouseholdLedger, HouseholdExpense,
 )
 
 admin.site.site_header = 'CashTrail Admin'
@@ -15,3 +16,8 @@ admin.site.register(Transaction)
 admin.site.register(RecurringExpense)
 admin.site.register(ReceivableInstallment)
 admin.site.register(PayableInstallment)
+admin.site.register(Household)
+admin.site.register(HouseholdMembership)
+admin.site.register(HouseholdInvite)
+admin.site.register(HouseholdLedger)
+admin.site.register(HouseholdExpense)
