@@ -101,7 +101,9 @@ export default function HouseholdPage() {
   const [expenseTotal, setExpenseTotal] = useState(0)
 
   const [createOpen, setCreateOpen] = useState(false)
+  const [editHouseholdOpen, setEditHouseholdOpen] = useState(false)
   const [ledgerOpen, setLedgerOpen] = useState(false)
+  const [editingLedger, setEditingLedger] = useState<Ledger | null>(null)
   const [joinOpen, setJoinOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
@@ -238,6 +240,41 @@ export default function HouseholdPage() {
       if (res.data?.id) openHousehold(res.data.id)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create household.'))
+    } finally { setSaving(false) }
+  }
+
+  const saveHousehold = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!selectedId) return
+    setSaving(true); setError('')
+    try {
+      await householdsApi.update(selectedId, { name: name.trim() })
+      setEditHouseholdOpen(false)
+      setName('')
+      await load()
+      await openHousehold(selectedId)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update household.'))
+    } finally { setSaving(false) }
+  }
+
+  const deleteHousehold = async () => {
+    if (!selectedId || !selected) return
+    const ok = await confirm({
+      title: 'Delete household?',
+      message: `Permanently delete “${selected.name}”? All ledgers, shared expenses, contributions, and invites will be removed. Personal wallets are not affected.`,
+      confirmLabel: 'Delete household',
+      danger: true,
+    })
+    if (!ok) return
+    setSaving(true); setError('')
+    try {
+      await householdsApi.remove(selectedId)
+      setSelectedId(null)
+      setActiveLedger(null)
+      await load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not delete household.'))
     } finally { setSaving(false) }
   }
 
@@ -427,23 +464,74 @@ export default function HouseholdPage() {
     if (!selectedId) return
     setSaving(true); setError('')
     try {
-      const res = await householdsApi.createLedger(selectedId, {
-        name: ledgerForm.name.trim(),
-        kind: ledgerForm.kind,
-        start_date: ledgerForm.start_date,
-      })
-      setLedgerOpen(false)
-      setLedgerForm({ name: '', kind: 'ongoing', start_date: new Date().toISOString().slice(0, 10) })
+      if (editingLedger) {
+        const res = await householdsApi.updateLedger(editingLedger.id, {
+          name: ledgerForm.name.trim(),
+        })
+        setLedgerOpen(false)
+        setEditingLedger(null)
+        setLedgerForm({ name: '', kind: 'ongoing', start_date: new Date().toISOString().slice(0, 10) })
+        const lRes = await householdsApi.ledgers(selectedId)
+        const list = asList<Ledger>(lRes.data)
+        setLedgers(list)
+        const updated = list.find(l => l.id === res.data.id) || res.data
+        setActiveLedger(updated)
+        await loadExpenses(updated, true)
+      } else {
+        const res = await householdsApi.createLedger(selectedId, {
+          name: ledgerForm.name.trim(),
+          kind: ledgerForm.kind,
+          start_date: ledgerForm.start_date,
+        })
+        setLedgerOpen(false)
+        setLedgerForm({ name: '', kind: 'ongoing', start_date: new Date().toISOString().slice(0, 10) })
+        const lRes = await householdsApi.ledgers(selectedId)
+        const list = asList<Ledger>(lRes.data)
+        setLedgers(list)
+        if (res.data?.id) {
+          const created = list.find(l => l.id === res.data.id) || res.data
+          setActiveLedger(created)
+          await loadExpenses(created, true)
+        }
+      }
+    } catch (err) {
+      setError(apiErrorMessage(err, editingLedger ? 'Could not update ledger.' : 'Could not create ledger.'))
+    } finally { setSaving(false) }
+  }
+
+  const openEditLedger = (l: Ledger) => {
+    setEditingLedger(l)
+    setLedgerForm({
+      name: l.name,
+      kind: l.kind,
+      start_date: new Date().toISOString().slice(0, 10),
+    })
+    setLedgerOpen(true)
+    setError('')
+  }
+
+  const deleteLedger = async (l: Ledger) => {
+    if (!selectedId) return
+    const ok = await confirm({
+      title: 'Delete ledger?',
+      message: `Delete “${l.name}” and all its shared expenses/contributions? This cannot be undone.`,
+      confirmLabel: 'Delete ledger',
+      danger: true,
+    })
+    if (!ok) return
+    setSaving(true); setError('')
+    try {
+      await householdsApi.removeLedger(l.id)
       const lRes = await householdsApi.ledgers(selectedId)
       const list = asList<Ledger>(lRes.data)
       setLedgers(list)
-      if (res.data?.id) {
-        const created = list.find(l => l.id === res.data.id) || res.data
-        setActiveLedger(created)
-        await loadExpenses(created)
-      }
+      const next = list.find(x => x.status === 'open') || list[0] || null
+      setActiveLedger(next)
+      if (next) await loadExpenses(next, true)
+      else { setExpenses([]); setExpenseTotal(0); setSummary(null) }
+      await load()
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not create ledger.'))
+      setError(apiErrorMessage(err, 'Could not delete ledger.'))
     } finally { setSaving(false) }
   }
 
@@ -758,21 +846,43 @@ export default function HouseholdPage() {
                   {selected.member_count} members · your role: {selected.my_role}
                 </p>
               </div>
-              {(selected.my_role === 'owner' || selected.my_role === 'admin') && (
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {(selected.my_role === 'owner' || selected.my_role === 'admin') && (
+                  <>
+                    <button
+                      className="btn-glass"
+                      style={{ fontSize: '0.82rem' }}
+                      onClick={() => { setName(selected.name); setEditHouseholdOpen(true); setError('') }}
+                      title="Rename household"
+                    >
+                      <Pencil size={14} strokeWidth={2} style={{ marginRight: '0.3rem', verticalAlign: '-2px' }} />
+                      Edit
+                    </button>
+                    <button className="btn-glass" style={{ fontSize: '0.82rem' }} onClick={() => setMembersOpen(true)}>
+                      Members
+                    </button>
+                    <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => { setInviteOpen(true); if (!invite) regenInvite() }}>
+                      Invite
+                    </button>
+                  </>
+                )}
+                {selected.my_role === 'owner' && (
+                  <button
+                    className="btn-glass"
+                    style={{ fontSize: '0.82rem', color: 'var(--red-600, #c53030)' }}
+                    onClick={deleteHousehold}
+                    title="Delete household"
+                  >
+                    <Trash2 size={14} strokeWidth={2} style={{ marginRight: '0.3rem', verticalAlign: '-2px' }} />
+                    Delete
+                  </button>
+                )}
+                {selected.my_role === 'member' && (
                   <button className="btn-glass" style={{ fontSize: '0.82rem' }} onClick={() => setMembersOpen(true)}>
                     Members
                   </button>
-                  <button className="btn-primary" style={{ fontSize: '0.82rem' }} onClick={() => { setInviteOpen(true); if (!invite) regenInvite() }}>
-                    Invite
-                  </button>
-                </div>
-              )}
-              {selected.my_role === 'member' && (
-                <button className="btn-glass" style={{ fontSize: '0.82rem' }} onClick={() => setMembersOpen(true)}>
-                  Members
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
@@ -805,13 +915,42 @@ export default function HouseholdPage() {
                 ))}
               </div>
               {(selected.my_role === 'owner' || selected.my_role === 'admin') && (
-                <button
-                  className="btn-glass"
-                  style={{ fontSize: '0.78rem' }}
-                  onClick={() => { setLedgerOpen(true); setError('') }}
-                >
-                  + Ledger
-                </button>
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  {activeLedger && activeLedger.status === 'open' && (
+                    <>
+                      <button
+                        className="btn-glass"
+                        style={{ fontSize: '0.78rem', padding: '0.35rem 0.5rem' }}
+                        title="Rename ledger"
+                        onClick={() => openEditLedger(activeLedger)}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      {ledgers.length > 1 && (
+                        <button
+                          className="btn-glass"
+                          style={{ fontSize: '0.78rem', padding: '0.35rem 0.5rem', color: 'var(--red-600, #c53030)' }}
+                          title="Delete ledger"
+                          onClick={() => deleteLedger(activeLedger)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </>
+                  )}
+                  <button
+                    className="btn-glass"
+                    style={{ fontSize: '0.78rem' }}
+                    onClick={() => {
+                      setEditingLedger(null)
+                      setLedgerForm({ name: '', kind: 'ongoing', start_date: new Date().toISOString().slice(0, 10) })
+                      setLedgerOpen(true)
+                      setError('')
+                    }}
+                  >
+                    + Ledger
+                  </button>
+                </div>
               )}
             </div>
           )}
@@ -1071,7 +1210,7 @@ export default function HouseholdPage() {
         </>
       )}
 
-      {/* Create modal */}
+      {/* Create / edit household */}
       {createOpen && (
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setCreateOpen(false)}>
           <div className="modal-sheet">
@@ -1085,6 +1224,26 @@ export default function HouseholdPage() {
                 <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Khan Family" required />
               </div>
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? <span className="spinner" /> : 'Create'}</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editHouseholdOpen && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setEditHouseholdOpen(false)}>
+          <div className="modal-sheet">
+            <div className="modal-header">
+              <h2>Edit household</h2>
+              <button className="modal-close" onClick={() => setEditHouseholdOpen(false)} aria-label="Close"><X size={18} /></button>
+            </div>
+            <form onSubmit={saveHousehold} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div className="form-group">
+                <label>Name</label>
+                <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Khan Family" required />
+              </div>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? <span className="spinner" /> : 'Save changes'}
+              </button>
             </form>
           </div>
         </div>
@@ -1238,13 +1397,13 @@ export default function HouseholdPage() {
         </div>
       )}
 
-      {/* Create ledger — Monthly vs Event */}
+      {/* Create / rename ledger */}
       {ledgerOpen && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setLedgerOpen(false)}>
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && (setLedgerOpen(false), setEditingLedger(null))}>
           <div className="modal-sheet">
             <div className="modal-header">
-              <h2>New ledger</h2>
-              <button className="modal-close" onClick={() => setLedgerOpen(false)} aria-label="Close"><X size={18} /></button>
+              <h2>{editingLedger ? 'Rename ledger' : 'New ledger'}</h2>
+              <button className="modal-close" onClick={() => { setLedgerOpen(false); setEditingLedger(null) }} aria-label="Close"><X size={18} /></button>
             </div>
             <form onSubmit={createLedger} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div className="form-group">
@@ -1256,43 +1415,47 @@ export default function HouseholdPage() {
                   required
                 />
               </div>
-              <div className="form-group">
-                <label>Type</label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className={ledgerForm.kind === 'ongoing' ? 'btn-primary' : 'btn-glass'}
-                    style={{ flex: 1, fontSize: '0.85rem' }}
-                    onClick={() => setLedgerForm(f => ({ ...f, kind: 'ongoing' }))}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    type="button"
-                    className={ledgerForm.kind === 'event' ? 'btn-primary' : 'btn-glass'}
-                    style={{ flex: 1, fontSize: '0.85rem' }}
-                    onClick={() => setLedgerForm(f => ({ ...f, kind: 'event' }))}
-                  >
-                    Event
-                  </button>
-                </div>
-                <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.4rem' }}>
-                  {ledgerForm.kind === 'event'
-                    ? 'Trip, wedding, Eid — close when done to lock the total.'
-                    : 'Ongoing shared book with a monthly view.'}
-                </p>
-              </div>
-              <div className="form-group">
-                <label>Start date</label>
-                <input
-                  type="date"
-                  value={ledgerForm.start_date}
-                  onChange={e => setLedgerForm(f => ({ ...f, start_date: e.target.value }))}
-                  required
-                />
-              </div>
+              {!editingLedger && (
+                <>
+                  <div className="form-group">
+                    <label>Type</label>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className={ledgerForm.kind === 'ongoing' ? 'btn-primary' : 'btn-glass'}
+                        style={{ flex: 1, fontSize: '0.85rem' }}
+                        onClick={() => setLedgerForm(f => ({ ...f, kind: 'ongoing' }))}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        className={ledgerForm.kind === 'event' ? 'btn-primary' : 'btn-glass'}
+                        style={{ flex: 1, fontSize: '0.85rem' }}
+                        onClick={() => setLedgerForm(f => ({ ...f, kind: 'event' }))}
+                      >
+                        Event
+                      </button>
+                    </div>
+                    <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.4rem' }}>
+                      {ledgerForm.kind === 'event'
+                        ? 'Trip, wedding, Eid — close when done to lock the total.'
+                        : 'Ongoing shared book with a monthly view.'}
+                    </p>
+                  </div>
+                  <div className="form-group">
+                    <label>Start date</label>
+                    <input
+                      type="date"
+                      value={ledgerForm.start_date}
+                      onChange={e => setLedgerForm(f => ({ ...f, start_date: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </>
+              )}
               <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? <span className="spinner" /> : 'Create ledger'}
+                {saving ? <span className="spinner" /> : editingLedger ? 'Save name' : 'Create ledger'}
               </button>
             </form>
           </div>

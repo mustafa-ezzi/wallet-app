@@ -561,6 +561,29 @@ class HouseholdViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'Only the owner can delete a household.'}, status=403)
         return super().destroy(request, *args, **kwargs)
 
+    def update(self, request, *args, **kwargs):
+        household = self.get_object()
+        m = require_owner_or_admin(request.user, household.id)
+        if not m:
+            return Response({'detail': 'Only owner/admin can edit this household.'}, status=403)
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(household, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        # Only name/currency are editable
+        allowed = {}
+        if 'name' in serializer.validated_data:
+            name = (serializer.validated_data['name'] or '').strip()
+            if not name:
+                return Response({'name': 'Name is required.'}, status=400)
+            allowed['name'] = name[:120]
+        if 'currency' in serializer.validated_data:
+            allowed['currency'] = serializer.validated_data['currency']
+        for k, v in allowed.items():
+            setattr(household, k, v)
+        if allowed:
+            household.save(update_fields=list(allowed.keys()))
+        return Response(HouseholdSerializer(household, context={'request': request}).data)
+
     @action(detail=True, methods=['get'])
     def members(self, request, pk=None):
         household = self.get_object()
@@ -739,9 +762,10 @@ class HouseholdViewSet(viewsets.ModelViewSet):
         )
 
 
-class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
+class HouseholdLedgerViewSet(viewsets.ModelViewSet):
     serializer_class = HouseholdLedgerSerializer
     permission_classes = [IsAuthenticated]
+    http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_queryset(self):
         qs = HouseholdLedger.objects.filter(
@@ -752,6 +776,49 @@ class HouseholdLedgerViewSet(viewsets.ReadOnlyModelViewSet):
         if status_filter:
             qs = qs.filter(status=status_filter)
         return qs
+
+    def update(self, request, *args, **kwargs):
+        ledger = self.get_object()
+        m = require_owner_or_admin(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Only owner/admin can edit a ledger.'}, status=403)
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(ledger, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        name = serializer.validated_data.get('name')
+        notes = serializer.validated_data.get('notes')
+        fields = []
+        if name is not None:
+            name = name.strip()
+            if not name:
+                return Response({'name': 'Name is required.'}, status=400)
+            ledger.name = name[:150]
+            fields.append('name')
+        if notes is not None:
+            ledger.notes = notes
+            fields.append('notes')
+        if fields:
+            ledger.save(update_fields=fields)
+        return Response(HouseholdLedgerSerializer(ledger, context={'request': request}).data)
+
+    def destroy(self, request, *args, **kwargs):
+        ledger = self.get_object()
+        m = require_owner_or_admin(request.user, ledger.household_id)
+        if not m:
+            return Response({'detail': 'Only owner/admin can delete a ledger.'}, status=403)
+        if ledger.status == 'closed':
+            return Response(
+                {'detail': 'Reopen the ledger before deleting, or leave it closed for history.'},
+                status=400,
+            )
+        # Keep at least one ledger on the household
+        if ledger.household.ledgers.count() <= 1:
+            return Response(
+                {'detail': 'Cannot delete the only ledger. Create another first, or delete the household.'},
+                status=400,
+            )
+        ledger.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['get'])
     def summary(self, request, pk=None):
