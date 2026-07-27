@@ -12,8 +12,10 @@ export function initAnalytics() {
 
   posthog.init(KEY, {
     api_host: HOST,
+    defaults: '2026-05-30',
     person_profiles: 'identified_only',
-    capture_pageview: true,
+    // SPA: capture pageviews manually on React Router changes (see capturePageview)
+    capture_pageview: false,
     capture_pageleave: true,
     persistence: 'localStorage+cookie',
     session_recording: {
@@ -21,6 +23,15 @@ export function initAnalytics() {
       maskTextSelector: '.amt-negative, .amt-positive, .stat-value, .balance-value',
     },
   })
+
+  // First load (before router is ready)
+  posthog.capture('$pageview')
+}
+
+/** Call on every React Router location change. */
+export function capturePageview(url?: string) {
+  if (!started) return
+  posthog.capture('$pageview', url ? { $current_url: url } : undefined)
 }
 
 export function identifyUser(user: {
