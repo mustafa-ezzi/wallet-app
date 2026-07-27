@@ -291,26 +291,37 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="list">
-            {data.recent_transactions.map(tx => (
-              <div key={tx.id} className="list-item glass-hover">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div className={`tx-icon ${tx.type === 'income' ? 'tx-icon-income' : 'tx-icon-expense'}`}>
-                    {tx.type === 'income'
-                      ? <ArrowUpRight size={14} strokeWidth={2.25} />
-                      : <ArrowDownRight size={14} strokeWidth={2.25} />}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>
-                      {tx.project_name || tx.category || (tx.type === 'income' ? 'Income' : 'Expense')}
+            {data.recent_transactions.map((tx, i) => {
+              const title = tx.project_name || tx.category || (tx.type === 'income' ? 'Income' : 'Expense')
+              const note = (tx.notes || '').trim()
+              return (
+                <div
+                  key={tx.id && !Number.isNaN(tx.id) ? tx.id : `tx-${tx.date}-${i}`}
+                  className="list-item glass-hover dash-tx-item"
+                >
+                  <div className="dash-tx-left">
+                    <div className={`tx-icon ${tx.type === 'income' ? 'tx-icon-income' : 'tx-icon-expense'}`}>
+                      {tx.type === 'income'
+                        ? <ArrowUpRight size={14} strokeWidth={2.25} />
+                        : <ArrowDownRight size={14} strokeWidth={2.25} />}
                     </div>
-                    <div className="text-muted">{tx.account_name} · {tx.date}</div>
+                    <div className="dash-tx-body">
+                      <div className="dash-tx-title">{title}</div>
+                      {note ? <div className="dash-tx-notes">{note}</div> : null}
+                      <div className="dash-tx-meta text-muted">
+                        {tx.account_name} · {tx.date}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className="dash-tx-amount"
+                    style={{ color: tx.type === 'income' ? 'var(--success)' : 'var(--danger)' }}
+                  >
+                    {tx.type === 'income' ? '+' : '−'} {fmt(tx.amount)}
                   </div>
                 </div>
-                <div style={{ fontWeight: 700, color: tx.type === 'income' ? 'var(--success)' : 'var(--danger)' }}>
-                  {tx.type === 'income' ? '+' : '−'} {fmt(tx.amount)}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

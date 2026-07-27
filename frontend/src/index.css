@@ -595,6 +595,52 @@ select option { background: var(--surface); color: var(--text-primary); }
 }
 .list-item:hover { background: var(--green-50); border-color: var(--border); }
 
+/* Dashboard recent transactions — category + notes, mobile-friendly */
+.dash-tx-item {
+  align-items: flex-start;
+}
+.dash-tx-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+.dash-tx-body {
+  min-width: 0;
+  flex: 1;
+}
+.dash-tx-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  line-height: 1.25;
+  word-break: break-word;
+}
+.dash-tx-notes {
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.dash-tx-meta {
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+.dash-tx-amount {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+  padding-top: 0.05rem;
+  white-space: nowrap;
+  text-align: right;
+}
+
 /* ── Stat card ───────────────────────────────────────────────────── */
 .stat-card {
   padding: 0.9rem 1rem;
