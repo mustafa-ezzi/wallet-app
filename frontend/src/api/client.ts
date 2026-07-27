@@ -77,6 +77,11 @@ api.interceptors.response.use(
   (res) => assertApiResponse(res),
   async (err) => {
     const original = err.config
+    // Never wipe the session on pure network failures (offline open)
+    const noResponse = !err.response
+    if (noResponse) {
+      return Promise.reject(err)
+    }
     if (err.response?.status === 401 && original && !original._retry) {
       original._retry = true
       const refresh = localStorage.getItem('refresh_token')
@@ -87,9 +92,14 @@ api.interceptors.response.use(
           original.headers = original.headers ?? {}
           original.headers.Authorization = `Bearer ${data.access}`
           return api(original)
-        } catch {
+        } catch (refreshErr) {
+          // Refresh also failed due to network → keep tokens, stay logged in offline
+          if (!(refreshErr as { response?: unknown })?.response) {
+            return Promise.reject(err)
+          }
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
+          try { localStorage.removeItem('cashtrail_user') } catch { /* ignore */ }
           window.location.href = '/login'
         }
       } else {
