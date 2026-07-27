@@ -119,10 +119,13 @@ class TransactionSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'type', 'amount', 'date', 'account', 'account_name',
             'linked_project', 'project_name', 'linked_receivable', 'linked_payable',
-            'category', 'notes', 'created_at',
+            'category', 'notes', 'client_mutation_id', 'created_at',
             'household_ledger', 'household_expense_id', 'household_ledger_name',
         )
         read_only_fields = ('created_at',)
+        extra_kwargs = {
+            'client_mutation_id': {'required': False, 'allow_null': True, 'allow_blank': True},
+        }
 
     def get_account_name(self, obj):
         return obj.account.name if obj.account else None
@@ -166,6 +169,18 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         ledger = validated_data.pop('household_ledger', None)
+        mutation_id = (validated_data.get('client_mutation_id') or '').strip() or None
+        if mutation_id:
+            validated_data['client_mutation_id'] = mutation_id
+            existing = Transaction.objects.filter(
+                user=validated_data['user'],
+                client_mutation_id=mutation_id,
+            ).first()
+            if existing:
+                return existing
+        else:
+            validated_data['client_mutation_id'] = None
+
         tx = Transaction.objects.create(**validated_data)
         if ledger and tx.type == 'expense':
             he = HouseholdExpense.objects.create(

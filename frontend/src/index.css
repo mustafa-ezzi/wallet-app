@@ -475,6 +475,43 @@ select option { background: var(--surface); color: var(--text-primary); }
   align-items: center;
   gap: 0.45rem;
 }
+.sync-chip {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.28rem 0.55rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sync-chip-offline {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+.sync-chip-pending {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+.offline-banner {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.75rem;
+  font-size: 0.82rem;
+}
+.badge-pending {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  margin-left: 0.35rem;
+}
 .mobile-header-settings {
   display: inline-flex;
   align-items: center;

@@ -126,13 +126,28 @@ class TransactionViewSet(viewsets.ModelViewSet):
         account_id = self.request.query_params.get('account')
         month = self.request.query_params.get('month')
         year = self.request.query_params.get('year')
+        updated_since = self.request.query_params.get('updated_since')
         if tx_type:
             qs = qs.filter(type=tx_type)
         if account_id:
             qs = qs.filter(account_id=account_id)
         if year and month:
             qs = qs.filter(date__year=year, date__month=month)
+        if updated_since:
+            qs = qs.filter(created_at__gte=updated_since)
         return qs
+
+    def create(self, request, *args, **kwargs):
+        """Idempotent create when client_mutation_id was already used (offline retries)."""
+        mid = (request.data.get('client_mutation_id') or '').strip()
+        if mid:
+            existing = Transaction.objects.filter(
+                user=request.user, client_mutation_id=mid,
+            ).first()
+            if existing:
+                serializer = self.get_serializer(existing)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

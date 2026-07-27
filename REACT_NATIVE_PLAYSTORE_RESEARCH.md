@@ -467,14 +467,18 @@ Hard cases (defer to L2):
 
 ### 6.13 Implementation checklist (offline)
 
-- [ ] `expo-sqlite` schema + migrations  
-- [ ] Hydrate accounts/txs after login  
-- [ ] Outbox + `client_mutation_id` on create  
-- [ ] Django unique constraint + idempotent POST  
-- [ ] NetInfo-driven sync engine + retry/backoff  
-- [ ] Offline / Pending sync UI indicators  
-- [ ] Logout wipes local ledger  
-- [ ] PostHog: `transaction_queued_offline`, `transaction_sync_success`, `transaction_sync_failed` (no amounts)
+- [x] Local store schema (IndexedDB on web PWA; SQLite planned for RN)  
+- [x] Hydrate accounts/txs after login  
+- [x] Outbox + `client_mutation_id` on create  
+- [x] Django unique constraint + idempotent POST  
+- [x] Online/offline-driven sync engine + retry/backoff  
+- [x] Offline / Pending sync UI indicators  
+- [x] Logout wipes local ledger  
+- [x] PostHog: `transaction_queued_offline`, `transaction_sync_success`, `transaction_sync_failed` (no amounts)  
+- [x] Unit tests (frontend vitest) + Django idempotency tests  
+
+> **Web PWA note (2026-07):** L0+L1 shipped in the current React/Vite app using IndexedDB (`frontend/src/offline/`). React Native will reuse the same outbox/idempotency contract with `expo-sqlite`.
+
 
 ### 6.14 Bottom line on offline
 

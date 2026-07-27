@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { dashboardApi, forecastApi, householdsApi } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useOffline } from '../offline'
 import { fmt, fmtBalance } from '../utils/format'
 
 interface DashboardData {
@@ -39,14 +40,55 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const { getCachedAccounts, getCachedTransactions, online, pending } = useOffline()
   const navigate = useNavigate()
   const [data, setData]         = useState<DashboardData | null>(null)
   const [forecast, setForecast] = useState<Forecast | null>(null)
   const [loading, setLoading]   = useState(true)
   const [hhUnread, setHhUnread] = useState(0)
+  const [fromCache, setFromCache] = useState(false)
 
   useEffect(() => {
     const now = new Date()
+    const loadCached = async () => {
+      const [accounts, txs] = await Promise.all([
+        getCachedAccounts(),
+        getCachedTransactions(),
+      ])
+      if (!accounts.length && !txs.length) {
+        setData(null)
+        return
+      }
+      const total = accounts.reduce((s, a) => s + a.currentBalance, 0)
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      const monthTxs = txs.filter(t => t.date.startsWith(month))
+      const monthIncome = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const monthExpense = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      const nameById = new Map(accounts.map(a => [a.serverId, a.name]))
+      setData({
+        total_balance: total,
+        accounts: accounts.map(a => ({
+          id: a.serverId, name: a.name, type: a.type, balance: a.currentBalance,
+        })),
+        month_income: monthIncome,
+        month_expense: monthExpense,
+        month_net: monthIncome - monthExpense,
+        recent_transactions: txs.slice(0, 8).map(t => ({
+          id: t.serverId ?? Number.NaN,
+          type: t.type,
+          amount: t.amount,
+          date: t.date,
+          account_name: nameById.get(t.accountServerId) || 'Wallet',
+          project_name: null,
+          category: t.syncStatus === 'pending' || t.syncStatus === 'failed'
+            ? `${t.category || 'Pending'} · sync`
+            : t.category,
+          notes: t.notes,
+        })),
+      })
+      setFromCache(true)
+    }
+
     Promise.all([
       dashboardApi.get(),
       forecastApi.get(now.getFullYear(), now.getMonth() + 1),
@@ -60,11 +102,12 @@ export default function Dashboard() {
       })
       setForecast(fRes.data ?? null)
       setHhUnread(Number(uRes.data?.count) || 0)
-    }).catch(() => {
-      setData(null)
+      setFromCache(false)
+    }).catch(async () => {
       setForecast(null)
+      await loadCached()
     }).finally(() => setLoading(false))
-  }, [])
+  }, [getCachedAccounts, getCachedTransactions])
 
   const now = new Date()
   const monthName = MONTH_NAMES[now.getMonth()]
@@ -85,6 +128,13 @@ export default function Dashboard() {
         </span>
       </div>
 
+      {(fromCache || !online || pending > 0) && (
+        <div className="offline-banner" style={{ marginBottom: '0.85rem' }}>
+          {!online || fromCache
+            ? 'Showing saved data on this device. New entries sync when you’re online.'
+            : `${pending} transaction${pending === 1 ? '' : 's'} waiting to sync.`}
+        </div>
+      )}
       {/* ── Hero balance card ── */}
       <div className="hero-balance">
         <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>

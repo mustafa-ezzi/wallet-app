@@ -9,6 +9,7 @@ import {
 import { accountsApi, transactionsApi, householdsApi, asList } from '../api/client'
 import { fmtBalance } from '../utils/format'
 import { track } from '../lib/analytics'
+import { useOffline } from '../offline'
 
 interface Props {
   onClose: () => void
@@ -30,6 +31,7 @@ interface OpenLedger {
 }
 
 export default function AddTransactionModal({ onClose, onAdded }: Props) {
+  const { queueTransaction, online, getCachedAccounts } = useOffline()
   const [type, setType] = useState<TxType>('income')
 
   const [amount, setAmount]   = useState('')
@@ -49,11 +51,26 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const [openLedgers, setOpenLedgers] = useState<OpenLedger[]>([])
 
   useEffect(() => {
-    accountsApi.list().then(r => setAccounts(asList(r.data)))
-    householdsApi.openLedgers()
-      .then(r => setOpenLedgers(asList(r.data)))
-      .catch(() => setOpenLedgers([]))
-  }, [])
+    accountsApi.list()
+      .then(r => setAccounts(asList(r.data)))
+      .catch(async () => {
+        const cached = await getCachedAccounts()
+        setAccounts(cached.map(a => ({
+          id: a.serverId,
+          name: a.name,
+          type: a.type,
+          opening_balance: a.openingBalance,
+          current_balance: a.currentBalance,
+        })))
+      })
+    if (online) {
+      householdsApi.openLedgers()
+        .then(r => setOpenLedgers(asList(r.data)))
+        .catch(() => setOpenLedgers([]))
+    } else {
+      setOpenLedgers([])
+    }
+  }, [online, getCachedAccounts])
 
   const switchType = (t: TxType) => {
     setType(t); setError(''); setCategory(''); setHouseholdLedgerId('')
@@ -72,29 +89,30 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
       const fromAcc = accounts.find(a => String(a.id) === fromAccountId)
       const toAcc   = accounts.find(a => String(a.id) === toAccountId)
       const label   = notes || `Transfer: ${fromAcc?.name ?? ''} → ${toAcc?.name ?? ''}`
+      const amt = parseFloat(amount)
 
       setLoading(true)
       try {
-        await transactionsApi.create({
+        await queueTransaction({
           type: 'expense',
-          amount: parseFloat(amount),
+          amount: amt,
           date,
-          account: parseInt(fromAccountId),
+          accountServerId: parseInt(fromAccountId),
           category: 'Bank Transfer',
           notes: `${label} (out)`,
         })
-        await transactionsApi.create({
+        await queueTransaction({
           type: 'income',
-          amount: parseFloat(amount),
+          amount: amt,
           date,
-          account: parseInt(toAccountId),
+          accountServerId: parseInt(toAccountId),
           category: 'Bank Transfer',
           notes: `${label} (in)`,
         })
         track('transaction_created', { tx_type: 'transfer', has_household_link: false })
         onAdded()
       } catch (err: any) {
-        setError(err.response?.data?.detail ?? 'Transfer failed. Please try again.')
+        setError(err?.message ?? err.response?.data?.detail ?? 'Transfer failed. Please try again.')
       } finally {
         setLoading(false)
       }
@@ -103,33 +121,56 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
     if (!accountId) { setError('Please select an account.'); return }
 
+    if (type === 'expense' && householdLedgerId) {
+      if (!online) {
+        setError('Household linking needs an internet connection.')
+        return
+      }
+      setLoading(true)
+      try {
+        await transactionsApi.create({
+          type,
+          amount: parseFloat(amount),
+          date,
+          account: parseInt(accountId),
+          category,
+          notes,
+          household_ledger: parseInt(householdLedgerId),
+        })
+        track('transaction_created', { tx_type: type, has_household_link: true })
+        onAdded()
+      } catch (err: any) {
+        const data = err.response?.data
+        const msg = typeof data?.household_ledger === 'string'
+          ? data.household_ledger
+          : Array.isArray(data?.household_ledger)
+            ? data.household_ledger.join(' ')
+            : data?.detail ?? 'Something went wrong.'
+        setError(msg)
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     setLoading(true)
     try {
-      const payload: Record<string, unknown> = {
+      const result = await queueTransaction({
         type,
         amount: parseFloat(amount),
         date,
-        account: parseInt(accountId),
+        accountServerId: parseInt(accountId),
         category,
         notes,
-      }
-      if (type === 'expense' && householdLedgerId) {
-        payload.household_ledger = parseInt(householdLedgerId)
-      }
-      await transactionsApi.create(payload)
+      })
       track('transaction_created', {
         tx_type: type,
-        has_household_link: Boolean(type === 'expense' && householdLedgerId),
+        has_household_link: false,
+        queued_offline: result.queuedOffline,
       })
       onAdded()
     } catch (err: any) {
-      const data = err.response?.data
-      const msg = typeof data?.household_ledger === 'string'
-        ? data.household_ledger
-        : Array.isArray(data?.household_ledger)
-          ? data.household_ledger.join(' ')
-          : data?.detail ?? 'Something went wrong.'
-      setError(msg)
+      setError(err?.message ?? err.response?.data?.detail ?? 'Something went wrong.')
     } finally {
       setLoading(false)
     }
@@ -170,6 +211,11 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
         </div>
 
         {error && <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div>}
+        {!online && (
+          <div className="offline-banner" style={{ marginBottom: '0.75rem' }}>
+            You’re offline — this will save on this device and sync when you’re back online.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
 
@@ -284,7 +330,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 </div>
               )}
 
-              {type === 'expense' && openLedgers.length > 0 && (
+              {type === 'expense' && online && openLedgers.length > 0 && (
                 <div className="form-group">
                   <label>Link to Household (optional)</label>
                   <select value={householdLedgerId} onChange={e => setHouseholdLedgerId(e.target.value)}>

@@ -107,10 +107,20 @@ class Transaction(models.Model):
         related_name='transactions')
     category = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
+    # Client-generated UUID for offline sync retries (unique per user when set)
+    client_mutation_id = models.CharField(max_length=64, null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-date', '-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'client_mutation_id'],
+                name='uniq_tx_user_client_mutation_id',
+                condition=models.Q(client_mutation_id__isnull=False)
+                & ~models.Q(client_mutation_id=''),
+            ),
+        ]
 
     def __str__(self):
         return f"{self.type} {self.amount} on {self.date}"

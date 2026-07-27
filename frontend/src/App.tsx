@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { OfflineProvider } from './offline'
 import Layout from './components/Layout'
 import AppUpdateGate from './hooks/AppUpdateGate'
 import { ThemeProvider } from './theme/ThemeProvider'
@@ -67,11 +68,13 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
-          <AppUpdateGate>
-            <AppRoutes />
-          </AppUpdateGate>
-        </BrowserRouter>
+        <OfflineProvider>
+          <BrowserRouter>
+            <AppUpdateGate>
+              <AppRoutes />
+            </AppUpdateGate>
+          </BrowserRouter>
+        </OfflineProvider>
       </AuthProvider>
     </ThemeProvider>
   )

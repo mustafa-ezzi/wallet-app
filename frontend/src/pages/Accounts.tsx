@@ -12,6 +12,7 @@ import { accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/cl
 import { fmt, fmtBalance, toMoney } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
 import { track } from '../lib/analytics'
+import { useOffline } from '../offline'
 
 interface Account {
   id: number; name: string; type: string
@@ -37,6 +38,7 @@ const EMPTY_TX_FORM = {
 
 export default function Accounts() {
   const { confirm, dialog: confirmDialog } = useConfirm()
+  const { getCachedAccounts, getCachedTransactions } = useOffline()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading]   = useState(true)
 
@@ -65,25 +67,53 @@ export default function Accounts() {
     setAccError('')
     accountsApi.list()
       .then(r => setAccounts(asList(r.data)))
-      .catch((err) => {
-        setAccounts([])
-        setAccError(apiErrorMessage(err, 'Could not load accounts.'))
+      .catch(async (err) => {
+        const cached = await getCachedAccounts()
+        if (cached.length) {
+          setAccounts(cached.map(a => ({
+            id: a.serverId,
+            name: a.name,
+            type: a.type,
+            opening_balance: a.openingBalance,
+            current_balance: a.currentBalance,
+          })))
+          setAccError('')
+        } else {
+          setAccounts([])
+          setAccError(apiErrorMessage(err, 'Could not load accounts.'))
+        }
       })
       .finally(() => setLoading(false))
   }
 
   const reloadTxs = async (acc: Account) => {
     setTxLoading(true)
-    const r = await transactionsApi.list({ account: acc.id })
-    setTxs(asList(r.data))
-    setTxLoading(false)
-    // Refresh balance shown in header
-    const ar = await accountsApi.list()
-    const fresh = asList<Account>(ar.data).find((a) => a.id === acc.id)
-    if (fresh) setSelectedAccount(fresh)
+    try {
+      const r = await transactionsApi.list({ account: acc.id })
+      setTxs(asList(r.data))
+      const ar = await accountsApi.list()
+      const fresh = asList<Account>(ar.data).find((a) => a.id === acc.id)
+      if (fresh) setSelectedAccount(fresh)
+    } catch {
+      const cached = await getCachedTransactions()
+      const name = acc.name
+      setTxs(cached.filter(t => t.accountServerId === acc.id).map(t => ({
+        id: t.serverId ?? 0,
+        type: t.type,
+        amount: t.amount,
+        date: t.date,
+        account: acc.id,
+        account_name: name,
+        category: t.syncStatus !== 'synced' ? `${t.category || ''} · pending`.trim() : t.category,
+        notes: t.notes,
+        project_name: null,
+      })))
+    } finally {
+      setTxLoading(false)
+    }
   }
 
-  useEffect(loadAccounts, [])
+  useEffect(loadAccounts, [getCachedAccounts])
 
   // ── account CRUD ─────────────────────────────────────────────────────
 

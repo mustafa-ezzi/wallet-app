@@ -185,6 +185,56 @@ class AccountTransactionScenarioTests(ScenarioBase):
         self.assertEqual(Decimal(str(self.account.current_balance)), Decimal('10000'))
 
 
+class OfflineIdempotencyScenarioTests(ScenarioBase):
+    """Offline sync retries must not create duplicate transactions."""
+
+    def test_same_client_mutation_id_returns_existing_once(self):
+        payload = {
+            'type': 'expense',
+            'amount': '500',
+            'date': '2026-07-15',
+            'account': self.account.id,
+            'category': 'Food',
+            'client_mutation_id': 'offline-uuid-1111',
+        }
+        first = self.client.post('/api/transactions/', payload, format='json')
+        self.assertEqual(first.status_code, 201)
+        second = self.client.post('/api/transactions/', payload, format='json')
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.data['id'], second.data['id'])
+        self.assertEqual(
+            Transaction.objects.filter(user=self.user, client_mutation_id='offline-uuid-1111').count(),
+            1,
+        )
+        self.account.refresh_from_db()
+        self.assertEqual(Decimal(str(self.account.current_balance)), Decimal('9500'))
+
+    def test_different_mutation_ids_create_two_rows(self):
+        base = {
+            'type': 'income',
+            'amount': '100',
+            'date': '2026-07-15',
+            'account': self.account.id,
+            'category': 'Other',
+        }
+        a = self.client.post('/api/transactions/', {**base, 'client_mutation_id': 'm-a'}, format='json')
+        b = self.client.post('/api/transactions/', {**base, 'client_mutation_id': 'm-b'}, format='json')
+        self.assertEqual(a.status_code, 201)
+        self.assertEqual(b.status_code, 201)
+        self.assertNotEqual(a.data['id'], b.data['id'])
+
+    def test_blank_mutation_id_still_creates(self):
+        res = self.client.post('/api/transactions/', {
+            'type': 'expense',
+            'amount': '50',
+            'date': '2026-07-16',
+            'account': self.account.id,
+            'category': 'Misc',
+            'client_mutation_id': '',
+        }, format='json')
+        self.assertEqual(res.status_code, 201)
+
+
 class ForecastTenureScenarioTests(ScenarioBase):
     """Forecasts must only cover installment tenure months — not forever."""
 

@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useOffline } from '../offline'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   LayoutDashboard,
@@ -34,6 +35,7 @@ const SIDE_EXTRA: { path: string; label: string; icon: ReactNode }[] = [
 
 export default function Layout() {
   const { user, logout } = useAuth()
+  const { online, pending, syncing, syncNow } = useOffline()
   const location = useLocation()
   const navigate = useNavigate()
   const [showAdd, setShowAdd] = useState(false)
@@ -90,6 +92,16 @@ export default function Layout() {
           <span className="mobile-header-title">CashTrail</span>
         </div>
         <div className="mobile-header-actions">
+          {(!online || pending > 0) && (
+            <button
+              type="button"
+              className={`sync-chip ${online ? 'sync-chip-pending' : 'sync-chip-offline'}`}
+              onClick={() => { if (online) void syncNow() }}
+              title={online ? 'Tap to sync pending transactions' : 'You are offline'}
+            >
+              {!online ? 'Offline' : syncing ? 'Syncing…' : `${pending} pending`}
+            </button>
+          )}
           {pwa.showInstallUi && (
             <button className="mobile-header-install" onClick={openInstall} aria-label="Install app">
               <Download size={16} strokeWidth={2} />
@@ -150,6 +162,16 @@ export default function Layout() {
         </nav>
 
         <div className="sidebar-footer">
+          {(!online || pending > 0) && (
+            <button
+              type="button"
+              className={`sidebar-nav-item sync-chip ${online ? 'sync-chip-pending' : 'sync-chip-offline'}`}
+              onClick={() => { if (online) void syncNow() }}
+              style={{ marginBottom: '0.35rem' }}
+            >
+              {!online ? 'Offline — changes saved locally' : syncing ? 'Syncing…' : `${pending} waiting to sync`}
+            </button>
+          )}
           {pwa.showInstallUi && (
             <button className="sidebar-nav-item sidebar-install-btn" onClick={openInstall}>
               <span className="nav-icon"><Download size={18} strokeWidth={1.75} /></span>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { authApi } from '../api/client'
 import { identifyUser, resetAnalytics, track } from '../lib/analytics'
+import { getOfflineStore } from '../offline/store'
 
 interface User {
   id: number
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('refresh_token')
     setUser(null)
     resetAnalytics()
+    void getOfflineStore().clearAll()
   }
 
   return (

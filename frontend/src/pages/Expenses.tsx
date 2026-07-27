@@ -665,9 +665,7 @@ export default function Expenses() {
             <h3>Money owed to you</h3>
             <button className="btn-primary" style={{ fontSize: '0.82rem', padding: '0.5rem 0.9rem' }} onClick={openAddRec}>+ Add installment</button>
           </div>
-          <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '0.85rem' }}>
-            One-time payments and installment plans clients still owe you. Create one-time / paid-in-parts from Income → Add Income — they appear here, not in the Income list.
-          </p>
+          
 
           {!hasAny ? (
             <div className="glass empty-state">
