@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { track } from '../lib/analytics'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -52,13 +53,14 @@ function readPersistedInstalled(): boolean {
   }
 }
 
-function markInstalled() {
+function markInstalled(opts?: { trackEvent?: boolean }) {
   installedFlag = true
   deferredPrompt = null
   try {
     localStorage.setItem(LS_INSTALLED, '1')
   } catch { /* ignore */ }
   emit()
+  if (opts?.trackEvent) track('pwa_installed')
 }
 
 let listening = false
@@ -82,7 +84,7 @@ function ensureGlobalListeners() {
   })
 
   window.addEventListener('appinstalled', () => {
-    markInstalled()
+    markInstalled({ trackEvent: true })
   })
 }
 
@@ -111,7 +113,7 @@ export function usePwaInstall() {
         const { outcome } = await promptEvent.userChoice
         deferredPrompt = null
         if (outcome === 'accepted') {
-          markInstalled()
+          markInstalled({ trackEvent: true })
           setDialogOpen(false)
         } else {
           emit()

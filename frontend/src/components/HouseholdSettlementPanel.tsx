@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { householdsApi, apiErrorMessage } from '../api/client'
 import { fmt } from '../utils/format'
+import { track } from '../lib/analytics'
 
 export interface SettlementData {
   member_count: number
@@ -58,8 +59,17 @@ export default function HouseholdSettlementPanel({ ledgerId, refreshKey = 0, aut
   }, [ledgerId])
 
   useEffect(() => {
+    if (autoLoad) track('household_split_equal_viewed')
+  }, [autoLoad, ledgerId])
+
+  useEffect(() => {
     if (autoLoad || shown) load()
   }, [load, refreshKey, autoLoad, shown])
+
+  const openSplit = () => {
+    track('household_split_equal_viewed')
+    void load()
+  }
 
   const markSettled = async (t: SettlementData['transfers'][0]) => {
     try {
@@ -80,7 +90,7 @@ export default function HouseholdSettlementPanel({ ledgerId, refreshKey = 0, aut
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.65rem' }}>
         <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Split equal</h3>
         {!shown ? (
-          <button type="button" className="btn-primary" style={{ fontSize: '0.82rem' }} disabled={loading} onClick={load}>
+          <button type="button" className="btn-primary" style={{ fontSize: '0.82rem' }} disabled={loading} onClick={openSplit}>
             {loading ? '…' : 'Split equal'}
           </button>
         ) : (

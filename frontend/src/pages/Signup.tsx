@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi, apiErrorMessage } from '../api/client'
+import { track } from '../lib/analytics'
 
 export default function Signup() {
   const navigate = useNavigate()
@@ -16,6 +17,7 @@ export default function Signup() {
     setLoading(true); setError('')
     try {
       await authApi.register(form)
+      track('user_signed_up', { source: 'signup_page', currency: form.currency })
       navigate('/login', {
         replace: true,
         state: { registered: true, email: form.email },

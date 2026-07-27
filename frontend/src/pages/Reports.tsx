@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { accountsApi, forecastApi, transactionsApi, asList } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { track } from '../lib/analytics'
 import { fmt, fmtBalance, sumMoney, toMoney } from '../utils/format'
 import { downloadLedgerCSV, downloadReportPDF, type LedgerRow, type ReportMeta } from '../utils/reportExport'
 
@@ -259,12 +260,14 @@ export default function Reports() {
     const { rows, meta } = buildExport()
     if (exportModal === 'csv') {
       downloadLedgerCSV(rows, meta)
+      track('report_exported', { format: 'csv', scope: 'personal' })
       setExportModal(null)
       return
     }
     setPdfBusy(true)
     try {
       await downloadReportPDF(rows, meta)
+      track('report_exported', { format: 'pdf', scope: 'personal' })
     } finally {
       setPdfBusy(false)
       setExportModal(null)

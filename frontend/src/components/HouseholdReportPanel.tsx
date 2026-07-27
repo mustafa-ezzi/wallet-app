@@ -4,6 +4,7 @@ import { householdsApi, apiErrorMessage } from '../api/client'
 import { fmt } from '../utils/format'
 import { downloadHouseholdReportCSV } from '../utils/reportExport'
 import HouseholdSettlementPanel from './HouseholdSettlementPanel'
+import { track } from '../lib/analytics'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May',
@@ -125,6 +126,7 @@ export default function HouseholdReportPanel({ ledger, householdName, refreshKey
       byMember: report.by_member,
       byCategory: report.by_category,
     })
+    track('report_exported', { format: 'csv', scope: 'household' })
   }
 
   return (

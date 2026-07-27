@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { accountsApi, transactionsApi, householdsApi, asList } from '../api/client'
 import { fmtBalance } from '../utils/format'
+import { track } from '../lib/analytics'
 
 interface Props {
   onClose: () => void
@@ -90,6 +91,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
           category: 'Bank Transfer',
           notes: `${label} (in)`,
         })
+        track('transaction_created', { tx_type: 'transfer', has_household_link: false })
         onAdded()
       } catch (err: any) {
         setError(err.response?.data?.detail ?? 'Transfer failed. Please try again.')
@@ -115,6 +117,10 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
         payload.household_ledger = parseInt(householdLedgerId)
       }
       await transactionsApi.create(payload)
+      track('transaction_created', {
+        tx_type: type,
+        has_household_link: Boolean(type === 'expense' && householdLedgerId),
+      })
       onAdded()
     } catch (err: any) {
       const data = err.response?.data

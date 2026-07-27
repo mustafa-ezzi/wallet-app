@@ -11,6 +11,7 @@ import {
 import { accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt, fmtBalance, toMoney } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
+import { track } from '../lib/analytics'
 
 interface Account {
   id: number; name: string; type: string
@@ -111,7 +112,10 @@ export default function Accounts() {
     const payload = { ...accForm, opening_balance: parseFloat(accForm.opening_balance) }
     try {
       if (editingAcc) await accountsApi.update(editingAcc.id, payload)
-      else await accountsApi.create(payload)
+      else {
+        await accountsApi.create(payload)
+        track('wallet_created', { account_type: payload.type })
+      }
       setShowAccModal(false); loadAccounts()
     } catch (err: any) {
       setAccError(apiErrorMessage(err, 'Failed to save.'))

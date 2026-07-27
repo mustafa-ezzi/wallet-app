@@ -7,6 +7,7 @@ import { useConfirm } from '../hooks/useConfirm'
 import { useAuth } from '../context/AuthContext'
 import HouseholdReportPanel from '../components/HouseholdReportPanel'
 import InviteQr from '../components/InviteQr'
+import { track } from '../lib/analytics'
 
 interface Household {
   id: number
@@ -248,6 +249,7 @@ export default function HouseholdPage() {
     setSaving(true); setError('')
     try {
       const res = await householdsApi.create({ name: name.trim() })
+      track('household_created')
       setCreateOpen(false); setName('')
       await load()
       if (res.data?.id) openHousehold(res.data.id)
@@ -306,6 +308,7 @@ export default function HouseholdPage() {
     setSaving(true); setError('')
     try {
       const res = await householdsApi.join({ code: preview.code })
+      track('household_joined', { via: 'code' })
       setJoinOpen(false); setPreview(null); setJoinCode('')
       await load()
       if (res.data?.id) openHousehold(res.data.id)
@@ -317,6 +320,7 @@ export default function HouseholdPage() {
   const acceptPending = async (id: number) => {
     try {
       const res = await householdsApi.acceptInvite(id)
+      track('household_joined', { via: 'email' })
       await load()
       if (res.data?.id) openHousehold(res.data.id)
     } catch (err) {
@@ -373,6 +377,10 @@ export default function HouseholdPage() {
           ...(expForm.linked_account && potAmt < amount
             ? { linked_account: parseInt(expForm.linked_account) }
             : {}),
+        })
+        track('household_expense_added', {
+          used_pot: potAmt > 0,
+          has_wallet_link: Boolean(expForm.linked_account && potAmt < amount),
         })
       }
       setExpenseOpen(false)
@@ -468,6 +476,9 @@ export default function HouseholdPage() {
         date: contribForm.date,
         notes: contribForm.notes,
         ...(contribForm.linked_account ? { linked_account: parseInt(contribForm.linked_account) } : {}),
+      })
+      track('household_pot_contributed', {
+        has_wallet_link: Boolean(contribForm.linked_account),
       })
       setContribOpen(false)
       setContribForm({ amount: '', date: new Date().toISOString().slice(0, 10), notes: '', linked_account: '' })
@@ -567,6 +578,9 @@ export default function HouseholdPage() {
     setSaving(true); setError('')
     try {
       const res = await householdsApi.closeLedger(activeLedger.id)
+      track('household_ledger_closed', {
+        kind: activeLedger.kind === 'event' ? 'event' : 'ongoing',
+      })
       const updated = res.data?.ledger ?? res.data
       const lRes = await householdsApi.ledgers(selectedId)
       setLedgers(asList(lRes.data))
@@ -601,7 +615,10 @@ export default function HouseholdPage() {
 
   const copyCode = async () => {
     if (!invite?.code) return
-    try { await navigator.clipboard.writeText(invite.code) } catch { /* ignore */ }
+    try {
+      await navigator.clipboard.writeText(invite.code)
+      track('household_invite_shared', { channel: 'copy' })
+    } catch { /* ignore */ }
   }
 
   const inviteUrl = invite
@@ -627,6 +644,7 @@ export default function HouseholdPage() {
     if (!inviteUrl) return
     try {
       await navigator.clipboard.writeText(buildInviteMessage())
+      track('household_invite_shared', { channel: 'copy' })
       await confirm({
         title: 'Invite copied',
         message: 'WhatsApp-ready message copied. Paste it in a chat to invite them.',
@@ -639,6 +657,7 @@ export default function HouseholdPage() {
 
   const shareInviteWhatsApp = () => {
     if (!inviteUrl) return
+    track('household_invite_shared', { channel: 'whatsapp' })
     const url = `https://wa.me/?text=${encodeURIComponent(buildInviteMessage())}`
     window.open(url, '_blank', 'noopener,noreferrer')
   }

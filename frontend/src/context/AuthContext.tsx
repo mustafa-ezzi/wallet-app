@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { authApi } from '../api/client'
+import { identifyUser, resetAnalytics, track } from '../lib/analytics'
 
 interface User {
   id: number
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data } = await authApi.me()
       setUser(data)
+      identifyUser(data)
     } catch {
       setUser(null)
     }
@@ -47,12 +49,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('access_token', data.access)
     localStorage.setItem('refresh_token', data.refresh)
     await refreshUser()
+    track('user_logged_in')
   }
 
   const logout = () => {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     setUser(null)
+    resetAnalytics()
   }
 
   return (
