@@ -42,7 +42,12 @@ class Project(models.Model):
         ('one_time', 'One-Time'),
         ('one_time_installments', 'One-Time (Installments)'),
     ]
-    STATUS_CHOICES = [('active', 'Active'), ('completed', 'Completed'), ('paused', 'Paused')]
+    STATUS_CHOICES = [
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('paused', 'Paused'),
+        ('stuck', 'Stuck'),
+    ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
     name = models.CharField(max_length=150)

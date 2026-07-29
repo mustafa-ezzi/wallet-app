@@ -5,6 +5,8 @@
 **Date:** 2026-07-27  
 **Related:** `Monetization_Research.md` (revenue + Capacitor vs RN overview), `posthawk.md` (analytics), requirements + household docs  
 
+**Build roadmap:** see **`REACT_NATIVE_BUILD_PHASES.md`** for phase-by-phase implementation (P0–P9).
+
 **Goal:** Convert CashTrail into a **React Native** Android app, publish it on the **Google Play Store**, add **biometric unlock to reveal money amounts**, ship a **notification system** for loan (payable) due dates and money owed to you (receivables), and support **offline use** so the app still runs and can **store transactions locally** when there is no internet, then sync when back online.
 
 ---

@@ -280,6 +280,24 @@ export default function Expenses() {
     await receivablesApi.update(r.id, { status: newStatus }); load()
   }
 
+  const markOneTimeStuck = async (p: { id: number; name: string; status: string }) => {
+    const newStatus = p.status === 'stuck' ? 'active' : 'stuck'
+    const ok = await confirm({
+      title: newStatus === 'stuck' ? 'Mark as stuck?' : 'Mark as active?',
+      message: newStatus === 'stuck'
+        ? `Mark “${p.name}” as stuck? It will stop counting in your monthly forecasts until resumed.`
+        : `Resume “${p.name}”? It will count in your monthly forecasts again.`,
+      confirmLabel: 'Confirm',
+    })
+    if (!ok) return
+    try {
+      await projectsApi.update(p.id, { status: newStatus })
+      load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update status.'))
+    }
+  }
+
   const deleteExpense = async (exp: RecurringExpense) => {
     const ok = await confirm({
       title: 'Delete cost?',
@@ -680,13 +698,18 @@ export default function Expenses() {
                 const rem = Number(p.remaining_amount) || 0
                 const advance = Number(p.advance_amount) || 0
                 const done = p.status === 'completed' || rem <= 0.01
+                const stuck = p.status === 'stuck'
                 return (
                   <div key={`ot-${p.id}`} className="glass" style={{ padding: '0.9rem 1rem', borderRadius: 'var(--radius-md)', opacity: done ? 0.6 : 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.35rem' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
                           <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{p.name}</span>
-                          <span className={done ? 'badge badge-green' : 'badge badge-blue'}>
+                          <span className={
+                            done ? 'badge badge-green' :
+                            stuck ? 'badge badge-red' :
+                            'badge badge-blue'
+                          }>
                             {done ? 'completed' : p.status}
                           </span>
                           <span className="badge badge-blue" style={{ fontSize: '0.62rem' }}>One-time payment</span>
@@ -695,6 +718,11 @@ export default function Expenses() {
                           Total {fmt(p.amount)}
                           {advance > 0 ? ` · advance ${fmt(advance)}` : ''}
                         </div>
+                        {stuck && !done && (
+                          <div style={{ marginTop: '0.3rem', fontSize: '0.78rem', color: '#fb7185' }}>
+                            Stuck — not counted in income forecasts
+                          </div>
+                        )}
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--success)' }}>
@@ -733,6 +761,19 @@ export default function Expenses() {
                           style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem', opacity: 0.65, cursor: 'not-allowed', color: 'var(--success)', borderColor: 'rgba(52,211,153,0.35)' }}
                         >
                           ✓ Fully received
+                        </button>
+                      )}
+                      {!done && (
+                        <button
+                          className="btn-glass"
+                          style={{
+                            fontSize: '0.75rem', padding: '0.3rem 0.7rem',
+                            color: stuck ? '#34d399' : '#fb7185',
+                            borderColor: stuck ? 'rgba(52,211,153,0.3)' : 'rgba(251,113,133,0.3)',
+                          }}
+                          onClick={() => markOneTimeStuck(p)}
+                        >
+                          {stuck ? 'Resume' : 'Mark Stuck'}
                         </button>
                       )}
                       <button
@@ -801,26 +842,27 @@ export default function Expenses() {
                     </div>
 
                     <div className="divider" style={{ margin: '0.55rem 0 0.45rem' }} />
-                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      {r.status === 'ongoing' && (
-                        r.received_this_month ? (
-                          <button
-                            className="btn-glass"
-                            disabled
-                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem', opacity: 0.65, cursor: 'not-allowed', color: 'var(--success)', borderColor: 'rgba(52,211,153,0.35)' }}
-                            title="This month's receipt is already recorded"
-                          >
-                            ✓ Received this month
-                          </button>
-                        ) : (
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
+                      {r.status !== 'completed' && (
+                        <>
                           <button
                             className="btn-primary"
                             style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
-                            onClick={() => { setRecordPayModal({ type: 'receivable', id: r.id, name: r.project_name, amount: r.monthly_amount }); setRecordAmount(String(r.monthly_amount)); setRecordAccount(''); setError('') }}
+                            onClick={() => {
+                              setRecordPayModal({ type: 'receivable', id: r.id, name: r.project_name, amount: r.monthly_amount })
+                              setRecordAmount(String(r.monthly_amount))
+                              setRecordAccount('')
+                              setError('')
+                            }}
                           >
                             Record Receipt
                           </button>
-                        )
+                          {r.received_this_month && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--success)' }}>
+                              Received this month — you can still record another
+                            </span>
+                          )}
+                        </>
                       )}
                       <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }} onClick={() => openEditRec(r)}>Edit</button>
                       {r.status !== 'completed' && (

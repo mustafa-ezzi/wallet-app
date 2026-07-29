@@ -41,6 +41,7 @@ const STATUS_BADGE: Record<string, string> = {
   active:    'badge-green',
   paused:    'badge-yellow',
   completed: 'badge-gray',
+  stuck:     'badge-red',
 }
 
 const EMPTY_FORM = {
@@ -401,6 +402,7 @@ export default function Projects() {
                   <select value={form.status} onChange={set('status')}>
                     <option value="active">Active</option>
                     <option value="paused">Paused</option>
+                    <option value="stuck">Stuck</option>
                     <option value="completed">Done</option>
                   </select>
                 </div>
