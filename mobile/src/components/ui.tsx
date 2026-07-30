@@ -1,7 +1,6 @@
 import React from 'react'
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -9,21 +8,25 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native'
-import { colors, radii, spacing, typography } from '../theme/colors'
+import { BouncyPressable } from './motion'
+import { radii, spacing, typography } from '../theme/colors'
+import { useColors } from '../theme/ThemeContext'
 
 export function Screen({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.screen, style]}>{children}</View>
+  const colors = useColors()
+  return <View style={[{ flex: 1, backgroundColor: colors.background }, style]}>{children}</View>
 }
 
 export function BrandMark({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
+  const colors = useColors()
   const big = size === 'lg'
   return (
     <View style={styles.brandWrap}>
-      <View style={[styles.logoBadge, big && styles.logoBadgeLg]}>
+      <View style={[styles.logoBadge, { backgroundColor: colors.primary }, big && styles.logoBadgeLg]}>
         <Text style={[styles.logoLetter, big && styles.logoLetterLg]}>C</Text>
       </View>
-      <Text style={[styles.brandName, big && styles.brandNameLg]}>CashTrail</Text>
-      {big ? <Text style={styles.brandTag}>Follow every rupee</Text> : null}
+      <Text style={[styles.brandName, { color: colors.primaryDark }, big && styles.brandNameLg]}>CashTrail</Text>
+      {big ? <Text style={[styles.brandTag, { color: colors.textMuted }]}>Follow every rupee</Text> : null}
     </View>
   )
 }
@@ -32,12 +35,16 @@ export function Field({
   label,
   ...props
 }: TextInputProps & { label: string }) {
+  const colors = useColors()
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text>
       <TextInput
         placeholderTextColor={colors.textMuted}
-        style={styles.input}
+        style={[
+          styles.input,
+          { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
+        ]}
         autoCapitalize="none"
         {...props}
       />
@@ -50,20 +57,24 @@ export function PrimaryButton({
   onPress,
   loading,
   disabled,
+  color,
 }: {
   title: string
   onPress: () => void
   loading?: boolean
   disabled?: boolean
+  /** Optional background override — defaults to the active theme's primary color. */
+  color?: string
 }) {
+  const colors = useColors()
   return (
-    <Pressable
+    <BouncyPressable
       onPress={onPress}
       disabled={disabled || loading}
-      style={({ pressed }) => [
+      style={[
         styles.primaryBtn,
-        (disabled || loading) && styles.btnDisabled,
-        pressed && !disabled && !loading && styles.btnPressed,
+        { backgroundColor: color ?? colors.primary },
+        (disabled || loading) ? styles.btnDisabled : null,
       ]}
     >
       {loading ? (
@@ -71,7 +82,7 @@ export function PrimaryButton({
       ) : (
         <Text style={styles.primaryBtnText}>{title}</Text>
       )}
-    </Pressable>
+    </BouncyPressable>
   )
 }
 
@@ -85,14 +96,15 @@ export function ErrorBanner({ message }: { message: string }) {
 }
 
 export function Card({ children }: { children: React.ReactNode }) {
-  return <View style={styles.card}>{children}</View>
+  const colors = useColors()
+  return (
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {children}
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   brandWrap: {
     alignItems: 'center',
     marginBottom: spacing.xl,
@@ -101,77 +113,40 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: colors.primaryDark,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  logoBadgeLg: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-  },
-  logoLetter: {
-    color: colors.white,
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  logoLetterLg: {
-    fontSize: 28,
-  },
-  brandName: {
-    fontSize: typography.subtitle,
-    fontWeight: '800',
-    color: colors.primaryDark,
-  },
-  brandNameLg: {
-    fontSize: typography.title,
-  },
-  brandTag: {
-    marginTop: 4,
-    fontSize: typography.caption,
-    color: colors.textMuted,
-  },
-  field: {
-    marginBottom: spacing.md,
-  },
+  logoBadgeLg: { width: 64, height: 64, borderRadius: 18 },
+  logoLetter: { color: '#fff', fontWeight: '900', fontSize: 22 },
+  logoLetterLg: { fontSize: 28 },
+  brandName: { fontSize: typography.subtitle, fontWeight: '800' },
+  brandNameLg: { fontSize: typography.title },
+  brandTag: { fontSize: typography.caption, marginTop: 4 },
+  field: { marginBottom: spacing.md },
   label: {
     fontSize: typography.label,
     fontWeight: '700',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    marginBottom: 6,
   },
   input: {
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     fontSize: typography.body,
-    color: colors.text,
+    fontWeight: '600',
   },
   primaryBtn: {
-    backgroundColor: colors.primary,
     borderRadius: radii.sm,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: spacing.sm,
   },
-  primaryBtnText: {
-    color: colors.white,
-    fontWeight: '800',
-    fontSize: typography.body,
-  },
-  btnDisabled: {
-    opacity: 0.6,
-  },
-  btnPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.99 }],
-  },
+  primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: typography.body },
+  btnDisabled: { opacity: 0.5 },
+  btnPressed: { opacity: 0.9 },
   errorBox: {
     backgroundColor: '#fef2f2',
     borderColor: '#fecaca',
@@ -180,15 +155,11 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
-  errorText: {
-    color: colors.danger,
-    fontSize: typography.caption,
-  },
+  errorText: { color: '#dc2626', fontWeight: '600', fontSize: typography.caption },
   card: {
-    backgroundColor: colors.surface,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.lg,
+    marginBottom: spacing.md,
   },
 })

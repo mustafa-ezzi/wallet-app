@@ -15,7 +15,8 @@ import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import type { PrivacyTimeout } from '@/src/privacy/storage'
-import { colors, radii, spacing, typography } from '@/src/theme/colors'
+import { useTheme } from '@/src/theme/ThemeContext'
+import { radii, spacing, typography } from '@/src/theme/colors'
 
 const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
   { id: 'immediate', label: 'Immediate' },
@@ -28,6 +29,7 @@ export default function SettingsScreen() {
   const { clearLocal, online, pending, syncNow, syncing } = useOffline()
   const reminders = useReminders()
   const privacy = usePrivacyLock()
+  const { themeId, themes, setThemeAnimated, colors } = useTheme()
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email
 
   const [pin, setPin] = useState('')
@@ -69,22 +71,65 @@ export default function SettingsScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.pad}>
-        <Text style={styles.title}>Settings</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>Signed in as</Text>
-          <Text style={styles.value}>{name}</Text>
-          <Text style={styles.meta}>{user?.email}</Text>
-          <Text style={styles.meta}>Currency: {user?.currency || 'PKR'}</Text>
-          <Text style={styles.meta}>API: {API_ROOT || '(not set)'}</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.label, { color: colors.textMuted }]}>Signed in as</Text>
+          <Text style={[styles.value, { color: colors.text }]}>{name}</Text>
+          <Text style={[styles.meta, { color: colors.textSecondary }]}>{user?.email}</Text>
+          <Text style={[styles.meta, { color: colors.textSecondary }]}>Currency: {user?.currency || 'PKR'}</Text>
+          <Text style={[styles.meta, { color: colors.textSecondary }]}>API: {API_ROOT || '(not set)'}</Text>
         </View>
 
-        <Text style={styles.section}>Privacy lock</Text>
-        <View style={styles.card}>
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Theme</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+            Same palettes as the web app — Emerald, Ocean, Violet, Rose, Amber.
+          </Text>
+          <View style={styles.swatchRow}>
+            {themes.map((t) => {
+              const selected = themeId === t.id
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={(e) => {
+                    const { pageX, pageY } = e.nativeEvent
+                    setThemeAnimated(t.id, pageX, pageY)
+                  }}
+                  style={styles.swatchWrap}
+                >
+                  <View
+                    style={[
+                      styles.swatch,
+                      {
+                        backgroundColor: t.swatch,
+                        borderColor: selected ? t.swatchEdge : 'transparent',
+                        transform: [{ scale: selected ? 1.08 : 1 }],
+                      },
+                    ]}
+                  >
+                    {selected ? <Text style={styles.swatchCheck}>✓</Text> : null}
+                  </View>
+                  <Text
+                    style={[
+                      styles.swatchLabel,
+                      { color: selected ? colors.primaryDark : colors.textMuted },
+                    ]}
+                  >
+                    {t.name}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        </View>
+
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Privacy lock</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.row}>
             <View style={{ flex: 1, paddingRight: spacing.md }}>
-              <Text style={styles.rowTitle}>Hide amounts</Text>
-              <Text style={styles.rowHint}>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Hide amounts</Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
                 Amounts show as PKR ••••. Tap the eye on the balance card to reveal with biometrics or PIN.
               </Text>
             </View>
@@ -98,23 +143,27 @@ export default function SettingsScreen() {
 
           {enableError ? <Text style={styles.tip}>{enableError}</Text> : null}
 
-          <Text style={[styles.rowTitle, { marginTop: spacing.lg }]}>Hide amounts after background</Text>
+          <Text style={[styles.rowTitle, { marginTop: spacing.lg, color: colors.text }]}>Hide amounts after background</Text>
           <View style={styles.seg}>
             {TIMEOUTS.map((t) => (
               <Pressable
                 key={t.id}
                 onPress={() => void privacy.setTimeoutPref(t.id)}
-                style={[styles.segBtn, privacy.timeout === t.id && styles.segBtnOn]}
+                style={[
+                  styles.segBtn,
+                  { borderColor: colors.border },
+                  privacy.timeout === t.id && { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark },
+                ]}
               >
-                <Text style={[styles.segText, privacy.timeout === t.id && styles.segTextOn]}>{t.label}</Text>
+                <Text style={[styles.segText, { color: colors.textSecondary }, privacy.timeout === t.id && styles.segTextOn]}>{t.label}</Text>
               </Pressable>
             ))}
           </View>
 
           <View style={[styles.row, { marginTop: spacing.lg }]}>
             <View style={{ flex: 1, paddingRight: spacing.md }}>
-              <Text style={styles.rowTitle}>Block screenshots</Text>
-              <Text style={styles.rowHint}>Uses FLAG_SECURE on Android when privacy is on.</Text>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Block screenshots</Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>Uses FLAG_SECURE on Android when privacy is on.</Text>
             </View>
             <Switch
               value={privacy.blockScreenshots}
@@ -124,41 +173,41 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <Text style={styles.meta}>
+          <Text style={[styles.meta, { color: colors.textSecondary }]}>
             Biometrics: {privacy.biometricsAvailable ? 'available' : 'not available (use PIN)'}
           </Text>
           {privacy.enabled ? (
-          <Pressable style={styles.lockBtn} onPress={privacy.lockNow}>
-            <Text style={styles.lockBtnText}>Hide amounts now</Text>
+          <Pressable style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted }]} onPress={privacy.lockNow}>
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Hide amounts now</Text>
           </Pressable>
           ) : null}
         </View>
 
-        <Text style={styles.section}>CashTrail PIN</Text>
-        <View style={styles.card}>
-          <Text style={styles.rowHint}>
+        <Text style={[styles.section, { color: colors.primaryDark }]}>CashTrail PIN</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
             {privacy.hasPin ? 'PIN is set. Enter a new one to change it.' : 'Create a 4–6 digit PIN fallback.'}
           </Text>
           <ErrorBanner message={pinError} />
           {pinSaved ? <Text style={styles.ok}>PIN saved.</Text> : null}
-          <Text style={styles.fieldLabel}>New PIN</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>New PIN</Text>
           <TextInput
             value={pin}
             onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))}
             keyboardType="number-pad"
             secureTextEntry
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
             placeholder="••••"
             placeholderTextColor={colors.textMuted}
             maxLength={6}
           />
-          <Text style={styles.fieldLabel}>Confirm PIN</Text>
+          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Confirm PIN</Text>
           <TextInput
             value={pinConfirm}
             onChangeText={(t) => setPinConfirm(t.replace(/\D/g, '').slice(0, 6))}
             keyboardType="number-pad"
             secureTextEntry
-            style={styles.input}
+            style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
             placeholder="••••"
             placeholderTextColor={colors.textMuted}
             maxLength={6}
@@ -166,15 +215,15 @@ export default function SettingsScreen() {
           <PrimaryButton title={privacy.hasPin ? 'Update PIN' : 'Save PIN'} onPress={() => void savePin()} />
         </View>
 
-        <Text style={styles.section}>Due reminders</Text>
-        <View style={styles.card}>
-          <Text style={styles.rowHint}>
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Due reminders</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
             Local notifications + server push for loans and money owed (Asia/Karachi).
           </Text>
           <View style={[styles.row, { marginTop: spacing.md }]}>
             <View style={{ flex: 1, paddingRight: spacing.md }}>
-              <Text style={styles.rowTitle}>Enable reminders</Text>
-              <Text style={styles.rowHint}>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Enable reminders</Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
                 Permission: {reminders.permission}
                 {reminders.lastScheduled > 0 ? ` · ${reminders.lastScheduled} scheduled` : ''}
               </Text>
@@ -196,7 +245,7 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <Text style={[styles.rowTitle, { marginTop: spacing.lg }]}>Remind me</Text>
+          <Text style={[styles.rowTitle, { marginTop: spacing.lg, color: colors.text }]}>Remind me</Text>
           {(
             [
               { key: 'lead3' as const, label: '3 days before' },
@@ -216,18 +265,18 @@ export default function SettingsScreen() {
           ))}
         </View>
 
-        <Text style={styles.section}>Offline</Text>
-        <View style={styles.card}>
-          <Text style={styles.rowHint}>
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Offline</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
             Status: {online ? 'Online' : 'Offline'}
             {pending > 0 ? ` · ${pending} pending` : ''}
           </Text>
           <Pressable
-            style={[styles.lockBtn, { opacity: !online || syncing || pending === 0 ? 0.5 : 1 }]}
+            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, opacity: !online || syncing || pending === 0 ? 0.5 : 1 }]}
             onPress={() => void syncNow()}
             disabled={!online || syncing || pending === 0}
           >
-            <Text style={styles.lockBtnText}>{syncing ? 'Syncing…' : 'Sync now'}</Text>
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>{syncing ? 'Syncing…' : 'Sync now'}</Text>
           </Pressable>
         </View>
 
@@ -247,70 +296,86 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  pad: { padding: spacing.lg, paddingBottom: spacing.xxl },
-  title: { fontSize: typography.title, fontWeight: '800', color: colors.text, marginBottom: spacing.lg },
+  pad: { padding: spacing.lg, paddingBottom: spacing.xxl + 80 },
+  title: { fontSize: typography.title, fontWeight: '800', marginBottom: spacing.lg, color: '#122a20' },
   section: {
     fontSize: typography.subtitle,
     fontWeight: '800',
-    color: colors.primaryDark,
     marginBottom: spacing.sm,
     marginTop: spacing.sm,
+    color: '#047857',
   },
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#ffffff',
+    borderColor: '#e5e7eb',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.border,
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },
-  label: { fontSize: 12, color: colors.textMuted, fontWeight: '700', textTransform: 'uppercase' },
-  value: { fontSize: typography.subtitle, fontWeight: '800', color: colors.text, marginTop: 4 },
-  meta: { color: colors.textSecondary, marginTop: 4, fontSize: typography.caption },
+  swatchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+  },
+  swatchWrap: { alignItems: 'center', flex: 1 },
+  swatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swatchCheck: { color: '#fff', fontWeight: '900', fontSize: 14 },
+  swatchLabel: { fontSize: 10, fontWeight: '700', marginTop: 6 },
+  label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', color: '#5f7569' },
+  value: { fontSize: typography.subtitle, fontWeight: '800', marginTop: 4, color: '#122a20' },
+  meta: { marginTop: 4, fontSize: typography.caption, color: '#3f6153' },
   row: { flexDirection: 'row', alignItems: 'center' },
-  rowTitle: { fontWeight: '800', color: colors.text, fontSize: typography.body },
-  rowHint: { color: colors.textMuted, fontSize: typography.caption, marginTop: 4, lineHeight: 18 },
-  tip: { color: colors.warning, marginTop: spacing.sm, fontSize: typography.caption, lineHeight: 18 },
-  ok: { color: colors.success, fontWeight: '700', marginVertical: spacing.sm },
+  rowTitle: { fontWeight: '800', fontSize: typography.body, color: '#122a20' },
+  rowHint: { fontSize: typography.caption, marginTop: 4, lineHeight: 18, color: '#5f7569' },
+  tip: { marginTop: spacing.sm, fontSize: typography.caption, lineHeight: 18, color: '#c2410c' },
+  ok: { fontWeight: '700', marginVertical: spacing.sm, color: '#059669' },
   seg: { flexDirection: 'row', gap: 8, marginTop: spacing.sm },
   segBtn: {
     flex: 1,
     paddingVertical: 10,
     borderRadius: radii.sm,
     borderWidth: 1,
-    borderColor: colors.border,
     alignItems: 'center',
+    borderColor: '#e5e7eb',
   },
-  segBtnOn: { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark },
-  segText: { fontWeight: '700', fontSize: 12, color: colors.textSecondary },
-  segTextOn: { color: colors.white },
+  segBtnOn: { backgroundColor: '#047857', borderColor: '#047857' },
+  segText: { fontWeight: '700', fontSize: 12, color: '#3f6153' },
+  segTextOn: { color: '#fff' },
   lockBtn: {
     marginTop: spacing.md,
     alignSelf: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: radii.sm,
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: '#f3f4f6',
   },
-  lockBtnText: { fontWeight: '800', color: colors.primaryDark },
+  lockBtnText: { fontWeight: '800', color: '#047857' },
   fieldLabel: {
     fontSize: typography.label,
     fontWeight: '700',
-    color: colors.textSecondary,
     marginTop: spacing.md,
     marginBottom: spacing.xs,
     textTransform: 'uppercase',
+    color: '#3f6153',
   },
   input: {
-    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     fontSize: typography.body,
-    color: colors.text,
     letterSpacing: 4,
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+    color: '#122a20',
   },
-  hint: { marginTop: spacing.lg, color: colors.textMuted, fontSize: typography.caption, lineHeight: 18 },
+  hint: { marginTop: spacing.lg, fontSize: typography.caption, lineHeight: 18, color: '#5f7569' },
 })

@@ -37,3 +37,7 @@ export function mutationId(): string {
     return v.toString(16)
   })
 }
+
+export function sumMoney<T>(rows: T[], pick: (row: T) => number | string | null | undefined): number {
+  return rows.reduce((s, row) => s + toMoney(pick(row)), 0)
+}

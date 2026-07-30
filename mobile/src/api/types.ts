@@ -71,3 +71,111 @@ export type Receivable = {
   status: string
   received_this_month: boolean
 }
+
+export type Project = {
+  id: number
+  name: string
+  income_type: 'recurring_monthly' | 'contract_monthly' | 'one_time' | 'one_time_installments'
+  amount: number | string
+  installment_amount?: number | string | null
+  advance_amount?: number | string | null
+  remaining_amount?: number | string
+  months_to_complete?: number | null
+  installments_received?: number | null
+  received_this_month?: boolean
+  status: 'active' | 'paused' | 'completed' | 'stuck' | string
+  start_date: string
+  default_account?: number | null
+  default_account_name?: string | null
+  notes?: string
+}
+
+export type ForecastItem = {
+  label: string
+  amount: number | string
+  type: string
+  due_day?: number | null
+}
+
+export type Forecast = {
+  year: number
+  month: number
+  forecast_income: ForecastItem[]
+  forecast_outgoing: ForecastItem[]
+  total_expected_income: number | string
+  total_expected_outgoing: number | string
+  net_forecast: number | string
+  actual_income: number | string
+  actual_expense: number | string
+  actual_net: number | string
+}
+
+export type Household = {
+  id: number
+  name: string
+  currency: string
+  my_role: string | null
+  member_count: number
+  ledger_count: number
+}
+
+export type HouseholdLedger = {
+  id: number
+  name: string
+  kind: string
+  status: string
+  total_spent: number | string
+  month_spent?: number | string
+  pot_contributed?: number | string
+  pot_spent?: number | string
+  pot_balance?: number | string
+  closed_total_expense?: number | string | null
+  closed_at?: string | null
+  start_date?: string
+  end_date?: string | null
+}
+
+export type HouseholdExpense = {
+  id: number
+  amount: number | string
+  date: string
+  category: string
+  notes: string
+  pot_amount: number | string
+  personal_amount?: number | string
+  paid_by_name: string
+  created_by: number
+  account_name?: string | null
+}
+
+export type HouseholdInvite = {
+  code: string
+  expires_at?: string
+  join_path?: string
+  is_valid?: boolean
+}
+
+export type HouseholdMember = {
+  id: number
+  user: number | null
+  display_name: string
+  email: string
+  role: string
+  status: string
+}
+
+export type LedgerSummary = {
+  total_spent: number | string
+  expense_count: number
+  by_member: { name: string; amount: number | string }[]
+  by_category: { name: string; amount: number | string }[]
+}
+
+export type SettlementRow = {
+  from_name?: string
+  to_name?: string
+  from_user?: number
+  to_user?: number
+  amount: number | string
+  settled?: boolean
+}

@@ -173,3 +173,55 @@ export const receivablesApi = {
   update: (id: number, data: object) => api.patch(`/receivables/${id}/`, data),
   remove: (id: number) => api.delete(`/receivables/${id}/`),
 }
+
+export const forecastApi = {
+  get: (year: number, month: number) => api.get(`/forecast/${year}/${month}/`),
+}
+
+export const projectsApi = {
+  list: (params?: object) => api.get('/projects/', { params }),
+  create: (data: object) => api.post('/projects/', data),
+  update: (id: number, data: object) => api.patch(`/projects/${id}/`, data),
+  remove: (id: number) => api.delete(`/projects/${id}/`),
+}
+
+export const householdsApi = {
+  list: () => api.get('/households/'),
+  create: (data: object) => api.post('/households/', data),
+  get: (id: number) => api.get(`/households/${id}/`),
+  update: (id: number, data: object) => api.patch(`/households/${id}/`, data),
+  remove: (id: number) => api.delete(`/households/${id}/`),
+  members: (id: number) => api.get(`/households/${id}/members/`),
+  leave: (id: number) => api.post(`/households/${id}/leave/`),
+  getInvite: (id: number) => api.get(`/households/${id}/invites/`),
+  regenerateInvite: (id: number) => api.post(`/households/${id}/invites/`),
+  inviteByEmail: (id: number, email: string) =>
+    api.post(`/households/${id}/invite-by-email/`, { email }),
+  ledgers: (id: number) => api.get(`/households/${id}/ledgers/`),
+  /** All open ledgers across households — for linking personal expenses. */
+  openLedgers: () => api.get('/household-ledgers/', { params: { status: 'open' } }),
+  createLedger: (id: number, data: object) => api.post(`/households/${id}/ledgers/`, data),
+  closeLedger: (ledgerId: number) => api.post(`/household-ledgers/${ledgerId}/close/`),
+  reopenLedger: (ledgerId: number) => api.post(`/household-ledgers/${ledgerId}/reopen/`),
+  ledgerSummary: (ledgerId: number) => api.get(`/household-ledgers/${ledgerId}/summary/`),
+  ledgerReport: (ledgerId: number, params?: { year?: number; month?: number }) =>
+    api.get(`/household-ledgers/${ledgerId}/report/`, { params }),
+  ledgerContributions: (ledgerId: number) =>
+    api.get(`/household-ledgers/${ledgerId}/contributions/`),
+  addContribution: (ledgerId: number, data: object) =>
+    api.post(`/household-ledgers/${ledgerId}/contributions/`, data),
+  settlement: (ledgerId: number) => api.get(`/household-ledgers/${ledgerId}/settlement/`),
+  markSettlement: (ledgerId: number, data: object) =>
+    api.post(`/household-ledgers/${ledgerId}/settlement/mark/`, data),
+  joinPreview: (data: { code?: string; token?: string }) => api.post('/households/join/preview/', data),
+  join: (data: { code?: string; token?: string }) => api.post('/households/join/', data),
+  pendingInvites: () => api.get('/households/invitations/pending/'),
+  acceptInvite: (id: number) => api.post(`/households/invitations/${id}/accept/`),
+  declineInvite: (id: number) => api.post(`/households/invitations/${id}/decline/`),
+  ledgerExpenses: (ledgerId: number, params?: object) =>
+    api.get(`/household-ledgers/${ledgerId}/expenses/`, { params }),
+  addExpense: (ledgerId: number, data: object) =>
+    api.post(`/household-ledgers/${ledgerId}/expenses/`, data),
+  removeExpense: (id: number) => api.delete(`/household-expenses/${id}/`),
+  unreadNotificationCount: () => api.get('/household-notifications/unread_count/'),
+}

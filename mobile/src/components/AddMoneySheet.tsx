@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Modal,
@@ -8,22 +8,50 @@ import {
   Text,
   View,
 } from 'react-native'
+import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated'
 import {
   accountsApi,
   apiErrorMessage,
   asList,
+  householdsApi,
+  transactionsApi,
 } from '@/src/api/client'
 import type { Account } from '@/src/api/types'
 import { Field, PrimaryButton, ErrorBanner } from '@/src/components/ui'
+import { DateField, SelectField } from '@/src/components/SelectFields'
 import { useOffline } from '@/src/offline'
-import { colors, radii, spacing, typography } from '@/src/theme/colors'
-import { todayISO } from '@/src/utils/format'
+import { useColors } from '@/src/theme/ThemeContext'
+import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
+import { fmtBalance, todayISO } from '@/src/utils/format'
 
-const EXPENSE_CATS = ['Food', 'Groceries', 'Transport', 'Utilities', 'Rent', 'Miscellaneous']
+const EXPENSE_CATS = [
+  'Utilities',
+  'Server Charges',
+  'Rent',
+  'Food',
+  'Transport',
+  'Salary',
+  'Miscellaneous',
+  'Groceries',
+]
 const INCOME_CATS = ['Salary', 'Monthly Income', 'Freelance', 'Other']
 
 type Kind = 'expense' | 'income' | 'transfer'
+
+type OpenLedger = {
+  id: number
+  name: string
+  household: number
+  household_name: string
+}
+
+function kindAccent(kind: Kind, colors: ColorTokens) {
+  if (kind === 'income') return { accent: colors.primary, bg: `${colors.primary}20`, icon: 'long-arrow-up' as const }
+  if (kind === 'expense') return { accent: colors.danger, bg: 'rgba(220,38,38,0.14)', icon: 'long-arrow-down' as const }
+  return { accent: colors.infoText, bg: colors.infoBg, icon: 'exchange' as const }
+}
 
 export function AddMoneySheet({
   visible,
@@ -35,13 +63,17 @@ export function AddMoneySheet({
   onSaved: () => void
 }) {
   const insets = useSafeAreaInsets()
+  const colors = useColors()
   const { online, queueTransaction, getCachedAccounts, hydrateNow } = useOffline()
   const [kind, setKind] = useState<Kind>('expense')
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [accountId, setAccountId] = useState<number | null>(null)
-  const [toAccountId, setToAccountId] = useState<number | null>(null)
+  const [openLedgers, setOpenLedgers] = useState<OpenLedger[]>([])
+  const [accountId, setAccountId] = useState('')
+  const [toAccountId, setToAccountId] = useState('')
   const [amount, setAmount] = useState('')
-  const [category, setCategory] = useState(EXPENSE_CATS[0])
+  const [date, setDate] = useState(todayISO())
+  const [category, setCategory] = useState('')
+  const [householdLedgerId, setHouseholdLedgerId] = useState('')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [booting, setBooting] = useState(false)
@@ -53,23 +85,30 @@ export function AddMoneySheet({
     setAmount('')
     setNotes('')
     setKind('expense')
-    setCategory(EXPENSE_CATS[0])
+    setCategory('')
+    setHouseholdLedgerId('')
+    setDate(todayISO())
     setBooting(true)
     ;(async () => {
       try {
         if (online) {
           try {
-            const { data } = await accountsApi.list()
+            const [{ data }, ledgersRes] = await Promise.all([
+              accountsApi.list(),
+              householdsApi.openLedgers().catch(() => ({ data: [] })),
+            ])
             const list = asList<Account>(data)
             setAccounts(list)
-            setAccountId(list[0]?.id ?? null)
-            setToAccountId(list[1]?.id ?? list[0]?.id ?? null)
+            setAccountId(list[0] ? String(list[0].id) : '')
+            setToAccountId(list[1] ? String(list[1].id) : list[0] ? String(list[0].id) : '')
+            setOpenLedgers(asList<OpenLedger>(ledgersRes.data))
             void hydrateNow()
             return
           } catch {
             /* fall through to cache */
           }
         }
+        setOpenLedgers([])
         const cached = await getCachedAccounts()
         const list: Account[] = cached.map((a) => ({
           id: a.serverId,
@@ -79,8 +118,8 @@ export function AddMoneySheet({
           current_balance: a.currentBalance,
         }))
         setAccounts(list)
-        setAccountId(list[0]?.id ?? null)
-        setToAccountId(list[1]?.id ?? list[0]?.id ?? null)
+        setAccountId(list[0] ? String(list[0].id) : '')
+        setToAccountId(list[1] ? String(list[1].id) : list[0] ? String(list[0].id) : '')
         if (list.length === 0) {
           setError('No wallets cached. Connect once to download your wallets.')
         }
@@ -93,10 +132,40 @@ export function AddMoneySheet({
   }, [visible, online, getCachedAccounts, hydrateNow])
 
   useEffect(() => {
-    if (kind === 'income') setCategory(INCOME_CATS[0])
-    if (kind === 'expense') setCategory(EXPENSE_CATS[0])
-    if (kind === 'transfer') setCategory('Bank Transfer')
+    setCategory('')
+    setHouseholdLedgerId('')
   }, [kind])
+
+  const walletOptions = useMemo(
+    () =>
+      accounts.map((a) => ({
+        value: String(a.id),
+        label: a.name,
+        hint: fmtBalance(a.current_balance),
+      })),
+    [accounts],
+  )
+
+  const toWalletOptions = useMemo(
+    () => walletOptions.filter((o) => o.value !== accountId),
+    [walletOptions, accountId],
+  )
+
+  const categoryOptions = useMemo(() => {
+    const cats = kind === 'income' ? INCOME_CATS : EXPENSE_CATS
+    return cats.map((c) => ({ value: c, label: c }))
+  }, [kind])
+
+  const householdOptions = useMemo(
+    () => [
+      { value: '', label: 'Personal only — not shared' },
+      ...openLedgers.map((l) => ({
+        value: String(l.id),
+        label: `${l.household_name} — ${l.name}`,
+      })),
+    ],
+    [openLedgers],
+  )
 
   const submit = async () => {
     setError('')
@@ -105,25 +174,28 @@ export function AddMoneySheet({
       setError('Enter a valid amount.')
       return
     }
-    if (!accountId) {
-      setError('Create a wallet first.')
+    if (!date) {
+      setError('Pick a date.')
       return
     }
-    setLoading(true)
-    try {
-      const date = todayISO()
-      if (kind === 'transfer') {
-        if (!toAccountId || toAccountId === accountId) {
-          setError('Pick a different destination wallet.')
-          setLoading(false)
-          return
-        }
+
+    if (kind === 'transfer') {
+      if (!accountId || !toAccountId) {
+        setError('Select both wallets.')
+        return
+      }
+      if (toAccountId === accountId) {
+        setError('Pick a different destination wallet.')
+        return
+      }
+      setLoading(true)
+      try {
         const note = notes.trim() || 'Transfer'
         await queueTransaction({
           type: 'expense',
           amount: value,
           date,
-          accountServerId: accountId,
+          accountServerId: Number(accountId),
           category: 'Bank Transfer',
           notes: `${note} (out)`,
         })
@@ -131,20 +203,63 @@ export function AddMoneySheet({
           type: 'income',
           amount: value,
           date,
-          accountServerId: toAccountId,
+          accountServerId: Number(toAccountId),
           category: 'Bank Transfer',
           notes: `${note} (in)`,
         })
-      } else {
-        await queueTransaction({
-          type: kind,
+        onSaved()
+        onClose()
+      } catch (err) {
+        setError(apiErrorMessage(err, 'Could not save transfer.'))
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    if (!accountId) {
+      setError('Create a wallet first.')
+      return
+    }
+
+    // Household-linked expense must go online (same as web).
+    if (kind === 'expense' && householdLedgerId) {
+      if (!online) {
+        setError('Household linking needs an internet connection.')
+        return
+      }
+      setLoading(true)
+      try {
+        await transactionsApi.create({
+          type: 'expense',
           amount: value,
           date,
-          accountServerId: accountId,
+          account: Number(accountId),
           category,
           notes: notes.trim(),
+          household_ledger: Number(householdLedgerId),
         })
+        void hydrateNow()
+        onSaved()
+        onClose()
+      } catch (err) {
+        setError(apiErrorMessage(err, 'Could not save expense.'))
+      } finally {
+        setLoading(false)
       }
+      return
+    }
+
+    setLoading(true)
+    try {
+      await queueTransaction({
+        type: kind,
+        amount: value,
+        date,
+        accountServerId: Number(accountId),
+        category,
+        notes: notes.trim(),
+      })
       onSaved()
       onClose()
     } catch (err) {
@@ -154,85 +269,123 @@ export function AddMoneySheet({
     }
   }
 
-  const cats = kind === 'income' ? INCOME_CATS : EXPENSE_CATS
+  const { accent } = kindAccent(kind, colors)
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
       <View style={styles.modalRoot}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-          <View style={styles.handle} />
-          <Text style={styles.title}>Add money</Text>
+        <Animated.View entering={FadeIn.duration(200)} style={styles.backdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        </Animated.View>
+        <Animated.View
+          entering={SlideInDown.springify().damping(16).stiffness(190).mass(0.8)}
+          style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
+        >
+          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.title, { color: colors.primaryDark }]}>Add transaction</Text>
 
-          <View style={styles.seg}>
-            {(['expense', 'income', 'transfer'] as Kind[]).map((k) => (
-              <Pressable
-                key={k}
-                onPress={() => setKind(k)}
-                style={[styles.segBtn, kind === k && styles.segBtnOn]}
-              >
-                <Text style={[styles.segText, kind === k && styles.segTextOn]}>
-                  {k === 'expense' ? 'Expense' : k === 'income' ? 'Income' : 'Transfer'}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={[styles.seg, { backgroundColor: colors.surfaceMuted }]}>
+            {(['income', 'expense', 'transfer'] as Kind[]).map((k) => {
+              const active = kind === k
+              const { accent: kAccent, bg: kBg, icon } = kindAccent(k, colors)
+              return (
+                <Pressable
+                  key={k}
+                  onPress={() => setKind(k)}
+                  style={[styles.segBtn, active && { backgroundColor: kBg }]}
+                >
+                  <FontAwesome name={icon} size={12} color={active ? kAccent : colors.textMuted} />
+                  <Text style={[styles.segText, { color: colors.textMuted }, active && { color: kAccent, fontWeight: '800' }]}>
+                    {k === 'expense' ? 'Expense' : k === 'income' ? 'Income' : 'Transfer'}
+                  </Text>
+                </Pressable>
+              )
+            })}
           </View>
 
           {booting ? (
-            <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.xl }} />
+            <ActivityIndicator color={accent} style={{ marginVertical: spacing.xl }} />
           ) : (
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               <ErrorBanner message={error} />
-              <Field
-                label="Amount (PKR)"
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                placeholder="0"
-              />
+              {!online ? (
+                <View style={[styles.offlineNote, { backgroundColor: colors.warningBg, borderColor: colors.warningBorder }]}>
+                  <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '600' }}>
+                    You’re offline — this will save on this device and sync when you’re back online.
+                  </Text>
+                </View>
+              ) : null}
 
-              <Text style={styles.label}>{kind === 'transfer' ? 'From wallet' : 'Wallet'}</Text>
-              <View style={styles.chips}>
-                {accounts.map((a) => (
-                  <Pressable
-                    key={a.id}
-                    onPress={() => setAccountId(a.id)}
-                    style={[styles.chip, accountId === a.id && styles.chipOn]}
-                  >
-                    <Text style={[styles.chipText, accountId === a.id && styles.chipTextOn]}>{a.name}</Text>
-                  </Pressable>
-                ))}
+              {kind === 'transfer' ? (
+                <View style={[styles.infoNote, { backgroundColor: colors.infoBg }]}>
+                  <Text style={{ color: colors.infoText, fontSize: 12, fontWeight: '600' }}>
+                    Moves money between your wallets. Transfers do not count as income or expense.
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={styles.row2}>
+                <View style={{ flex: 1 }}>
+                  <Field
+                    label="Amount (PKR)"
+                    value={amount}
+                    onChangeText={setAmount}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <DateField label="Date" value={date} onChange={setDate} />
+                </View>
               </View>
+
+              <SelectField
+                label={kind === 'transfer' ? 'From wallet' : 'Link to bank'}
+                value={accountId}
+                options={walletOptions}
+                onChange={setAccountId}
+                placeholder="Select wallet…"
+              />
 
               {kind === 'transfer' ? (
                 <>
-                  <Text style={styles.label}>To wallet</Text>
-                  <View style={styles.chips}>
-                    {accounts.map((a) => (
-                      <Pressable
-                        key={a.id}
-                        onPress={() => setToAccountId(a.id)}
-                        style={[styles.chip, toAccountId === a.id && styles.chipOn]}
-                      >
-                        <Text style={[styles.chipText, toAccountId === a.id && styles.chipTextOn]}>{a.name}</Text>
-                      </Pressable>
-                    ))}
+                  <View style={styles.transferArrowRow}>
+                    <FontAwesome name="long-arrow-down" size={14} color={colors.infoText} />
                   </View>
+                  <SelectField
+                    label="To wallet"
+                    value={toAccountId}
+                    options={toWalletOptions}
+                    onChange={setToAccountId}
+                    placeholder="Select destination…"
+                  />
                 </>
               ) : (
                 <>
-                  <Text style={styles.label}>Category</Text>
-                  <View style={styles.chips}>
-                    {cats.map((c) => (
-                      <Pressable
-                        key={c}
-                        onPress={() => setCategory(c)}
-                        style={[styles.chip, category === c && styles.chipOn]}
-                      >
-                        <Text style={[styles.chipText, category === c && styles.chipTextOn]}>{c}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
+                  {kind === 'expense' || kind === 'income' ? (
+                    <SelectField
+                      label="Category"
+                      value={category}
+                      options={categoryOptions}
+                      onChange={setCategory}
+                      placeholder="Select category…"
+                    />
+                  ) : null}
+
+                  {kind === 'expense' && online && openLedgers.length > 0 ? (
+                    <>
+                      <SelectField
+                        label="Link to Household (optional)"
+                        value={householdLedgerId}
+                        options={householdOptions}
+                        onChange={setHouseholdLedgerId}
+                        placeholder="Personal only — not shared"
+                      />
+                      <Text style={[styles.hint, { color: colors.textMuted }]}>
+                        Your wallet balance still drops. Household only shares the expense line with members.
+                      </Text>
+                    </>
+                  ) : null}
                 </>
               )}
 
@@ -243,10 +396,15 @@ export function AddMoneySheet({
                 placeholder="Optional"
                 autoCapitalize="sentences"
               />
-              <PrimaryButton title="Save" onPress={() => void submit()} loading={loading} />
+              <PrimaryButton
+                title={kind === 'income' ? 'Add Income' : kind === 'expense' ? 'Add Expense' : 'Record Transfer'}
+                onPress={() => void submit()}
+                loading={loading}
+                color={accent}
+              />
             </ScrollView>
           )}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   )
@@ -257,85 +415,65 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
   },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15, 31, 26, 0.45)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15,23,42,0.45)' },
   sheet: {
-    backgroundColor: colors.surface,
     borderTopLeftRadius: radii.lg,
     borderTopRightRadius: radii.lg,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    maxHeight: '88%',
+    maxHeight: '92%',
   },
   handle: {
     alignSelf: 'center',
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: colors.border,
     marginBottom: spacing.md,
   },
   title: {
     fontSize: typography.title,
     fontWeight: '800',
-    color: colors.primaryDark,
     marginBottom: spacing.md,
   },
   seg: {
     flexDirection: 'row',
-    backgroundColor: colors.surfaceMuted,
     borderRadius: radii.sm,
     padding: 4,
     marginBottom: spacing.lg,
   },
   segBtn: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     paddingVertical: 10,
     borderRadius: 8,
-    alignItems: 'center',
-  },
-  segBtnOn: {
-    backgroundColor: colors.surface,
   },
   segText: {
     fontWeight: '700',
     fontSize: typography.caption,
-    color: colors.textMuted,
   },
-  segTextOn: {
-    color: colors.primary,
-  },
-  label: {
-    fontSize: typography.label,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  chips: {
+  row2: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: spacing.sm,
+  },
+  transferArrowRow: { alignItems: 'center', marginBottom: spacing.sm, marginTop: -spacing.xs },
+  offlineNote: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    padding: spacing.md,
     marginBottom: spacing.md,
   },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radii.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+  infoNote: {
+    borderRadius: radii.sm,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
-  chipOn: {
-    backgroundColor: colors.primaryDark,
-    borderColor: colors.primaryDark,
-  },
-  chipText: {
-    fontWeight: '700',
-    fontSize: typography.caption,
-    color: colors.textSecondary,
-  },
-  chipTextOn: {
-    color: colors.white,
+  hint: {
+    fontSize: 12,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+    lineHeight: 16,
   },
 })

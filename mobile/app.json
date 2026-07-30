@@ -14,7 +14,7 @@
     "android": {
       "package": "com.cashtrail.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0a2f2a",
+        "backgroundColor": "#04333b",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -51,8 +51,29 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0a2f2a"
+          "backgroundColor": "#04333b"
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "CashTrailBalance",
+              "label": "CashTrail Balance",
+              "description": "See your total wallet balance on the home screen",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "previewImage": "./assets/images/widget-preview.png",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
         }
       ]
     ],
