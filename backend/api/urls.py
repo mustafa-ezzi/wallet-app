@@ -2,6 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from . import household_api
+from . import devices_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -15,6 +16,7 @@ router.register('household-ledgers', household_api.HouseholdLedgerViewSet, basen
 router.register('household-expenses', household_api.HouseholdExpenseViewSet, basename='household-expense')
 router.register('household-contributions', household_api.HouseholdContributionViewSet, basename='household-contribution')
 router.register('household-notifications', household_api.HouseholdNotificationViewSet, basename='household-notification')
+router.register('devices', devices_api.DeviceTokenViewSet, basename='device')
 
 urlpatterns = [
     path('auth/register/', views.RegisterView.as_view(), name='register'),
@@ -29,5 +31,7 @@ urlpatterns = [
         household_api.PendingInvitationActionView.as_view(),
         name='household-pending-action',
     ),
+    path('notification-preferences/', devices_api.NotificationPreferenceView.as_view(), name='notification-preferences'),
+    path('jobs/due-reminders/', devices_api.DueRemindersJobView.as_view(), name='jobs-due-reminders'),
     path('', include(router.urls)),
 ]

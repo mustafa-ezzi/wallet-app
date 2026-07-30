@@ -12,10 +12,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { accountsApi, apiErrorMessage, asList } from '@/src/api/client'
 import type { Account } from '@/src/api/types'
+import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
 import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
+import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { colors, radii, spacing, typography } from '@/src/theme/colors'
-import { fmtBalance, toMoney } from '@/src/utils/format'
+import { toMoney } from '@/src/utils/format'
 
 function sumBalances(list: Account[]) {
   return list.reduce((s, a) => s + toMoney(a.current_balance), 0)
@@ -24,6 +26,7 @@ function sumBalances(list: Account[]) {
 export default function WalletsScreen() {
   const insets = useSafeAreaInsets()
   const { refreshKey, bumpRefresh } = useMoneyUi()
+  const money = useMaskedMoney()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -96,9 +99,12 @@ export default function WalletsScreen() {
         }
       >
         <View style={styles.head}>
-          <View>
-            <Text style={styles.title}>Wallets</Text>
-            <Text style={styles.sub}>{fmtBalance(total)} total</Text>
+          <View style={{ flex: 1 }}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Wallets</Text>
+              <AmountEyeToggle />
+            </View>
+            <Text style={[styles.sub, money.amountStyle]}>{money.fmtBalance(total)} total</Text>
           </View>
           <Pressable style={styles.addBtn} onPress={() => setCreateOpen(true)}>
             <Text style={styles.addBtnText}>+ New</Text>
@@ -123,7 +129,7 @@ export default function WalletsScreen() {
                 <Text style={styles.cardName}>{a.name}</Text>
                 <Text style={styles.cardType}>{a.type === 'cash' ? 'Cash' : 'Bank'}</Text>
               </View>
-              <Text style={styles.cardBal}>{fmtBalance(a.current_balance)}</Text>
+              <Text style={[styles.cardBal, money.amountStyle]}>{money.fmtBalance(a.current_balance)}</Text>
             </View>
           ))
         )}
@@ -161,6 +167,7 @@ export default function WalletsScreen() {
 
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: typography.title, fontWeight: '800', color: colors.text },
   sub: { color: colors.textMuted, fontWeight: '600', marginTop: 2 },
   addBtn: {

@@ -13,12 +13,12 @@ import {
   accountsApi,
   apiErrorMessage,
   asList,
-  transactionsApi,
 } from '@/src/api/client'
 import type { Account } from '@/src/api/types'
 import { Field, PrimaryButton, ErrorBanner } from '@/src/components/ui'
+import { useOffline } from '@/src/offline'
 import { colors, radii, spacing, typography } from '@/src/theme/colors'
-import { mutationId, todayISO } from '@/src/utils/format'
+import { todayISO } from '@/src/utils/format'
 
 const EXPENSE_CATS = ['Food', 'Groceries', 'Transport', 'Utilities', 'Rent', 'Miscellaneous']
 const INCOME_CATS = ['Salary', 'Monthly Income', 'Freelance', 'Other']
@@ -35,6 +35,7 @@ export function AddMoneySheet({
   onSaved: () => void
 }) {
   const insets = useSafeAreaInsets()
+  const { online, queueTransaction, getCachedAccounts, hydrateNow } = useOffline()
   const [kind, setKind] = useState<Kind>('expense')
   const [accounts, setAccounts] = useState<Account[]>([])
   const [accountId, setAccountId] = useState<number | null>(null)
@@ -56,18 +57,40 @@ export function AddMoneySheet({
     setBooting(true)
     ;(async () => {
       try {
-        const { data } = await accountsApi.list()
-        const list = asList<Account>(data)
+        if (online) {
+          try {
+            const { data } = await accountsApi.list()
+            const list = asList<Account>(data)
+            setAccounts(list)
+            setAccountId(list[0]?.id ?? null)
+            setToAccountId(list[1]?.id ?? list[0]?.id ?? null)
+            void hydrateNow()
+            return
+          } catch {
+            /* fall through to cache */
+          }
+        }
+        const cached = await getCachedAccounts()
+        const list: Account[] = cached.map((a) => ({
+          id: a.serverId,
+          name: a.name,
+          type: a.type === 'cash' ? 'cash' : 'bank',
+          opening_balance: a.openingBalance,
+          current_balance: a.currentBalance,
+        }))
         setAccounts(list)
         setAccountId(list[0]?.id ?? null)
         setToAccountId(list[1]?.id ?? list[0]?.id ?? null)
+        if (list.length === 0) {
+          setError('No wallets cached. Connect once to download your wallets.')
+        }
       } catch (err) {
         setError(apiErrorMessage(err, 'Could not load wallets.'))
       } finally {
         setBooting(false)
       }
     })()
-  }, [visible])
+  }, [visible, online, getCachedAccounts, hydrateNow])
 
   useEffect(() => {
     if (kind === 'income') setCategory(INCOME_CATS[0])
@@ -96,33 +119,30 @@ export function AddMoneySheet({
           return
         }
         const note = notes.trim() || 'Transfer'
-        await transactionsApi.create({
+        await queueTransaction({
           type: 'expense',
           amount: value,
           date,
-          account: accountId,
+          accountServerId: accountId,
           category: 'Bank Transfer',
           notes: `${note} (out)`,
-          client_mutation_id: mutationId(),
         })
-        await transactionsApi.create({
+        await queueTransaction({
           type: 'income',
           amount: value,
           date,
-          account: toAccountId,
+          accountServerId: toAccountId,
           category: 'Bank Transfer',
           notes: `${note} (in)`,
-          client_mutation_id: mutationId(),
         })
       } else {
-        await transactionsApi.create({
+        await queueTransaction({
           type: kind,
           amount: value,
           date,
-          account: accountId,
+          accountServerId: accountId,
           category,
           notes: notes.trim(),
-          client_mutation_id: mutationId(),
         })
       }
       onSaved()

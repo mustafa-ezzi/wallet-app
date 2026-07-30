@@ -167,3 +167,6 @@ CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(
 
 # Railway / reverse-proxy HTTPS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Daily due-reminder cron (POST /api/jobs/due-reminders/)
+CRON_SECRET = os.environ.get('CRON_SECRET', '')

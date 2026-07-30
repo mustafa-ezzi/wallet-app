@@ -924,3 +924,81 @@ class HouseholdPhase6PolishTests(TestCase):
         self.assertIn("has_more", page.data)
         self.assertEqual(page.data["limit"], 1)
         self.assertEqual(len(page.data["results"]), 1)
+
+
+class DevicePushPhase6Tests(ScenarioBase):
+    """Phase 6: device token register + due job idempotency."""
+
+    def test_register_token_scoped_to_user(self):
+        from api.models import DeviceToken
+
+        res = self.client.post('/api/devices/', {
+            'token': 'ExponentPushToken[test-token-aaa]',
+            'platform': 'android',
+        }, format='json')
+        self.assertIn(res.status_code, (200, 201), res.data)
+        self.assertEqual(DeviceToken.objects.filter(user=self.user).count(), 1)
+
+        other = User.objects.create_user(
+            username='other@example.com', email='other@example.com', password='testpass123',
+        )
+        UserProfile.objects.get_or_create(user=other, defaults={'currency': 'PKR'})
+        other_client = APIClient()
+        other_client.credentials(
+            HTTP_AUTHORIZATION=f'Bearer {RefreshToken.for_user(other).access_token}'
+        )
+        # Same token moves to other user
+        res2 = other_client.post('/api/devices/', {
+            'token': 'ExponentPushToken[test-token-aaa]',
+            'platform': 'android',
+        }, format='json')
+        self.assertIn(res2.status_code, (200, 201), res2.data)
+        self.assertEqual(DeviceToken.objects.filter(token='ExponentPushToken[test-token-aaa]').count(), 1)
+        self.assertEqual(
+            DeviceToken.objects.get(token='ExponentPushToken[test-token-aaa]').user_id,
+            other.id,
+        )
+
+        revoke = other_client.post('/api/devices/revoke/', {
+            'token': 'ExponentPushToken[test-token-aaa]',
+        }, format='json')
+        self.assertEqual(revoke.status_code, 204)
+        self.assertEqual(DeviceToken.objects.count(), 0)
+
+    def test_due_job_dry_run_and_idempotent(self):
+        from datetime import timedelta
+        from django.test import override_settings
+        from api.due_push import karachi_today, send_due_reminders
+        from api.models import DeviceToken, PushDeliveryLog
+
+        today = karachi_today()
+        due_day = (today + timedelta(days=1)).day
+        PayableInstallment.objects.create(
+            user=self.user,
+            name='Test Loan',
+            total_amount=Decimal('10000'),
+            monthly_amount=Decimal('1000'),
+            total_installments=10,
+            due_day=due_day,
+            status='ongoing',
+        )
+        DeviceToken.objects.create(
+            user=self.user,
+            token='ExponentPushToken[dry-run-token]',
+            platform='android',
+        )
+
+        dry = send_due_reminders(dry_run=True, today=today)
+        self.assertGreaterEqual(dry['candidates'], 1)
+        self.assertEqual(PushDeliveryLog.objects.count(), 0)
+
+        with override_settings(CRON_SECRET='test-cron'):
+            forbidden = self.client.post('/api/jobs/due-reminders/')
+            self.assertEqual(forbidden.status_code, 403)
+
+            ok = APIClient().post(
+                '/api/jobs/due-reminders/?dry_run=1',
+                HTTP_X_CRON_SECRET='test-cron',
+            )
+            self.assertEqual(ok.status_code, 200)
+            self.assertTrue(ok.data['dry_run'])

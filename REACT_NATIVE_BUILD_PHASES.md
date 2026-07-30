@@ -2,10 +2,25 @@
 
 **Product:** CashTrail (My-Wallet)  
 **Source:** `REACT_NATIVE_PLAYSTORE_RESEARCH.md`  
-**Status:** Phase 0–2 implemented in `mobile/` (auth + core money UI). See `mobile/PHASE_0_1_GUIDE.md`.  
+**Status:** Phase **0–6 code complete** in `mobile/` + backend device push (prep → auth → money UI → privacy lock → offline → local reminders → server push). Phases **7–9** not started. See `mobile/PHASE_0_1_GUIDE.md`.  
 **Date:** 2026-07-30  
 **Stack decision:** **Expo (React Native) + existing Django API on Railway**  
 **Package id:** `com.cashtrail.app`
+
+---
+
+## Progress snapshot
+
+| Phase | Status |
+| --- | --- |
+| P0 Prep | Done (mood board still open) |
+| P1 Auth shell | Done (manual device test checklist open) |
+| P2 Core money UI | Done (Projects screen + Android side-by-side check open) |
+| P3 Privacy lock | Done (manual test checklist open) |
+| P4 Offline SQLite | Done (manual / unit test checklist open) |
+| P5 Local reminders | Done (manual device test checklist open) |
+| P6 Server push | Done (Railway cron + device test open) |
+| P7–P9 | Not started |
 
 ---
 
@@ -139,7 +154,7 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 **Backend**
 
 - [x] No schema change required (existing JWT auth)  
-- [ ] Confirm CORS / HTTPS works for mobile clients *(native clients typically don’t need CORS; verify login against Railway)*  
+- [x] Confirm CORS / HTTPS works for mobile clients *(native clients typically don’t need CORS; Expo **web** + Railway CORS updated for localhost:8081 / Vite)*  
 
 **Tests**
 
@@ -165,7 +180,8 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 **Mobile**
 
 - [x] **Home:** bold hero total balance, month in/out chips, recent txs (category **+ notes**) — polished Android layout  
-- [x] **Wallets:** list with clear icons/balances, create bank/cash, view txs  
+- [x] **Wallets:** list with clear icons/balances, create bank/cash  
+- [ ] **Wallets:** per-wallet transaction list / detail  
 - [x] **Add money** FAB + bottom sheet (not a cramped web modal): income, expense, transfer  
 - [x] **Bills:** recurring expenses, payables (loans), receivables — list + mark paid / record  
 - [ ] **Income / Projects** screen (or fold into Bills+Home for v1 — don’t block)  
@@ -202,17 +218,17 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 
 **Mobile**
 
-- [ ] `PrivacyLockProvider` + lock screen UI  
-- [ ] `expo-local-authentication` unlock  
-- [ ] Fallback: device PIN / CashTrail app PIN in SecureStore  
-- [ ] Mask balances, tx amounts, report totals, forecast numbers  
-- [ ] Settings: enable lock, timeout (immediate / 1m / 5m)  
-- [ ] Optional `FLAG_SECURE` on sensitive screens (block screenshots)  
-- [ ] PostHog: `privacy_unlock_success` / `privacy_unlock_failed` (no amounts)  
+- [x] `PrivacyLockProvider` + lock screen UI  
+- [x] `expo-local-authentication` unlock  
+- [x] Fallback: device PIN / CashTrail app PIN in SecureStore  
+- [x] Mask balances, tx amounts, report totals, forecast numbers  
+- [x] Settings: enable lock, timeout (immediate / 1m / 5m)  
+- [x] Optional `FLAG_SECURE` on sensitive screens (block screenshots)  
+- [x] PostHog: `privacy_unlock_success` / `privacy_unlock_failed` (no amounts) *(stub analytics — wire PostHog SDK later)*  
 
 **Backend**
 
-- [ ] None  
+- [x] None  
 
 **Tests**
 
@@ -238,13 +254,13 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 
 **Mobile**
 
-- [ ] `expo-sqlite` schema: accounts, transactions, outbox, sync_meta  
-- [ ] Port queue/sync/hydrate logic from `frontend/src/offline/`  
-- [ ] NetInfo: sync on reconnect, foreground, pull-to-refresh  
-- [ ] Offline chip + “N pending”  
-- [ ] Hydrate after login; logout wipes local DB  
-- [ ] Household link on add-expense: **block offline** with clear copy  
-- [ ] PostHog: `transaction_queued_offline`, `transaction_sync_success`, `transaction_sync_failed`  
+- [x] `expo-sqlite` schema: accounts, transactions, outbox, sync_meta  
+- [x] Port queue/sync/hydrate logic from `frontend/src/offline/`  
+- [x] NetInfo: sync on reconnect, foreground, pull-to-refresh  
+- [x] Offline chip + “N pending”  
+- [x] Hydrate after login; logout wipes local DB  
+- [x] Household link on add-expense: **block offline** with clear copy  
+- [x] PostHog: `transaction_queued_offline`, `transaction_sync_success`, `transaction_sync_failed` *(analytics stub — wire SDK later)*  
 
 **Backend**
 
@@ -274,17 +290,17 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 
 **Mobile**
 
-- [ ] Permission prompt UX (why we need notifications)  
-- [ ] `expo-notifications` schedule from payables / receivables  
-- [ ] Preferences: remind 3 days / 1 day / due day (Asia/Karachi default)  
-- [ ] Reschedule after Bills sync / hydrate  
-- [ ] Deep link → payable / receivable screen  
-- [ ] If privacy lock on: notification body **without** exact PKR amounts  
-- [ ] PostHog: `reminder_scheduled`, `reminder_tapped`  
+- [x] Permission prompt UX (why we need notifications) — Bills banner + Settings toggle  
+- [x] `expo-notifications` schedule from payables / receivables (+ recurring expenses)  
+- [x] Preferences: remind 3 days / 1 day / due day (Asia/Karachi 09:00 default)  
+- [x] Reschedule after Bills load / pull-to-refresh / prefs change  
+- [x] Deep link → Bills with `?focus=&id=` highlight  
+- [x] If privacy lock on: notification body **without** exact PKR amounts  
+- [x] Analytics stub: `reminder_scheduled`, `reminder_tapped` (PostHog later)  
 
 **Backend**
 
-- [ ] None required for local-only  
+- [x] None required for local-only  
 
 **Tests**
 
@@ -309,23 +325,23 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 
 **Backend**
 
-- [ ] Model `DeviceToken` (user, token, platform, updated_at)  
-- [ ] `POST/DELETE /api/devices/`  
-- [ ] Optional `NotificationPreference`  
-- [ ] Daily job (Railway cron): due payables/receivables → push  
-- [ ] Idempotent “already notified today” guard  
+- [x] Model `DeviceToken` (user, token, platform, updated_at)  
+- [x] `POST /api/devices/` + `POST /api/devices/revoke/`  
+- [x] Optional `NotificationPreference` (`GET/PATCH /api/notification-preferences/`)  
+- [x] Daily job: `manage.py send_due_push` + `POST /api/jobs/due-reminders/` (Railway cron + `CRON_SECRET`)  
+- [x] Idempotent `PushDeliveryLog` (“already notified today”)  
 
 **Mobile**
 
-- [ ] Register Expo push token after permission  
-- [ ] Re-register on login; revoke on logout  
-- [ ] Handle notification response (deep link + privacy lock)  
+- [x] Register Expo push token after permission  
+- [x] Re-register on login; revoke on logout  
+- [x] Handle notification response (deep link to Bills + amount privacy via eye)  
 
 **Tests**
 
-- [ ] API: register token scoped to user  
-- [ ] Job dry-run in staging  
-- [ ] Two devices same user both receive (or documented single-device policy)  
+- [x] API: register token scoped to user  
+- [x] Job dry-run endpoint  
+- [ ] Two devices same user both receive (policy: all registered tokens get the push)  
 
 **Demo:** Don’t open app for a day → push arrives for loan due → open to Bills.
 

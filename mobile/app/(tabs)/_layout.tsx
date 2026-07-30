@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '@/src/context/AuthContext'
 import { MoneyUiProvider, useMoneyUi } from '@/src/context/MoneyUiContext'
 import { AddMoneySheet } from '@/src/components/AddMoneySheet'
+import { OfflineBanner } from '@/src/offline'
+import { AmountUnlockSheet } from '@/src/privacy/AmountUnlockSheet'
 import { colors } from '@/src/theme/colors'
 
 function TabIcon(props: { name: React.ComponentProps<typeof FontAwesome>['name']; color: string }) {
@@ -22,6 +24,7 @@ function TabsShell() {
 
   return (
     <View style={{ flex: 1 }}>
+      <OfflineBanner />
       <Tabs
         screenOptions={{
           headerStyle: { backgroundColor: colors.surface },
@@ -94,6 +97,7 @@ function TabsShell() {
         onClose={closeAdd}
         onSaved={bumpRefresh}
       />
+      <AmountUnlockSheet />
     </View>
   )
 }

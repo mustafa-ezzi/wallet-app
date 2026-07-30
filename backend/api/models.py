@@ -494,3 +494,89 @@ class HouseholdNotification(models.Model):
     @property
     def is_read(self):
         return self.read_at is not None
+
+
+# ── Mobile push (Phase 6) ─────────────────────────────────────────────────────
+
+class DeviceToken(models.Model):
+    PLATFORMS = [
+        ('android', 'Android'),
+        ('ios', 'iOS'),
+        ('web', 'Web'),
+        ('unknown', 'Unknown'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_tokens')
+    token = models.CharField(max_length=255)
+    platform = models.CharField(max_length=16, choices=PLATFORMS, default='unknown')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(fields=['token'], name='uniq_device_push_token'),
+        ]
+        indexes = [
+            models.Index(fields=['user', '-updated_at'], name='device_token_user_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.platform} token for {self.user_id}"
+
+
+class NotificationPreference(models.Model):
+    """Per-user push prefs (optional; defaults applied when missing)."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_pref')
+    enabled = models.BooleanField(default=True)
+    remind_payables = models.BooleanField(default=True)
+    remind_receivables = models.BooleanField(default=True)
+    lead_3 = models.BooleanField(default=True)
+    lead_1 = models.BooleanField(default=True)
+    lead_due = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"NotifPref({self.user_id})"
+
+    def lead_days(self):
+        days = []
+        if self.lead_3:
+            days.append(3)
+        if self.lead_1:
+            days.append(1)
+        if self.lead_due:
+            days.append(0)
+        return days
+
+
+class PushDeliveryLog(models.Model):
+    """Idempotent guard: one push per user/kind/object/lead/day."""
+
+    KINDS = [
+        ('payable', 'Payable'),
+        ('receivable', 'Receivable'),
+        ('expense', 'Expense'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='push_delivery_logs')
+    kind = models.CharField(max_length=16, choices=KINDS)
+    object_id = models.PositiveIntegerField()
+    lead_days = models.PositiveSmallIntegerField(default=0)
+    notify_date = models.DateField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'kind', 'object_id', 'lead_days', 'notify_date'],
+                name='uniq_push_delivery_day',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['notify_date'], name='push_log_date_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.kind}:{self.object_id} lead={self.lead_days} @ {self.notify_date}"
