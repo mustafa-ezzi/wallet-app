@@ -2,8 +2,8 @@
 
 **Product:** CashTrail (My-Wallet)  
 **Source:** `REACT_NATIVE_PLAYSTORE_RESEARCH.md`  
-**Status:** Build roadmap (implementation not started for React Native)  
-**Date:** 2026-07-29  
+**Status:** Phase 0–2 implemented in `mobile/` (auth + core money UI). See `mobile/PHASE_0_1_GUIDE.md`.  
+**Date:** 2026-07-30  
 **Stack decision:** **Expo (React Native) + existing Django API on Railway**  
 **Package id:** `com.cashtrail.app`
 
@@ -98,15 +98,15 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 
 **Deliverables**
 
-- [ ] Create `apps/mobile` (or `mobile/`) Expo TypeScript app  
-- [ ] Set `android.package` = `com.cashtrail.app`, app name **CashTrail**  
-- [ ] Env: `EXPO_PUBLIC_API_URL` → Railway backend (no trailing slash)  
-- [ ] Port thin API client (Axios + JWT attach) from web `client.ts`  
-- [ ] Theme tokens (forest / existing palette) as StyleSheet or NativeWind vars — designed for **Android-native** screens, not a web clone  
+- [x] Create `apps/mobile` (or `mobile/`) Expo TypeScript app  
+- [x] Set `android.package` = `com.cashtrail.app`, app name **CashTrail**  
+- [x] Env: `EXPO_PUBLIC_API_URL` → Railway backend (no trailing slash)  
+- [x] Port thin API client (Axios + JWT attach) from web `client.ts`  
+- [x] Theme tokens (forest / existing palette) as StyleSheet or NativeWind vars — designed for **Android-native** screens, not a web clone  
 - [ ] Lock a short **UI mood board** (3–5 reference screenshots: Home hero, wallet row, add sheet) so “cooler than PWA” is clear  
-- [ ] EAS project configured (`eas.json` development + preview + production)  
-- [ ] Decide: Expo Router vs React Navigation (recommend **Expo Router**)  
-- [ ] Git ignore: secrets, `.env`, keystores  
+- [x] EAS project configured (`eas.json` development + preview + production)  
+- [x] Decide: Expo Router vs React Navigation (recommend **Expo Router**)  
+- [x] Git ignore: secrets, `.env`, keystores  
 
 **Out of scope:** Feature screens beyond a “API OK” smoke screen (but theme + navigation chrome should already look intentional).
 
@@ -128,18 +128,18 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 
 **Mobile**
 
-- [ ] Auth stack: Login, Signup (currency default PKR)  
-- [ ] Store `access` + `refresh` in **`expo-secure-store`** (not AsyncStorage)  
-- [ ] Cache lightweight user profile for offline restore (mirror web `cashtrail_user` idea)  
-- [ ] Token refresh on 401; **do not** wipe session on pure network errors  
-- [ ] Root tabs shell that already feels **native Android** (icons, labels, active state) — not a web nav bar pasted in  
-- [ ] Auth screens with branded hero/logo and clean keyboard-friendly forms (cooler than plain web auth)  
-- [ ] Protected routes + loading gate  
+- [x] Auth stack: Login, Signup (currency default PKR)  
+- [x] Store `access` + `refresh` in **`expo-secure-store`** (not AsyncStorage)  
+- [x] Cache lightweight user profile for offline restore (mirror web `cashtrail_user` idea)  
+- [x] Token refresh on 401; **do not** wipe session on pure network errors  
+- [x] Root tabs shell that already feels **native Android** (icons, labels, active state) — not a web nav bar pasted in  
+- [x] Auth screens with branded hero/logo and clean keyboard-friendly forms (cooler than plain web auth)  
+- [x] Protected routes + loading gate  
 
 **Backend**
 
-- [ ] No schema change required (existing JWT auth)  
-- [ ] Confirm CORS / HTTPS works for mobile clients  
+- [x] No schema change required (existing JWT auth)  
+- [ ] Confirm CORS / HTTPS works for mobile clients *(native clients typically don’t need CORS; verify login against Railway)*  
 
 **Tests**
 
@@ -164,19 +164,19 @@ Suggested minimum for **production:** **P0–P6** + privacy policy + Data safety
 
 **Mobile**
 
-- [ ] **Home:** bold hero total balance, month in/out chips, recent txs (category **+ notes**) — polished Android layout  
-- [ ] **Wallets:** list with clear icons/balances, create bank/cash, view txs  
-- [ ] **Add money** FAB + bottom sheet (not a cramped web modal): income, expense, transfer  
-- [ ] **Bills:** recurring expenses, payables (loans), receivables — list + mark paid / record  
+- [x] **Home:** bold hero total balance, month in/out chips, recent txs (category **+ notes**) — polished Android layout  
+- [x] **Wallets:** list with clear icons/balances, create bank/cash, view txs  
+- [x] **Add money** FAB + bottom sheet (not a cramped web modal): income, expense, transfer  
+- [x] **Bills:** recurring expenses, payables (loans), receivables — list + mark paid / record  
 - [ ] **Income / Projects** screen (or fold into Bills+Home for v1 — don’t block)  
-- [ ] Pull-to-refresh; empty states; error toasts  
-- [ ] Amount formatting PKR (reuse `fmt` / `fmtBalance` logic)  
-- [ ] **UI polish pass:** spacing, type scale, press feedback, 2–3 light motions (e.g. FAB appear, sheet slide)  
+- [x] Pull-to-refresh; empty states; error toasts  
+- [x] Amount formatting PKR (reuse `fmt` / `fmtBalance` logic)  
+- [x] **UI polish pass:** spacing, type scale, press feedback, 2–3 light motions (e.g. FAB appear, sheet slide)  
 - [ ] Side-by-side check: Android Home should feel more premium than current web Overview  
 
 **Backend**
 
-- [ ] No new endpoints required  
+- [x] No new endpoints required  
 - [ ] Sanity-check pagination if lists grow  
 
 **Tests**

@@ -121,11 +121,22 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': False,
 }
 
-# CORS — set FRONTEND_URL to your Railway frontend URL in production
+# CORS — set FRONTEND_URL to your Railway frontend URL in production.
+# Local Expo web / Vite origins are always allowed so mobile web + local PWA can hit prod API.
+_LOCAL_DEV_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:8081',
+    'http://127.0.0.1:8081',
+    'http://localhost:19006',
+    'http://127.0.0.1:19006',
+]
 _frontend_url = os.environ.get('FRONTEND_URL', '').strip()
-if _frontend_url and not DEBUG:
+_configured_origins = [o.strip() for o in _frontend_url.split(',') if o.strip()]
+
+if _configured_origins and not DEBUG:
     CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in _frontend_url.split(',') if o.strip()]
+    CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_configured_origins + _LOCAL_DEV_ORIGINS))
 else:
     CORS_ALLOW_ALL_ORIGINS = True
 
@@ -142,10 +153,15 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', _frontend_url).split(',')
-    if o.strip()
-]
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(
+    [
+        o.strip()
+        for o in os.environ.get('CSRF_TRUSTED_ORIGINS', _frontend_url).split(',')
+        if o.strip()
+    ]
+    + _LOCAL_DEV_ORIGINS
+))
+
 
 # Railway / reverse-proxy HTTPS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
