@@ -30,9 +30,7 @@ def _find_user(email: str):
     )
 
 
-def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
-    from django.core.mail import EmailMessage, get_connection
-
+def _otp_email_content(code: str, first_name: str = '') -> tuple[str, str]:
     name = (first_name or '').strip() or 'there'
     subject = 'CashTrail password reset code'
     body = (
@@ -43,11 +41,76 @@ def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
         f'— CashTrail\n'
         f'Follow every rupee.\n'
     )
-    # SMTP auth user (e.g. "resend") is NOT the From address.
-    # From must be a verified sender: onboarding@resend.dev or your domain.
+    return subject, body
+
+
+def _from_email() -> str:
     from_email = (getattr(settings, 'DEFAULT_FROM_EMAIL', None) or '').strip()
-    if not from_email or from_email.lower() == 'resend':
-        from_email = 'CashTrail <onboarding@resend.dev>'
+    if not from_email or from_email.lower() in ('resend', 'noreply@cashtrail.app'):
+        return 'CashTrail <onboarding@resend.dev>'
+    return from_email
+
+
+def _resend_api_key() -> str:
+    key = (
+        getattr(settings, 'RESEND_API_KEY', None)
+        or getattr(settings, 'EMAIL_HOST_PASSWORD', None)
+        or ''
+    )
+    return str(key).replace(' ', '').strip()
+
+
+def _use_resend_http() -> bool:
+    """Railway often blocks outbound SMTP — prefer Resend HTTPS API."""
+    host = (getattr(settings, 'EMAIL_HOST', '') or '').lower()
+    key = _resend_api_key()
+    if getattr(settings, 'RESEND_API_KEY', ''):
+        return True
+    if key.startswith('re_'):
+        return True
+    if 'resend.com' in host:
+        return True
+    return False
+
+
+def _send_via_resend_api(to_email: str, subject: str, body: str) -> None:
+    import json
+    import urllib.error
+    import urllib.request
+
+    api_key = _resend_api_key()
+    if not api_key:
+        raise RuntimeError('RESEND_API_KEY / EMAIL_HOST_PASSWORD is missing')
+
+    payload = {
+        'from': _from_email(),
+        'to': [to_email],
+        'subject': subject,
+        'text': body,
+    }
+    req = urllib.request.Request(
+        'https://api.resend.com/emails',
+        data=json.dumps(payload).encode('utf-8'),
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+            'User-Agent': 'CashTrail/1.0',
+        },
+        method='POST',
+    )
+    timeout = getattr(settings, 'EMAIL_TIMEOUT', 12)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode('utf-8', errors='replace')
+            if resp.status >= 400:
+                raise RuntimeError(f'Resend API {resp.status}: {raw}')
+    except urllib.error.HTTPError as exc:
+        err_body = exc.read().decode('utf-8', errors='replace')
+        raise RuntimeError(f'Resend API {exc.code}: {err_body}') from exc
+
+
+def _send_via_smtp(to_email: str, subject: str, body: str) -> None:
+    from django.core.mail import EmailMessage, get_connection
 
     password = (getattr(settings, 'EMAIL_HOST_PASSWORD', '') or '').replace(' ', '')
     use_ssl = int(getattr(settings, 'EMAIL_PORT', 587) or 587) in (465, 2465)
@@ -66,11 +129,19 @@ def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
     msg = EmailMessage(
         subject=subject,
         body=body,
-        from_email=from_email,
+        from_email=_from_email(),
         to=[to_email],
         connection=connection,
     )
     msg.send(fail_silently=False)
+
+
+def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
+    subject, body = _otp_email_content(code, first_name)
+    if _use_resend_http():
+        _send_via_resend_api(to_email, subject, body)
+        return
+    _send_via_smtp(to_email, subject, body)
 
 
 class ForgotPasswordView(APIView):
@@ -133,10 +204,10 @@ class ForgotPasswordView(APIView):
                 return Response(payload)
             return Response(
                 {
-                    'detail': 'Could not send the reset email. Check EMAIL_* on Railway and Resend dashboard.',
+                    'detail': 'Could not send the reset email. Check Resend API key / DEFAULT_FROM_EMAIL on Railway.',
+                    'transport': 'resend_http' if _use_resend_http() else 'smtp',
                     'smtp_host': getattr(settings, 'EMAIL_HOST', ''),
-                    'smtp_user': getattr(settings, 'EMAIL_HOST_USER', ''),
-                    'from_email': (getattr(settings, 'DEFAULT_FROM_EMAIL', '') or ''),
+                    'from_email': _from_email(),
                     'smtp_error': f'{exc.__class__.__name__}: {exc}',
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
