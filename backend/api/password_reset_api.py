@@ -1,15 +1,20 @@
 """Forgot-password OTP API (email code → verify → set new password)."""
 
+import logging
+
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import signing
 from django.core.mail import send_mail
+from django.db import DatabaseError, ProgrammingError
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import PasswordResetOTP
+
+logger = logging.getLogger(__name__)
 
 RESET_SALT = 'cashtrail-password-reset'
 RESET_MAX_AGE = 15 * 60  # seconds after OTP verified
@@ -37,8 +42,19 @@ def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
         f'— CashTrail\n'
         f'Follow every rupee.\n'
     )
-    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or 'CashTrail <noreply@cashtrail.app>'
-    send_mail(subject, body, from_email, [to_email], fail_silently=False)
+    # Prefer authenticated mailbox as From — Gmail rejects mismatched addresses
+    from_email = (
+        getattr(settings, 'DEFAULT_FROM_EMAIL', None)
+        or getattr(settings, 'EMAIL_HOST_USER', None)
+        or 'CashTrail <noreply@cashtrail.app>'
+    )
+    send_mail(
+        subject,
+        body,
+        from_email,
+        [to_email],
+        fail_silently=False,
+    )
 
 
 class ForgotPasswordView(APIView):
@@ -49,29 +65,65 @@ class ForgotPasswordView(APIView):
         if not email or '@' not in email:
             return Response({'detail': 'Enter a valid email address.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = _find_user(email)
+        try:
+            user = _find_user(email)
+        except Exception:
+            logger.exception('forgot-password: user lookup failed')
+            return Response(
+                {'detail': 'Server error looking up account. Try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
         # Always look successful to avoid account enumeration
         if not user:
             return Response(GENERIC_OK)
 
-        _row, code = PasswordResetOTP.create_for_email(email)
+        try:
+            _row, code = PasswordResetOTP.create_for_email(email)
+        except (ProgrammingError, DatabaseError) as exc:
+            logger.exception('forgot-password: OTP table missing or DB error')
+            return Response(
+                {
+                    'detail': (
+                        'Password reset is not ready on the server yet '
+                        '(run migrations: 0013_password_reset_otp).'
+                    ),
+                    'error': exc.__class__.__name__,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        except Exception:
+            logger.exception('forgot-password: create OTP failed')
+            return Response(
+                {'detail': 'Could not start password reset. Try again.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
         payload = dict(GENERIC_OK)
+        smtp_configured = bool(getattr(settings, 'EMAIL_HOST', '').strip())
 
         try:
             _send_otp_email(user.email or email, code, user.first_name)
         except Exception as exc:
-            # Dev / misconfigured SMTP: still allow reset when DEBUG
-            if settings.DEBUG:
+            logger.exception('forgot-password: email send failed')
+            # Always include a usable path in DEBUG; in prod return clear SMTP guidance
+            if settings.DEBUG or not smtp_configured:
                 payload['debug_code'] = code
                 payload['detail'] = (
-                    'Email could not be sent (check SMTP). '
-                    f'Debug code included because DEBUG=True. ({exc.__class__.__name__})'
+                    'Email could not be sent. Use the debug code below, '
+                    'or set EMAIL_HOST / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD on Railway '
+                    f'({exc.__class__.__name__}).'
                 )
-            else:
-                return Response(
-                    {'detail': 'Could not send email right now. Try again later.'},
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                )
+                return Response(payload)
+            return Response(
+                {
+                    'detail': (
+                        'Could not send email. Check Railway EMAIL_* variables '
+                        '(Gmail needs an App Password, and DEFAULT_FROM_EMAIL should match that Gmail).'
+                    ),
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         return Response(payload)
 
@@ -85,11 +137,18 @@ class VerifyResetOTPView(APIView):
         if not email or not code:
             return Response({'detail': 'Email and code are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        row = (
-            PasswordResetOTP.objects.filter(email=email, used=False)
-            .order_by('-created_at')
-            .first()
-        )
+        try:
+            row = (
+                PasswordResetOTP.objects.filter(email=email, used=False)
+                .order_by('-created_at')
+                .first()
+            )
+        except (ProgrammingError, DatabaseError):
+            return Response(
+                {'detail': 'Password reset is not ready (run DB migrations).'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         if not row or not row.verify(code):
             return Response({'detail': 'Invalid or expired code.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -115,6 +174,11 @@ class ResetPasswordView(APIView):
 
         try:
             data = signing.loads(token, salt=RESET_SALT, max_age=RESET_MAX_AGE)
+        except signing.SignatureExpired:
+            return Response(
+                {'detail': 'Reset session expired. Request a new code.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except signing.BadSignature:
             return Response(
                 {'detail': 'Reset session expired. Request a new code.'},
