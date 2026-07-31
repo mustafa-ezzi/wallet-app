@@ -193,3 +193,4 @@ if not _default_from and EMAIL_HOST_USER:
     _default_from = EMAIL_HOST_USER
 DEFAULT_FROM_EMAIL = _default_from or 'CashTrail <noreply@cashtrail.app>'
 SERVER_EMAIL = EMAIL_HOST_USER or DEFAULT_FROM_EMAIL
+
