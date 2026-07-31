@@ -5,7 +5,6 @@ import logging
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core import signing
-from django.core.mail import send_mail
 from django.db import DatabaseError, ProgrammingError
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -32,6 +31,8 @@ def _find_user(email: str):
 
 
 def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
+    from django.core.mail import EmailMessage, get_connection
+
     name = (first_name or '').strip() or 'there'
     subject = 'CashTrail password reset code'
     body = (
@@ -42,19 +43,27 @@ def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
         f'— CashTrail\n'
         f'Follow every rupee.\n'
     )
-    # Prefer authenticated mailbox as From — Gmail rejects mismatched addresses
-    from_email = (
-        getattr(settings, 'DEFAULT_FROM_EMAIL', None)
-        or getattr(settings, 'EMAIL_HOST_USER', None)
-        or 'CashTrail <noreply@cashtrail.app>'
+    # Gmail requires From == authenticated user
+    from_email = (getattr(settings, 'EMAIL_HOST_USER', None) or '').strip() or settings.DEFAULT_FROM_EMAIL
+    password = (getattr(settings, 'EMAIL_HOST_PASSWORD', '') or '').replace(' ', '')
+
+    connection = get_connection(
+        backend='django.core.mail.backends.smtp.EmailBackend',
+        host=settings.EMAIL_HOST,
+        port=settings.EMAIL_PORT,
+        username=settings.EMAIL_HOST_USER,
+        password=password,
+        use_tls=settings.EMAIL_USE_TLS,
+        timeout=getattr(settings, 'EMAIL_TIMEOUT', 12),
     )
-    send_mail(
-        subject,
-        body,
-        from_email,
-        [to_email],
-        fail_silently=False,
+    msg = EmailMessage(
+        subject=subject,
+        body=body,
+        from_email=from_email,
+        to=[to_email],
+        connection=connection,
     )
+    msg.send(fail_silently=False)
 
 
 class ForgotPasswordView(APIView):
@@ -118,9 +127,12 @@ class ForgotPasswordView(APIView):
             return Response(
                 {
                     'detail': (
-                        'Could not send email. Check Railway EMAIL_* variables '
-                        '(Gmail needs an App Password, and DEFAULT_FROM_EMAIL should match that Gmail).'
+                        'Could not send email via Gmail SMTP. '
+                        'Common fixes: strip spaces from App Password, set DEFAULT_FROM_EMAIL to just '
+                        'mustafaezzi143@gmail.com, confirm 2FA App Password, and check Gmail '
+                        '"Security > Recent security activity" for a blocked sign-in from Railway.'
                     ),
+                    'smtp_error': f'{exc.__class__.__name__}: {exc}',
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )

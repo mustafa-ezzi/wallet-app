@@ -182,11 +182,14 @@ _default_backend = (
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', _default_backend)
 EMAIL_HOST = _email_host
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587') or '587')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '').strip()
+# Gmail App Passwords are often pasted with spaces — strip them
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '').replace(' ', '').strip()
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '12') or '12')
-DEFAULT_FROM_EMAIL = os.environ.get(
-    'DEFAULT_FROM_EMAIL',
-    'CashTrail <noreply@cashtrail.app>',
-)
+# Prefer plain mailbox address for Gmail SMTP (display-name From often gets rejected)
+_default_from = os.environ.get('DEFAULT_FROM_EMAIL', '').strip()
+if not _default_from and EMAIL_HOST_USER:
+    _default_from = EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = _default_from or 'CashTrail <noreply@cashtrail.app>'
+SERVER_EMAIL = EMAIL_HOST_USER or DEFAULT_FROM_EMAIL
