@@ -113,8 +113,12 @@ export function apiErrorMessage(err: unknown, fallback = 'Request failed.'): str
   }
   if (typeof data === 'string') return data
   if (typeof data === 'object' && data !== null) {
-    const detail = (data as { detail?: unknown }).detail
-    if (typeof detail === 'string') return detail
+    const obj = data as { detail?: unknown; smtp_error?: unknown }
+    const detail = typeof obj.detail === 'string' ? obj.detail : ''
+    const smtp = typeof obj.smtp_error === 'string' ? obj.smtp_error : ''
+    if (detail && smtp) return `${detail}\n\n${smtp}`
+    if (detail) return detail
+    if (smtp) return smtp
     const parts = Object.values(data as Record<string, unknown>).flat()
     const joined = parts.filter(v => typeof v === 'string' || typeof v === 'number').join(' ')
     if (joined.trim()) return joined

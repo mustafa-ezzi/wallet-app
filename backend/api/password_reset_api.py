@@ -43,9 +43,15 @@ def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
         f'— CashTrail\n'
         f'Follow every rupee.\n'
     )
-    # Gmail requires From == authenticated user
-    from_email = (getattr(settings, 'EMAIL_HOST_USER', None) or '').strip() or settings.DEFAULT_FROM_EMAIL
+    # SMTP auth user (e.g. "resend") is NOT the From address.
+    # From must be a verified sender: onboarding@resend.dev or your domain.
+    from_email = (getattr(settings, 'DEFAULT_FROM_EMAIL', None) or '').strip()
+    if not from_email or from_email.lower() == 'resend':
+        from_email = 'CashTrail <onboarding@resend.dev>'
+
     password = (getattr(settings, 'EMAIL_HOST_PASSWORD', '') or '').replace(' ', '')
+    use_ssl = int(getattr(settings, 'EMAIL_PORT', 587) or 587) in (465, 2465)
+    use_tls = (not use_ssl) and bool(getattr(settings, 'EMAIL_USE_TLS', True))
 
     connection = get_connection(
         backend='django.core.mail.backends.smtp.EmailBackend',
@@ -53,7 +59,8 @@ def _send_otp_email(to_email: str, code: str, first_name: str = '') -> None:
         port=settings.EMAIL_PORT,
         username=settings.EMAIL_HOST_USER,
         password=password,
-        use_tls=settings.EMAIL_USE_TLS,
+        use_tls=use_tls,
+        use_ssl=use_ssl,
         timeout=getattr(settings, 'EMAIL_TIMEOUT', 12),
     )
     msg = EmailMessage(
@@ -126,12 +133,10 @@ class ForgotPasswordView(APIView):
                 return Response(payload)
             return Response(
                 {
-                    'detail': (
-                        'Could not send email via Gmail SMTP. '
-                        'Common fixes: strip spaces from App Password, set DEFAULT_FROM_EMAIL to just '
-                        'mustafaezzi143@gmail.com, confirm 2FA App Password, and check Gmail '
-                        '"Security > Recent security activity" for a blocked sign-in from Railway.'
-                    ),
+                    'detail': 'Could not send the reset email. Check EMAIL_* on Railway and Resend dashboard.',
+                    'smtp_host': getattr(settings, 'EMAIL_HOST', ''),
+                    'smtp_user': getattr(settings, 'EMAIL_HOST_USER', ''),
+                    'from_email': (getattr(settings, 'DEFAULT_FROM_EMAIL', '') or ''),
                     'smtp_error': f'{exc.__class__.__name__}: {exc}',
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
