@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,7 +13,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { apiErrorMessage, asList, dashboardApi, forecastApi } from '@/src/api/client'
+import { apiErrorMessage, asList, dashboardApi, forecastApi, transactionsApi } from '@/src/api/client'
 import type { Dashboard, Forecast, Transaction } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
 import { Reveal } from '@/src/components/motion'
@@ -38,7 +39,7 @@ function todayMonthPrefix(): string {
 export default function HomeScreen() {
   const { user } = useAuth()
   const router = useRouter()
-  const { openAdd, refreshKey } = useMoneyUi()
+  const { openAdd, refreshKey, bumpRefresh } = useMoneyUi()
   const { online, syncNow, hydrateNow, getCachedAccounts, getCachedTransactions } = useOffline()
   const money = useMaskedMoney()
   const colors = useColors()
@@ -128,6 +129,36 @@ export default function HomeScreen() {
 
   const txs: Transaction[] = data?.recent_transactions ?? asList(data?.recent_transactions)
   const balanceNeg = toMoney(data?.total_balance) < 0
+
+  const deleteExpense = (tx: Transaction) => {
+    if (tx.type !== 'expense' || tx.category === 'Bank Transfer') return
+    if (!online) {
+      Alert.alert('Offline', 'Connect to the internet to delete an expense.')
+      return
+    }
+    Alert.alert(
+      'Delete expense?',
+      `Remove “${tx.category || 'Expense'}” of ${money.fmt(tx.amount)}? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await transactionsApi.remove(tx.id)
+                bumpRefresh()
+                await load(true)
+              } catch (err) {
+                Alert.alert('Delete failed', apiErrorMessage(err, 'Could not delete expense.'))
+              }
+            })()
+          },
+        },
+      ],
+    )
+  }
 
   return (
     <Screen>
@@ -342,6 +373,7 @@ export default function HomeScreen() {
             ) : (
               txs.map((tx, i) => {
                 const income = tx.type === 'income'
+                const canDelete = !income && tx.category !== 'Bank Transfer'
                 return (
                   <Reveal index={i} key={tx.id}>
                   <View style={[styles.txRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -359,15 +391,27 @@ export default function HomeScreen() {
                         {tx.account_name || 'Wallet'} · {tx.date}
                       </Text>
                     </View>
-                    <Text
-                      style={[
-                        styles.txAmt,
-                        money.amountStyle,
-                        { color: income ? colors.success : colors.danger },
-                      ]}
-                    >
-                      {money.fmtSigned(Math.abs(toMoney(tx.amount)), income)}
-                    </Text>
+                    <View style={styles.txRight}>
+                      <Text
+                        style={[
+                          styles.txAmt,
+                          money.amountStyle,
+                          { color: income ? colors.success : colors.danger },
+                        ]}
+                      >
+                        {money.fmtSigned(Math.abs(toMoney(tx.amount)), income)}
+                      </Text>
+                      {canDelete ? (
+                        <Pressable
+                          onPress={() => deleteExpense(tx)}
+                          hitSlop={10}
+                          accessibilityLabel="Delete expense"
+                          style={styles.txDelete}
+                        >
+                          <FontAwesome name="trash-o" size={15} color={colors.danger} />
+                        </Pressable>
+                      ) : null}
+                    </View>
                   </View>
                   </Reveal>
                 )
@@ -545,5 +589,9 @@ const styles = StyleSheet.create({
   txCat: { fontWeight: '800', fontSize: typography.body },
   txNotes: { fontSize: typography.caption, marginTop: 2, color: '#4b5563' },
   txMeta: { fontSize: 11, marginTop: 3, color: '#6b7280' },
+  txRight: { alignItems: 'flex-end', gap: 8 },
   txAmt: { fontWeight: '800', fontSize: typography.caption },
+  txDelete: {
+    padding: 4,
+  },
 })

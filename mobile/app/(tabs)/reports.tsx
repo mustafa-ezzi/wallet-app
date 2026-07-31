@@ -140,6 +140,31 @@ export default function ReportsScreen() {
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1])
   }, [monthTxs])
 
+  const deleteExpense = (tx: Transaction) => {
+    if (tx.type !== 'expense' || isTransfer(tx)) return
+    Alert.alert(
+      'Delete expense?',
+      `Remove “${tx.category || 'Expense'}” of ${money.fmt(tx.amount)}? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await transactionsApi.remove(tx.id)
+                await load(true)
+              } catch (err) {
+                Alert.alert('Delete failed', apiErrorMessage(err, 'Could not delete expense.'))
+              }
+            })()
+          },
+        },
+      ],
+    )
+  }
+
   const shareCsv = async () => {
     const header = 'Date,Type,Category,Wallet,Amount,Notes'
     const lines = ledgerTxs.map((t) => {
@@ -411,6 +436,7 @@ export default function ReportsScreen() {
             ) : (
               ledgerTxs.slice(0, 40).map((tx, i) => {
                 const income = tx.type === 'income'
+                const canDelete = !income && !isTransfer(tx)
                 return (
                   <Reveal index={i} key={tx.id}>
                   <View style={styles.txRow}>
@@ -420,15 +446,27 @@ export default function ReportsScreen() {
                         {tx.account_name || 'Wallet'} · {tx.date}
                       </Text>
                     </View>
-                    <Text
-                      style={[
-                        styles.lineAmt,
-                        money.amountStyle,
-                        { color: income ? colors.success : colors.danger },
-                      ]}
-                    >
-                      {money.fmtSigned(Math.abs(toMoney(tx.amount)), income)}
-                    </Text>
+                    <View style={styles.txRight}>
+                      <Text
+                        style={[
+                          styles.lineAmt,
+                          money.amountStyle,
+                          { color: income ? colors.success : colors.danger },
+                        ]}
+                      >
+                        {money.fmtSigned(Math.abs(toMoney(tx.amount)), income)}
+                      </Text>
+                      {canDelete ? (
+                        <Pressable
+                          onPress={() => deleteExpense(tx)}
+                          hitSlop={10}
+                          accessibilityLabel="Delete expense"
+                          style={styles.txDelete}
+                        >
+                          <FontAwesome name="trash-o" size={15} color={colors.danger} />
+                        </Pressable>
+                      ) : null}
+                    </View>
                   </View>
                   </Reveal>
                 )
@@ -559,5 +597,7 @@ function makeStyles(colors: ColorTokens) {
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
+  txRight: { alignItems: 'flex-end', gap: 8 },
+  txDelete: { padding: 4 },
   })
 }

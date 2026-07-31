@@ -1,5 +1,6 @@
 import React from 'react'
 import { Platform } from 'react-native'
+import type { WidgetInfo } from 'react-native-android-widget'
 import { getOfflineStore } from '@/src/offline/store'
 import { fmt, fmtBalance } from '@/src/utils/format'
 import type { BalanceWidgetData } from './BalanceWidget'
@@ -22,6 +23,15 @@ function todayMonthPrefix(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
+function updatedClockLabel(): string {
+  const d = new Date()
+  const h = d.getHours()
+  const m = String(d.getMinutes()).padStart(2, '0')
+  const ap = h >= 12 ? 'pm' : 'am'
+  const hour12 = h % 12 || 12
+  return `${hour12}:${m}${ap}`
+}
+
 export async function loadBalanceWidgetData(): Promise<BalanceWidgetData> {
   try {
     const store = await getOfflineStore()
@@ -33,6 +43,7 @@ export async function loadBalanceWidgetData(): Promise<BalanceWidgetData> {
         ? `${accounts.length} wallet${accounts.length === 1 ? '' : 's'} · tap to open`
         : 'Open CashTrail to sync wallets',
       walletCount: accounts.length,
+      updatedLabel: updatedClockLabel(),
     }
   } catch {
     return {
@@ -64,6 +75,8 @@ export async function loadMonthFlowWidgetData(): Promise<MonthFlowWidgetData> {
       expenseLabel: fmt(expense),
       netLabel: fmtBalance(net),
       netPositive: net >= 0,
+      incomeValue: income,
+      expenseValue: expense,
     }
   } catch {
     return {
@@ -72,6 +85,8 @@ export async function loadMonthFlowWidgetData(): Promise<MonthFlowWidgetData> {
       expenseLabel: '—',
       netLabel: '—',
       netPositive: true,
+      incomeValue: 0,
+      expenseValue: 0,
     }
   }
 }
@@ -81,9 +96,10 @@ export async function loadWalletsWidgetData(): Promise<WalletsWidgetData> {
     const store = await getOfflineStore()
     const accounts = await store.listAccounts()
     const total = accounts.reduce((s, a) => s + (Number(a.currentBalance) || 0), 0)
+    // Load enough rows for tall widgets; UI slices by height.
     const rows = [...accounts]
       .sort((a, b) => (Number(b.currentBalance) || 0) - (Number(a.currentBalance) || 0))
-      .slice(0, 3)
+      .slice(0, 5)
       .map((a) => ({
         name: a.name,
         balanceLabel: fmtBalance(a.currentBalance),
@@ -112,12 +128,12 @@ export async function loadQuickGlanceWidgetData(): Promise<QuickGlanceWidgetData
 
 async function safeRequest(
   widgetName: string,
-  render: () => React.ReactElement,
+  render: (info: WidgetInfo) => React.ReactElement,
 ) {
   const { requestWidgetUpdate } = await import('react-native-android-widget')
   await requestWidgetUpdate({
     widgetName,
-    renderWidget: render,
+    renderWidget: (info) => render(info),
     widgetNotFound: () => {},
   })
 }
@@ -147,10 +163,18 @@ export async function updateAllWidgets() {
     ])
 
     await Promise.all([
-      safeRequest(BALANCE_WIDGET_NAME, () => <BalanceWidget {...balance} />),
-      safeRequest(MONTH_FLOW_WIDGET_NAME, () => <MonthFlowWidget {...month} />),
-      safeRequest(WALLETS_WIDGET_NAME, () => <WalletsWidget {...wallets} />),
-      safeRequest(QUICK_GLANCE_WIDGET_NAME, () => <QuickGlanceWidget {...glance} />),
+      safeRequest(BALANCE_WIDGET_NAME, (info) => (
+        <BalanceWidget {...balance} size={{ width: info.width, height: info.height }} />
+      )),
+      safeRequest(MONTH_FLOW_WIDGET_NAME, (info) => (
+        <MonthFlowWidget {...month} size={{ width: info.width, height: info.height }} />
+      )),
+      safeRequest(WALLETS_WIDGET_NAME, (info) => (
+        <WalletsWidget {...wallets} size={{ width: info.width, height: info.height }} />
+      )),
+      safeRequest(QUICK_GLANCE_WIDGET_NAME, (info) => (
+        <QuickGlanceWidget {...glance} size={{ width: info.width, height: info.height }} />
+      )),
     ])
   } catch (err) {
     console.warn('[CashTrail] widget update failed', err)

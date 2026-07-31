@@ -64,7 +64,7 @@
             {
               "name": "CashTrailBalance",
               "label": "CashTrail Balance",
-              "description": "See your total wallet balance on the home screen",
+              "description": "Total balance with live sync — resizes cleanly",
               "minWidth": "180dp",
               "minHeight": "110dp",
               "targetCellWidth": 3,
@@ -76,7 +76,7 @@
             {
               "name": "CashTrailMonthFlow",
               "label": "CashTrail Month Flow",
-              "description": "This month's money in, out, and net",
+              "description": "Month in / out / net with a flow bar",
               "minWidth": "180dp",
               "minHeight": "110dp",
               "targetCellWidth": 3,
@@ -88,7 +88,7 @@
             {
               "name": "CashTrailWallets",
               "label": "CashTrail Wallets",
-              "description": "Top wallets and total balance",
+              "description": "Top wallets — shows more when you enlarge it",
               "minWidth": "180dp",
               "minHeight": "140dp",
               "targetCellWidth": 3,
@@ -100,7 +100,7 @@
             {
               "name": "CashTrailQuickGlance",
               "label": "CashTrail Glance",
-              "description": "Compact balance glance",
+              "description": "Compact glance — stacks or goes wide when resized",
               "minWidth": "110dp",
               "minHeight": "70dp",
               "targetCellWidth": 2,

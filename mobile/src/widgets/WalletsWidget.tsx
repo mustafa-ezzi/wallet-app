@@ -1,5 +1,8 @@
+'use no memo'
+
 import React from 'react'
 import { FlexWidget, TextWidget } from 'react-native-android-widget'
+import { W, truncate, widgetLayout, type WidgetSize } from './widgetTheme'
 
 export type WalletRow = {
   name: string
@@ -11,59 +14,125 @@ export type WalletsWidgetData = {
   totalLabel: string
 }
 
-/** Widget listing top wallets + total. */
-export function WalletsWidget({ rows, totalLabel }: WalletsWidgetData) {
-  const display = rows.slice(0, 3)
+/** Top wallets + total — shows more rows when the widget is taller. */
+export function WalletsWidget({
+  rows,
+  totalLabel,
+  size,
+}: WalletsWidgetData & { size?: WidgetSize }) {
+  const L = widgetLayout(size)
+  const display = rows.slice(0, L.maxWallets)
 
   return (
     <FlexWidget
       clickAction="OPEN_APP"
+      accessibilityLabel={`CashTrail wallets ${totalLabel}`}
       style={{
         height: 'match_parent',
         width: 'match_parent',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        backgroundColor: '#04333b',
-        borderRadius: 22,
-        padding: 14,
+        flexDirection: 'row',
+        backgroundColor: W.bgDeep,
+        backgroundGradient: {
+          from: W.bgDeep,
+          to: W.bg,
+          orientation: 'TL_BR',
+        },
+        borderRadius: L.radius,
+        borderWidth: 1,
+        borderColor: W.border,
+        overflow: 'hidden',
       }}
     >
-      <FlexWidget style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <TextWidget text="Wallets" style={{ fontSize: 13, fontWeight: '800', color: '#ffffff' }} />
-        <TextWidget text={totalLabel} style={{ fontSize: 12, fontWeight: '700', color: '#6ee7b7' }} />
-      </FlexWidget>
+      <FlexWidget
+        style={{
+          width: L.micro ? 4 : 6,
+          height: 'match_parent',
+          backgroundColor: W.accent,
+          backgroundGradient: {
+            from: W.accentSoft,
+            to: W.accent,
+            orientation: 'TOP_BOTTOM',
+          },
+        }}
+      />
 
-      <FlexWidget style={{ flexDirection: 'column', flexGap: 6, marginTop: 10 }}>
-        {display.length === 0 ? (
+      <FlexWidget
+        style={{
+          flex: 1,
+          height: 'match_parent',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          padding: L.pad,
+        }}
+      >
+        <FlexWidget style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <TextWidget
-            text="Open CashTrail to sync wallets"
-            style={{ fontSize: 12, fontWeight: '500', color: '#94a3b8' }}
+            text="Wallets"
+            style={{ fontSize: L.brand + 1, fontWeight: '800', color: W.white }}
           />
-        ) : (
-          display.map((row) => (
-            <FlexWidget
-              key={row.name}
+          <FlexWidget
+            style={{
+              backgroundColor: W.panel,
+              borderRadius: 999,
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+            }}
+          >
+            <TextWidget
+              text={totalLabel}
+              maxLines={1}
+              truncate="END"
               style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#0b4a52',
-                borderRadius: 12,
-                paddingHorizontal: 10,
-                paddingVertical: 8,
+                fontSize: L.label,
+                fontWeight: '800',
+                color: W.accentSoft,
+                adjustsFontSizeToFit: true,
               }}
-            >
-              <TextWidget
-                text={row.name}
-                style={{ fontSize: 12, fontWeight: '700', color: '#e2e8f0' }}
-              />
-              <TextWidget
-                text={row.balanceLabel}
-                style={{ fontSize: 12, fontWeight: '800', color: '#ffffff' }}
-              />
-            </FlexWidget>
-          ))
-        )}
+            />
+          </FlexWidget>
+        </FlexWidget>
+
+        <FlexWidget style={{ flexDirection: 'column', flexGap: L.compact ? 5 : 6, marginTop: L.compact ? 8 : 10 }}>
+          {display.length === 0 ? (
+            <TextWidget
+              text="Open CashTrail to sync wallets"
+              style={{ fontSize: L.label, fontWeight: '500', color: W.muted }}
+            />
+          ) : (
+            display.map((row, idx) => (
+              <FlexWidget
+                key={`${row.name}-${idx}`}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  backgroundColor: idx % 2 === 0 ? W.panel : W.panelSoft,
+                  borderRadius: L.compact ? 10 : 12,
+                  paddingHorizontal: L.compact ? 8 : 10,
+                  paddingVertical: L.compact ? 6 : 8,
+                }}
+              >
+                <TextWidget
+                  text={truncate(row.name, L.wide ? 22 : L.compact ? 12 : 16)}
+                  maxLines={1}
+                  truncate="END"
+                  style={{ fontSize: L.body - 1, fontWeight: '700', color: '#e2e8f0' }}
+                />
+                <TextWidget
+                  text={row.balanceLabel}
+                  maxLines={1}
+                  truncate="END"
+                  style={{
+                    fontSize: L.body - 1,
+                    fontWeight: '800',
+                    color: W.white,
+                    adjustsFontSizeToFit: true,
+                  }}
+                />
+              </FlexWidget>
+            ))
+          )}
+        </FlexWidget>
       </FlexWidget>
     </FlexWidget>
   )
