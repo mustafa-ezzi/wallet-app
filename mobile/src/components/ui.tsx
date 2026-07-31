@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { BouncyPressable } from './motion'
-import { radii, spacing, typography } from '../theme/colors'
+import { iosShadow, radii, spacing, typography } from '../theme/colors'
 import { useColors } from '../theme/ThemeContext'
 
 export function Screen({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
@@ -110,37 +110,37 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   logoBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  logoBadgeLg: { width: 64, height: 64, borderRadius: 18 },
-  logoLetter: { color: '#fff', fontWeight: '900', fontSize: 22 },
-  logoLetterLg: { fontSize: 28 },
+  logoBadgeLg: { width: 56, height: 56, borderRadius: 16 },
+  logoLetter: { color: '#fff', fontWeight: '900', fontSize: 20 },
+  logoLetterLg: { fontSize: 24 },
   brandName: { fontSize: typography.subtitle, fontWeight: '800' },
   brandNameLg: { fontSize: typography.title },
-  brandTag: { fontSize: typography.caption, marginTop: 4 },
+  brandTag: { fontSize: typography.caption, marginTop: 3 },
   field: { marginBottom: spacing.md },
   label: {
     fontSize: typography.label,
     fontWeight: '700',
     textTransform: 'uppercase',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   input: {
     borderWidth: 1,
     borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: 12,
+    paddingVertical: 10,
     fontSize: typography.body,
     fontWeight: '600',
   },
   primaryBtn: {
     borderRadius: radii.sm,
-    paddingVertical: 14,
+    paddingVertical: 12,
     alignItems: 'center',
     marginTop: spacing.sm,
   },
@@ -157,9 +157,10 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#dc2626', fontWeight: '600', fontSize: typography.caption },
   card: {
-    borderRadius: radii.md,
-    borderWidth: 1,
-    padding: spacing.lg,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.md,
     marginBottom: spacing.md,
+    ...iosShadow,
   },
 })

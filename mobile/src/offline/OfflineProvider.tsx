@@ -17,7 +17,7 @@ import { queuePersonalTransaction, type QueueTxInput } from './queueTransaction'
 import { getOfflineStore, __resetOfflineStore } from './store'
 import { pendingCount, syncOutbox } from './syncEngine'
 import type { OfflineAccount, OfflineTransaction } from './types'
-import { updateBalanceWidgets } from '@/src/widgets/updateBalanceWidget'
+import { updateAllWidgets } from '@/src/widgets/updateWidgets'
 
 interface OfflineContextValue {
   ready: boolean
@@ -58,7 +58,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     const [aRes, tRes] = await Promise.all([accountsApi.list(), transactionsApi.list()])
     await hydrateFromServer(store, aRes.data, tRes.data, user.id)
     await refreshStatus()
-    void updateBalanceWidgets()
+    void updateAllWidgets()
   }, [user, refreshStatus])
 
   const syncNow = useCallback(async () => {
@@ -98,7 +98,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     const result = await queuePersonalTransaction(store, input, { online: onlineNow })
     if (!onlineNow) track('transaction_queued_offline', { tx_type: input.type })
     await refreshStatus()
-    void updateBalanceWidgets()
+    void updateAllWidgets()
     if (onlineNow) await syncNow()
     return { queuedOffline: !onlineNow, localId: result.transaction.localId }
   }, [refreshStatus, syncNow])

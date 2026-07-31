@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from . import household_api
 from . import devices_api
+from . import password_reset_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -20,6 +21,9 @@ router.register('devices', devices_api.DeviceTokenViewSet, basename='device')
 
 urlpatterns = [
     path('auth/register/', views.RegisterView.as_view(), name='register'),
+    path('auth/forgot-password/', password_reset_api.ForgotPasswordView.as_view(), name='forgot-password'),
+    path('auth/verify-reset-otp/', password_reset_api.VerifyResetOTPView.as_view(), name='verify-reset-otp'),
+    path('auth/reset-password/', password_reset_api.ResetPasswordView.as_view(), name='reset-password'),
     path('me/', views.MeView.as_view(), name='me'),
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
     path('forecast/<int:year>/<int:month>/', views.ForecastView.as_view(), name='forecast'),

@@ -99,6 +99,33 @@ export async function requestReminderPermission(): Promise<boolean> {
   return Boolean(next.granted)
 }
 
+/**
+ * Fire a local test notification so the user can confirm banners work.
+ * Asks for permission if needed. Returns false if denied / web.
+ */
+export async function sendTestNotification(): Promise<boolean> {
+  if (Platform.OS === 'web') return false
+  const ok = await requestReminderPermission()
+  if (!ok) return false
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'CashTrail test',
+      body: 'Notifications are working. You’ll get reminders like this for loans and bills.',
+      data: { screen: 'bills', kind: 'payable', id: 0, test: true },
+      sound: true,
+      ...(Platform.OS === 'android' ? { channelId: CHANNEL_ID } : {}),
+    },
+    // Slight delay so you can leave Settings / background the app
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 3,
+    },
+  })
+  track('test_notification_sent')
+  return true
+}
+
 async function cancelCashTrailReminders(): Promise<void> {
   if (Platform.OS === 'web') return
   const scheduled = await Notifications.getAllScheduledNotificationsAsync()

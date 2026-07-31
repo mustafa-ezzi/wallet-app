@@ -580,3 +580,59 @@ class PushDeliveryLog(models.Model):
 
     def __str__(self):
         return f"{self.kind}:{self.object_id} lead={self.lead_days} @ {self.notify_date}"
+
+
+class PasswordResetOTP(models.Model):
+    """Short-lived email OTP for forgot-password flow."""
+
+    email = models.EmailField(db_index=True)
+    code_hash = models.CharField(max_length=64)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['email', '-created_at'], name='pwd_otp_email_idx'),
+        ]
+
+    def __str__(self):
+        return f'OTP({self.email}, used={self.used})'
+
+    @staticmethod
+    def hash_code(code: str) -> str:
+        import hashlib
+        return hashlib.sha256(code.strip().encode('utf-8')).hexdigest()
+
+    @classmethod
+    def create_for_email(cls, email: str, ttl_minutes: int = 10):
+        """Invalidate prior unused codes, create a new one. Returns (row, plain_code)."""
+        import secrets
+        from datetime import timedelta
+        from django.utils import timezone
+
+        email_n = email.strip().lower()
+        cls.objects.filter(email=email_n, used=False).update(used=True)
+        code = f'{secrets.randbelow(1_000_000):06d}'
+        row = cls.objects.create(
+            email=email_n,
+            code_hash=cls.hash_code(code),
+            expires_at=timezone.now() + timedelta(minutes=ttl_minutes),
+        )
+        return row, code
+
+    def verify(self, code: str, max_attempts: int = 5) -> bool:
+        import secrets
+        from django.utils import timezone
+
+        if self.used:
+            return False
+        if timezone.now() > self.expires_at:
+            return False
+        if self.attempts >= max_attempts:
+            return False
+        self.attempts += 1
+        self.save(update_fields=['attempts'])
+        return secrets.compare_digest(self.code_hash, self.hash_code(code))

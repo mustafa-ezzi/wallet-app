@@ -18,7 +18,7 @@ export function BalanceWidget({ balanceLabel, subtitle, walletCount }: BalanceWi
         flexDirection: 'column',
         justifyContent: 'space-between',
         backgroundColor: '#04333b',
-        borderRadius: 20,
+        borderRadius: 22,
         padding: 16,
       }}
     >
@@ -45,10 +45,10 @@ export function BalanceWidget({ balanceLabel, subtitle, walletCount }: BalanceWi
       <TextWidget
         text={balanceLabel}
         style={{
-          fontSize: 26,
+          fontSize: 28,
           fontWeight: '800',
           color: '#ffffff',
-          marginTop: 8,
+          marginTop: 10,
         }}
       />
 

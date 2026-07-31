@@ -632,11 +632,21 @@ export default function HouseholdPage() {
   )
 
   const buildInviteMessage = () => {
-    const accountName = selected?.name || 'our shared account'
+    const accountName = selected?.name || 'our household'
+    const code = invite?.code ? invite.code.trim().toUpperCase() : ''
     return (
-      `${inviterName} is inviting you to join the combined account “${accountName}” on CashTrail.\n\n` +
-      `Track shared home & family expenses together — your personal wallets stay private.\n\n` +
-      `Join with this link:\n${inviteUrl}`
+      `${inviterName} invited you to track shared expenses together on CashTrail.\n\n` +
+      `Household: “${accountName}”\n` +
+      (code ? `Invite code: ${code}\n\n` : '\n') +
+      `Why CashTrail?\n` +
+      `• Shared household ledger — everyone sees what was spent\n` +
+      `• Split equal — know who owes whom, instantly\n` +
+      `• Your personal wallets stay private\n` +
+      `• Also track bills, loans & EMI reminders in PKR\n\n` +
+      `Join with this link:\n${inviteUrl}\n\n` +
+      (code ? `Or open CashTrail → Family / Household → Join, and enter ${code}\n\n` : '') +
+      `Fair house money. No WhatsApp IOU fights.\n` +
+      `CashTrail — Follow every rupee.`
     )
   }
 

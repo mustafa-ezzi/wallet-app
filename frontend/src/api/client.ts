@@ -148,6 +148,12 @@ export const authApi = {
     api.post('/auth/register/', { ...data, username: data.email }),
   me: () => api.get('/me/'),
   updateMe: (data: object) => api.patch('/me/', data),
+  forgotPassword: (email: string) =>
+    api.post('/auth/forgot-password/', { email }),
+  verifyResetOtp: (email: string, code: string) =>
+    api.post('/auth/verify-reset-otp/', { email, code }),
+  resetPassword: (reset_token: string, password: string) =>
+    api.post('/auth/reset-password/', { reset_token, password }),
 }
 
 export const accountsApi = {

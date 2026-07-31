@@ -9,19 +9,20 @@ import {
   View,
 } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { apiErrorMessage, asList, dashboardApi, forecastApi } from '@/src/api/client'
 import type { Dashboard, Forecast, Transaction } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
-import { BouncyPressable, Reveal } from '@/src/components/motion'
+import { Reveal } from '@/src/components/motion'
 import { Screen } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { useOffline } from '@/src/offline'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
-import { radii, spacing, typography } from '@/src/theme/colors'
+import { iosShadow, radii, spacing, typography } from '@/src/theme/colors'
 import { toMoney } from '@/src/utils/format'
 
 const MONTH_NAMES = [
@@ -132,7 +133,7 @@ export default function HomeScreen() {
     <Screen>
       <ScrollView
         contentContainerStyle={{
-          paddingBottom: insets.bottom + 88,
+          paddingBottom: insets.bottom + 78,
           paddingHorizontal: spacing.lg,
           paddingTop: spacing.md,
         }}
@@ -159,9 +160,16 @@ export default function HomeScreen() {
             {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
             <Reveal index={0}>
-            <View style={[styles.hero, { backgroundColor: colors.primaryDark }]}>
+            <LinearGradient
+              colors={[colors.primaryDark, colors.primary, colors.primarySoft]}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.hero}
+            >
               <View style={styles.heroGlow} pointerEvents="none" />
               <View style={styles.heroGlow2} pointerEvents="none" />
+              <View style={styles.heroSheen} pointerEvents="none" />
               <View style={styles.heroTop}>
                 <Text style={styles.heroLabel}>Total balance</Text>
                 <AmountEyeToggle tone="light" />
@@ -182,7 +190,7 @@ export default function HomeScreen() {
               <View style={styles.balanceChips}>
                 <View style={styles.balanceChip}>
                   <View style={styles.chipLabelRow}>
-                    <FontAwesome name="arrow-up" size={10} color="rgba(255,255,255,0.75)" />
+                    <FontAwesome name="arrow-up" size={10} color="rgba(255,255,255,0.8)" />
                     <Text style={styles.chipLabel}>{monthName} in</Text>
                   </View>
                   <Text style={[styles.chipValue, money.amountStyle]}>
@@ -191,7 +199,7 @@ export default function HomeScreen() {
                 </View>
                 <View style={styles.balanceChip}>
                   <View style={styles.chipLabelRow}>
-                    <FontAwesome name="arrow-down" size={10} color="rgba(255,255,255,0.75)" />
+                    <FontAwesome name="arrow-down" size={10} color="rgba(255,255,255,0.8)" />
                     <Text style={styles.chipLabel}>{monthName} out</Text>
                   </View>
                   <Text style={[styles.chipValue, money.amountStyle]}>
@@ -199,7 +207,7 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
-            </View>
+            </LinearGradient>
             </Reveal>
 
             {forecast ? (
@@ -281,22 +289,6 @@ export default function HomeScreen() {
                 </Pressable>
               </Reveal>
             ) : null}
-
-            <Reveal index={2}>
-              <BouncyPressable
-                style={[styles.householdCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={() => router.push('/(tabs)/household')}
-              >
-                <View style={[styles.householdIcon, { backgroundColor: colors.primarySoft + '22' }]}>
-                  <FontAwesome name="users" size={18} color={colors.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.householdTitle, { color: colors.text }]}>Household</Text>
-                  <Text style={[styles.householdSub, { color: colors.textMuted }]}>Shared expenses with family or friends</Text>
-                </View>
-                <Text style={[styles.link, { color: colors.primary }]}>Open →</Text>
-              </BouncyPressable>
-            </Reveal>
 
             {(data?.accounts?.length ?? 0) > 0 ? (
               <>
@@ -397,31 +389,42 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   hi: { fontSize: typography.body, fontWeight: '600', color: '#7fa393' },
-  name: { fontSize: typography.title, fontWeight: '800', color: '#047857' },
+  name: { fontSize: 20, fontWeight: '800', color: '#047857', letterSpacing: -0.3 },
   error: { color: '#dc2626', marginBottom: spacing.md, fontWeight: '600' },
   hero: {
-    borderRadius: radii.lg,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
+    borderRadius: radii.xl,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
     overflow: 'hidden',
+    ...iosShadow,
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
   },
   heroGlow: {
     position: 'absolute',
-    top: -60,
-    right: -50,
-    width: 180,
-    height: 180,
-    borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    top: -50,
+    right: -40,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   heroGlow2: {
     position: 'absolute',
-    top: -20,
-    right: 10,
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    top: -16,
+    right: 8,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  heroSheen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 40,
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   heroTop: {
     flexDirection: 'row',
@@ -429,7 +432,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   heroLabel: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.72)',
     fontSize: typography.label,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -437,27 +440,30 @@ const styles = StyleSheet.create({
   },
   heroAmount: {
     color: '#ffffff',
-    fontSize: typography.hero,
+    fontSize: 30,
     fontWeight: '800',
     marginTop: spacing.sm,
+    letterSpacing: -0.5,
   },
-  heroHint: { color: 'rgba(255,255,255,0.55)', fontSize: typography.caption, marginTop: 4 },
+  heroHint: { color: 'rgba(255,255,255,0.58)', fontSize: typography.caption, marginTop: 3 },
   balanceChips: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
   },
   balanceChip: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radii.sm,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.22)',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
-  chipLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  chipLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   chipLabel: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
@@ -465,100 +471,79 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '800',
     fontSize: typography.caption,
-    marginTop: 4,
+    marginTop: 3,
   },
   forecastCard: {
-    borderRadius: radii.md,
-    borderWidth: 1,
-    padding: spacing.lg,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.md,
     marginBottom: spacing.md,
+    ...iosShadow,
   },
   forecastHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   forecastTitle: { fontWeight: '800', fontSize: typography.body },
   forecastNet: { fontWeight: '800', fontSize: typography.title, marginTop: spacing.sm },
-  forecastHint: { fontSize: 12, marginTop: 2 },
-  divider: { height: 1, marginVertical: spacing.md },
+  forecastHint: { fontSize: 11, marginTop: 2 },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: spacing.md },
   actualRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   actualLabel: { fontSize: typography.caption, fontWeight: '600' },
   actualValue: { fontWeight: '800', fontSize: typography.caption },
-  barLabel: { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  barLabel: { fontSize: 11, fontWeight: '600', marginBottom: 3 },
   barTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   barFill: { height: '100%', borderRadius: 3 },
-  householdCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  householdIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  householdTitle: { fontWeight: '800', fontSize: typography.body },
-  householdSub: { fontSize: 12, marginTop: 2 },
   sectionHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  sectionTitle: { fontSize: typography.subtitle, fontWeight: '800' },
-  link: { fontWeight: '800' },
-  walletStrip: { gap: spacing.sm, paddingBottom: spacing.lg },
+  sectionTitle: { fontSize: typography.subtitle, fontWeight: '800', letterSpacing: -0.2 },
+  link: { fontWeight: '800', fontSize: typography.caption },
+  walletStrip: { gap: spacing.sm, paddingBottom: spacing.md },
   walletCard: {
-    width: 140,
-    backgroundColor: '#ffffff',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    width: 128,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: spacing.md,
+    ...iosShadow,
   },
   walletIcon: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     borderRadius: 8,
-    backgroundColor: '#f3f4f6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   walletName: { fontWeight: '700', fontSize: typography.caption },
-  walletBal: { fontWeight: '800', marginTop: 4, fontSize: 13 },
+  walletBal: { fontWeight: '800', marginTop: 3, fontSize: 12 },
   empty: {
-    backgroundColor: '#ffffff',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    padding: spacing.lg,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: spacing.md,
+    ...iosShadow,
   },
-  emptyTitle: { fontWeight: '800', marginBottom: 4 },
-  emptyBody: { fontSize: typography.caption, lineHeight: 18, color: '#6b7280' },
+  emptyTitle: { fontWeight: '800', marginBottom: 3, fontSize: typography.body },
+  emptyBody: { fontSize: typography.caption, lineHeight: 16, color: '#6b7280' },
   txRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
-    backgroundColor: '#ffffff',
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    gap: spacing.sm,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    ...iosShadow,
   },
   txIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   txCat: { fontWeight: '800', fontSize: typography.body },
   txNotes: { fontSize: typography.caption, marginTop: 2, color: '#4b5563' },
-  txMeta: { fontSize: 12, marginTop: 4, color: '#6b7280' },
+  txMeta: { fontSize: 11, marginTop: 3, color: '#6b7280' },
   txAmt: { fontWeight: '800', fontSize: typography.caption },
 })

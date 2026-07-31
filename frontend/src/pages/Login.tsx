@@ -8,6 +8,7 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const registered = Boolean((location.state as { registered?: boolean } | null)?.registered)
+  const resetDone = Boolean((location.state as { reset?: boolean } | null)?.reset)
   const prefillEmail = (location.state as { email?: string } | null)?.email ?? ''
 
   const [email, setEmail] = useState(prefillEmail)
@@ -43,6 +44,11 @@ export default function Login() {
             Account created. Sign in with your email and password.
           </div>
         )}
+        {resetDone && (
+          <div className="auth-success" style={{ marginBottom: '1rem' }}>
+            Password updated. Sign in with your new password.
+          </div>
+        )}
         {error && <div className="auth-error" style={{ marginBottom: '1rem' }}>{error}</div>}
 
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -57,7 +63,12 @@ export default function Login() {
             />
           </div>
           <div className="form-group">
-            <label>Password</label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <label>Password</label>
+              <Link to="/forgot-password" style={{ fontSize: '0.85rem', fontWeight: 700 }}>
+                Forgot password?
+              </Link>
+            </div>
             <input
               type="password"
               placeholder="••••••••"

@@ -38,6 +38,8 @@ import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { todayISO, toMoney } from '@/src/utils/format'
+import { buildHouseholdInviteMessage } from '@/src/utils/shareInvite'
+import { useAuth } from '@/src/context/AuthContext'
 
 type ViewMode = 'list' | 'detail' | 'ledger'
 
@@ -47,6 +49,7 @@ export default function HouseholdScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors])
   const money = useMaskedMoney()
   const { online } = useOffline()
+  const { user } = useAuth()
 
   const [view, setView] = useState<ViewMode>('list')
   const [households, setHouseholds] = useState<Household[]>([])
@@ -249,8 +252,16 @@ export default function HouseholdScreen() {
 
   const shareInvite = async () => {
     if (!invite?.code || !selected) return
-    const msg = `Join my CashTrail household "${selected.name}" with code ${invite.code}`
-    await Share.share({ message: msg, title: 'CashTrail invite' })
+    const inviterName =
+      [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim()
+      || user?.email
+      || null
+    const msg = buildHouseholdInviteMessage({
+      householdName: selected.name,
+      inviteCode: invite.code,
+      inviterName,
+    })
+    await Share.share({ message: msg, title: 'Join my CashTrail household' })
   }
 
   const isOwner = selected?.my_role === 'owner'

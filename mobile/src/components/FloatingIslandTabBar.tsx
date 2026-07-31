@@ -1,17 +1,28 @@
 import { useEffect, useState } from 'react'
 import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Platform, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native'
+import { Platform, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing } from '@/src/theme/colors'
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient)
 
 /** Must match styles.row.paddingHorizontal below. */
-const ROW_H_PADDING = 8
+const ROW_H_PADDING = 10
+const PILL_INSET = 5
 
 type IconName = React.ComponentProps<typeof FontAwesome>['name']
 
@@ -46,13 +57,44 @@ const ICONS: Record<string, IconName> = {
   settings: 'cog',
 }
 
-/** Floating liquid-glass pill island tab bar with a spring-sliding active indicator. */
+function TabIcon({
+  focused,
+  icon,
+  activeColor,
+  idleColor,
+}: {
+  focused: boolean
+  icon: IconName
+  activeColor: string
+  idleColor: string
+}) {
+  const scale = useSharedValue(focused ? 1 : 0.92)
+  const glow = useSharedValue(focused ? 1 : 0)
+
+  useEffect(() => {
+    scale.value = withSpring(focused ? 1.08 : 0.94, { damping: 14, stiffness: 220, mass: 0.55 })
+    glow.value = withTiming(focused ? 1 : 0, { duration: 220 })
+  }, [focused, scale, glow])
+
+  const anim = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: interpolate(glow.value, [0, 1], [0.72, 1]),
+  }))
+
+  return (
+    <Animated.View style={[styles.iconSlot, anim]}>
+      <FontAwesome name={icon} size={focused ? 17 : 16} color={focused ? activeColor : idleColor} />
+    </Animated.View>
+  )
+}
+
+/** Floating liquid-crystal glass pill — icons only, shiny active indicator. */
 export function FloatingIslandTabBar({ state, descriptors, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const [rowWidth, setRowWidth] = useState(0)
 
-  const HIDDEN_TABS = new Set(['household', 'settings'])
+  const HIDDEN_TABS = new Set(['reports', 'settings'])
 
   const visibleRoutes = state.routes.filter((route) => {
     if (HIDDEN_TABS.has(route.name)) return false
@@ -66,33 +108,43 @@ export function FloatingIslandTabBar({ state, descriptors, navigation }: TabBarP
     visibleRoutes.findIndex((r) => state.routes.findIndex((rr) => rr.key === r.key) === state.index),
   )
 
-  // `row` has paddingHorizontal: ROW_H_PADDING, so its flex content (the tab
-  // items) starts inset from the measured layout width. Absolutely positioned
-  // children are placed relative to the padding edge, so we must subtract the
-  // padding before dividing into equal slots and re-add it as a left offset —
-  // otherwise the pill drifts further from the real icon on each tab to the
-  // right, eventually leaving the (white) active label with no pill behind it.
   const contentWidth = Math.max(0, rowWidth - ROW_H_PADDING * 2)
   const itemWidth = visibleRoutes.length > 0 ? contentWidth / visibleRoutes.length : 0
   const translateX = useSharedValue(0)
   const pillWidth = useSharedValue(0)
+  const shineX = useSharedValue(-0.4)
 
   const onRowLayout = (e: LayoutChangeEvent) => {
-    const w = e.nativeEvent.layout.width
-    setRowWidth(w)
+    setRowWidth(e.nativeEvent.layout.width)
   }
 
   useEffect(() => {
     if (rowWidth <= 0) return
-    const target = ROW_H_PADDING + focusedVisibleIndex * itemWidth + 6
-    const targetWidth = Math.max(0, itemWidth - 12)
-    translateX.value = withSpring(target, { damping: 18, stiffness: 180, mass: 0.7 })
-    pillWidth.value = withSpring(targetWidth, { damping: 18, stiffness: 180, mass: 0.7 })
+    const target = ROW_H_PADDING + focusedVisibleIndex * itemWidth + PILL_INSET
+    const targetWidth = Math.max(0, itemWidth - PILL_INSET * 2)
+    translateX.value = withSpring(target, { damping: 16, stiffness: 200, mass: 0.65 })
+    pillWidth.value = withSpring(targetWidth, { damping: 16, stiffness: 200, mass: 0.65 })
   }, [rowWidth, itemWidth, focusedVisibleIndex, translateX, pillWidth])
+
+  // Soft specular sweep across the glass island
+  useEffect(() => {
+    shineX.value = withRepeat(
+      withSequence(
+        withTiming(1.25, { duration: 2800, easing: Easing.inOut(Easing.quad) }),
+        withDelay(1600, withTiming(-0.4, { duration: 0 })),
+      ),
+      -1,
+      false,
+    )
+  }, [shineX])
 
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
     width: pillWidth.value,
+  }))
+
+  const shineStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shineX.value * Math.max(rowWidth, 1) }, { skewX: '-18deg' }],
   }))
 
   return (
@@ -103,38 +155,75 @@ export function FloatingIslandTabBar({ state, descriptors, navigation }: TabBarP
       <View style={styles.islandShadow}>
         <View style={[styles.island, { borderColor: colors.glassBorder }]}>
           {Platform.OS === 'web' ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.96)' }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255,255,255,0.94)' }]} />
           ) : (
-            <BlurView intensity={28} tint="light" style={StyleSheet.absoluteFill} />
+            <BlurView
+              intensity={Platform.OS === 'ios' ? 64 : 48}
+              tint="light"
+              style={StyleSheet.absoluteFill}
+            />
           )}
+
+          {/* Crystal fill */}
           <LinearGradient
-            colors={['rgba(255,255,255,0.88)', 'rgba(255,255,255,0.72)', 'rgba(255,255,255,0.84)']}
-            start={{ x: 0.1, y: 0 }}
-            end={{ x: 0.9, y: 1 }}
+            colors={[
+              'rgba(255,255,255,0.78)',
+              'rgba(255,255,255,0.42)',
+              'rgba(255,255,255,0.62)',
+            ]}
+            locations={[0, 0.45, 1]}
+            start={{ x: 0.15, y: 0 }}
+            end={{ x: 0.85, y: 1 }}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
-          <View style={[styles.sheen, { backgroundColor: colors.glassHighlight }]} pointerEvents="none" />
+
+          {/* Top glass rim */}
+          <LinearGradient
+            colors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0)']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={styles.topRim}
+            pointerEvents="none"
+          />
+
+          {/* Moving specular shine */}
+          <Animated.View style={[styles.shineBand, shineStyle]} pointerEvents="none">
+            <LinearGradient
+              colors={[
+                'rgba(255,255,255,0)',
+                'rgba(255,255,255,0.55)',
+                'rgba(255,255,255,0)',
+              ]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
 
           <View style={styles.row} onLayout={onRowLayout}>
             {rowWidth > 0 ? (
               <AnimatedLinearGradient
-                colors={[colors.primary, colors.primarySoft]}
+                colors={[colors.primary, colors.primarySoft, colors.primary]}
+                locations={[0, 0.5, 1]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.slidingPill, pillStyle]}
                 pointerEvents="none"
-              />
+              >
+                <LinearGradient
+                  colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0.05)', 'rgba(255,255,255,0)']}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={styles.pillSheen}
+                  pointerEvents="none"
+                />
+              </AnimatedLinearGradient>
             ) : null}
 
             {visibleRoutes.map((route) => {
               const index = state.routes.findIndex((r) => r.key === route.key)
               const focused = state.index === index
-              const { options } = descriptors[route.key]
-              const label =
-                typeof options.tabBarLabel === 'string'
-                  ? options.tabBarLabel
-                  : options.title ?? route.name
               const icon = ICONS[route.name] ?? 'circle'
 
               const onPress = () => {
@@ -153,21 +242,16 @@ export function FloatingIslandTabBar({ state, descriptors, navigation }: TabBarP
                   key={route.key}
                   accessibilityRole="button"
                   accessibilityState={focused ? { selected: true } : {}}
+                  accessibilityLabel={descriptors[route.key]?.options?.title ?? route.name}
                   onPress={onPress}
-                  style={({ pressed }) => [styles.item, pressed && { opacity: 0.85 }]}
+                  style={({ pressed }) => [styles.item, pressed && { opacity: 0.82 }]}
                 >
-                  {focused ? (
-                    <View style={styles.activeContent}>
-                      <FontAwesome name={icon} size={15} color={colors.white} />
-                      <Text style={styles.activeLabel} numberOfLines={1}>
-                        {label}
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.idle}>
-                      <FontAwesome name={icon} size={18} color={colors.tabInactive} />
-                    </View>
-                  )}
+                  <TabIcon
+                    focused={focused}
+                    icon={icon}
+                    activeColor={colors.white}
+                    idleColor={colors.tabInactive}
+                  />
                 </Pressable>
               )
             })}
@@ -189,70 +273,70 @@ const styles = StyleSheet.create({
   },
   islandShadow: {
     width: '100%',
-    maxWidth: 420,
+    maxWidth: 360,
     borderRadius: radii.full,
+    // iOS-style layered shadow
     shadowColor: '#0f172a',
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.2,
     shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 14,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 16,
   },
   island: {
     borderRadius: radii.full,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     overflow: 'hidden',
-    minHeight: 62,
+    minHeight: 56,
     justifyContent: 'center',
-    // Solid enough that list content never bleeds through the glass
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: 'rgba(255,255,255,0.38)',
   },
-  sheen: {
+  topRim: {
     position: 'absolute',
     top: 0,
-    left: '8%',
-    right: '8%',
-    height: 1.5,
-    opacity: 0.7,
-    borderRadius: 2,
+    left: '6%',
+    right: '6%',
+    height: 14,
+    opacity: 0.9,
+  },
+  shineBand: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 54,
+    opacity: 0.55,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: ROW_H_PADDING,
+    paddingVertical: 6,
   },
   slidingPill: {
     position: 'absolute',
-    top: 8,
-    bottom: 8,
+    top: 6,
+    bottom: 6,
     left: 0,
     borderRadius: radii.full,
+    overflow: 'hidden',
+    // Soft glow under the active crystal pill
+    shadowColor: '#059669',
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  pillSheen: {
+    ...StyleSheet.absoluteFillObject,
   },
   item: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  activeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  activeLabel: {
-    color: '#fff',
-    fontWeight: '800',
-    fontSize: 11,
-    maxWidth: 64,
-    textShadowColor: 'rgba(0,0,0,0.18)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  idle: {
-    width: 42,
     height: 42,
+  },
+  iconSlot: {
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: radii.full,

@@ -11,6 +11,7 @@ export {
   rescheduleDueReminders,
   requestReminderPermission,
   getPermissionStatus,
+  sendTestNotification,
   isDueSoon,
   upcomingFireDates,
 } from './schedule'

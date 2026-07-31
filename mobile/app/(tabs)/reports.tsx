@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,10 +24,12 @@ import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
 import { Reveal } from '@/src/components/motion'
 import { SelectField } from '@/src/components/SelectFields'
 import { Screen } from '@/src/components/ui'
+import { useAuth } from '@/src/context/AuthContext'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { sumMoney, toMoney } from '@/src/utils/format'
+import { shareReportPdf, type ReportLedgerRow } from '@/src/utils/reportPdf'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -48,6 +51,7 @@ export default function ReportsScreen() {
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const money = useMaskedMoney()
+  const { user } = useAuth()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [forecast, setForecast] = useState<Forecast | null>(null)
@@ -57,6 +61,7 @@ export default function ReportsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [walletFilter, setWalletFilter] = useState<number | 'all'>('all')
+  const [pdfBusy, setPdfBusy] = useState(false)
 
   const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
   const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`
@@ -153,6 +158,48 @@ export default function ReportsScreen() {
       title: `CashTrail ${monthLabel}`,
       message: `CashTrail ledger — ${monthLabel}\n\n${csv}`,
     })
+  }
+
+  const downloadPdf = async () => {
+    setPdfBusy(true)
+    try {
+      const chron = ledgerTxs.slice().sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id)
+      let running = 0
+      const rows: ReportLedgerRow[] = chron.map((t) => {
+        const amt = toMoney(t.amount)
+        const isIncome = t.type === 'income'
+        if (isIncome) running += amt
+        else running -= amt
+        return {
+          date: t.date,
+          description: t.notes || t.category || (isIncome ? 'Income' : 'Expense'),
+          account: t.account_name || 'Wallet',
+          type: isIncome ? 'Income' : 'Expense',
+          category: t.category || '',
+          debit: isIncome ? 0 : amt,
+          credit: isIncome ? amt : 0,
+          balance: running,
+        }
+      })
+      const username =
+        [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim()
+        || user?.email
+        || 'CashTrail user'
+      await shareReportPdf(rows, {
+        username,
+        monthLabel,
+        income: monthIncome,
+        expense: monthExpense,
+        net: monthIncome - monthExpense,
+        expectedIncome: toMoney(forecast?.total_expected_income),
+        expectedExpense: toMoney(forecast?.total_expected_outgoing),
+        netForecast: toMoney(forecast?.net_forecast),
+      })
+    } catch (err) {
+      Alert.alert('PDF export', apiErrorMessage(err, 'Could not create the PDF report.'))
+    } finally {
+      setPdfBusy(false)
+    }
   }
 
   return (
@@ -337,9 +384,16 @@ export default function ReportsScreen() {
 
             <View style={[styles.sectionHead, { marginTop: spacing.lg }]}>
               <Text style={styles.section}>Wallet ledger</Text>
-              <Pressable onPress={() => void shareCsv()} hitSlop={8}>
-                <Text style={styles.link}>Share CSV</Text>
-              </Pressable>
+              <View style={styles.exportRow}>
+                <Pressable onPress={() => void downloadPdf()} hitSlop={8} disabled={pdfBusy}>
+                  <Text style={[styles.link, pdfBusy && { opacity: 0.5 }]}>
+                    {pdfBusy ? 'Building PDF…' : 'Download PDF'}
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => void shareCsv()} hitSlop={8}>
+                  <Text style={styles.linkMuted}>CSV</Text>
+                </Pressable>
+              </View>
             </View>
 
             <SelectField
@@ -448,7 +502,9 @@ function makeStyles(colors: ColorTokens) {
     marginTop: spacing.sm,
   },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  exportRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   link: { color: colors.primary, fontWeight: '800' },
+  linkMuted: { color: colors.textMuted, fontWeight: '700', fontSize: 13 },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.md,

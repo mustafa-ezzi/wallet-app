@@ -17,6 +17,7 @@ import {
   getPermissionStatus,
   requestReminderPermission,
   rescheduleDueReminders,
+  sendTestNotification,
   type ReminderData,
 } from './schedule'
 import {
@@ -39,6 +40,7 @@ type RemindersValue = {
   updatePrefs: (patch: Partial<ReminderPrefs>) => Promise<void>
   enableWithPermission: () => Promise<boolean>
   dismissPrompt: () => Promise<void>
+  sendTest: () => Promise<boolean>
   reschedule: (input: {
     payables: Payable[]
     receivables: Receivable[]
@@ -168,6 +170,8 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
     setShowPromptBanner(false)
   }, [])
 
+  const sendTest = useCallback(async () => sendTestNotification(), [])
+
   const value = useMemo(
     () => ({
       ready,
@@ -179,6 +183,7 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
       updatePrefs,
       enableWithPermission,
       dismissPrompt,
+      sendTest,
       reschedule,
     }),
     [
@@ -191,6 +196,7 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
       updatePrefs,
       enableWithPermission,
       dismissPrompt,
+      sendTest,
       reschedule,
     ],
   )

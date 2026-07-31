@@ -31,9 +31,11 @@ import { mutationId, todayISO, toMoney } from '@/src/utils/format'
 const TYPE_LABEL: Record<string, string> = {
   recurring_monthly: 'Every month',
   contract_monthly: 'Salary / contract',
-  one_time: 'One-time',
-  one_time_installments: 'Paid in parts',
 }
+
+/** Income tab only shows recurring sources — one-time / installments live under Bills. */
+const INCOME_TYPES = Object.keys(TYPE_LABEL) as Project['income_type'][]
+const OWED_TYPES = new Set(['one_time', 'one_time_installments'])
 
 export default function IncomeScreen() {
   const insets = useSafeAreaInsets()
@@ -79,8 +81,14 @@ export default function IncomeScreen() {
     void load()
   }, [load, refreshKey])
 
-  const active = useMemo(() => projects.filter((p) => p.status === 'active'), [projects])
-  const other = useMemo(() => projects.filter((p) => p.status !== 'active'), [projects])
+  const active = useMemo(
+    () => projects.filter((p) => p.status === 'active' && !OWED_TYPES.has(p.income_type)),
+    [projects],
+  )
+  const other = useMemo(
+    () => projects.filter((p) => p.status !== 'active' && !OWED_TYPES.has(p.income_type)),
+    [projects],
+  )
 
   const create = async () => {
     if (!form.name.trim() || toMoney(form.amount) <= 0) {
@@ -98,9 +106,6 @@ export default function IncomeScreen() {
         start_date: form.start_date || todayISO(),
         status: 'active',
         notes: form.notes.trim(),
-      }
-      if (form.income_type === 'one_time_installments') {
-        payload.installment_amount = toMoney(form.installment_amount || form.amount)
       }
       if (form.default_account) payload.default_account = Number(form.default_account)
       await projectsApi.create(payload)
@@ -202,11 +207,7 @@ export default function IncomeScreen() {
           <Text style={[styles.amt, money.amountStyle, { color: colors.success }]}>
             {money.fmt(p.amount)}
           </Text>
-          <Text style={[styles.meta, { color: colors.textMuted }]}>
-            {p.income_type === 'one_time_installments' && p.installment_amount
-              ? `${money.fmt(p.installment_amount)}/mo`
-              : 'each month'}
-          </Text>
+          <Text style={[styles.meta, { color: colors.textMuted }]}>each month</Text>
         </View>
       </View>
 
@@ -328,27 +329,13 @@ export default function IncomeScreen() {
             <SelectField
               label="Type"
               value={form.income_type}
-              options={(Object.keys(TYPE_LABEL) as Project['income_type'][]).map((t) => ({
+              options={INCOME_TYPES.map((t) => ({
                 value: t,
                 label: TYPE_LABEL[t],
               }))}
               onChange={(t) => setForm((f) => ({ ...f, income_type: t }))}
             />
             <Field label="Amount" value={form.amount} onChangeText={(t) => setForm((f) => ({ ...f, amount: t }))} keyboardType="decimal-pad" />
-            {form.income_type === 'one_time_installments' ? (
-              <Field
-                label="Monthly installment"
-                value={form.installment_amount}
-                onChangeText={(t) => setForm((f) => ({ ...f, installment_amount: t }))}
-                keyboardType="decimal-pad"
-              />
-            ) : null}
-            <Field
-              label="Advance already received"
-              value={form.advance_amount}
-              onChangeText={(t) => setForm((f) => ({ ...f, advance_amount: t }))}
-              keyboardType="decimal-pad"
-            />
             <DateField
               label="Start date"
               value={form.start_date}

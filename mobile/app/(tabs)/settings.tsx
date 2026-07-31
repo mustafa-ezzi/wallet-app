@@ -10,7 +10,6 @@ import {
 } from 'react-native'
 import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
-import { API_ROOT } from '@/src/api/client'
 import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
@@ -37,6 +36,8 @@ export default function SettingsScreen() {
   const [pinError, setPinError] = useState('')
   const [pinSaved, setPinSaved] = useState(false)
   const [enableError, setEnableError] = useState('')
+  const [testBusy, setTestBusy] = useState(false)
+  const [testMsg, setTestMsg] = useState('')
 
   const savePin = async () => {
     setPinError('')
@@ -78,14 +79,10 @@ export default function SettingsScreen() {
           <Text style={[styles.value, { color: colors.text }]}>{name}</Text>
           <Text style={[styles.meta, { color: colors.textSecondary }]}>{user?.email}</Text>
           <Text style={[styles.meta, { color: colors.textSecondary }]}>Currency: {user?.currency || 'PKR'}</Text>
-          <Text style={[styles.meta, { color: colors.textSecondary }]}>API: {API_ROOT || '(not set)'}</Text>
         </View>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Theme</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            Same palettes as the web app — Emerald, Ocean, Violet, Rose, Amber.
-          </Text>
           <View style={styles.swatchRow}>
             {themes.map((t) => {
               const selected = themeId === t.id
@@ -163,7 +160,9 @@ export default function SettingsScreen() {
           <View style={[styles.row, { marginTop: spacing.lg }]}>
             <View style={{ flex: 1, paddingRight: spacing.md }}>
               <Text style={[styles.rowTitle, { color: colors.text }]}>Block screenshots</Text>
-              <Text style={[styles.rowHint, { color: colors.textMuted }]}>Uses FLAG_SECURE on Android when privacy is on.</Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                Stop others from capturing your balances on this device.
+              </Text>
             </View>
             <Switch
               value={privacy.blockScreenshots}
@@ -173,9 +172,6 @@ export default function SettingsScreen() {
             />
           </View>
 
-          <Text style={[styles.meta, { color: colors.textSecondary }]}>
-            Biometrics: {privacy.biometricsAvailable ? 'available' : 'not available (use PIN)'}
-          </Text>
           {privacy.enabled ? (
           <Pressable style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted }]} onPress={privacy.lockNow}>
             <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Hide amounts now</Text>
@@ -218,15 +214,20 @@ export default function SettingsScreen() {
         <Text style={[styles.section, { color: colors.primaryDark }]}>Due reminders</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            Local notifications + server push for loans and money owed (Asia/Karachi).
+            Get notified before loans and money owed are due.
           </Text>
           <View style={[styles.row, { marginTop: spacing.md }]}>
             <View style={{ flex: 1, paddingRight: spacing.md }}>
               <Text style={[styles.rowTitle, { color: colors.text }]}>Enable reminders</Text>
-              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                Permission: {reminders.permission}
-                {reminders.lastScheduled > 0 ? ` · ${reminders.lastScheduled} scheduled` : ''}
-              </Text>
+              {reminders.permission === 'denied' ? (
+                <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                  Notifications are blocked — enable them in system settings.
+                </Text>
+              ) : reminders.lastScheduled > 0 ? (
+                <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                  {reminders.lastScheduled} reminder{reminders.lastScheduled === 1 ? '' : 's'} scheduled
+                </Text>
+              ) : null}
             </View>
             <Switch
               value={reminders.prefs.enabled && reminders.permission === 'granted'}
@@ -263,6 +264,32 @@ export default function SettingsScreen() {
               />
             </View>
           ))}
+
+          <Pressable
+            style={[
+              styles.lockBtn,
+              { backgroundColor: colors.surfaceMuted, opacity: testBusy ? 0.55 : 1, marginTop: spacing.lg },
+            ]}
+            disabled={testBusy}
+            onPress={() => {
+              void (async () => {
+                setTestBusy(true)
+                setTestMsg('')
+                const ok = await reminders.sendTest()
+                setTestMsg(
+                  ok
+                    ? 'Test notification coming in ~3 seconds. You can leave this screen.'
+                    : 'Could not send — allow notifications for CashTrail first.',
+                )
+                setTestBusy(false)
+              })()
+            }}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
+              {testBusy ? 'Sending…' : 'Send test notification'}
+            </Text>
+          </Pressable>
+          {testMsg ? <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{testMsg}</Text> : null}
         </View>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Offline</Text>
@@ -289,7 +316,6 @@ export default function SettingsScreen() {
             })()
           }}
         />
-        <Text style={styles.hint}>Push works when the app is closed (Phase 6).</Text>
       </ScrollView>
     </Screen>
   )
@@ -377,5 +403,4 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     color: '#122a20',
   },
-  hint: { marginTop: spacing.lg, fontSize: typography.caption, lineHeight: 18, color: '#5f7569' },
 })

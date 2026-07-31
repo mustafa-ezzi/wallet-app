@@ -72,6 +72,9 @@ export default function LoginScreen() {
               autoComplete="password"
               placeholder="••••••••"
             />
+            <Link href="/(auth)/forgot-password" style={styles.forgot}>
+              Forgot password?
+            </Link>
             <PrimaryButton title="Sign In" onPress={onSubmit} loading={loading} />
           </View>
 
@@ -110,6 +113,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
+  },
+  forgot: {
+    alignSelf: 'flex-end',
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: typography.caption,
+    marginBottom: spacing.sm,
+    marginTop: -4,
   },
   footer: {
     marginTop: spacing.xl,

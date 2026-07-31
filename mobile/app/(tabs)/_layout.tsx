@@ -28,23 +28,23 @@ function TabsShell() {
         tabBar={(props) => <FloatingIslandTabBar {...(props as unknown as React.ComponentProps<typeof FloatingIslandTabBar>)} />}
         screenOptions={{
           headerStyle: { backgroundColor: colors.background },
-          headerTitleStyle: { fontWeight: '800', color: colors.primaryDark },
+          headerTitleStyle: { fontWeight: '800', color: colors.primaryDark, fontSize: 16 },
           headerShadowVisible: false,
           headerRight: () => (
             <View style={styles.headerRight}>
               <Pressable
-                onPress={() => router.push('/(tabs)/household')}
+                onPress={() => router.push('/(tabs)/reports')}
                 hitSlop={8}
                 style={styles.headerBtn}
               >
-                <FontAwesome name="users" size={18} color={colors.primaryDark} />
+                <FontAwesome name="bar-chart" size={16} color={colors.primaryDark} />
               </Pressable>
               <Pressable
                 onPress={() => router.push('/(tabs)/settings')}
                 hitSlop={8}
-                style={[styles.headerBtn, { marginRight: 12 }]}
+                style={[styles.headerBtn, { marginRight: 10 }]}
               >
-                <FontAwesome name="cog" size={18} color={colors.primaryDark} />
+                <FontAwesome name="cog" size={16} color={colors.primaryDark} />
               </Pressable>
             </View>
           ),
@@ -54,10 +54,10 @@ function TabsShell() {
         <Tabs.Screen name="wallets" options={{ title: 'Wallets' }} />
         <Tabs.Screen name="income" options={{ title: 'Income' }} />
         <Tabs.Screen name="bills" options={{ title: 'Bills' }} />
-        <Tabs.Screen name="reports" options={{ title: 'Reports' }} />
+        <Tabs.Screen name="household" options={{ title: 'Family' }} />
         <Tabs.Screen
-          name="household"
-          options={{ title: 'Family', href: null, headerShown: true }}
+          name="reports"
+          options={{ title: 'Reports', href: null, headerShown: true }}
         />
         <Tabs.Screen
           name="settings"
@@ -69,7 +69,7 @@ function TabsShell() {
         <BouncingFab
           onPress={openAdd}
           color={colors.primary}
-          bottom={88 + Math.max(insets.bottom - 8, 0)}
+          bottom={78 + Math.max(insets.bottom - 8, 0)}
         />
       ) : null}
 
@@ -88,6 +88,6 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  headerBtn: { padding: 8 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  headerBtn: { padding: 6 },
 })

@@ -5,9 +5,13 @@ import Animated, {
   Easing,
   FadeIn,
   FadeInUp,
+  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated'
 import { useAuth } from '@/src/context/AuthContext'
@@ -16,18 +20,16 @@ const BLACK = '#000000'
 const GREEN = '#22c55e'
 const GREEN_SOFT = '#4ade80'
 const WHITE = '#ffffff'
-const MUTED = 'rgba(255,255,255,0.45)'
+const MUTED = 'rgba(255,255,255,0.4)'
 
-const MIN_HOLD_MS = 2400
+const MIN_HOLD_MS = 2200
 const EXIT_MS = 480
 
 const logoSource = require('../../assets/images/splash-logo.png')
 const trisiteSource = require('../../assets/images/splash-trisite.png')
-const textureSource = require('../../assets/images/splash-texture.png')
 
 /**
- * Professional black splash — compact assets + reliable FadeIn entrances
- * so logos never stay stuck at opacity 0.
+ * Professional black splash — clean mark, wordmark, quiet footer.
  */
 export function AnimatedSplashScreen() {
   const { loading } = useAuth()
@@ -36,11 +38,28 @@ export function AnimatedSplashScreen() {
   const [minElapsed, setMinElapsed] = useState(false)
 
   const rootOpacity = useSharedValue(1)
+  const pulse = useSharedValue(0)
+  const markScale = useSharedValue(0.9)
 
   useEffect(() => {
     const timer = setTimeout(() => setMinElapsed(true), MIN_HOLD_MS)
     return () => clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    markScale.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) })
+    pulse.value = withDelay(
+      500,
+      withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+        ),
+        -1,
+        false,
+      ),
+    )
+  }, [markScale, pulse])
 
   useEffect(() => {
     if (!minElapsed || loading) return
@@ -53,31 +72,44 @@ export function AnimatedSplashScreen() {
 
   const rootStyle = useAnimatedStyle(() => ({ opacity: rootOpacity.value }))
 
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(pulse.value, [0, 1], [0.12, 0.28]),
+    transform: [{ scale: interpolate(pulse.value, [0, 1], [1, 1.06]) }],
+  }))
+
+  const markStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: markScale.value }],
+  }))
+
   if (!visible) return null
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, rootStyle]} pointerEvents="auto">
       <View style={styles.blackFill} />
-      <Image source={textureSource} style={styles.texture} resizeMode="cover" fadeDuration={0} />
 
       <View style={styles.center}>
-        <Animated.View entering={FadeIn.duration(650).delay(80)}>
-          <Image source={logoSource} style={styles.logo} resizeMode="contain" fadeDuration={0} />
+        <Animated.View style={[styles.glowRing, glowStyle]} pointerEvents="none" />
+
+        <Animated.View entering={FadeIn.duration(650).delay(60)} style={markStyle}>
+          <View style={styles.logoFrame}>
+            <Image source={logoSource} style={styles.logo} resizeMode="cover" fadeDuration={0} />
+          </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInUp.duration(600).delay(320)} style={styles.nameBlock}>
+        <Animated.View entering={FadeInUp.duration(580).delay(280)} style={styles.nameBlock}>
           <Text style={styles.name}>
             <Text style={styles.nameCash}>Cash</Text>
             <Text style={styles.nameTrail}>Trail</Text>
           </Text>
+          <Text style={styles.tagline}>Follow every rupee</Text>
         </Animated.View>
 
-        <Animated.View entering={FadeIn.duration(500).delay(560)} style={styles.hairline} />
+        <Animated.View entering={FadeIn.duration(450).delay(500)} style={styles.hairline} />
       </View>
 
       <Animated.View
-        entering={FadeInUp.duration(550).delay(720)}
-        style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 24 }]}
+        entering={FadeInUp.duration(500).delay(640)}
+        style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 20 }]}
       >
         <Text style={styles.poweredBy}>powered by</Text>
         <View style={styles.footerRow}>
@@ -98,21 +130,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   blackFill: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: BLACK,
-  },
-  texture: {
-    ...StyleSheet.absoluteFill,
-    opacity: 0.5,
   },
   center: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
+  glowRing: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 40,
+    backgroundColor: 'rgba(34,197,94,0.18)',
+  },
+  logoFrame: {
+    width: 112,
+    height: 112,
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
   logo: {
-    width: 148,
-    height: 148,
+    width: 112,
+    height: 112,
   },
   nameBlock: {
     alignItems: 'center',
@@ -121,7 +164,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 36,
     fontWeight: '700',
-    letterSpacing: 0.6,
+    letterSpacing: -0.3,
   },
   nameCash: {
     color: WHITE,
@@ -129,9 +172,16 @@ const styles = StyleSheet.create({
   nameTrail: {
     color: GREEN_SOFT,
   },
+  tagline: {
+    marginTop: 8,
+    fontSize: 13,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    color: MUTED,
+  },
   hairline: {
-    marginTop: 28,
-    width: 48,
+    marginTop: 26,
+    width: 32,
     height: StyleSheet.hairlineWidth * 2,
     backgroundColor: 'rgba(255,255,255,0.22)',
     borderRadius: 1,
@@ -144,12 +194,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   poweredBy: {
-    fontSize: 11,
-    fontWeight: '500',
-    letterSpacing: 1.8,
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 2,
     textTransform: 'uppercase',
     color: MUTED,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   footerRow: {
     flexDirection: 'row',
@@ -157,13 +207,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   trisiteIcon: {
-    width: 22,
-    height: 22,
+    width: 20,
+    height: 20,
+    borderRadius: 5,
   },
   trisiteName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: 0.2,
     color: GREEN,
   },
 })
