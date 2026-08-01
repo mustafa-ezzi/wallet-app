@@ -535,6 +535,8 @@ class NotificationPreference(models.Model):
     lead_3 = models.BooleanField(default=True)
     lead_1 = models.BooleanField(default=True)
     lead_due = models.BooleanField(default=True)
+    # Ops / product updates (broadcast campaigns). Default on; user can opt out in Settings.
+    marketing_enabled = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -636,3 +638,156 @@ class PasswordResetOTP(models.Model):
         self.attempts += 1
         self.save(update_fields=['attempts'])
         return secrets.compare_digest(self.code_hash, self.hash_code(code))
+
+
+# ── Ops panel (Phase 0–1) — no finance row access via these models ────────────
+
+class UserOpsMeta(models.Model):
+    """Staff-facing ops metadata. Never store balances or transaction data here."""
+
+    INACTIVITY_NONE = 'none'
+    INACTIVITY_7D = '7d'
+    INACTIVITY_30D = '30d'
+    INACTIVITY_90D = '90d'
+    INACTIVITY_TIERS = [
+        (INACTIVITY_NONE, 'Active'),
+        (INACTIVITY_7D, 'Inactive 7d'),
+        (INACTIVITY_30D, 'Inactive 30d'),
+        (INACTIVITY_90D, 'Inactive 90d'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='ops_meta')
+    suspended_at = models.DateTimeField(null=True, blank=True)
+    internal_notes = models.TextField(blank=True, default='')
+    marketing_opt_out = models.BooleanField(default=False)
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    inactivity_tier = models.CharField(
+        max_length=8, choices=INACTIVITY_TIERS, default=INACTIVITY_NONE, db_index=True,
+    )
+    last_reengagement_push_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'User ops meta'
+        verbose_name_plural = 'User ops meta'
+
+    def __str__(self):
+        return f'OpsMeta({self.user_id})'
+
+    @property
+    def is_suspended(self):
+        return self.suspended_at is not None
+
+
+class AdminAuditLog(models.Model):
+    """Immutable-ish trail of staff actions in the Ops panel / Django admin."""
+
+    actor = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='ops_audit_logs',
+    )
+    action = models.CharField(max_length=64, db_index=True)
+    target_type = models.CharField(max_length=64, blank=True, default='')
+    target_id = models.CharField(max_length=64, blank=True, default='')
+    meta = models.JSONField(default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['action', '-created_at'], name='ops_audit_action_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.action} by {self.actor_id} @ {self.created_at}'
+
+
+# ── Ops broadcast campaigns (Phase 2) ─────────────────────────────────────────
+
+class PushCampaign(models.Model):
+    AUDIENCE_ALL = 'all'
+    AUDIENCE_ANDROID = 'android'
+    AUDIENCE_INACTIVE_7D = 'inactive_7d'
+    AUDIENCE_INACTIVE_30D = 'inactive_30d'
+    AUDIENCE_INACTIVE_90D = 'inactive_90d'
+    AUDIENCE_CHOICES = [
+        (AUDIENCE_ALL, 'All opted-in users with a device'),
+        (AUDIENCE_ANDROID, 'Android only'),
+        (AUDIENCE_INACTIVE_7D, 'Inactive 7d+'),
+        (AUDIENCE_INACTIVE_30D, 'Inactive 30d+'),
+        (AUDIENCE_INACTIVE_90D, 'Inactive 90d+'),
+    ]
+
+    STATUS_DRAFT = 'draft'
+    STATUS_SCHEDULED = 'scheduled'
+    STATUS_SENDING = 'sending'
+    STATUS_SENT = 'sent'
+    STATUS_FAILED = 'failed'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, 'Draft'),
+        (STATUS_SCHEDULED, 'Scheduled'),
+        (STATUS_SENDING, 'Sending'),
+        (STATUS_SENT, 'Sent'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
+    title = models.CharField(max_length=120)
+    body = models.CharField(max_length=400)
+    data = models.JSONField(default=dict, blank=True)  # e.g. {"route": "/(tabs)/settings"}
+    audience = models.CharField(max_length=32, choices=AUDIENCE_CHOICES, default=AUDIENCE_ALL)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='push_campaigns_created',
+    )
+    scheduled_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    recipient_estimate = models.PositiveIntegerField(default=0)
+    sent_ok = models.PositiveIntegerField(default=0)
+    sent_failed = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'scheduled_at'], name='push_camp_sched_idx'),
+        ]
+
+    def __str__(self):
+        return f'Campaign({self.id}, {self.status}): {self.title}'
+
+
+class PushCampaignDelivery(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_OK = 'ok'
+    STATUS_FAILED = 'failed'
+    STATUS_SKIPPED = 'skipped'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_OK, 'Ok'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_SKIPPED, 'Skipped'),
+    ]
+
+    campaign = models.ForeignKey(PushCampaign, on_delete=models.CASCADE, related_name='deliveries')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='campaign_deliveries')
+    device_token = models.ForeignKey(
+        DeviceToken, null=True, blank=True, on_delete=models.SET_NULL, related_name='campaign_deliveries',
+    )
+    token_snapshot = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    expo_ticket_id = models.CharField(max_length=128, blank=True, default='')
+    error = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['campaign', 'status'], name='push_deliv_camp_status_idx'),
+        ]
+
+    def __str__(self):
+        return f'Delivery({self.campaign_id} → user {self.user_id}: {self.status})'

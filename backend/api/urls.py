@@ -4,6 +4,8 @@ from . import views
 from . import household_api
 from . import devices_api
 from . import password_reset_api
+from . import ops_api
+from . import ops_campaigns_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -37,5 +39,19 @@ urlpatterns = [
     ),
     path('notification-preferences/', devices_api.NotificationPreferenceView.as_view(), name='notification-preferences'),
     path('jobs/due-reminders/', devices_api.DueRemindersJobView.as_view(), name='jobs-due-reminders'),
+    path('jobs/push-campaigns/', devices_api.PushCampaignsJobView.as_view(), name='jobs-push-campaigns'),
+    # Ops panel (staff only)
+    path('ops/me/', ops_api.OpsMeView.as_view(), name='ops-me'),
+    path('ops/dashboard/', ops_api.OpsDashboardView.as_view(), name='ops-dashboard'),
+    path('ops/users/', ops_api.OpsUserListView.as_view(), name='ops-users'),
+    path('ops/users/refresh-inactivity/', ops_api.OpsRefreshInactivityView.as_view(), name='ops-refresh-inactivity'),
+    path('ops/users/<int:user_id>/', ops_api.OpsUserDetailView.as_view(), name='ops-user-detail'),
+    path('ops/users/<int:user_id>/suspend/', ops_api.OpsUserSuspendView.as_view(), name='ops-user-suspend'),
+    path('ops/users/<int:user_id>/unsuspend/', ops_api.OpsUserUnsuspendView.as_view(), name='ops-user-unsuspend'),
+    path('ops/campaigns/', ops_campaigns_api.OpsCampaignListCreateView.as_view(), name='ops-campaigns'),
+    path('ops/campaigns/estimate/', ops_campaigns_api.OpsCampaignEstimateView.as_view(), name='ops-campaigns-estimate'),
+    path('ops/campaigns/<int:campaign_id>/', ops_campaigns_api.OpsCampaignDetailView.as_view(), name='ops-campaign-detail'),
+    path('ops/campaigns/<int:campaign_id>/send/', ops_campaigns_api.OpsCampaignSendView.as_view(), name='ops-campaign-send'),
+    path('ops/campaigns/<int:campaign_id>/cancel/', ops_campaigns_api.OpsCampaignCancelView.as_view(), name='ops-campaign-cancel'),
     path('', include(router.urls)),
 ]

@@ -79,6 +79,11 @@ export async function ensureAndroidChannel(): Promise<void> {
     importance: Notifications.AndroidImportance.DEFAULT,
     description: 'Loan and money-owed due reminders',
   })
+  await Notifications.setNotificationChannelAsync('cashtrail-updates', {
+    name: 'Product updates',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    description: 'CashTrail news and product updates',
+  })
 }
 
 export async function getPermissionStatus(): Promise<'granted' | 'denied' | 'undetermined'> {

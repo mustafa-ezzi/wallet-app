@@ -20,10 +20,11 @@ def send_expo_push(
     channel_id: str = 'cashtrail-due-reminders',
 ) -> dict:
     """
-    Send push messages via Expo. Returns summary {ok, failed, errors}.
-    Tokens that look invalid are skipped.
+    Send push messages via Expo.
+    Returns {ok, failed, errors, tickets: [{token, status, id?, message?}]}.
     """
     messages = []
+    message_tokens: list[str] = []
     for token in tokens:
         t = (token or '').strip()
         if not t.startswith('ExponentPushToken[') and not t.startswith('ExpoPushToken['):
@@ -40,9 +41,10 @@ def send_expo_push(
         if data:
             msg['data'] = data
         messages.append(msg)
+        message_tokens.append(t)
 
     if not messages:
-        return {'ok': 0, 'failed': 0, 'errors': ['no valid tokens']}
+        return {'ok': 0, 'failed': 0, 'errors': ['no valid tokens'], 'tickets': []}
 
     payload = json.dumps(messages).encode('utf-8')
     req = urllib.request.Request(
@@ -61,10 +63,28 @@ def send_expo_push(
     except urllib.error.HTTPError as exc:
         err_body = exc.read().decode('utf-8', errors='replace')
         logger.error('Expo push HTTP %s: %s', exc.code, err_body[:500])
-        return {'ok': 0, 'failed': len(messages), 'errors': [err_body[:200]]}
+        tickets = [
+            {'token': t, 'status': 'error', 'message': f'HTTP {exc.code}'}
+            for t in message_tokens
+        ]
+        return {
+            'ok': 0,
+            'failed': len(messages),
+            'errors': [err_body[:200]],
+            'tickets': tickets,
+        }
     except Exception as exc:  # noqa: BLE001
         logger.exception('Expo push failed')
-        return {'ok': 0, 'failed': len(messages), 'errors': [str(exc)]}
+        tickets = [
+            {'token': t, 'status': 'error', 'message': str(exc)[:200]}
+            for t in message_tokens
+        ]
+        return {
+            'ok': 0,
+            'failed': len(messages),
+            'errors': [str(exc)],
+            'tickets': tickets,
+        }
 
     data_list = parsed.get('data') if isinstance(parsed, dict) else None
     if not isinstance(data_list, list):
@@ -73,12 +93,26 @@ def send_expo_push(
     ok = 0
     failed = 0
     errors: list[str] = []
-    for item in data_list:
+    tickets: list[dict] = []
+    for idx, item in enumerate(data_list):
+        token = message_tokens[idx] if idx < len(message_tokens) else ''
         if isinstance(item, dict) and item.get('status') == 'ok':
             ok += 1
+            tickets.append({
+                'token': token,
+                'status': 'ok',
+                'id': item.get('id') or '',
+            })
         else:
             failed += 1
+            message = ''
             if isinstance(item, dict):
-                errors.append(str(item.get('message') or item.get('details') or item))
+                message = str(item.get('message') or item.get('details') or item)
+                errors.append(message)
+            tickets.append({
+                'token': token,
+                'status': 'error',
+                'message': message or 'unknown',
+            })
 
-    return {'ok': ok, 'failed': failed, 'errors': errors}
+    return {'ok': ok, 'failed': failed, 'errors': errors, 'tickets': tickets}

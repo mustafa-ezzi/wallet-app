@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from django.conf import settings
 
 from .due_push import send_due_reminders
+from .campaign_push import process_due_scheduled_campaigns
 from .models import DeviceToken, NotificationPreference
 
 
@@ -26,6 +27,7 @@ class NotificationPreferenceSerializer(serializers.ModelSerializer):
             'lead_3',
             'lead_1',
             'lead_due',
+            'marketing_enabled',
             'updated_at',
         )
         read_only_fields = ('updated_at',)
@@ -120,3 +122,33 @@ class DueRemindersJobView(APIView):
             'failed': result['failed'],
             'dry_run': result['dry_run'],
         })
+
+
+class PushCampaignsJobView(APIView):
+    """
+    Railway cron: POST /api/jobs/push-campaigns/
+    Sends due scheduled Ops campaigns.
+    Auth: same CRON_SECRET as due-reminders.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        secret = getattr(settings, 'CRON_SECRET', '') or ''
+        provided = (
+            request.headers.get('X-Cron-Secret')
+            or request.META.get('HTTP_X_CRON_SECRET')
+            or ''
+        ).strip()
+        auth = (request.headers.get('Authorization') or '').strip()
+        if auth.lower().startswith('bearer '):
+            provided = auth[7:].strip() or provided
+
+        if not secret or provided != secret:
+            return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+
+        dry = str(request.query_params.get('dry_run') or request.data.get('dry_run') or '').lower() in {
+            '1', 'true', 'yes',
+        }
+        return Response(process_due_scheduled_campaigns(dry_run=dry))

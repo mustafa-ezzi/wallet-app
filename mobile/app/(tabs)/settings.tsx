@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Pressable,
   ScrollView,
@@ -12,6 +12,9 @@ import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
 import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
+import { registerDeviceToken } from '@/src/notifications/pushRegistration'
+import { requestReminderPermission } from '@/src/notifications/schedule'
+import api from '@/src/api/client'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import type { PrivacyTimeout } from '@/src/privacy/storage'
 import { useTheme } from '@/src/theme/ThemeContext'
@@ -38,6 +41,21 @@ export default function SettingsScreen() {
   const [enableError, setEnableError] = useState('')
   const [testBusy, setTestBusy] = useState(false)
   const [testMsg, setTestMsg] = useState('')
+  const [marketingEnabled, setMarketingEnabled] = useState(true)
+  const [marketingBusy, setMarketingBusy] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    void api.get('/notification-preferences/').then((res) => {
+      if (cancelled) return
+      const v = res.data?.marketing_enabled
+      if (typeof v === 'boolean') setMarketingEnabled(v)
+    }).catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
   const savePin = async () => {
     setPinError('')
@@ -290,6 +308,41 @@ export default function SettingsScreen() {
             </Text>
           </Pressable>
           {testMsg ? <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{testMsg}</Text> : null}
+        </View>
+
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Product updates</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.row}>
+            <View style={{ flex: 1, paddingRight: spacing.md }}>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>App news & tips</Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                Occasional CashTrail updates. Separate from due-date reminders.
+              </Text>
+            </View>
+            <Switch
+              value={marketingEnabled}
+              disabled={marketingBusy}
+              onValueChange={(v) => {
+                void (async () => {
+                  setMarketingBusy(true)
+                  try {
+                    if (v) {
+                      const ok = await requestReminderPermission()
+                      if (ok) await registerDeviceToken()
+                    }
+                    await api.patch('/notification-preferences/', { marketing_enabled: v })
+                    setMarketingEnabled(v)
+                  } catch {
+                    /* keep previous */
+                  } finally {
+                    setMarketingBusy(false)
+                  }
+                })()
+              }}
+              trackColor={{ false: colors.border, true: '#86efac' }}
+              thumbColor={marketingEnabled ? colors.primary : '#f4f4f5'}
+            />
+          </View>
         </View>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Offline</Text>

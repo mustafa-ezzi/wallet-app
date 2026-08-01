@@ -92,8 +92,30 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
     if (Platform.OS === 'web') return
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as ReminderData | undefined
-      track('reminder_tapped', { kind: data?.kind ?? 'unknown' })
+      const data = response.notification.request.content.data as
+        | (ReminderData & { type?: string; route?: string; screen?: string })
+        | undefined
+      track('reminder_tapped', { kind: data?.kind ?? data?.type ?? 'unknown' })
+
+      const route = (data?.route || data?.screen || '').toLowerCase()
+      if (data?.type === 'campaign' || route) {
+        const map: Record<string, string> = {
+          home: '/(tabs)',
+          settings: '/(tabs)/settings',
+          bills: '/(tabs)/bills',
+          wallets: '/(tabs)/wallets',
+          income: '/(tabs)/income',
+          reports: '/(tabs)/reports',
+          family: '/(tabs)/household',
+          household: '/(tabs)/household',
+        }
+        const path = map[route]
+        if (path) {
+          router.push(path as never)
+          return
+        }
+      }
+
       if (data?.screen === 'bills') {
         const q = data.kind && data.id
           ? `?focus=${data.kind}&id=${data.id}`
