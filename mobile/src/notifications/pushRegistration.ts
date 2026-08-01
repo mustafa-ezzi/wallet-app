@@ -2,6 +2,7 @@ import Constants from 'expo-constants'
 import * as Notifications from 'expo-notifications'
 import { Platform } from 'react-native'
 import api from '@/src/api/client'
+import { ensureAndroidChannel } from './schedule'
 
 let lastToken: string | null = null
 
@@ -15,6 +16,7 @@ function projectId(): string | undefined {
 export async function getExpoPushToken(): Promise<string | null> {
   if (Platform.OS === 'web') return null
   try {
+    await ensureAndroidChannel()
     const { status } = await Notifications.getPermissionsAsync()
     if (status !== 'granted') {
       const next = await Notifications.requestPermissionsAsync()
@@ -31,9 +33,16 @@ export async function getExpoPushToken(): Promise<string | null> {
   }
 }
 
+/**
+ * Fetch Expo push token and POST to backend /api/devices/.
+ * Call whenever OS notification permission is granted — not only for due reminders.
+ */
 export async function registerDeviceToken(): Promise<string | null> {
   const token = await getExpoPushToken()
-  if (!token) return null
+  if (!token) {
+    console.warn('[CashTrail] no Expo push token (permission denied or getExpoPushTokenAsync failed)')
+    return null
+  }
   lastToken = token
   try {
     await api.post('/devices/', {
@@ -42,6 +51,7 @@ export async function registerDeviceToken(): Promise<string | null> {
     })
   } catch (err) {
     console.warn('[CashTrail] device register failed', err)
+    return null
   }
   return token
 }

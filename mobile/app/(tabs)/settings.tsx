@@ -45,6 +45,7 @@ export default function SettingsScreen() {
   const [testMsg, setTestMsg] = useState('')
   const [marketingEnabled, setMarketingEnabled] = useState(true)
   const [marketingBusy, setMarketingBusy] = useState(false)
+  const [pushSyncMsg, setPushSyncMsg] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -345,6 +346,45 @@ export default function SettingsScreen() {
               thumbColor={marketingEnabled ? colors.primary : '#f4f4f5'}
             />
           </View>
+          <Pressable
+            style={[
+              styles.lockBtn,
+              { backgroundColor: colors.surfaceMuted, opacity: marketingBusy ? 0.55 : 1, marginTop: spacing.md },
+            ]}
+            disabled={marketingBusy}
+            onPress={() => {
+              void (async () => {
+                setMarketingBusy(true)
+                setPushSyncMsg('')
+                try {
+                  const ok = await requestReminderPermission()
+                  if (!ok) {
+                    setPushSyncMsg('Allow notifications in system settings first.')
+                    return
+                  }
+                  const token = await registerDeviceToken()
+                  await api.patch('/notification-preferences/', { marketing_enabled: true })
+                  setMarketingEnabled(true)
+                  setPushSyncMsg(
+                    token
+                      ? 'Push linked to your account. Ops can reach this device now — reopen Users in admin.'
+                      : 'Permission OK but token sync failed. Check you are online and logged in.',
+                  )
+                } catch {
+                  setPushSyncMsg('Could not sync push. Check internet and try again.')
+                } finally {
+                  setMarketingBusy(false)
+                }
+              })()
+            }}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
+              {marketingBusy ? 'Syncing…' : 'Link this device for push'}
+            </Text>
+          </Pressable>
+          {pushSyncMsg ? (
+            <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{pushSyncMsg}</Text>
+          ) : null}
         </View>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Help & Support</Text>

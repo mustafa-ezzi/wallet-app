@@ -23,7 +23,7 @@ npm run dev
 
 Open http://127.0.0.1:5174 — sign in with a **staff** Django user.
 
-Production: set `VITE_API_URL` to your Railway API origin (same as the mobile app).
+Production: leave `VITE_API_URL` empty when using the Vite proxy locally. For a hosted Ops site, set `VITE_API_URL` to the API origin and add that Ops origin to Railway `OPS_FRONTEND_URL` / CORS.
 
 ## API
 

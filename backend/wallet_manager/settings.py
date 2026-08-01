@@ -124,13 +124,19 @@ SIMPLE_JWT = {
     'UPDATE_LAST_LOGIN': True,
 }
 
-# CORS — set FRONTEND_URL to your Railway frontend URL in production.
-# Local Expo web / Vite origins are always allowed so mobile web + local PWA can hit prod API.
+# CORS — set FRONTEND_URL (and optional OPS_FRONTEND_URL) in production.
+# Local Vite / Expo origins are always allowed so PWA + Ops admin can hit prod API.
 _LOCAL_DEV_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:5174',
     'http://127.0.0.1:5174',
+    'http://localhost:5175',
+    'http://127.0.0.1:5175',
+    'http://localhost:5176',
+    'http://127.0.0.1:5176',
+    'http://localhost:4173',
+    'http://127.0.0.1:4173',
     'http://localhost:8081',
     'http://127.0.0.1:8081',
     'http://localhost:8082',
@@ -138,13 +144,24 @@ _LOCAL_DEV_ORIGINS = [
     'http://127.0.0.1:19006',
 ]
 _frontend_url = os.environ.get('FRONTEND_URL', '').strip()
-_configured_origins = [o.strip() for o in _frontend_url.split(',') if o.strip()]
+_ops_frontend_url = os.environ.get('OPS_FRONTEND_URL', '').strip()
+_configured_origins = [
+    o.strip()
+    for o in f'{_frontend_url},{_ops_frontend_url}'.split(',')
+    if o.strip()
+]
 
 if _configured_origins and not DEBUG:
     CORS_ALLOW_ALL_ORIGINS = False
     CORS_ALLOWED_ORIGINS = list(dict.fromkeys(_configured_origins + _LOCAL_DEV_ORIGINS))
 else:
     CORS_ALLOW_ALL_ORIGINS = True
+
+# Any localhost / 127.0.0.1 Vite port (Ops often lands on 5175 when 5174 is busy)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^http://localhost:\d+$',
+    r'^http://127\.0\.0\.1:\d+$',
+]
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
@@ -162,7 +179,10 @@ CORS_ALLOW_HEADERS = [
 CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(
     [
         o.strip()
-        for o in os.environ.get('CSRF_TRUSTED_ORIGINS', _frontend_url).split(',')
+        for o in os.environ.get(
+            'CSRF_TRUSTED_ORIGINS',
+            f'{_frontend_url},{_ops_frontend_url}',
+        ).split(',')
         if o.strip()
     ]
     + _LOCAL_DEV_ORIGINS

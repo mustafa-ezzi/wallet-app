@@ -131,28 +131,29 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove()
   }, [router])
 
-  // Clear schedules when logged out so the next account does not inherit them.
+  // Keep Expo push token registered whenever the user is logged in and OS permission is on.
+  // (Ops campaigns need DeviceToken rows — do not gate on due-reminder prefs alone.)
   useEffect(() => {
-    if (user) {
-      // Re-register Expo push token after login when local reminders are enabled
-      if (prefs.enabled && permission === 'granted') {
-        void registerDeviceToken()
-      }
+    if (!user) {
+      lastPayload.current = null
+      setLastScheduled(0)
+      void revokeDeviceToken()
+      if (Platform.OS === 'web') return
+      void (async () => {
+        const scheduled = await Notifications.getAllScheduledNotificationsAsync()
+        await Promise.all(
+          scheduled
+            .filter((n) => (n.content.data as ReminderData | undefined)?.screen === 'bills')
+            .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
+        )
+      })()
       return
     }
-    lastPayload.current = null
-    setLastScheduled(0)
-    void revokeDeviceToken()
     if (Platform.OS === 'web') return
-    void (async () => {
-      const scheduled = await Notifications.getAllScheduledNotificationsAsync()
-      await Promise.all(
-        scheduled
-          .filter((n) => (n.content.data as ReminderData | undefined)?.screen === 'bills')
-          .map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)),
-      )
-    })()
-  }, [user, prefs.enabled, permission])
+    if (permission === 'granted') {
+      void registerDeviceToken()
+    }
+  }, [user, permission])
 
   const reschedule = useCallback(async (input: {
     payables: Payable[]
