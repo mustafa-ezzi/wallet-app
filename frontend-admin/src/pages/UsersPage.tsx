@@ -123,32 +123,34 @@ export function UsersPage() {
         <table>
           <thead>
             <tr>
+              <th>S.No</th>
               <th>User</th>
               <th>Joined</th>
               <th>Last seen</th>
               <th>Activity</th>
               <th>Push</th>
               <th>Wallets*</th>
-              <th>Tx 30d*</th>
+              <th>Tx count (30d)*</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={9} className="muted">
                   Loading…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="muted">
+                <td colSpan={9} className="muted">
                   No users match.
                 </td>
               </tr>
             ) : (
-              rows.map((u) => (
+              rows.map((u, idx) => (
                 <tr key={u.id}>
+                  <td>{(page - 1) * 25 + idx + 1}</td>
                   <td>
                     <Link to={`/users/${u.id}`}>
                       <strong>{u.username}</strong>
@@ -200,7 +202,14 @@ export function UsersPage() {
         </button>
       </div>
 
-      <p className="note">* Counts only — amounts are never shown in Ops.</p>
+      <p className="note">
+        * Counts only — amounts are never shown in Ops.
+        <br />
+        <strong>Tx count (30d)</strong> = how many transactions that user created/synced with a date in the last 30 days
+        (not money amounts).
+        <br />
+        Activity uses last API use, login, push-device ping, or latest transaction — not “days since signup”.
+      </p>
     </div>
   )
 }

@@ -39,6 +39,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'api.middleware_last_seen.LastSeenMiddleware',
 ]
 
 ROOT_URLCONF = 'wallet_manager.urls'
@@ -119,6 +120,8 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': False,
+    # PWA/mobile stay logged in via refresh — also stamp Django last_login on password login
+    'UPDATE_LAST_LOGIN': True,
 }
 
 # CORS — set FRONTEND_URL to your Railway frontend URL in production.

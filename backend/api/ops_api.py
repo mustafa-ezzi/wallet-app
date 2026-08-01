@@ -25,12 +25,30 @@ def _ensure_ops_meta(user: User) -> UserOpsMeta:
     return meta
 
 
-def _last_seen_for(user: User, ops_meta: UserOpsMeta | None):
+def _last_seen_for(
+    user: User,
+    ops_meta: UserOpsMeta | None,
+    *,
+    device_touch=None,
+    activity_touch=None,
+):
+    """
+    Best-effort "last active" for Ops.
+    Prefer explicit last_seen / login / device / recent writes — never invent 90d idle
+    just because last_login is null (JWT refresh does not update last_login).
+    """
     candidates = []
     if user.last_login:
         candidates.append(user.last_login)
     if ops_meta and ops_meta.last_seen_at:
         candidates.append(ops_meta.last_seen_at)
+    if device_touch:
+        candidates.append(device_touch)
+    if activity_touch:
+        candidates.append(activity_touch)
+    if not candidates and user.date_joined:
+        # Brand-new or never stamped — use join time, not "inactive 90d"
+        candidates.append(user.date_joined)
     return max(candidates) if candidates else None
 
 
@@ -47,10 +65,22 @@ def _inactivity_tier(last_seen):
     return UserOpsMeta.INACTIVITY_NONE
 
 
-def _serialize_user(user: User, *, wallet_count=None, tx_count_30d=None, device_count=None, platforms=None):
+def _serialize_user(
+    user: User,
+    *,
+    wallet_count=None,
+    tx_count_30d=None,
+    device_count=None,
+    platforms=None,
+    device_touch=None,
+    activity_touch=None,
+):
     ops = getattr(user, 'ops_meta', None)
-    last_seen = _last_seen_for(user, ops)
-    tier = (ops.inactivity_tier if ops and ops.inactivity_tier else None) or _inactivity_tier(last_seen)
+    last_seen = _last_seen_for(
+        user, ops, device_touch=device_touch, activity_touch=activity_touch,
+    )
+    # Always compute live — do not trust a stale cached inactivity_tier
+    tier = _inactivity_tier(last_seen)
     suspended = bool(ops and ops.suspended_at) or (not user.is_active)
 
     if wallet_count is None:
@@ -129,7 +159,10 @@ class OpsDashboardView(APIView):
         new_30d = User.objects.filter(date_joined__gte=month_ago).count()
 
         active_7d = User.objects.filter(
-            Q(last_login__gte=week_ago) | Q(ops_meta__last_seen_at__gte=week_ago)
+            Q(last_login__gte=week_ago)
+            | Q(ops_meta__last_seen_at__gte=week_ago)
+            | Q(transactions__created_at__gte=week_ago)
+            | Q(device_tokens__updated_at__gte=week_ago)
         ).distinct().count()
 
         suspended = User.objects.filter(
@@ -246,6 +279,24 @@ class OpsUserListView(APIView):
             )
         }
 
+        device_last = {
+            row['user_id']: row['m']
+            for row in (
+                DeviceToken.objects.filter(user_id__in=page_ids)
+                .values('user_id')
+                .annotate(m=Max('updated_at'))
+            )
+        }
+        # Recent writes = real app usage (PWA included), even when last_login is stale
+        activity_last = {
+            row['user_id']: row['m']
+            for row in (
+                Transaction.objects.filter(user_id__in=page_ids)
+                .values('user_id')
+                .annotate(m=Max('created_at'))
+            )
+        }
+
         results = [
             _serialize_user(
                 u,
@@ -253,6 +304,8 @@ class OpsUserListView(APIView):
                 tx_count_30d=tx_counts.get(u.id, 0),
                 device_count=getattr(u, 'device_count', None),
                 platforms=platform_map.get(u.id, []),
+                device_touch=device_last.get(u.id),
+                activity_touch=activity_last.get(u.id),
             )
             for u in page
         ]
@@ -268,13 +321,26 @@ class OpsUserDetailView(APIView):
         except User.DoesNotExist:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        data = _serialize_user(user)
+        data = _serialize_user(
+            user,
+            device_touch=(
+                DeviceToken.objects.filter(user=user)
+                .order_by('-updated_at')
+                .values_list('updated_at', flat=True)
+                .first()
+            ),
+            activity_touch=(
+                Transaction.objects.filter(user=user)
+                .order_by('-created_at')
+                .values_list('created_at', flat=True)
+                .first()
+            ),
+        )
         ops = _ensure_ops_meta(user)
         data['internal_notes'] = ops.internal_notes
         # Latest device touch (no token value — privacy)
         latest = (
             DeviceToken.objects.filter(user=user)
-            .annotate()
             .order_by('-updated_at')
             .values('platform', 'updated_at')
             .first()
@@ -361,25 +427,30 @@ class OpsRefreshInactivityView(APIView):
 
     def post(self, request):
         updated = 0
-        # Annotate last device touch as a last-seen signal
         device_last = {
             row['user_id']: row['m']
             for row in DeviceToken.objects.values('user_id').annotate(m=Max('updated_at'))
         }
+        activity_last = {
+            row['user_id']: row['m']
+            for row in Transaction.objects.values('user_id').annotate(m=Max('created_at'))
+        }
         for user in User.objects.select_related('ops_meta').iterator(chunk_size=200):
             meta = _ensure_ops_meta(user)
-            last_seen = _last_seen_for(user, meta)
-            device_touch = device_last.get(user.id)
-            if device_touch and (last_seen is None or device_touch > last_seen):
-                last_seen = device_touch
-                meta.last_seen_at = device_touch
+            last_seen = _last_seen_for(
+                user,
+                meta,
+                device_touch=device_last.get(user.id),
+                activity_touch=activity_last.get(user.id),
+            )
             tier = _inactivity_tier(last_seen)
-            fields = []
+            fields: list[str] = []
+            if last_seen and (meta.last_seen_at is None or last_seen > meta.last_seen_at):
+                meta.last_seen_at = last_seen
+                fields.append('last_seen_at')
             if meta.inactivity_tier != tier:
                 meta.inactivity_tier = tier
                 fields.append('inactivity_tier')
-            if device_touch and meta.last_seen_at == device_touch:
-                fields.append('last_seen_at')
             if fields:
                 fields.append('updated_at')
                 meta.save(update_fields=list(dict.fromkeys(fields)))
