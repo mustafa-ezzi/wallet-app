@@ -25,6 +25,8 @@ from .models import (
     PushCampaignDelivery,
     ReceivableInstallment,
     RecurringExpense,
+    SupportMessage,
+    SupportThread,
     Transaction,
     UserOpsMeta,
     UserProfile,
@@ -197,6 +199,27 @@ class PushCampaignDeliveryAdmin(admin.ModelAdmin):
         'campaign', 'user', 'device_token', 'token_snapshot',
         'status', 'expo_ticket_id', 'error', 'created_at',
     )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SupportThread)
+class SupportThreadAdmin(admin.ModelAdmin):
+    list_display = ('id', 'subject', 'user', 'category', 'status', 'priority', 'updated_at')
+    list_filter = ('status', 'category', 'priority')
+    search_fields = ('subject', 'user__username', 'user__email')
+
+
+@admin.register(SupportMessage)
+class SupportMessageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'thread', 'sender', 'author', 'created_at')
+    list_filter = ('sender',)
+    search_fields = ('body', 'thread__subject', 'author__username')
+    readonly_fields = ('thread', 'sender', 'author', 'body', 'created_at')
 
     def has_add_permission(self, request):
         return False

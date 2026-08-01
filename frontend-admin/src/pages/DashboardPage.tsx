@@ -76,6 +76,8 @@ export function DashboardPage() {
             <Stat label="Inactive 90d" value={data.inactivity.tier_90d} />
             <Stat label="Wallets (count)" value={data.volume_counts_only.wallet_accounts} />
             <Stat label="Tx (30d count)" value={data.volume_counts_only.transactions_30d} />
+            <Stat label="Support open" value={data.support?.open ?? 0} />
+            <Stat label="Needs reply" value={data.support?.waiting_ops ?? 0} />
           </div>
           <p className="note">
             Wallet and transaction figures are <strong>counts only</strong> — amounts and categories are never exposed

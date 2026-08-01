@@ -791,3 +791,81 @@ class PushCampaignDelivery(models.Model):
 
     def __str__(self):
         return f'Delivery({self.campaign_id} → user {self.user_id}: {self.status})'
+
+
+# ── Support tickets (Phase 3) ─────────────────────────────────────────────────
+
+class SupportThread(models.Model):
+    STATUS_OPEN = 'open'
+    STATUS_WAITING_USER = 'waiting_user'
+    STATUS_WAITING_OPS = 'waiting_ops'
+    STATUS_CLOSED = 'closed'
+    STATUS_CHOICES = [
+        (STATUS_OPEN, 'Open'),
+        (STATUS_WAITING_USER, 'Waiting on user'),
+        (STATUS_WAITING_OPS, 'Waiting on ops'),
+        (STATUS_CLOSED, 'Closed'),
+    ]
+
+    CATEGORY_BILLING = 'billing'
+    CATEGORY_BUG = 'bug'
+    CATEGORY_ACCOUNT = 'account'
+    CATEGORY_OTHER = 'other'
+    CATEGORY_CHOICES = [
+        (CATEGORY_BILLING, 'Billing / Premium'),
+        (CATEGORY_BUG, 'Bug'),
+        (CATEGORY_ACCOUNT, 'Account'),
+        (CATEGORY_OTHER, 'Other'),
+    ]
+
+    PRIORITY_NORMAL = 'normal'
+    PRIORITY_HIGH = 'high'
+    PRIORITY_CHOICES = [
+        (PRIORITY_NORMAL, 'Normal'),
+        (PRIORITY_HIGH, 'High'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='support_threads')
+    subject = models.CharField(max_length=160)
+    category = models.CharField(max_length=16, choices=CATEGORY_CHOICES, default=CATEGORY_OTHER)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_WAITING_OPS, db_index=True)
+    priority = models.CharField(max_length=16, choices=PRIORITY_CHOICES, default=PRIORITY_NORMAL)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [
+            models.Index(fields=['status', '-updated_at'], name='support_status_upd_idx'),
+            models.Index(fields=['user', '-updated_at'], name='support_user_upd_idx'),
+        ]
+
+    def __str__(self):
+        return f'Support#{self.id} {self.subject} ({self.status})'
+
+
+class SupportMessage(models.Model):
+    SENDER_USER = 'user'
+    SENDER_STAFF = 'staff'
+    SENDER_CHOICES = [
+        (SENDER_USER, 'User'),
+        (SENDER_STAFF, 'Staff'),
+    ]
+
+    thread = models.ForeignKey(SupportThread, on_delete=models.CASCADE, related_name='messages')
+    sender = models.CharField(max_length=8, choices=SENDER_CHOICES)
+    author = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='support_messages',
+    )
+    body = models.TextField(max_length=4000)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['thread', 'created_at'], name='support_msg_thread_idx'),
+        ]
+
+    def __str__(self):
+        return f'Msg({self.sender}) on thread {self.thread_id}'

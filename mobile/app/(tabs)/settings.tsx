@@ -8,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { useRouter } from 'expo-router'
 import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
 import { useOffline } from '@/src/offline'
@@ -28,6 +29,7 @@ const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
 
 export default function SettingsScreen() {
   const { user, logout } = useAuth()
+  const router = useRouter()
   const { clearLocal, online, pending, syncNow, syncing } = useOffline()
   const reminders = useReminders()
   const privacy = usePrivacyLock()
@@ -343,6 +345,19 @@ export default function SettingsScreen() {
               thumbColor={marketingEnabled ? colors.primary : '#f4f4f5'}
             />
           </View>
+        </View>
+
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Help & Support</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+            Message us about bugs, account issues, or billing — we reply in-app.
+          </Text>
+          <Pressable
+            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, marginTop: spacing.md }]}
+            onPress={() => router.push('/support' as never)}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Open support</Text>
+          </Pressable>
         </View>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Offline</Text>

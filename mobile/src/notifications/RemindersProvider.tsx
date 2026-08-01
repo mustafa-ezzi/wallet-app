@@ -93,7 +93,7 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
 
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as
-        | (ReminderData & { type?: string; route?: string; screen?: string })
+        | (ReminderData & { type?: string; route?: string; screen?: string; thread_id?: number })
         | undefined
       track('reminder_tapped', { kind: data?.kind ?? data?.type ?? 'unknown' })
 
@@ -108,9 +108,14 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
           reports: '/(tabs)/reports',
           family: '/(tabs)/household',
           household: '/(tabs)/household',
+          support: '/support',
         }
         const path = map[route]
         if (path) {
+          if (route === 'support' && data?.thread_id) {
+            router.push(`/support?threadId=${data.thread_id}` as never)
+            return
+          }
           router.push(path as never)
           return
         }

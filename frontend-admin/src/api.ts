@@ -72,6 +72,11 @@ export type OpsDashboard = {
     wallet_accounts: number
     transactions_30d: number
   }
+  support?: {
+    open: number
+    waiting_ops: number
+    waiting_user: number
+  }
   generated_at: string
 }
 
@@ -234,5 +239,57 @@ export async function sendCampaign(id: number, opts: { confirm?: boolean; dry_ru
 
 export async function cancelCampaign(id: number) {
   const { data } = await opsApi.post<OpsCampaign>(`/ops/campaigns/${id}/cancel/`)
+  return data
+}
+
+export type SupportMessage = {
+  id: number
+  sender: 'user' | 'staff'
+  author_id: number | null
+  author_username: string | null
+  body: string
+  created_at: string | null
+}
+
+export type SupportThread = {
+  id: number
+  subject: string
+  category: string
+  status: string
+  priority: string
+  user_id: number
+  username: string | null
+  email: string
+  created_at: string | null
+  updated_at: string | null
+  closed_at: string | null
+  message_count: number | null
+  last_message_preview?: string
+  last_sender?: string | null
+  messages?: SupportMessage[]
+}
+
+export async function fetchSupportThreads(params?: Record<string, string | number | undefined>) {
+  const { data } = await opsApi.get<Paginated<SupportThread>>('/ops/support/', { params })
+  return data
+}
+
+export async function fetchSupportThread(id: number) {
+  const { data } = await opsApi.get<SupportThread>(`/ops/support/${id}/`)
+  return data
+}
+
+export async function replySupportThread(
+  id: number,
+  payload: { body: string; close?: boolean },
+) {
+  const { data } = await opsApi.post<SupportThread>(`/ops/support/${id}/reply/`, payload)
+  return data
+}
+
+export async function setSupportStatus(id: number, statusValue: string) {
+  const { data } = await opsApi.post<SupportThread>(`/ops/support/${id}/status/`, {
+    status: statusValue,
+  })
   return data
 }

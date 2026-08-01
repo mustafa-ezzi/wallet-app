@@ -25,6 +25,7 @@ function ThemedStack() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="support" options={{ headerShown: false, presentation: 'card' }} />
       </Stack>
       <AnimatedSplashScreen />
     </>

@@ -6,6 +6,7 @@ from . import devices_api
 from . import password_reset_api
 from . import ops_api
 from . import ops_campaigns_api
+from . import support_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -53,5 +54,14 @@ urlpatterns = [
     path('ops/campaigns/<int:campaign_id>/', ops_campaigns_api.OpsCampaignDetailView.as_view(), name='ops-campaign-detail'),
     path('ops/campaigns/<int:campaign_id>/send/', ops_campaigns_api.OpsCampaignSendView.as_view(), name='ops-campaign-send'),
     path('ops/campaigns/<int:campaign_id>/cancel/', ops_campaigns_api.OpsCampaignCancelView.as_view(), name='ops-campaign-cancel'),
+    # Support (user)
+    path('support/threads/', support_api.SupportThreadListCreateView.as_view(), name='support-threads'),
+    path('support/threads/<int:thread_id>/', support_api.SupportThreadDetailView.as_view(), name='support-thread-detail'),
+    path('support/threads/<int:thread_id>/reply/', support_api.SupportThreadReplyView.as_view(), name='support-thread-reply'),
+    # Support (ops)
+    path('ops/support/', support_api.OpsSupportListView.as_view(), name='ops-support'),
+    path('ops/support/<int:thread_id>/', support_api.OpsSupportDetailView.as_view(), name='ops-support-detail'),
+    path('ops/support/<int:thread_id>/reply/', support_api.OpsSupportReplyView.as_view(), name='ops-support-reply'),
+    path('ops/support/<int:thread_id>/status/', support_api.OpsSupportStatusView.as_view(), name='ops-support-status'),
     path('', include(router.urls)),
 ]

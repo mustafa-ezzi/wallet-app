@@ -19,7 +19,7 @@ export function AppShell() {
       <aside className="sidebar">
         <div className="brand">
           <strong>CashTrail Ops</strong>
-          <span>Phase 0–2</span>
+          <span>Phase 0–3</span>
         </div>
         <nav>
           <NavLink to="/" end>
@@ -27,6 +27,7 @@ export function AppShell() {
           </NavLink>
           <NavLink to="/users">Users</NavLink>
           <NavLink to="/campaigns">Notifications</NavLink>
+          <NavLink to="/support">Support</NavLink>
         </nav>
         <div className="meta">
           <div>Signed in as @{user.username}</div>

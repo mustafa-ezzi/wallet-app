@@ -15,7 +15,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Account, DeviceToken, Transaction, UserOpsMeta
+from .models import Account, DeviceToken, Transaction, UserOpsMeta, SupportThread
 from .ops_audit import log_ops_action
 from .ops_permissions import IsOpsStaff
 
@@ -201,6 +201,11 @@ class OpsDashboardView(APIView):
             'volume_counts_only': {
                 'wallet_accounts': wallet_accounts,
                 'transactions_30d': txs_30d,
+            },
+            'support': {
+                'open': SupportThread.objects.exclude(status=SupportThread.STATUS_CLOSED).count(),
+                'waiting_ops': SupportThread.objects.filter(status=SupportThread.STATUS_WAITING_OPS).count(),
+                'waiting_user': SupportThread.objects.filter(status=SupportThread.STATUS_WAITING_USER).count(),
             },
             'generated_at': now.isoformat(),
         })

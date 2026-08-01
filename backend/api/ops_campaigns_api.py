@@ -49,6 +49,7 @@ ALLOWED_ROUTES = {
     'reports',
     'family',
     'household',
+    'support',
 }
 
 
