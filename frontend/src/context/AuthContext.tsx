@@ -13,6 +13,7 @@ interface User {
   username: string
   email: string
   currency: string
+  is_premium?: boolean
 }
 
 interface AuthContextType {

@@ -126,6 +126,7 @@ export default function Dashboard() {
         <span className="welcome-name">
           {[user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || 'there'}
         </span>
+        {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
       </div>
 
       {(fromCache || !online || pending > 0) && (

@@ -388,6 +388,13 @@ select option { background: var(--surface); color: var(--text-primary); }
 .badge-yellow { background: var(--amber-100); color: var(--amber-600); border: 1px solid #fde09a; }
 .badge-blue   { background: var(--blue-100);  color: var(--blue-600);  border: 1px solid #bfdbfe; }
 .badge-gray   { background: #f1f5f2; color: #5f7569; border: 1px solid #d0ddd4; }
+.badge-premium {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #92400e;
+  border: 1px solid #f59e0b;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
 
 /* ── Scrollbar ──────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; }

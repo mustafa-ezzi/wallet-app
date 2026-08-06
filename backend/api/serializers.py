@@ -47,16 +47,21 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     currency = serializers.SerializerMethodField()
+    is_premium = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'first_name', 'last_name', 'username', 'email', 'currency')
+        fields = ('id', 'first_name', 'last_name', 'username', 'email', 'currency', 'is_premium')
 
     def get_currency(self, obj):
         try:
             return obj.profile.currency
         except Exception:
             return 'PKR'
+
+    def get_is_premium(self, obj):
+        from .entitlements import user_is_premium
+        return user_is_premium(obj)
 
 
 class AccountSerializer(serializers.ModelSerializer):

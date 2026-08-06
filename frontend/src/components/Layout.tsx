@@ -90,6 +90,7 @@ export default function Layout() {
         <div className="mobile-header-brand" data-tour="brand">
           <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-sm" />
           <span className="mobile-header-title">CashTrail</span>
+          {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
         </div>
         <div className="mobile-header-actions">
           {(!online || pending > 0) && (
@@ -122,7 +123,10 @@ export default function Layout() {
         <div className="sidebar-brand" data-tour="brand">
           <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-md" />
           <div>
-            <div className="sidebar-title">CashTrail</div>
+            <div className="sidebar-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              CashTrail
+              {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
+            </div>
             <div className="sidebar-subtitle">Follow every rupee</div>
           </div>
         </div>
@@ -188,8 +192,9 @@ export default function Layout() {
           <div className="sidebar-user">
             <div className="sidebar-avatar">{initials}</div>
             <div>
-              <div className="sidebar-user-name">
+              <div className="sidebar-user-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 {user?.first_name ? `${user.first_name} ${user.last_name ?? ''}`.trim() : user?.username}
+                {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
               </div>
               <div className="sidebar-user-email">{user?.email}</div>
             </div>

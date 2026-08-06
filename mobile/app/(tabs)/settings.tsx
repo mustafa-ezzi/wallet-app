@@ -101,7 +101,14 @@ export default function SettingsScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.label, { color: colors.textMuted }]}>Signed in as</Text>
-          <Text style={[styles.value, { color: colors.text }]}>{name}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+            <Text style={[styles.value, { color: colors.text }]}>{name}</Text>
+            {(premium.is_premium || user?.is_premium) ? (
+              <View style={styles.premiumBadge}>
+                <Text style={styles.premiumBadgeText}>Premium</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={[styles.meta, { color: colors.textSecondary }]}>{user?.email}</Text>
           <Text style={[styles.meta, { color: colors.textSecondary }]}>Currency: {user?.currency || 'PKR'}</Text>
         </View>
@@ -525,6 +532,20 @@ const styles = StyleSheet.create({
   swatchLabel: { fontSize: 10, fontWeight: '700', marginTop: 6 },
   label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', color: '#5f7569' },
   value: { fontSize: typography.subtitle, fontWeight: '800', marginTop: 4, color: '#122a20' },
+  premiumBadge: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 4,
+  },
+  premiumBadgeText: {
+    color: '#92400e',
+    fontSize: 11,
+    fontWeight: '800',
+  },
   meta: { marginTop: 4, fontSize: typography.caption, color: '#3f6153' },
   row: { flexDirection: 'row', alignItems: 'center' },
   rowTitle: { fontWeight: '800', fontSize: typography.body, color: '#122a20' },

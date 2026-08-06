@@ -22,6 +22,7 @@ import { useAuth } from '@/src/context/AuthContext'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { useOffline } from '@/src/offline'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
+import { useRemoteConfig } from '@/src/config/RemoteConfigContext'
 import { useColors } from '@/src/theme/ThemeContext'
 import { iosShadow, radii, spacing, typography } from '@/src/theme/colors'
 import { toMoney } from '@/src/utils/format'
@@ -39,6 +40,7 @@ function todayMonthPrefix(): string {
 
 export default function HomeScreen() {
   const { user } = useAuth()
+  const { premium } = useRemoteConfig()
   const router = useRouter()
   const { openAdd, refreshKey, bumpRefresh } = useMoneyUi()
   const { online, syncNow, hydrateNow, getCachedAccounts, getCachedTransactions } = useOffline()
@@ -181,8 +183,17 @@ export default function HomeScreen() {
         }
       >
         <View style={styles.welcomeRow}>
-          <Text style={[styles.hi, { color: colors.textMuted }]}>Welcome back,</Text>
-          <Text style={[styles.name, { color: colors.primaryDark }]}>{name}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.hi, { color: colors.textMuted }]}>Welcome back,</Text>
+            <View style={styles.nameRow}>
+              <Text style={[styles.name, { color: colors.primaryDark }]}>{name}</Text>
+              {(premium.is_premium || user?.is_premium) ? (
+                <View style={styles.premiumBadge}>
+                  <Text style={styles.premiumBadgeText}>Premium</Text>
+                </View>
+              ) : null}
+            </View>
+          </View>
         </View>
 
         {loading && !data ? (
@@ -435,7 +446,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   hi: { fontSize: typography.body, fontWeight: '600', color: '#7fa393' },
+  nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 2 },
   name: { fontSize: 20, fontWeight: '800', color: '#047857', letterSpacing: -0.3 },
+  premiumBadge: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  premiumBadgeText: {
+    color: '#92400e',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   error: { color: '#dc2626', marginBottom: spacing.md, fontWeight: '600' },
   hero: {
     borderRadius: radii.xl,

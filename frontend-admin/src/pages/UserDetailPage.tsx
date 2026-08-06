@@ -137,6 +137,18 @@ export function UserDetailPage() {
               <div className="v">{user.tx_count_30d}</div>
             </div>
             <div className="kv">
+              <div className="k">Plan</div>
+              <div className="v">
+                {user.premium?.is_premium ? (
+                  <span className="badge ok">
+                    Premium{user.premium.product_id ? ` · ${user.premium.product_id}` : ''}
+                  </span>
+                ) : (
+                  <span className="badge">Free</span>
+                )}
+              </div>
+            </div>
+            <div className="kv">
               <div className="k">Status</div>
               <div className="v">{user.suspended ? 'Suspended' : 'Active'}</div>
             </div>

@@ -18,6 +18,7 @@ export function UsersPage() {
   const [inactivity, setInactivity] = useState('')
   const [suspended, setSuspended] = useState('')
   const [push, setPush] = useState('')
+  const [premium, setPremium] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -39,6 +40,7 @@ export function UsersPage() {
           inactivity: inactivity || undefined,
           suspended: suspended || undefined,
           push: push || undefined,
+          premium: premium || undefined,
         })
         if (!cancelled) {
           setRows(data.results)
@@ -53,7 +55,7 @@ export function UsersPage() {
     return () => {
       cancelled = true
     }
-  }, [page, q, inactivity, suspended, push])
+  }, [page, q, inactivity, suspended, push, premium])
 
   const totalPages = Math.max(1, Math.ceil(count / 25))
 
@@ -115,6 +117,17 @@ export function UsersPage() {
           <option value="1">Has device</option>
           <option value="0">No device</option>
         </select>
+        <select
+          value={premium}
+          onChange={(e) => {
+            setPage(1)
+            setPremium(e.target.value)
+          }}
+        >
+          <option value="">Any plan</option>
+          <option value="1">Premium</option>
+          <option value="0">Free</option>
+        </select>
       </div>
 
       {error ? <p className="error">{error}</p> : null}
@@ -129,6 +142,7 @@ export function UsersPage() {
               <th>Last seen</th>
               <th>Activity</th>
               <th>Push</th>
+              <th>Plan</th>
               <th>Wallets*</th>
               <th>Tx count (30d)*</th>
               <th>Status</th>
@@ -137,13 +151,13 @@ export function UsersPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="muted">
+                <td colSpan={10} className="muted">
                   Loading…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="muted">
+                <td colSpan={10} className="muted">
                   No users match.
                 </td>
               </tr>
@@ -167,6 +181,13 @@ export function UsersPage() {
                       <span className="badge ok">{u.platforms.join(', ') || 'yes'}</span>
                     ) : (
                       <span className="badge">none</span>
+                    )}
+                  </td>
+                  <td>
+                    {u.premium?.is_premium ? (
+                      <span className="badge ok">Premium</span>
+                    ) : (
+                      <span className="badge">Free</span>
                     )}
                   </td>
                   <td>{u.wallet_count}</td>

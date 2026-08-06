@@ -116,8 +116,9 @@ export default function Settings() {
             {((firstName?.[0] ?? '') + (lastName?.[0] ?? '')).toUpperCase() || '?'}
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               {[firstName, lastName].filter(Boolean).join(' ') || user?.email}
+              {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
             </div>
             <div className="text-muted" style={{ fontSize: '0.78rem' }}>{user?.email}</div>
           </div>
