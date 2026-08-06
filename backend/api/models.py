@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.db.models import Sum
+from django.utils import timezone
+
 
 
 class UserProfile(models.Model):
@@ -869,3 +871,152 @@ class SupportMessage(models.Model):
 
     def __str__(self):
         return f'Msg({self.sender}) on thread {self.thread_id}'
+
+
+# ── Premium + remote ads config (Phase 4) ─────────────────────────────────────
+
+class Entitlement(models.Model):
+    """Who has Premium — metadata only; never store CashTrail spending."""
+
+    PRODUCT_MONTHLY = 'premium_monthly'
+    PRODUCT_YEARLY = 'premium_yearly'
+    PRODUCT_LIFETIME = 'premium_lifetime'
+    PRODUCT_CHOICES = [
+        (PRODUCT_MONTHLY, 'Premium monthly'),
+        (PRODUCT_YEARLY, 'Premium yearly'),
+        (PRODUCT_LIFETIME, 'Premium lifetime'),
+    ]
+
+    SOURCE_PLAY = 'play'
+    SOURCE_MANUAL = 'manual_grant'
+    SOURCE_PROMO = 'promo'
+    SOURCE_CHOICES = [
+        (SOURCE_PLAY, 'Google Play'),
+        (SOURCE_MANUAL, 'Manual grant'),
+        (SOURCE_PROMO, 'Promo'),
+    ]
+
+    STATUS_ACTIVE = 'active'
+    STATUS_EXPIRED = 'expired'
+    STATUS_REVOKED = 'revoked'
+    STATUS_PENDING = 'pending'
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_EXPIRED, 'Expired'),
+        (STATUS_REVOKED, 'Revoked'),
+        (STATUS_PENDING, 'Pending verification'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='entitlements')
+    product_id = models.CharField(max_length=64, choices=PRODUCT_CHOICES, default=PRODUCT_MONTHLY)
+    source = models.CharField(max_length=16, choices=SOURCE_CHOICES, default=SOURCE_MANUAL)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    started_at = models.DateTimeField()
+    expires_at = models.DateTimeField(null=True, blank=True)
+    purchase_token_hash = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    order_id = models.CharField(max_length=128, blank=True, default='')
+    granted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='entitlements_granted',
+    )
+    note = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['user', 'status'], name='entitlement_user_status_idx'),
+            models.Index(fields=['status', 'expires_at'], name='entitlement_status_exp_idx'),
+        ]
+
+    def __str__(self):
+        return f'Entitlement({self.user_id}, {self.product_id}, {self.status})'
+
+    @property
+    def is_live(self) -> bool:
+        if self.status != self.STATUS_ACTIVE:
+            return False
+        if self.expires_at and self.expires_at <= timezone.now():
+            return False
+        return True
+
+
+class PurchaseEvent(models.Model):
+    """Play Billing verify trail — store hashed token / order metadata only."""
+
+    STATUS_RECEIVED = 'received'
+    STATUS_VERIFIED = 'verified'
+    STATUS_FAILED = 'failed'
+    STATUS_ACKNOWLEDGED = 'acknowledged'
+    STATUS_CHOICES = [
+        (STATUS_RECEIVED, 'Received'),
+        (STATUS_VERIFIED, 'Verified'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_ACKNOWLEDGED, 'Acknowledged'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='purchase_events')
+    product_id = models.CharField(max_length=64)
+    purchase_token_hash = models.CharField(max_length=64, db_index=True)
+    order_id = models.CharField(max_length=128, blank=True, default='')
+    package_name = models.CharField(max_length=128, blank=True, default='')
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_RECEIVED, db_index=True)
+    raw_summary = models.JSONField(default=dict, blank=True)  # never full secrets
+    error = models.CharField(max_length=255, blank=True, default='')
+    entitlement = models.ForeignKey(
+        Entitlement, null=True, blank=True, on_delete=models.SET_NULL, related_name='purchase_events',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', '-created_at'], name='purchase_evt_status_idx'),
+        ]
+
+    def __str__(self):
+        return f'PurchaseEvent({self.user_id}, {self.product_id}, {self.status})'
+
+
+class AppRemoteConfig(models.Model):
+    """
+    Singleton-ish remote config for ads + feature flags.
+    Ops edits via /api/ops/config/; app reads GET /api/config/.
+    """
+
+    KEY_DEFAULT = 'default'
+
+    key = models.CharField(max_length=32, unique=True, default=KEY_DEFAULT)
+    ads_enabled = models.BooleanField(default=True)
+    banner_enabled = models.BooleanField(default=True)
+    interstitial_enabled = models.BooleanField(default=False)
+    rewarded_enabled = models.BooleanField(default=False)
+    premium_hides_ads = models.BooleanField(default=True)
+    android_banner_unit = models.CharField(max_length=128, blank=True, default='')
+    android_interstitial_unit = models.CharField(max_length=128, blank=True, default='')
+    android_rewarded_unit = models.CharField(max_length=128, blank=True, default='')
+    show_after_sessions = models.PositiveIntegerField(default=3)
+    interstitial_min_interval_sec = models.PositiveIntegerField(default=180)
+    countries = models.JSONField(default=list, blank=True)  # e.g. ["PK"]
+    test_device_ids = models.JSONField(default=list, blank=True)
+    feature_flags = models.JSONField(default=dict, blank=True)
+    min_supported_version = models.CharField(max_length=32, blank=True, default='')
+    store_url = models.URLField(blank=True, default='')
+    maintenance_message = models.CharField(max_length=255, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='remote_config_updates',
+    )
+
+    class Meta:
+        verbose_name = 'App remote config'
+        verbose_name_plural = 'App remote config'
+
+    def __str__(self):
+        return f'AppRemoteConfig({self.key})'
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(key=cls.KEY_DEFAULT)
+        return obj

@@ -10,3 +10,9 @@
 9 verbose logfile logs-max:10 dir:D:\My-Wallet\.npm-cache\_logs\2026-08-01T12_55_37_365Z-
 10 verbose logfile D:\My-Wallet\.npm-cache\_logs\2026-08-01T12_55_37_365Z-debug-0.log
 11 silly logfile done cleaning log files
+12 verbose cwd D:\My-Wallet\frontend-admin
+13 verbose os Windows_NT 10.0.19045
+14 verbose node v22.15.0
+15 verbose npm  v10.9.2
+16 verbose exit 1
+17 verbose code 1

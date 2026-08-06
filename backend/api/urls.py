@@ -7,6 +7,8 @@ from . import password_reset_api
 from . import ops_api
 from . import ops_campaigns_api
 from . import support_api
+from . import premium_api
+from . import remote_config_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -63,5 +65,16 @@ urlpatterns = [
     path('ops/support/<int:thread_id>/', support_api.OpsSupportDetailView.as_view(), name='ops-support-detail'),
     path('ops/support/<int:thread_id>/reply/', support_api.OpsSupportReplyView.as_view(), name='ops-support-reply'),
     path('ops/support/<int:thread_id>/status/', support_api.OpsSupportStatusView.as_view(), name='ops-support-status'),
+    # Premium (user + ops) — Phase 4
+    path('premium/', premium_api.PremiumMeView.as_view(), name='premium-me'),
+    path('premium/verify/', premium_api.PremiumVerifyView.as_view(), name='premium-verify'),
+    path('ops/premium/', premium_api.OpsPremiumListView.as_view(), name='ops-premium'),
+    path('ops/premium/stats/', premium_api.OpsPremiumStatsView.as_view(), name='ops-premium-stats'),
+    path('ops/premium/grant/', premium_api.OpsPremiumGrantView.as_view(), name='ops-premium-grant'),
+    path('ops/premium/<int:entitlement_id>/revoke/', premium_api.OpsPremiumRevokeView.as_view(), name='ops-premium-revoke'),
+    path('ops/premium/purchases/', premium_api.OpsPurchaseQueueView.as_view(), name='ops-premium-purchases'),
+    # Remote ads / feature config
+    path('config/', remote_config_api.AppConfigView.as_view(), name='app-config'),
+    path('ops/config/', remote_config_api.OpsConfigView.as_view(), name='ops-config'),
     path('', include(router.urls)),
 ]

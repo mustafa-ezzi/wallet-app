@@ -1,3 +1,4 @@
+import Constants from 'expo-constants'
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import {
   clearSession,
@@ -6,27 +7,39 @@ import {
   setTokens,
 } from './authStorage'
 
-function normalizeApiRoot(raw: string | undefined): string {
+/** Always-on fallback so a misconfigured EAS build never points at invalid.local. */
+const PRODUCTION_API_ROOT = 'https://tranquil-radiance-production.up.railway.app'
+
+function normalizeApiRoot(raw: string | undefined | null): string {
   const value = (raw ?? '').trim().replace(/\/$/, '')
   if (!value) return ''
   if (/^https?:\/\//i.test(value)) return value
   return `https://${value.replace(/^\/+/, '')}`
 }
 
-const API_ROOT = normalizeApiRoot(process.env.EXPO_PUBLIC_API_URL)
-const API_BASE = API_ROOT ? `${API_ROOT}/api` : ''
+function extraApiUrl(): string {
+  const fromExpoConfig = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl
+  const fromManifest = (Constants as { manifest?: { extra?: { apiUrl?: string } } }).manifest?.extra?.apiUrl
+  return normalizeApiRoot(fromExpoConfig || fromManifest)
+}
 
-if (!API_BASE && __DEV__) {
-  console.warn(
-    '[CashTrail] EXPO_PUBLIC_API_URL is not set. Create mobile/.env with your Railway backend URL.',
+/** Prefer env (dev / EAS), then app.json extra, then production fallback. */
+function resolveApiRoot(): string {
+  return (
+    normalizeApiRoot(process.env.EXPO_PUBLIC_API_URL)
+    || extraApiUrl()
+    || PRODUCTION_API_ROOT
   )
 }
 
+const API_ROOT = resolveApiRoot()
+const API_BASE = `${API_ROOT}/api`
+
 const api = axios.create({
-  // Prefer failing fast over an infinite spinner if URL/network is wrong
-  baseURL: API_BASE || 'https://invalid.local/api',
+  baseURL: API_BASE,
   headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-  timeout: 12000,
+  timeout: 45000,
+  transitional: { clarifyTimeoutError: true },
 })
 
 function looksLikeHtml(data: unknown): boolean {
@@ -76,7 +89,7 @@ api.interceptors.response.use(
       const refresh = await getRefreshToken()
       if (refresh && API_BASE) {
         try {
-          const { data } = await axios.post(`${API_BASE}/auth/refresh/`, { refresh })
+          const { data } = await axios.post(`${API_BASE}/auth/refresh/`, { refresh }, { timeout: 45000 })
           await setTokens(data.access, refresh)
           original.headers = original.headers ?? {}
           original.headers.Authorization = `Bearer ${data.access}`
@@ -94,7 +107,41 @@ api.interceptors.response.use(
 )
 
 export default api
-export { API_BASE, API_ROOT }
+export { API_BASE, API_ROOT, PRODUCTION_API_ROOT }
+
+/** Direct fetch probe — bypasses axios to diagnose device networking. */
+export async function probeApiConnection(): Promise<{
+  ok: boolean
+  url: string
+  status?: number
+  detail: string
+}> {
+  const url = `${API_BASE}/me/`
+  const started = Date.now()
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 30000)
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    })
+    clearTimeout(timer)
+    const ms = Date.now() - started
+    if (res.status === 401 || res.status === 200) {
+      return { ok: true, url, status: res.status, detail: `Reachable in ${ms}ms (HTTP ${res.status})` }
+    }
+    return {
+      ok: false,
+      url,
+      status: res.status,
+      detail: `Server responded HTTP ${res.status} in ${ms}ms`,
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return { ok: false, url, detail: `Fetch failed: ${msg}` }
+  }
+}
 
 export function asList<T = unknown>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[]
@@ -105,12 +152,31 @@ export function asList<T = unknown>(data: unknown): T[] {
 }
 
 export function apiErrorMessage(err: unknown, fallback = 'Request failed.'): string {
-  const data = (err as { response?: { data?: unknown } })?.response?.data
-  if (!data) {
-    const msg = (err as Error)?.message
-    if (msg && /network/i.test(msg)) return 'No internet connection. Check your network and try again.'
-    return msg || fallback
+  const ax = err as {
+    code?: string
+    message?: string
+    response?: { status?: number; data?: unknown }
   }
+
+  if (!ax?.response) {
+    const msg = (ax?.message || '').toLowerCase()
+    const code = (ax?.code || '').toUpperCase()
+    if (code === 'ECONNABORTED' || msg.includes('timeout') || msg.includes('aborted')) {
+      return 'Server took too long to respond. Try again in a moment.'
+    }
+    if (msg.includes('network') || code === 'ERR_NETWORK') {
+      return `Cannot reach CashTrail (${API_ROOT}). Check mobile data/Wi‑Fi, disable VPN, then retry.`
+    }
+    return ax?.message || fallback
+  }
+
+  const status = ax.response.status
+  const data = ax.response.data
+  if (status === 401) return 'Session expired. Please log in again.'
+  if (status === 403) return 'You do not have permission for this action.'
+  if (status === 404) return 'Not found on the server. The app may need an update.'
+  if (status && status >= 500) return 'Server error. Please try again shortly.'
+
   if (typeof data === 'string') return data
   if (typeof data === 'object' && data !== null) {
     const obj = data as { detail?: unknown; smtp_error?: unknown }

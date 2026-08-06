@@ -77,6 +77,9 @@ export type OpsDashboard = {
     waiting_ops: number
     waiting_user: number
   }
+  premium?: {
+    live: number
+  }
   generated_at: string
 }
 
@@ -101,6 +104,14 @@ export type OpsUser = {
   device_count: number
   platforms: string[]
   push_enabled: boolean
+  premium?: {
+    is_premium: boolean
+    product_id: string | null
+    source: string | null
+    status: string
+    started_at: string | null
+    expires_at: string | null
+  }
   internal_notes?: string
   latest_device?: { platform: string; updated_at: string } | null
 }
@@ -291,5 +302,136 @@ export async function setSupportStatus(id: number, statusValue: string) {
   const { data } = await opsApi.post<SupportThread>(`/ops/support/${id}/status/`, {
     status: statusValue,
   })
+  return data
+}
+
+export type OpsEntitlement = {
+  id: number
+  user_id: number
+  username: string | null
+  email: string
+  product_id: string
+  source: string
+  status: string
+  is_live: boolean
+  started_at: string | null
+  expires_at: string | null
+  order_id: string
+  note: string
+  granted_by_id: number | null
+  granted_by_username: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export type PremiumStats = {
+  live_premium: number
+  live_monthly: number
+  live_yearly: number
+  live_lifetime: number
+  manual_grants_live: number
+  play_live: number
+  pending_or_failed_purchases: number
+  play_verify_configured: boolean
+}
+
+export type PurchaseQueueItem = {
+  id: number
+  user_id: number
+  username: string
+  email: string
+  product_id: string
+  order_id: string
+  status: string
+  error: string
+  created_at: string | null
+}
+
+export type OpsRemoteConfig = {
+  ads: {
+    ads_enabled: boolean
+    banner_enabled: boolean
+    interstitial_enabled: boolean
+    rewarded_enabled: boolean
+    premium_hides_ads: boolean
+    effective_show_ads: boolean
+    units: {
+      android_banner: string
+      android_interstitial: string
+      android_rewarded: string
+    }
+    rules: {
+      show_after_sessions: number
+      interstitial_min_interval_sec: number
+      countries: string[]
+    }
+    test_device_ids: string[]
+  }
+  feature_flags: Record<string, unknown>
+  min_supported_version: string
+  store_url: string
+  maintenance_message: string
+  updated_at: string | null
+  raw: {
+    ads_enabled: boolean
+    banner_enabled: boolean
+    interstitial_enabled: boolean
+    rewarded_enabled: boolean
+    premium_hides_ads: boolean
+    android_banner_unit: string
+    android_interstitial_unit: string
+    android_rewarded_unit: string
+    show_after_sessions: number
+    interstitial_min_interval_sec: number
+    countries: string[]
+    test_device_ids: string[]
+    feature_flags: Record<string, unknown>
+    min_supported_version: string
+    store_url: string
+    maintenance_message: string
+    updated_by_id: number | null
+    updated_by_username: string | null
+  }
+}
+
+export async function fetchPremiumStats() {
+  const { data } = await opsApi.get<PremiumStats>('/ops/premium/stats/')
+  return data
+}
+
+export async function fetchEntitlements(params?: Record<string, string | number | undefined>) {
+  const { data } = await opsApi.get<Paginated<OpsEntitlement>>('/ops/premium/', { params })
+  return data
+}
+
+export async function grantPremium(payload: {
+  user_id?: number
+  username?: string
+  product_id: string
+  days?: number
+  note?: string
+  source?: 'manual_grant' | 'promo'
+}) {
+  const { data } = await opsApi.post<OpsEntitlement>('/ops/premium/grant/', payload)
+  return data
+}
+
+export async function revokePremium(id: number) {
+  const { data } = await opsApi.post<OpsEntitlement>(`/ops/premium/${id}/revoke/`)
+  return data
+}
+
+export async function fetchPurchaseQueue(params?: Record<string, string | number | undefined>) {
+  const { data } = await opsApi.get<Paginated<PurchaseQueueItem>>('/ops/premium/purchases/', { params })
+  return data
+}
+
+export async function fetchOpsConfig() {
+  const { data } = await opsApi.get<OpsRemoteConfig>('/ops/config/')
+  return data
+}
+
+export async function patchOpsConfig(payload: Record<string, unknown>) {
+  const { data } = await opsApi.patch<OpsRemoteConfig>('/ops/config/', payload)
   return data
 }

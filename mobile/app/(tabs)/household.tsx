@@ -103,10 +103,8 @@ export default function HouseholdScreen() {
   })
 
   const requireOnline = () => {
-    if (!online) {
-      setError('Household changes need an internet connection.')
-      return false
-    }
+    // NetInfo is unreliable on some Android devices (false “offline”).
+    // Always attempt the API call; real failures use apiErrorMessage.
     return true
   }
 

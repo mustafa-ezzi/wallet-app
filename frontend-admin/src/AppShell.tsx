@@ -19,14 +19,16 @@ export function AppShell() {
       <aside className="sidebar">
         <div className="brand">
           <strong>CashTrail Ops</strong>
-          <span>Phase 0–3</span>
+          <span>Phase 0–4</span>
         </div>
         <nav>
           <NavLink to="/" end>
             Dashboard
           </NavLink>
           <NavLink to="/users">Users</NavLink>
+          <NavLink to="/premium">Premium</NavLink>
           <NavLink to="/campaigns">Notifications</NavLink>
+          <NavLink to="/ads">Ads & Config</NavLink>
           <NavLink to="/support">Support</NavLink>
         </nav>
         <div className="meta">

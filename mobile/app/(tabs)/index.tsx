@@ -25,6 +25,7 @@ import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
 import { iosShadow, radii, spacing, typography } from '@/src/theme/colors'
 import { toMoney } from '@/src/utils/format'
+import { AdBanner } from '@/src/ads/AdBanner'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -420,6 +421,7 @@ export default function HomeScreen() {
           </>
         )}
       </ScrollView>
+      <AdBanner />
     </Screen>
   )
 }

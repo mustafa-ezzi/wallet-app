@@ -15,9 +15,10 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Account, DeviceToken, Transaction, UserOpsMeta, SupportThread
+from .models import Account, DeviceToken, Transaction, UserOpsMeta, SupportThread, Entitlement
 from .ops_audit import log_ops_action
 from .ops_permissions import IsOpsStaff
+from .entitlements import premium_summary
 
 
 def _ensure_ops_meta(user: User) -> UserOpsMeta:
@@ -118,6 +119,7 @@ def _serialize_user(
         'device_count': device_count,
         'platforms': platforms,
         'push_enabled': device_count > 0,
+        'premium': premium_summary(user),
         # Intentionally omitted: balances, transactions, categories, household ledgers
     }
 
@@ -180,6 +182,10 @@ class OpsDashboardView(APIView):
         wallet_accounts = Account.objects.count()
         txs_30d = Transaction.objects.filter(date__gte=month_ago.date()).count()
 
+        live_premium = Entitlement.objects.filter(status=Entitlement.STATUS_ACTIVE).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+        ).count()
+
         return Response({
             'users': {
                 'total': total_users,
@@ -206,6 +212,9 @@ class OpsDashboardView(APIView):
                 'open': SupportThread.objects.exclude(status=SupportThread.STATUS_CLOSED).count(),
                 'waiting_ops': SupportThread.objects.filter(status=SupportThread.STATUS_WAITING_OPS).count(),
                 'waiting_user': SupportThread.objects.filter(status=SupportThread.STATUS_WAITING_USER).count(),
+            },
+            'premium': {
+                'live': live_premium,
             },
             'generated_at': now.isoformat(),
         })
@@ -260,6 +269,23 @@ class OpsUserListView(APIView):
             qs = qs.filter(device_tokens__isnull=False).distinct()
         elif push in ('0', 'false', 'no'):
             qs = qs.filter(device_tokens__isnull=True)
+
+        premium = (request.query_params.get('premium') or '').strip().lower()
+        if premium in ('1', 'true', 'yes'):
+            now = timezone.now()
+            qs = qs.filter(
+                entitlements__status=Entitlement.STATUS_ACTIVE,
+            ).filter(
+                Q(entitlements__expires_at__isnull=True) | Q(entitlements__expires_at__gt=now)
+            ).distinct()
+        elif premium in ('0', 'false', 'no'):
+            now = timezone.now()
+            live_ids = (
+                Entitlement.objects.filter(status=Entitlement.STATUS_ACTIVE)
+                .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+                .values_list('user_id', flat=True)
+            )
+            qs = qs.exclude(id__in=live_ids)
 
         since = timezone.now().date() - timedelta(days=30)
 

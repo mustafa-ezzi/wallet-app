@@ -149,7 +149,7 @@ export function UserDetailPage() {
             <p className="note">Internal notes: {user.internal_notes}</p>
           ) : (
             <p className="note">
-              Broadcast push, premium, AdMob, and support tickets land in later phases.
+              Premium, ads config, and push campaigns are available in the Ops sidebar.
             </p>
           )}
         </>

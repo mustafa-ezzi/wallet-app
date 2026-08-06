@@ -8,6 +8,7 @@ import { AuthProvider } from '@/src/context/AuthContext'
 import { OfflineProvider } from '@/src/offline'
 import { RemindersProvider } from '@/src/notifications'
 import { PrivacyLockProvider } from '@/src/privacy/PrivacyLockContext'
+import { RemoteConfigProvider } from '@/src/config/RemoteConfigContext'
 import { ThemeProvider, ThemeRevealOverlay, useColors } from '@/src/theme/ThemeContext'
 
 export { ErrorBoundary } from 'expo-router'
@@ -46,7 +47,9 @@ export default function RootLayout() {
           <OfflineProvider>
             <RemindersProvider>
               <PrivacyLockProvider>
-                <ThemedStack />
+                <RemoteConfigProvider>
+                  <ThemedStack />
+                </RemoteConfigProvider>
               </PrivacyLockProvider>
             </RemindersProvider>
           </OfflineProvider>

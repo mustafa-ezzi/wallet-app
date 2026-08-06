@@ -15,10 +15,11 @@ import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
 import { registerDeviceToken } from '@/src/notifications/pushRegistration'
 import { requestReminderPermission } from '@/src/notifications/schedule'
-import api from '@/src/api/client'
+import api, { apiErrorMessage, API_ROOT, probeApiConnection } from '@/src/api/client'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import type { PrivacyTimeout } from '@/src/privacy/storage'
 import { useTheme } from '@/src/theme/ThemeContext'
+import { useRemoteConfig } from '@/src/config/RemoteConfigContext'
 import { radii, spacing, typography } from '@/src/theme/colors'
 
 const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
@@ -34,6 +35,7 @@ export default function SettingsScreen() {
   const reminders = useReminders()
   const privacy = usePrivacyLock()
   const { themeId, themes, setThemeAnimated, colors } = useTheme()
+  const { premium, config, refresh: refreshConfig, shouldShowAds } = useRemoteConfig()
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email
 
   const [pin, setPin] = useState('')
@@ -46,6 +48,8 @@ export default function SettingsScreen() {
   const [marketingEnabled, setMarketingEnabled] = useState(true)
   const [marketingBusy, setMarketingBusy] = useState(false)
   const [pushSyncMsg, setPushSyncMsg] = useState('')
+  const [connMsg, setConnMsg] = useState('')
+  const [connBusy, setConnBusy] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -370,8 +374,8 @@ export default function SettingsScreen() {
                       ? 'Push linked to your account. Ops can reach this device now — reopen Users in admin.'
                       : 'Permission OK but token sync failed. Check you are online and logged in.',
                   )
-                } catch {
-                  setPushSyncMsg('Could not sync push. Check internet and try again.')
+                } catch (err) {
+                  setPushSyncMsg(apiErrorMessage(err, 'Could not sync push. Try again.'))
                 } finally {
                   setMarketingBusy(false)
                 }
@@ -384,6 +388,62 @@ export default function SettingsScreen() {
           </Pressable>
           {pushSyncMsg ? (
             <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{pushSyncMsg}</Text>
+          ) : null}
+        </View>
+
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Premium</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowLabel, { color: colors.text }]}>
+            {premium.is_premium ? 'CashTrail Premium' : 'Free plan'}
+          </Text>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+            {premium.is_premium
+              ? `Active${premium.product_id ? ` · ${premium.product_id}` : ''}${
+                  premium.expires_at ? ` · until ${new Date(premium.expires_at).toLocaleDateString()}` : ' · lifetime'
+                }`
+              : shouldShowAds
+                ? 'Ads may appear per remote config. Upgrade via Play Store when billing is live.'
+                : config.ads.ads_enabled
+                  ? 'Ads are currently off for your account or via Ops kill switch.'
+                  : 'Ads are disabled by Ops.'}
+          </Text>
+          <Pressable
+            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, marginTop: spacing.md }]}
+            onPress={() => {
+              void refreshConfig()
+            }}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Refresh premium & ads config</Text>
+          </Pressable>
+        </View>
+
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Connection</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+            Server: {API_ROOT || '(missing)'}
+          </Text>
+          <Pressable
+            style={[
+              styles.lockBtn,
+              { backgroundColor: colors.surfaceMuted, opacity: connBusy ? 0.55 : 1, marginTop: spacing.md },
+            ]}
+            disabled={connBusy}
+            onPress={() => {
+              void (async () => {
+                setConnBusy(true)
+                setConnMsg('Testing…')
+                const result = await probeApiConnection()
+                setConnMsg(result.ok ? `OK — ${result.detail}` : `Failed — ${result.detail}`)
+                setConnBusy(false)
+              })()
+            }}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
+              {connBusy ? 'Testing…' : 'Test server connection'}
+            </Text>
+          </Pressable>
+          {connMsg ? (
+            <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{connMsg}</Text>
           ) : null}
         </View>
 
@@ -468,6 +528,7 @@ const styles = StyleSheet.create({
   meta: { marginTop: 4, fontSize: typography.caption, color: '#3f6153' },
   row: { flexDirection: 'row', alignItems: 'center' },
   rowTitle: { fontWeight: '800', fontSize: typography.body, color: '#122a20' },
+  rowLabel: { fontWeight: '800', fontSize: typography.body },
   rowHint: { fontSize: typography.caption, marginTop: 4, lineHeight: 18, color: '#5f7569' },
   tip: { marginTop: spacing.sm, fontSize: typography.caption, lineHeight: 18, color: '#c2410c' },
   ok: { fontWeight: '700', marginVertical: spacing.sm, color: '#059669' },

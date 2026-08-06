@@ -220,3 +220,7 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 # Optional explicit Resend key (otherwise EMAIL_HOST_PASSWORD is used when it starts with re_)
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
 
+# Google Play Billing (Phase 4) — path to service-account JSON for purchase verification
+GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.cashtrail.app').strip()
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON = os.environ.get('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON', '').strip()
+

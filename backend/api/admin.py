@@ -12,7 +12,9 @@ from django.contrib.auth.models import User
 from .models import (
     Account,
     AdminAuditLog,
+    AppRemoteConfig,
     DeviceToken,
+    Entitlement,
     Household,
     HouseholdExpense,
     HouseholdInvite,
@@ -21,6 +23,7 @@ from .models import (
     NotificationPreference,
     PayableInstallment,
     Project,
+    PurchaseEvent,
     PushCampaign,
     PushCampaignDelivery,
     ReceivableInstallment,
@@ -226,6 +229,43 @@ class SupportMessageAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Entitlement)
+class EntitlementAdmin(admin.ModelAdmin):
+    list_display = (
+        'id', 'user', 'product_id', 'source', 'status',
+        'started_at', 'expires_at', 'granted_by',
+    )
+    list_filter = ('status', 'source', 'product_id')
+    search_fields = ('user__username', 'user__email', 'order_id', 'note')
+    readonly_fields = ('purchase_token_hash', 'created_at', 'updated_at')
+
+
+@admin.register(PurchaseEvent)
+class PurchaseEventAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'product_id', 'status', 'order_id', 'created_at')
+    list_filter = ('status', 'product_id')
+    search_fields = ('user__username', 'order_id', 'error')
+    readonly_fields = (
+        'user', 'product_id', 'purchase_token_hash', 'order_id', 'package_name',
+        'status', 'raw_summary', 'error', 'entitlement', 'created_at', 'updated_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AppRemoteConfig)
+class AppRemoteConfigAdmin(admin.ModelAdmin):
+    list_display = (
+        'key', 'ads_enabled', 'banner_enabled', 'interstitial_enabled',
+        'premium_hides_ads', 'updated_at', 'updated_by',
+    )
+    readonly_fields = ('updated_at',)
 
 
 # Safer User list for staff: no password hash editing beyond Django defaults,

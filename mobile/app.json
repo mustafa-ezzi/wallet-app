@@ -20,6 +20,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
       ]
@@ -119,6 +122,7 @@
     },
     "extra": {
       "router": {},
+      "apiUrl": "https://tranquil-radiance-production.up.railway.app",
       "eas": {
         "projectId": "bf847a85-3034-464b-8ac3-b7018dc543ab"
       }
