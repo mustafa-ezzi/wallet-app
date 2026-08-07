@@ -1,0 +1,8 @@
+# Railway service config — see https://docs.railway.com/reference/config-as-code
+[deploy]
+# Used on each new deploy so traffic switches only after the app is ready.
+# Does NOT keep the service awake after it is live.
+healthcheckPath = "/health/"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

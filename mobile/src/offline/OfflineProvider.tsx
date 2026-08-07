@@ -9,7 +9,7 @@ import React, {
 } from 'react'
 import { AppState, type AppStateStatus } from 'react-native'
 import NetInfo from '@react-native-community/netinfo'
-import { accountsApi, transactionsApi } from '@/src/api/client'
+import { accountsApi, transactionsApi, wakeServer } from '@/src/api/client'
 import { useAuth } from '@/src/context/AuthContext'
 import { track } from '@/src/lib/analytics'
 import { hydrateFromServer } from './hydrate'
@@ -144,7 +144,12 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const onChange = (next: AppStateStatus) => {
-      if (next === 'active') void syncNow()
+      if (next === 'active') {
+        void (async () => {
+          await wakeServer(true)
+          await syncNow()
+        })()
+      }
     }
     const sub = AppState.addEventListener('change', onChange)
     return () => sub.remove()

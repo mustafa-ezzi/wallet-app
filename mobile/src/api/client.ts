@@ -1,5 +1,5 @@
 import Constants from 'expo-constants'
-import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
+import axios, { type AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import {
   clearSession,
   getAccessToken,
@@ -9,6 +9,11 @@ import {
 
 /** Always-on fallback so a misconfigured EAS build never points at invalid.local. */
 const PRODUCTION_API_ROOT = 'https://tranquil-radiance-production.up.railway.app'
+
+/** Railway cold starts often need a long first wait + retries. */
+const DEFAULT_TIMEOUT_MS = 60000
+const MAX_NETWORK_RETRIES = 3
+const RETRY_BASE_DELAY_MS = 1600
 
 function normalizeApiRoot(raw: string | undefined | null): string {
   const value = (raw ?? '').trim().replace(/\/$/, '')
@@ -34,13 +39,79 @@ function resolveApiRoot(): string {
 
 const API_ROOT = resolveApiRoot()
 const API_BASE = `${API_ROOT}/api`
+const HEALTH_URL = `${API_ROOT}/health/`
+
+type RetryConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean
+  _networkRetry?: number
+  _skipWake?: boolean
+}
 
 const api = axios.create({
   baseURL: API_BASE,
   headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-  timeout: 45000,
+  timeout: DEFAULT_TIMEOUT_MS,
   transitional: { clarifyTimeoutError: true },
 })
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isRetryableNetworkError(err: AxiosError): boolean {
+  if (err.response) return false
+  const code = (err.code || '').toUpperCase()
+  const msg = (err.message || '').toLowerCase()
+  return (
+    code === 'ERR_NETWORK'
+    || code === 'ECONNABORTED'
+    || code === 'ETIMEDOUT'
+    || code === 'ECONNRESET'
+    || msg.includes('network')
+    || msg.includes('timeout')
+    || msg.includes('aborted')
+  )
+}
+
+let wakeInFlight: Promise<boolean> | null = null
+let lastWakeOkAt = 0
+
+/** Ping /health/ to wake a sleeping Railway dyno. Safe to call often (throttled). */
+export async function wakeServer(force = false): Promise<boolean> {
+  const now = Date.now()
+  if (!force && now - lastWakeOkAt < 45_000) return true
+  if (wakeInFlight) return wakeInFlight
+
+  wakeInFlight = (async () => {
+    const attempts = force ? 4 : 3
+    for (let i = 0; i < attempts; i += 1) {
+      try {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
+        const res = await fetch(HEALTH_URL, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        })
+        clearTimeout(timer)
+        if (res.ok) {
+          lastWakeOkAt = Date.now()
+          return true
+        }
+      } catch {
+        /* retry */
+      }
+      await sleep(RETRY_BASE_DELAY_MS * (i + 1))
+    }
+    return false
+  })()
+
+  try {
+    return await wakeInFlight
+  } finally {
+    wakeInFlight = null
+  }
+}
 
 function looksLikeHtml(data: unknown): boolean {
   if (typeof data !== 'string') return false
@@ -69,27 +140,56 @@ function assertApiResponse(res: AxiosResponse) {
   return res
 }
 
-api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+api.interceptors.request.use(async (config: RetryConfig) => {
+  if (!config._skipWake) {
+    // Best-effort wake; do not block forever if health is down
+    await Promise.race([
+      wakeServer(false),
+      sleep(8000).then(() => false),
+    ])
+  }
   const token = await getAccessToken()
   if (token) {
+    config.headers = config.headers ?? {}
     config.headers.Authorization = `Bearer ${token}`
   }
   return config
 })
 
 api.interceptors.response.use(
-  (res) => assertApiResponse(res),
-  async (err) => {
-    const original = err.config as InternalAxiosRequestConfig & { _retry?: boolean }
+  (res) => {
+    lastWakeOkAt = Date.now()
+    return assertApiResponse(res)
+  },
+  async (err: AxiosError) => {
+    const original = err.config as RetryConfig | undefined
+    if (!original) return Promise.reject(err)
+
+    // Retry transient network / cold-start failures
+    if (isRetryableNetworkError(err)) {
+      const attempt = original._networkRetry ?? 0
+      if (attempt < MAX_NETWORK_RETRIES) {
+        original._networkRetry = attempt + 1
+        await wakeServer(true)
+        await sleep(RETRY_BASE_DELAY_MS * (attempt + 1))
+        return api(original)
+      }
+    }
+
     if (!err.response) {
       return Promise.reject(err)
     }
-    if (err.response?.status === 401 && original && !original._retry) {
+
+    if (err.response?.status === 401 && !original._retry) {
       original._retry = true
       const refresh = await getRefreshToken()
       if (refresh && API_BASE) {
         try {
-          const { data } = await axios.post(`${API_BASE}/auth/refresh/`, { refresh }, { timeout: 45000 })
+          const { data } = await axios.post(
+            `${API_BASE}/auth/refresh/`,
+            { refresh },
+            { timeout: DEFAULT_TIMEOUT_MS },
+          )
           await setTokens(data.access, refresh)
           original.headers = original.headers ?? {}
           original.headers.Authorization = `Bearer ${data.access}`
@@ -107,7 +207,7 @@ api.interceptors.response.use(
 )
 
 export default api
-export { API_BASE, API_ROOT, PRODUCTION_API_ROOT }
+export { API_BASE, API_ROOT, PRODUCTION_API_ROOT, HEALTH_URL }
 
 /** Direct fetch probe — bypasses axios to diagnose device networking. */
 export async function probeApiConnection(): Promise<{
@@ -116,11 +216,20 @@ export async function probeApiConnection(): Promise<{
   status?: number
   detail: string
 }> {
-  const url = `${API_BASE}/me/`
   const started = Date.now()
   try {
+    const woke = await wakeServer(true)
+    const wakeMs = Date.now() - started
+    if (!woke) {
+      return {
+        ok: false,
+        url: HEALTH_URL,
+        detail: `Health check failed after ${wakeMs}ms. Server may be sleeping or unreachable.`,
+      }
+    }
+    const url = `${API_BASE}/me/`
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 30000)
+    const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
     const res = await fetch(url, {
       method: 'GET',
       headers: { Accept: 'application/json' },
@@ -139,7 +248,7 @@ export async function probeApiConnection(): Promise<{
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return { ok: false, url, detail: `Fetch failed: ${msg}` }
+    return { ok: false, url: HEALTH_URL, detail: `Fetch failed: ${msg}` }
   }
 }
 
@@ -162,10 +271,10 @@ export function apiErrorMessage(err: unknown, fallback = 'Request failed.'): str
     const msg = (ax?.message || '').toLowerCase()
     const code = (ax?.code || '').toUpperCase()
     if (code === 'ECONNABORTED' || msg.includes('timeout') || msg.includes('aborted')) {
-      return 'Server took too long to respond. Try again in a moment.'
+      return 'Server is waking up or slow. Wait a few seconds and try again.'
     }
     if (msg.includes('network') || code === 'ERR_NETWORK') {
-      return `Cannot reach CashTrail (${API_ROOT}). Check mobile data/Wi‑Fi, disable VPN, then retry.`
+      return 'Cannot reach CashTrail right now (server may be waking up). Check Wi‑Fi/mobile data, disable VPN, wait ~15s, then retry.'
     }
     return ax?.message || fallback
   }

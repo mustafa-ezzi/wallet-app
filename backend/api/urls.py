@@ -10,6 +10,7 @@ from . import support_api
 from . import premium_api
 from . import remote_config_api
 from . import phase5_api
+from . import health
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -26,6 +27,7 @@ router.register('household-notifications', household_api.HouseholdNotificationVi
 router.register('devices', devices_api.DeviceTokenViewSet, basename='device')
 
 urlpatterns = [
+    path('health/', health.ApiHealthView.as_view(), name='api-health'),
     path('auth/register/', views.RegisterView.as_view(), name='register'),
     path('auth/forgot-password/', password_reset_api.ForgotPasswordView.as_view(), name='forgot-password'),
     path('auth/verify-reset-otp/', password_reset_api.VerifyResetOTPView.as_view(), name='verify-reset-otp'),

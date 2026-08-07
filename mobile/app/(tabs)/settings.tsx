@@ -13,7 +13,7 @@ import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
 import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
-import { registerDeviceToken } from '@/src/notifications/pushRegistration'
+import { registerDeviceTokenDetailed } from '@/src/notifications/pushRegistration'
 import { requestReminderPermission } from '@/src/notifications/schedule'
 import api, { apiErrorMessage, API_ROOT, probeApiConnection } from '@/src/api/client'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
@@ -345,7 +345,7 @@ export default function SettingsScreen() {
                   try {
                     if (v) {
                       const ok = await requestReminderPermission()
-                      if (ok) await registerDeviceToken()
+                      if (ok) await registerDeviceTokenDetailed()
                     }
                     await api.patch('/notification-preferences/', { marketing_enabled: v })
                     setMarketingEnabled(v)
@@ -376,13 +376,15 @@ export default function SettingsScreen() {
                     setPushSyncMsg('Allow notifications in system settings first.')
                     return
                   }
-                  const token = await registerDeviceToken()
+                  const result = await registerDeviceTokenDetailed()
+                  if (!result.ok) {
+                    setPushSyncMsg(result.error || 'Could not link push.')
+                    return
+                  }
                   await api.patch('/notification-preferences/', { marketing_enabled: true })
                   setMarketingEnabled(true)
                   setPushSyncMsg(
-                    token
-                      ? 'Push linked to your account. Ops can reach this device now — reopen Users in admin.'
-                      : 'Permission OK but token sync failed. Check you are online and logged in.',
+                    'Push linked to your account. Ops can reach this device now — reopen Users in admin.',
                   )
                 } catch (err) {
                   setPushSyncMsg(apiErrorMessage(err, 'Could not sync push. Try again.'))
