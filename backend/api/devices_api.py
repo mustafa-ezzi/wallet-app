@@ -152,3 +152,65 @@ class PushCampaignsJobView(APIView):
             '1', 'true', 'yes',
         }
         return Response(process_due_scheduled_campaigns(dry_run=dry))
+
+
+class RefreshInactivityJobView(APIView):
+    """
+    Railway cron: POST /api/jobs/refresh-inactivity/
+    Recomputes inactivity tiers (flag only — never deletes).
+    Auth: same CRON_SECRET as other jobs.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        secret = getattr(settings, 'CRON_SECRET', '') or ''
+        provided = (
+            request.headers.get('X-Cron-Secret')
+            or request.META.get('HTTP_X_CRON_SECRET')
+            or ''
+        ).strip()
+        auth = (request.headers.get('Authorization') or '').strip()
+        if auth.lower().startswith('bearer '):
+            provided = auth[7:].strip() or provided
+
+        if not secret or provided != secret:
+            return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+
+        from django.contrib.auth.models import User
+        from django.db.models import Max
+        from .models import DeviceToken, Transaction
+        from .ops_api import _ensure_ops_meta, _inactivity_tier, _last_seen_for
+
+        updated = 0
+        device_last = {
+            row['user_id']: row['m']
+            for row in DeviceToken.objects.values('user_id').annotate(m=Max('updated_at'))
+        }
+        activity_last = {
+            row['user_id']: row['m']
+            for row in Transaction.objects.values('user_id').annotate(m=Max('created_at'))
+        }
+        for user in User.objects.select_related('ops_meta').iterator(chunk_size=200):
+            meta = _ensure_ops_meta(user)
+            last_seen = _last_seen_for(
+                user,
+                meta,
+                device_touch=device_last.get(user.id),
+                activity_touch=activity_last.get(user.id),
+            )
+            tier = _inactivity_tier(last_seen)
+            fields: list[str] = []
+            if last_seen and (meta.last_seen_at is None or last_seen > meta.last_seen_at):
+                meta.last_seen_at = last_seen
+                fields.append('last_seen_at')
+            if meta.inactivity_tier != tier:
+                meta.inactivity_tier = tier
+                fields.append('inactivity_tier')
+            if fields:
+                fields.append('updated_at')
+                meta.save(update_fields=list(dict.fromkeys(fields)))
+                updated += 1
+
+        return Response({'updated': updated})

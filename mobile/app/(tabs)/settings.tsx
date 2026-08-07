@@ -50,6 +50,9 @@ export default function SettingsScreen() {
   const [pushSyncMsg, setPushSyncMsg] = useState('')
   const [connMsg, setConnMsg] = useState('')
   const [connBusy, setConnBusy] = useState(false)
+  const [promoCode, setPromoCode] = useState('')
+  const [promoBusy, setPromoBusy] = useState(false)
+  const [promoMsg, setPromoMsg] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -451,6 +454,55 @@ export default function SettingsScreen() {
           </Pressable>
           {connMsg ? (
             <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{connMsg}</Text>
+          ) : null}
+        </View>
+
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Promo code</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+            Have a CashTrail promo? Redeem for a Premium trial.
+          </Text>
+          <TextInput
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}
+            placeholder="PREMIUM30"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="characters"
+            value={promoCode}
+            onChangeText={setPromoCode}
+          />
+          <Pressable
+            style={[
+              styles.lockBtn,
+              { backgroundColor: colors.surfaceMuted, opacity: promoBusy ? 0.55 : 1, marginTop: spacing.sm },
+            ]}
+            disabled={promoBusy}
+            onPress={() => {
+              void (async () => {
+                if (!promoCode.trim()) {
+                  setPromoMsg('Enter a code.')
+                  return
+                }
+                setPromoBusy(true)
+                setPromoMsg('')
+                try {
+                  await api.post('/premium/redeem/', { code: promoCode.trim() })
+                  setPromoMsg('Promo applied — enjoy Premium!')
+                  setPromoCode('')
+                  await refreshConfig()
+                } catch (err: unknown) {
+                  setPromoMsg(apiErrorMessage(err, 'Could not redeem code.'))
+                } finally {
+                  setPromoBusy(false)
+                }
+              })()
+            }}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
+              {promoBusy ? 'Redeeming…' : 'Redeem'}
+            </Text>
+          </Pressable>
+          {promoMsg ? (
+            <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{promoMsg}</Text>
           ) : null}
         </View>
 

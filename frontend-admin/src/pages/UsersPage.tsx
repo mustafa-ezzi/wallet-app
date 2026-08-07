@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchOpsUsers, type OpsUser } from '../api'
+import { downloadUsersCsv, fetchOpsUsers, type OpsUser } from '../api'
 
 function tierBadge(tier: string) {
   if (tier === 'none') return <span className="badge ok">active</span>
@@ -21,6 +21,7 @@ export function UsersPage() {
   const [premium, setPremium] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exportBusy, setExportBusy] = useState(false)
 
   function applySearch() {
     setPage(1)
@@ -68,6 +69,29 @@ export function UsersPage() {
             {count} accounts · privacy-safe summaries only
           </p>
         </div>
+        <button
+          className="btn primary"
+          type="button"
+          disabled={exportBusy}
+          onClick={() => {
+            void (async () => {
+              setExportBusy(true)
+              setError(null)
+              try {
+                await downloadUsersCsv({
+                  q: q || undefined,
+                  premium: premium || undefined,
+                })
+              } catch {
+                setError('CSV export failed.')
+              } finally {
+                setExportBusy(false)
+              }
+            })()
+          }}
+        >
+          {exportBusy ? 'Exporting…' : 'Export CSV'}
+        </button>
       </div>
 
       <div className="toolbar">

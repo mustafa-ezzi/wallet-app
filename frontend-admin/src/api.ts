@@ -371,6 +371,7 @@ export type OpsRemoteConfig = {
   min_supported_version: string
   store_url: string
   maintenance_message: string
+  support_whatsapp?: string
   updated_at: string | null
   raw: {
     ads_enabled: boolean
@@ -389,6 +390,7 @@ export type OpsRemoteConfig = {
     min_supported_version: string
     store_url: string
     maintenance_message: string
+    support_whatsapp?: string
     updated_by_id: number | null
     updated_by_username: string | null
   }
@@ -434,4 +436,83 @@ export async function fetchOpsConfig() {
 export async function patchOpsConfig(payload: Record<string, unknown>) {
   const { data } = await opsApi.patch<OpsRemoteConfig>('/ops/config/', payload)
   return data
+}
+
+export type OpsPromo = {
+  id: number
+  code: string
+  product_id: string
+  trial_days: number
+  max_redemptions: number | null
+  redemption_count: number
+  active: boolean
+  starts_at: string | null
+  ends_at: string | null
+  note: string
+  is_valid_now: boolean
+  created_by_username: string | null
+  created_at: string | null
+}
+
+export type OpsAuditRow = {
+  id: number
+  action: string
+  actor_id: number | null
+  actor_username: string | null
+  target_type: string
+  target_id: string
+  meta: Record<string, unknown>
+  ip_address: string | null
+  created_at: string | null
+}
+
+export async function fetchPromos(params?: Record<string, string | number | undefined>) {
+  const { data } = await opsApi.get<Paginated<OpsPromo>>('/ops/promos/', { params })
+  return data
+}
+
+export async function createPromo(payload: {
+  code: string
+  product_id: string
+  trial_days: number
+  max_redemptions?: number | null
+  note?: string
+  active?: boolean
+}) {
+  const { data } = await opsApi.post<OpsPromo>('/ops/promos/', payload)
+  return data
+}
+
+export async function patchPromo(id: number, payload: Record<string, unknown>) {
+  const { data } = await opsApi.patch<OpsPromo>(`/ops/promos/${id}/`, payload)
+  return data
+}
+
+export async function fetchAuditLog(params?: Record<string, string | number | undefined>) {
+  const { data } = await opsApi.get<Paginated<OpsAuditRow>>('/ops/audit/', { params })
+  return data
+}
+
+export function usersExportUrl(params?: Record<string, string | undefined>) {
+  const qs = new URLSearchParams()
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      if (v) qs.set(k, v)
+    }
+  }
+  const q = qs.toString()
+  return `${opsApi.defaults.baseURL}/ops/users/export/${q ? `?${q}` : ''}`
+}
+
+export async function downloadUsersCsv(params?: Record<string, string | undefined>) {
+  const { data } = await opsApi.get<Blob>('/ops/users/export/', {
+    params,
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'cashtrail_users.csv'
+  a.click()
+  URL.revokeObjectURL(url)
 }

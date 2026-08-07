@@ -9,6 +9,7 @@ from . import ops_campaigns_api
 from . import support_api
 from . import premium_api
 from . import remote_config_api
+from . import phase5_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -43,11 +44,13 @@ urlpatterns = [
     path('notification-preferences/', devices_api.NotificationPreferenceView.as_view(), name='notification-preferences'),
     path('jobs/due-reminders/', devices_api.DueRemindersJobView.as_view(), name='jobs-due-reminders'),
     path('jobs/push-campaigns/', devices_api.PushCampaignsJobView.as_view(), name='jobs-push-campaigns'),
+    path('jobs/refresh-inactivity/', devices_api.RefreshInactivityJobView.as_view(), name='jobs-refresh-inactivity'),
     # Ops panel (staff only)
     path('ops/me/', ops_api.OpsMeView.as_view(), name='ops-me'),
     path('ops/dashboard/', ops_api.OpsDashboardView.as_view(), name='ops-dashboard'),
     path('ops/users/', ops_api.OpsUserListView.as_view(), name='ops-users'),
     path('ops/users/refresh-inactivity/', ops_api.OpsRefreshInactivityView.as_view(), name='ops-refresh-inactivity'),
+    path('ops/users/export/', phase5_api.OpsUsersExportView.as_view(), name='ops-users-export'),
     path('ops/users/<int:user_id>/', ops_api.OpsUserDetailView.as_view(), name='ops-user-detail'),
     path('ops/users/<int:user_id>/suspend/', ops_api.OpsUserSuspendView.as_view(), name='ops-user-suspend'),
     path('ops/users/<int:user_id>/unsuspend/', ops_api.OpsUserUnsuspendView.as_view(), name='ops-user-unsuspend'),
@@ -68,11 +71,15 @@ urlpatterns = [
     # Premium (user + ops) — Phase 4
     path('premium/', premium_api.PremiumMeView.as_view(), name='premium-me'),
     path('premium/verify/', premium_api.PremiumVerifyView.as_view(), name='premium-verify'),
+    path('premium/redeem/', phase5_api.PremiumRedeemView.as_view(), name='premium-redeem'),
     path('ops/premium/', premium_api.OpsPremiumListView.as_view(), name='ops-premium'),
     path('ops/premium/stats/', premium_api.OpsPremiumStatsView.as_view(), name='ops-premium-stats'),
     path('ops/premium/grant/', premium_api.OpsPremiumGrantView.as_view(), name='ops-premium-grant'),
     path('ops/premium/<int:entitlement_id>/revoke/', premium_api.OpsPremiumRevokeView.as_view(), name='ops-premium-revoke'),
     path('ops/premium/purchases/', premium_api.OpsPurchaseQueueView.as_view(), name='ops-premium-purchases'),
+    path('ops/promos/', phase5_api.OpsPromoListCreateView.as_view(), name='ops-promos'),
+    path('ops/promos/<int:promo_id>/', phase5_api.OpsPromoDetailView.as_view(), name='ops-promo-detail'),
+    path('ops/audit/', phase5_api.OpsAuditListView.as_view(), name='ops-audit'),
     # Remote ads / feature config
     path('config/', remote_config_api.AppConfigView.as_view(), name='app-config'),
     path('ops/config/', remote_config_api.OpsConfigView.as_view(), name='ops-config'),

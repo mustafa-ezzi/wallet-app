@@ -1,15 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native'
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import api from '@/src/api/client'
+import { useRemoteConfig } from '@/src/config/RemoteConfigContext'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography } from '@/src/theme/colors'
 
@@ -40,6 +34,7 @@ const CATEGORIES = [
 export default function SupportScreen() {
   const colors = useColors()
   const router = useRouter()
+  const { config } = useRemoteConfig()
   const params = useLocalSearchParams<{ threadId?: string }>()
   const [threads, setThreads] = useState<Thread[]>([])
   const [active, setActive] = useState<Thread | null>(null)
@@ -140,6 +135,24 @@ export default function SupportScreen() {
         <Text style={[styles.hint, { color: colors.textMuted }]}>
           Message CashTrail support. We’ll reply in this chat (and notify you if push is on).
         </Text>
+
+        {(() => {
+          const raw = (config.support_whatsapp || '').trim()
+          if (!raw) return null
+          const url = raw.startsWith('http')
+            ? raw
+            : `https://wa.me/${raw.replace(/[^\d]/g, '')}?text=${encodeURIComponent('Hi CashTrail support')}`
+          return (
+            <Pressable
+              style={[styles.waBtn, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}
+              onPress={() => {
+                void Linking.openURL(url)
+              }}
+            >
+              <Text style={[styles.waText, { color: colors.primaryDark }]}>Prefer WhatsApp</Text>
+            </Pressable>
+          )
+        })()}
 
         {error ? <ErrorBanner message={error} /> : null}
 
@@ -301,6 +314,14 @@ const styles = StyleSheet.create({
   pad: { padding: spacing.lg, paddingBottom: spacing.xxl + 80 },
   title: { fontSize: typography.title, fontWeight: '800', marginBottom: spacing.sm },
   hint: { fontSize: 13, lineHeight: 18, marginBottom: spacing.md },
+  waBtn: {
+    borderWidth: 1,
+    borderRadius: radii.md,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  waText: { fontWeight: '800', fontSize: typography.body },
   section: { fontSize: typography.subtitle, fontWeight: '800', marginTop: spacing.lg, marginBottom: spacing.sm },
   card: {
     borderWidth: StyleSheet.hairlineWidth,

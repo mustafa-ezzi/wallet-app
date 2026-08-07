@@ -1004,6 +1004,8 @@ class AppRemoteConfig(models.Model):
     min_supported_version = models.CharField(max_length=32, blank=True, default='')
     store_url = models.URLField(blank=True, default='')
     maintenance_message = models.CharField(max_length=255, blank=True, default='')
+    # Phase 5 — optional WhatsApp escape hatch (digits or full https://wa.me/… URL)
+    support_whatsapp = models.CharField(max_length=128, blank=True, default='')
     updated_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name='remote_config_updates',
@@ -1020,3 +1022,68 @@ class AppRemoteConfig(models.Model):
     def get_solo(cls):
         obj, _ = cls.objects.get_or_create(key=cls.KEY_DEFAULT)
         return obj
+
+
+class PromoCode(models.Model):
+    """Redeemable premium trial codes (e.g. PREMIUM30 → 30 days)."""
+
+    code = models.CharField(max_length=32, unique=True, db_index=True)
+    product_id = models.CharField(
+        max_length=64,
+        choices=Entitlement.PRODUCT_CHOICES,
+        default=Entitlement.PRODUCT_MONTHLY,
+    )
+    trial_days = models.PositiveIntegerField(default=30)
+    max_redemptions = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Null = unlimited',
+    )
+    redemption_count = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(default=True, db_index=True)
+    starts_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField(null=True, blank=True)
+    note = models.CharField(max_length=255, blank=True, default='')
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='promo_codes_created',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'PromoCode({self.code})'
+
+    def normalize_code(self):
+        return (self.code or '').strip().upper()
+
+    def is_currently_valid(self) -> bool:
+        if not self.active:
+            return False
+        now = timezone.now()
+        if self.starts_at and now < self.starts_at:
+            return False
+        if self.ends_at and now > self.ends_at:
+            return False
+        if self.max_redemptions is not None and self.redemption_count >= self.max_redemptions:
+            return False
+        return True
+
+
+class PromoRedemption(models.Model):
+    promo = models.ForeignKey(PromoCode, on_delete=models.CASCADE, related_name='redemptions')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='promo_redemptions')
+    entitlement = models.ForeignKey(
+        Entitlement, null=True, blank=True, on_delete=models.SET_NULL, related_name='promo_redemptions',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['promo', 'user'], name='promo_user_unique'),
+        ]
+
+    def __str__(self):
+        return f'Redeem({self.promo_id} by {self.user_id})'

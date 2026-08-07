@@ -9,6 +9,7 @@ import { OfflineProvider } from '@/src/offline'
 import { RemindersProvider } from '@/src/notifications'
 import { PrivacyLockProvider } from '@/src/privacy/PrivacyLockContext'
 import { RemoteConfigProvider } from '@/src/config/RemoteConfigContext'
+import { ForceUpdateGate, MaintenanceBanner } from '@/src/config/ForceUpdateGate'
 import { ThemeProvider, ThemeRevealOverlay, useColors } from '@/src/theme/ThemeContext'
 
 export { ErrorBoundary } from 'expo-router'
@@ -22,12 +23,14 @@ function ThemedStack() {
   return (
     <>
       <StatusBar style="dark" />
+      <MaintenanceBanner />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: 'card' }} />
       </Stack>
+      <ForceUpdateGate />
       <AnimatedSplashScreen />
     </>
   )

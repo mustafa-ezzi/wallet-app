@@ -23,6 +23,8 @@ from .models import (
     NotificationPreference,
     PayableInstallment,
     Project,
+    PromoCode,
+    PromoRedemption,
     PurchaseEvent,
     PushCampaign,
     PushCampaignDelivery,
@@ -266,6 +268,26 @@ class AppRemoteConfigAdmin(admin.ModelAdmin):
         'premium_hides_ads', 'updated_at', 'updated_by',
     )
     readonly_fields = ('updated_at',)
+
+
+@admin.register(PromoCode)
+class PromoCodeAdmin(admin.ModelAdmin):
+    list_display = (
+        'code', 'product_id', 'trial_days', 'redemption_count',
+        'max_redemptions', 'active', 'created_at',
+    )
+    list_filter = ('active', 'product_id')
+    search_fields = ('code', 'note')
+
+
+@admin.register(PromoRedemption)
+class PromoRedemptionAdmin(admin.ModelAdmin):
+    list_display = ('id', 'promo', 'user', 'created_at')
+    search_fields = ('promo__code', 'user__username')
+    readonly_fields = ('promo', 'user', 'entitlement', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
 
 
 # Safer User list for staff: no password hash editing beyond Django defaults,

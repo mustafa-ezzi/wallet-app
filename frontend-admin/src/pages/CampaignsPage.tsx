@@ -30,6 +30,41 @@ const ROUTES = [
   { value: 'settings', label: 'Settings' },
 ]
 
+const TEMPLATES = [
+  {
+    id: 'reengage_7d',
+    label: 'Re-engage 7d',
+    title: 'Your CashTrail is waiting',
+    body: 'Open the app to sync wallets and stay on top of bills.',
+    audience: 'inactive_7d',
+    route: 'home',
+  },
+  {
+    id: 'reengage_30d',
+    label: 'Win-back 30d',
+    title: 'We miss your CashTrail',
+    body: 'Come back — your money history is safe. Tap to open.',
+    audience: 'inactive_30d',
+    route: 'home',
+  },
+  {
+    id: 'reengage_90d',
+    label: 'Win-back 90d',
+    body: 'Your wallets are still here when you are ready. Open CashTrail anytime.',
+    title: 'Still keeping your rupees?',
+    audience: 'inactive_90d',
+    route: 'home',
+  },
+  {
+    id: 'whats_new',
+    label: "What's new",
+    title: 'CashTrail update',
+    body: 'Widgets and reports got sharper — open the app to try them.',
+    audience: 'all',
+    route: 'home',
+  },
+]
+
 function statusBadge(status: string) {
   if (status === 'sent') return <span className="badge ok">{status}</span>
   if (status === 'failed' || status === 'cancelled') return <span className="badge danger">{status}</span>
@@ -173,6 +208,23 @@ export function CampaignsPage() {
       <form className="card" onSubmit={onCreate} style={{ marginBottom: 20 }}>
         <div className="label" style={{ marginBottom: 12 }}>
           Compose campaign
+        </div>
+        <div className="toolbar" style={{ marginBottom: 12 }}>
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              className="btn"
+              type="button"
+              onClick={() => {
+                setTitle(t.title)
+                setBody(t.body)
+                setAudience(t.audience)
+                setRoute(t.route)
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
         <div className="field">
           <label htmlFor="title">Title</label>

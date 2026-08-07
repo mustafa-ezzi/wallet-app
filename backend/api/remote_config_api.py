@@ -49,6 +49,7 @@ def serialize_remote_config(cfg: AppRemoteConfig, *, for_user=None) -> dict:
         'min_supported_version': cfg.min_supported_version or '',
         'store_url': cfg.store_url or '',
         'maintenance_message': cfg.maintenance_message or '',
+        'support_whatsapp': cfg.support_whatsapp or '',
         'viewer': {
             'is_premium': premium,
         },
@@ -75,6 +76,7 @@ def serialize_ops_config(cfg: AppRemoteConfig) -> dict:
         'min_supported_version': cfg.min_supported_version or '',
         'store_url': cfg.store_url or '',
         'maintenance_message': cfg.maintenance_message or '',
+        'support_whatsapp': cfg.support_whatsapp or '',
         'updated_by_id': cfg.updated_by_id,
         'updated_by_username': getattr(cfg.updated_by, 'username', None) if cfg.updated_by_id else None,
     }
@@ -116,6 +118,7 @@ class OpsConfigView(APIView):
             'min_supported_version',
             'store_url',
             'maintenance_message',
+            'support_whatsapp',
         )
         changed = []
 

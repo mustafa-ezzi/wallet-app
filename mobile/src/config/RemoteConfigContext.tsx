@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store'
+import Constants from 'expo-constants'
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Platform } from 'react-native'
 import api from '@/src/api/client'
@@ -41,6 +42,7 @@ export type RemoteConfig = {
   min_supported_version: string
   store_url: string
   maintenance_message: string
+  support_whatsapp: string
   viewer: { is_premium: boolean }
   updated_at: string | null
 }
@@ -71,6 +73,7 @@ const DEFAULT_CONFIG: RemoteConfig = {
   min_supported_version: '',
   store_url: '',
   maintenance_message: '',
+  support_whatsapp: '',
   viewer: { is_premium: false },
   updated_at: null,
 }
@@ -90,6 +93,8 @@ type Ctx = {
   loading: boolean
   refresh: () => Promise<void>
   shouldShowAds: boolean
+  flag: (key: string) => unknown
+  needsForceUpdate: boolean
 }
 
 const RemoteConfigContext = createContext<Ctx | null>(null)
@@ -107,6 +112,41 @@ function mergeConfig(raw: Partial<RemoteConfig> | null | undefined): RemoteConfi
     },
     viewer: raw?.viewer || { is_premium: false },
   }
+}
+
+function parseVersion(raw: string): number[] {
+  return (raw || '')
+    .trim()
+    .split(/[.+-]/)
+    .filter(Boolean)
+    .map((p) => {
+      const n = parseInt(p.replace(/\D/g, ''), 10)
+      return Number.isFinite(n) ? n : 0
+    })
+}
+
+/** True when current < minimum (semver-ish). Empty minimum = no force. */
+export function isVersionBelow(current: string, minimum: string): boolean {
+  const min = (minimum || '').trim()
+  if (!min) return false
+  const a = parseVersion(current)
+  const b = parseVersion(min)
+  const len = Math.max(a.length, b.length, 3)
+  for (let i = 0; i < len; i += 1) {
+    const x = a[i] ?? 0
+    const y = b[i] ?? 0
+    if (x < y) return true
+    if (x > y) return false
+  }
+  return false
+}
+
+export function appVersion(): string {
+  return (
+    Constants.expoConfig?.version
+    || (Constants as { nativeAppVersion?: string }).nativeAppVersion
+    || '0.0.0'
+  )
 }
 
 async function cacheGet(): Promise<string | null> {
@@ -184,9 +224,16 @@ export function RemoteConfigProvider({ children }: { children: React.ReactNode }
     && !premium.is_premium
     && Boolean(config.ads?.banner_enabled)
 
+  const needsForceUpdate = isVersionBelow(appVersion(), config.min_supported_version || '')
+
+  const flag = useCallback(
+    (key: string) => (config.feature_flags || {})[key],
+    [config.feature_flags],
+  )
+
   const value = useMemo(
-    () => ({ config, premium, loading, refresh, shouldShowAds }),
-    [config, premium, loading, refresh, shouldShowAds],
+    () => ({ config, premium, loading, refresh, shouldShowAds, flag, needsForceUpdate }),
+    [config, premium, loading, refresh, shouldShowAds, flag, needsForceUpdate],
   )
 
   return <RemoteConfigContext.Provider value={value}>{children}</RemoteConfigContext.Provider>

@@ -22,6 +22,8 @@ export function AdsConfigPage() {
   const [minVersion, setMinVersion] = useState('')
   const [storeUrl, setStoreUrl] = useState('')
   const [maintenance, setMaintenance] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
+  const [flagsJson, setFlagsJson] = useState('{}')
 
   function applyForm(data: OpsRemoteConfig) {
     const r = data.raw
@@ -40,6 +42,8 @@ export function AdsConfigPage() {
     setMinVersion(r.min_supported_version || '')
     setStoreUrl(r.store_url || '')
     setMaintenance(r.maintenance_message || '')
+    setWhatsapp(r.support_whatsapp || '')
+    setFlagsJson(JSON.stringify(r.feature_flags || {}, null, 2))
   }
 
   async function load() {
@@ -62,6 +66,17 @@ export function AdsConfigPage() {
     setBusy(true)
     setError(null)
     setSaved(null)
+    let feature_flags: Record<string, unknown> = {}
+    try {
+      feature_flags = JSON.parse(flagsJson || '{}') as Record<string, unknown>
+      if (!feature_flags || typeof feature_flags !== 'object' || Array.isArray(feature_flags)) {
+        throw new Error('not object')
+      }
+    } catch {
+      setError('Feature flags must be valid JSON object.')
+      setBusy(false)
+      return
+    }
     try {
       const data = await patchOpsConfig({
         ads_enabled: adsEnabled,
@@ -79,6 +94,8 @@ export function AdsConfigPage() {
         min_supported_version: minVersion.trim(),
         store_url: storeUrl.trim(),
         maintenance_message: maintenance.trim(),
+        support_whatsapp: whatsapp.trim(),
+        feature_flags,
       })
       setCfg(data)
       applyForm(data)
@@ -192,7 +209,7 @@ export function AdsConfigPage() {
           </div>
 
           <div className="card" style={{ marginBottom: 16 }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>App gate (Phase 5-ready)</h2>
+            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>App gate & support</h2>
             <label>
               Min supported version
               <input value={minVersion} onChange={(e) => setMinVersion(e.target.value)} placeholder="1.0.0" />
@@ -204,6 +221,31 @@ export function AdsConfigPage() {
             <label>
               Maintenance message
               <input value={maintenance} onChange={(e) => setMaintenance(e.target.value)} />
+            </label>
+            <label>
+              WhatsApp support (digits or wa.me URL)
+              <input
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="923001234567"
+              />
+            </label>
+            <label>
+              Feature flags (JSON)
+              <textarea
+                value={flagsJson}
+                onChange={(e) => setFlagsJson(e.target.value)}
+                rows={6}
+                style={{
+                  width: '100%',
+                  fontFamily: 'var(--mono)',
+                  background: 'var(--bg-elev)',
+                  border: '1px solid var(--line)',
+                  color: 'var(--text)',
+                  borderRadius: 10,
+                  padding: 10,
+                }}
+              />
             </label>
           </div>
 
