@@ -99,7 +99,9 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     if (!onlineNow) track('transaction_queued_offline', { tx_type: input.type })
     await refreshStatus()
     void updateAllWidgets()
-    if (onlineNow) await syncNow()
+    // Sync in the background — never fail the UI after a successful local write
+    // (that caused "error then double entry" when users tapped Save again).
+    if (onlineNow) void syncNow()
     return { queuedOffline: !onlineNow, localId: result.transaction.localId }
   }, [refreshStatus, syncNow])
 

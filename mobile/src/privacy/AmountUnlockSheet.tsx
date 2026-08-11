@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import { colors, radii, spacing, typography } from '@/src/theme/colors'
 
-/** Bottom sheet: biometric / PIN to reveal amounts (page stays visible underneath). */
+/** Centered dialog: biometric / PIN to reveal amounts (page stays visible underneath). */
 export function AmountUnlockSheet() {
   const insets = useSafeAreaInsets()
   const {
@@ -88,100 +88,95 @@ export function AmountUnlockSheet() {
     <Modal
       visible={unlockSheetOpen}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={closeUnlockSheet}
     >
-      <Pressable style={styles.backdrop} onPress={closeUnlockSheet} />
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
-        <View style={styles.handle} />
-        <Text style={styles.title}>Reveal amounts</Text>
-        <Text style={styles.sub}>
-          Confirm with biometrics or your CashTrail PIN. Labels and the rest of the screen stay visible.
-        </Text>
+      <View style={[styles.modalRoot, { paddingBottom: insets.bottom }]}>
+        <Pressable style={styles.backdrop} onPress={closeUnlockSheet} />
+        <View style={styles.sheet}>
+          <Text style={styles.title}>Reveal amounts</Text>
+          <Text style={styles.sub}>
+            Confirm with biometrics or your CashTrail PIN. Labels and the rest of the screen stay visible.
+          </Text>
 
-        {busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} /> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          {busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} /> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        {biometricsAvailable ? (
-          <Pressable
-            style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
-            onPress={() => void onBiometric()}
-            disabled={busy}
-          >
-            <Text style={styles.primaryText}>Use biometrics</Text>
-          </Pressable>
-        ) : null}
+          {biometricsAvailable ? (
+            <Pressable
+              style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+              onPress={() => void onBiometric()}
+              disabled={busy}
+            >
+              <Text style={styles.primaryText}>Use biometrics</Text>
+            </Pressable>
+          ) : null}
 
-        {hasPin ? (
-          <>
-            {!showPin ? (
-              <Pressable
-                style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
-                onPress={() => setShowPin(true)}
-                disabled={busy}
-              >
-                <Text style={styles.secondaryText}>Use CashTrail PIN</Text>
-              </Pressable>
-            ) : (
-              <View style={styles.pinBox}>
-                <TextInput
-                  value={pin}
-                  onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))}
-                  keyboardType="number-pad"
-                  secureTextEntry
-                  placeholder="••••"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.pinInput}
-                  maxLength={6}
-                  autoFocus
-                />
+          {hasPin ? (
+            <>
+              {!showPin ? (
                 <Pressable
-                  style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
-                  onPress={() => void onPin()}
+                  style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}
+                  onPress={() => setShowPin(true)}
                   disabled={busy}
                 >
-                  <Text style={styles.primaryText}>Unlock</Text>
+                  <Text style={styles.secondaryText}>Use CashTrail PIN</Text>
                 </Pressable>
-              </View>
-            )}
-          </>
-        ) : !biometricsAvailable ? (
-          <Text style={styles.warn}>
-            Open Settings and set a CashTrail PIN to reveal amounts.
-          </Text>
-        ) : null}
+              ) : (
+                <View style={styles.pinBox}>
+                  <TextInput
+                    value={pin}
+                    onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))}
+                    keyboardType="number-pad"
+                    secureTextEntry
+                    placeholder="••••"
+                    placeholderTextColor={colors.textMuted}
+                    style={styles.pinInput}
+                    maxLength={6}
+                    autoFocus
+                  />
+                  <Pressable
+                    style={({ pressed }) => [styles.primary, pressed && styles.pressed]}
+                    onPress={() => void onPin()}
+                    disabled={busy}
+                  >
+                    <Text style={styles.primaryText}>Unlock</Text>
+                  </Pressable>
+                </View>
+              )}
+            </>
+          ) : !biometricsAvailable ? (
+            <Text style={styles.warn}>
+              Open Settings and set a CashTrail PIN to reveal amounts.
+            </Text>
+          ) : null}
 
-        <Pressable onPress={closeUnlockSheet} style={styles.cancel}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </Pressable>
+          <Pressable onPress={closeUnlockSheet} style={styles.cancel}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
+        </View>
       </View>
     </Modal>
   )
 }
 
 const styles = StyleSheet.create({
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
   backdrop: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15, 31, 26, 0.45)',
   },
   sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    borderRadius: radii.lg,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginBottom: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.md,
+    zIndex: 2,
   },
   title: {
     fontSize: typography.title,

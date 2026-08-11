@@ -11,9 +11,9 @@ import {
 const PRODUCTION_API_ROOT = 'https://tranquil-radiance-production.up.railway.app'
 
 /** Railway cold starts often need a long first wait + retries. */
-const DEFAULT_TIMEOUT_MS = 60000
-const MAX_NETWORK_RETRIES = 3
-const RETRY_BASE_DELAY_MS = 1600
+const DEFAULT_TIMEOUT_MS = 45000
+const MAX_NETWORK_RETRIES = 2
+const RETRY_BASE_DELAY_MS = 1200
 
 function normalizeApiRoot(raw: string | undefined | null): string {
   const value = (raw ?? '').trim().replace(/\/$/, '')
@@ -141,12 +141,10 @@ function assertApiResponse(res: AxiosResponse) {
 }
 
 api.interceptors.request.use(async (config: RetryConfig) => {
+  // Never block the UI waiting for Railway wake — kick it off in the background.
+  // Retries below still force-wake if the first attempt fails.
   if (!config._skipWake) {
-    // Best-effort wake; do not block forever if health is down
-    await Promise.race([
-      wakeServer(false),
-      sleep(8000).then(() => false),
-    ])
+    void wakeServer(false)
   }
   const token = await getAccessToken()
   if (token) {

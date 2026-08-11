@@ -5,6 +5,7 @@ import { View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { AnimatedSplashScreen } from '@/src/components/AnimatedSplashScreen'
 import { AuthProvider } from '@/src/context/AuthContext'
+import { MoneyUiProvider } from '@/src/context/MoneyUiContext'
 import { OfflineProvider } from '@/src/offline'
 import { RemindersProvider } from '@/src/notifications'
 import { PrivacyLockProvider } from '@/src/privacy/PrivacyLockContext'
@@ -28,6 +29,7 @@ function ThemedStack() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="add-transaction" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: 'card' }} />
       </Stack>
       <ForceUpdateGate />
@@ -51,7 +53,9 @@ export default function RootLayout() {
             <RemindersProvider>
               <PrivacyLockProvider>
                 <RemoteConfigProvider>
-                  <ThemedStack />
+                  <MoneyUiProvider>
+                    <ThemedStack />
+                  </MoneyUiProvider>
                 </RemoteConfigProvider>
               </PrivacyLockProvider>
             </RemindersProvider>

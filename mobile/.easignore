@@ -1,0 +1,20 @@
+# Keep the EAS upload small — local caches/logs must not ship.
+.expo/
+.expo-shared/
+dist/
+web-build/
+node_modules/
+npm-debug.*
+yarn-error.*
+*.log
+.git/
+ios/
+android/
+coverage/
+.vscode/
+.idea/
+.env
+.env*.local
+*.jks
+*.keystore
+google-services.json

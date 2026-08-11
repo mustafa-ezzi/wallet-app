@@ -36,6 +36,7 @@ export function AnimatedSplashScreen() {
   const insets = useSafeAreaInsets()
   const [visible, setVisible] = useState(true)
   const [minElapsed, setMinElapsed] = useState(false)
+  const [exiting, setExiting] = useState(false)
 
   const rootOpacity = useSharedValue(1)
   const pulse = useSharedValue(0)
@@ -63,10 +64,15 @@ export function AnimatedSplashScreen() {
 
   useEffect(() => {
     if (!minElapsed || loading) return
+    // Stop blocking touches immediately while fading out — opacity alone left an invisible mask.
+    setExiting(true)
     rootOpacity.value = withTiming(0, { duration: EXIT_MS, easing: Easing.in(Easing.cubic) }, (finished) => {
       'worklet'
       if (finished) runOnJS(setVisible)(false)
     })
+    // Safety: always unmount even if the timing callback is cancelled.
+    const forceHide = setTimeout(() => setVisible(false), EXIT_MS + 80)
+    return () => clearTimeout(forceHide)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minElapsed, loading])
 
@@ -84,7 +90,10 @@ export function AnimatedSplashScreen() {
   if (!visible) return null
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, styles.root, rootStyle]} pointerEvents="auto">
+    <Animated.View
+      style={[StyleSheet.absoluteFill, styles.root, rootStyle]}
+      pointerEvents={exiting ? 'none' : 'auto'}
+    >
       <View style={styles.blackFill} />
 
       <View style={styles.center}>

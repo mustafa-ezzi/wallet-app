@@ -748,7 +748,7 @@ export default function HouseholdScreen() {
       </ScrollView>
 
       {/* Create household */}
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
+      <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
@@ -761,7 +761,7 @@ export default function HouseholdScreen() {
       </Modal>
 
       {/* Join */}
-      <Modal visible={joinOpen} transparent animationType="slide" onRequestClose={() => setJoinOpen(false)}>
+      <Modal visible={joinOpen} transparent animationType="fade" onRequestClose={() => setJoinOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={() => setJoinOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
@@ -784,7 +784,7 @@ export default function HouseholdScreen() {
       </Modal>
 
       {/* New ledger */}
-      <Modal visible={ledgerOpen} transparent animationType="slide" onRequestClose={() => setLedgerOpen(false)}>
+      <Modal visible={ledgerOpen} transparent animationType="fade" onRequestClose={() => setLedgerOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={() => setLedgerOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
@@ -816,7 +816,7 @@ export default function HouseholdScreen() {
       </Modal>
 
       {/* Expense */}
-      <Modal visible={expenseOpen} transparent animationType="slide" onRequestClose={() => setExpenseOpen(false)}>
+      <Modal visible={expenseOpen} transparent animationType="fade" onRequestClose={() => setExpenseOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={() => setExpenseOpen(false)} />
           <ScrollView
@@ -887,7 +887,7 @@ export default function HouseholdScreen() {
       </Modal>
 
       {/* Edit household */}
-      <Modal visible={editHhOpen} transparent animationType="slide" onRequestClose={() => setEditHhOpen(false)}>
+      <Modal visible={editHhOpen} transparent animationType="fade" onRequestClose={() => setEditHhOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={() => setEditHhOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
@@ -905,7 +905,7 @@ export default function HouseholdScreen() {
       </Modal>
 
       {/* Members */}
-      <Modal visible={membersOpen} transparent animationType="slide" onRequestClose={() => setMembersOpen(false)}>
+      <Modal visible={membersOpen} transparent animationType="fade" onRequestClose={() => setMembersOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={() => setMembersOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg), maxHeight: '70%' }]}>
@@ -930,7 +930,7 @@ export default function HouseholdScreen() {
       </Modal>
 
       {/* Invite */}
-      <Modal visible={inviteOpen} transparent animationType="slide" onRequestClose={() => setInviteOpen(false)}>
+      <Modal visible={inviteOpen} transparent animationType="fade" onRequestClose={() => setInviteOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={() => setInviteOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
@@ -964,7 +964,7 @@ export default function HouseholdScreen() {
       </Modal>
 
       {/* Contribution */}
-      <Modal visible={contribOpen} transparent animationType="slide" onRequestClose={() => setContribOpen(false)}>
+      <Modal visible={contribOpen} transparent animationType="fade" onRequestClose={() => setContribOpen(false)}>
         <View style={styles.modalRoot}>
           <Pressable style={styles.backdrop} onPress={() => setContribOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
@@ -1148,13 +1148,14 @@ function makeStyles(colors: ColorTokens) {
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15,31,26,0.4)' },
+  modalRoot: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.4)' },
   sheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    borderRadius: radii.lg,
     padding: spacing.lg,
+    maxHeight: '88%',
+    zIndex: 2,
   },
   sheetTitle: { fontSize: typography.subtitle, fontWeight: '800', color: colors.primaryDark, marginBottom: spacing.md },
   preview: { color: colors.primaryDark, fontWeight: '700', marginBottom: spacing.md },

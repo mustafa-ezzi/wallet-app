@@ -3,8 +3,6 @@ import { Pressable, StyleSheet, View } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '@/src/context/AuthContext'
-import { MoneyUiProvider, useMoneyUi } from '@/src/context/MoneyUiContext'
-import { AddMoneySheet } from '@/src/components/AddMoneySheet'
 import { BouncingFab } from '@/src/components/BouncingFab'
 import { FloatingIslandTabBar } from '@/src/components/FloatingIslandTabBar'
 import { OfflineBanner } from '@/src/offline'
@@ -13,7 +11,6 @@ import { useColors } from '@/src/theme/ThemeContext'
 
 function TabsShell() {
   const { user, loading } = useAuth()
-  const { addOpen, openAdd, closeAdd, bumpRefresh } = useMoneyUi()
   const insets = useSafeAreaInsets()
   const colors = useColors()
 
@@ -67,24 +64,19 @@ function TabsShell() {
 
       {user ? (
         <BouncingFab
-          onPress={openAdd}
+          onPress={() => router.push('/add-transaction')}
           color={colors.primary}
           bottom={78 + Math.max(insets.bottom - 8, 0)}
         />
       ) : null}
 
-      <AddMoneySheet visible={addOpen} onClose={closeAdd} onSaved={bumpRefresh} />
       <AmountUnlockSheet />
     </View>
   )
 }
 
 export default function TabsLayout() {
-  return (
-    <MoneyUiProvider>
-      <TabsShell />
-    </MoneyUiProvider>
-  )
+  return <TabsShell />
 }
 
 const styles = StyleSheet.create({

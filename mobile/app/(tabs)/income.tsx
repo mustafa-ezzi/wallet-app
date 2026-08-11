@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -317,11 +319,15 @@ export default function IncomeScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={createOpen} transparent animationType="slide" onRequestClose={() => setCreateOpen(false)}>
-        <View style={styles.modalRoot}>
+      <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        >
           <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)} />
           <ScrollView
             style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}
+            keyboardShouldPersistTaps="handled"
           >
             <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>New income source</Text>
             <ErrorBanner message={error} />
@@ -355,11 +361,14 @@ export default function IncomeScreen() {
             ) : null}
             <PrimaryButton title="Create" onPress={() => void create()} loading={busy} />
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={!!receiveOpen} transparent animationType="slide" onRequestClose={() => setReceiveOpen(null)}>
-        <View style={styles.modalRoot}>
+      <Modal visible={!!receiveOpen} transparent animationType="fade" onRequestClose={() => setReceiveOpen(null)}>
+        <KeyboardAvoidingView
+          style={styles.modalRoot}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        >
           <Pressable style={styles.backdrop} onPress={() => setReceiveOpen(null)} />
           <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
             <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
@@ -368,7 +377,7 @@ export default function IncomeScreen() {
             <Field label="Amount" value={receiveAmount} onChangeText={setReceiveAmount} keyboardType="decimal-pad" />
             <PrimaryButton title="Save receipt" onPress={() => void recordReceived()} loading={busy} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Screen>
   )
@@ -409,13 +418,13 @@ const styles = StyleSheet.create({
   actionBtnMutedText: { fontWeight: '700', fontSize: 12 },
   actionBtnOutline: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: radii.sm, borderWidth: 1 },
   actionOutlineText: { fontWeight: '700', fontSize: 12 },
-  modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15,31,26,0.4)' },
+  modalRoot: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.4)' },
   sheet: {
     maxHeight: '88%',
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    borderRadius: radii.lg,
     padding: spacing.lg,
+    zIndex: 2,
   },
   sheetTitle: { fontSize: typography.subtitle, fontWeight: '800', marginBottom: spacing.md },
   label: { fontSize: 12, fontWeight: '700', marginBottom: 6 },

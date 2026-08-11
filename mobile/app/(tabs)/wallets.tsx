@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -211,8 +213,8 @@ export default function WalletsScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={createOpen} animationType="slide" transparent onRequestClose={() => setCreateOpen(false)}>
-        <View style={styles.modalRoot}>
+      <Modal visible={createOpen} animationType="fade" transparent onRequestClose={() => setCreateOpen(false)}>
+        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
           <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
             <Text style={styles.sheetTitle}>New wallet</Text>
@@ -235,7 +237,7 @@ export default function WalletsScreen() {
             />
             <PrimaryButton title="Create wallet" onPress={() => void create()} loading={saving} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Screen>
   )
@@ -326,13 +328,14 @@ function makeStyles(colors: ColorTokens) {
     actionText: { fontWeight: '700', fontSize: 12, color: colors.textSecondary },
     actionBtnDanger: { borderColor: '#fecaca' },
     actionTextDanger: { fontWeight: '700', fontSize: 12, color: colors.danger },
-    backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15,31,26,0.45)' },
-    modalRoot: { flex: 1, justifyContent: 'flex-end' },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.45)' },
+    modalRoot: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
     sheet: {
       backgroundColor: colors.surface,
-      borderTopLeftRadius: radii.lg,
-      borderTopRightRadius: radii.lg,
+      borderRadius: radii.lg,
       padding: spacing.lg,
+      maxHeight: '88%',
+      zIndex: 2,
     },
     sheetTitle: { fontSize: typography.title, fontWeight: '800', color: colors.primaryDark, marginBottom: spacing.md },
     label: {

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -1184,8 +1186,8 @@ export default function BillsScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={expenseOpen} transparent animationType="slide" onRequestClose={() => setExpenseOpen(false)}>
-        <View style={styles.modalRoot}>
+      <Modal visible={expenseOpen} transparent animationType="fade" onRequestClose={() => setExpenseOpen(false)}>
+        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
           <Pressable style={styles.backdrop} onPress={() => setExpenseOpen(false)} />
           <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
             <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
@@ -1206,11 +1208,11 @@ export default function BillsScreen() {
             <Field label="Due day (1–28)" value={expForm.due_day} onChangeText={(t) => setExpForm((f) => ({ ...f, due_day: t }))} keyboardType="number-pad" />
             <PrimaryButton title="Save" onPress={() => void saveExpense()} loading={saving} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={payableOpen} transparent animationType="slide" onRequestClose={() => setPayableOpen(false)}>
-        <View style={styles.modalRoot}>
+      <Modal visible={payableOpen} transparent animationType="fade" onRequestClose={() => setPayableOpen(false)}>
+        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
           <Pressable style={styles.backdrop} onPress={() => setPayableOpen(false)} />
           <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
             <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
@@ -1223,11 +1225,11 @@ export default function BillsScreen() {
             <Field label="Due day" value={payForm.due_day} onChangeText={(t) => setPayForm((f) => ({ ...f, due_day: t }))} keyboardType="number-pad" />
             <PrimaryButton title="Save" onPress={() => void savePayable()} loading={saving} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={receivableOpen} transparent animationType="slide" onRequestClose={() => setReceivableOpen(false)}>
-        <View style={styles.modalRoot}>
+      <Modal visible={receivableOpen} transparent animationType="fade" onRequestClose={() => setReceivableOpen(false)}>
+        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
           <Pressable style={styles.backdrop} onPress={() => setReceivableOpen(false)} />
           <ScrollView style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
             <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
@@ -1265,11 +1267,11 @@ export default function BillsScreen() {
             />
             <PrimaryButton title="Save" onPress={() => void saveReceivable()} loading={saving} />
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
-      <Modal visible={!!recordModal} transparent animationType="slide" onRequestClose={() => setRecordModal(null)}>
-        <View style={styles.modalRoot}>
+      <Modal visible={!!recordModal} transparent animationType="fade" onRequestClose={() => setRecordModal(null)}>
+        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
           <Pressable style={styles.backdrop} onPress={() => setRecordModal(null)} />
           <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
             <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
@@ -1294,7 +1296,7 @@ export default function BillsScreen() {
               loading={saving}
             />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </Screen>
   )
@@ -1360,8 +1362,8 @@ const styles = StyleSheet.create({
   chipText: { fontWeight: '700', fontSize: 12 },
   label: { fontSize: 12, fontWeight: '700', marginBottom: 6 },
 
-  modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15,31,26,0.4)' },
-  sheet: { maxHeight: '88%', borderTopLeftRadius: radii.lg, borderTopRightRadius: radii.lg, padding: spacing.lg },
+  modalRoot: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.4)' },
+  sheet: { maxHeight: '88%', borderRadius: radii.lg, padding: spacing.lg, zIndex: 2 },
   sheetTitle: { fontSize: typography.subtitle, fontWeight: '800', marginBottom: spacing.md },
 })
