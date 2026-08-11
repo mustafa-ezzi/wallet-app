@@ -17,4 +17,5 @@ coverage/
 .env*.local
 *.jks
 *.keystore
-google-services.json
+# Keep google-services.json in the EAS upload when present (required for Android FCM push).
+# Still gitignored locally if you prefer secrets via CI — place the file before `eas build`.

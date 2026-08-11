@@ -9,6 +9,7 @@ import { capturePageview } from './lib/analytics'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
+import { OnboardingAbout, OnboardingUserType } from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import Projects from './pages/Projects'
 import Accounts from './pages/Accounts'
@@ -19,18 +20,38 @@ import HouseholdPage from './pages/Household'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
-  if (loading) return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="spinner" style={{ width: '2rem', height: '2rem' }} />
-    </div>
-  )
-  return user ? <>{children}</> : <Navigate to="/login" replace />
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="spinner" style={{ width: '2rem', height: '2rem' }} />
+      </div>
+    )
+  }
+  if (!user) return <Navigate to="/login" replace />
+  if (user.onboarding_complete === false) return <Navigate to="/onboarding" replace />
+  return <>{children}</>
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
   if (loading) return null
-  return !user ? <>{children}</> : <Navigate to="/" replace />
+  if (user && user.onboarding_complete === false) return <Navigate to="/onboarding" replace />
+  if (user) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+function OnboardingRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="spinner" style={{ width: '2rem', height: '2rem' }} />
+      </div>
+    )
+  }
+  if (!user) return <Navigate to="/login" replace />
+  if (user.onboarding_complete !== false) return <Navigate to="/" replace />
+  return <>{children}</>
 }
 
 /** PostHog SPA pageviews — React Router does not reload the document. */
@@ -50,6 +71,8 @@ function AppRoutes() {
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
         <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+        <Route path="/onboarding" element={<OnboardingRoute><OnboardingAbout /></OnboardingRoute>} />
+        <Route path="/onboarding/user-type" element={<OnboardingRoute><OnboardingUserType /></OnboardingRoute>} />
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/income" element={<Projects />} />

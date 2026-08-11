@@ -97,7 +97,20 @@ class MeView(APIView):
             profile.country = str(data.get('country') or '')[:64]
         if 'onboarding_complete' in data:
             profile.onboarding_complete = bool(data.get('onboarding_complete'))
-        profile.save()
+        try:
+            profile.save()
+        except Exception as exc:
+            # Migration 0019 may not be applied on this environment yet.
+            return Response(
+                {
+                    'detail': (
+                        'Profile fields are not available on the server yet. '
+                        'Run migrations (0019_userprofile_onboarding), then retry.'
+                    ),
+                    'error': str(exc)[:200],
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         return Response(UserSerializer(user).data)
 
 

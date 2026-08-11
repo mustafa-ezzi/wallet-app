@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi, apiErrorMessage } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import { track } from '../lib/analytics'
 
 export default function Signup() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [form, setForm] = useState({ first_name: '', last_name: '', email: '', password: '', currency: 'PKR' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -18,10 +20,8 @@ export default function Signup() {
     try {
       await authApi.register(form)
       track('user_signed_up', { source: 'signup_page', currency: form.currency })
-      navigate('/login', {
-        replace: true,
-        state: { registered: true, email: form.email },
-      })
+      await login(form.email, form.password)
+      navigate('/onboarding', { replace: true })
     } catch (err: any) {
       setError(apiErrorMessage(err, 'Registration failed.'))
     } finally {

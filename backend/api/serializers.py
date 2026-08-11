@@ -79,23 +79,27 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_date_of_birth(self, obj):
         p = self._profile(obj)
-        return p.date_of_birth.isoformat() if p and p.date_of_birth else None
+        dob = getattr(p, 'date_of_birth', None) if p else None
+        return dob.isoformat() if dob else None
 
     def get_gender(self, obj):
         p = self._profile(obj)
-        return p.gender if p else ''
+        return getattr(p, 'gender', '') if p else ''
 
     def get_user_type(self, obj):
         p = self._profile(obj)
-        return p.user_type if p else ''
+        return getattr(p, 'user_type', '') if p else ''
 
     def get_country(self, obj):
         p = self._profile(obj)
-        return p.country if p else ''
+        return getattr(p, 'country', '') if p else ''
 
     def get_onboarding_complete(self, obj):
         p = self._profile(obj)
-        return bool(p.onboarding_complete) if p else False
+        # Default True for older rows / missing attribute so existing users are not trapped.
+        if not p:
+            return True
+        return bool(getattr(p, 'onboarding_complete', True))
 
 
 class AccountSerializer(serializers.ModelSerializer):

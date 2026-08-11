@@ -126,6 +126,32 @@ def send_campaign(campaign: PushCampaign, *, dry_run: bool = False) -> dict:
             'tokens': estimate['tokens'],
             'sent_ok': 0,
             'sent_failed': 0,
+            'detail': (
+                None if estimate['tokens']
+                else 'No devices registered. Users must open the native APK → Settings → Link this device for push (FCM required).'
+            ),
+        }
+
+    if not devices:
+        campaign.status = PushCampaign.STATUS_FAILED
+        campaign.last_error = (
+            'No push tokens for this audience. Users need a native EAS APK with FCM, '
+            'then Settings → Link this device for push.'
+        )
+        campaign.sent_ok = 0
+        campaign.sent_failed = 0
+        campaign.sent_at = timezone.now()
+        campaign.save(update_fields=[
+            'status', 'last_error', 'sent_ok', 'sent_failed', 'sent_at', 'updated_at',
+        ])
+        return {
+            'ok': False,
+            'dry_run': False,
+            'users': 0,
+            'tokens': 0,
+            'sent_ok': 0,
+            'sent_failed': 0,
+            'detail': campaign.last_error,
         }
 
     campaign.status = PushCampaign.STATUS_SENDING

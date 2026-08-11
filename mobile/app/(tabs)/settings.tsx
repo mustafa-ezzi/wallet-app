@@ -398,6 +398,9 @@ export default function SettingsScreen() {
               {marketingBusy ? 'Syncing…' : 'Link this device for push'}
             </Text>
           </Pressable>
+          <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>
+            Needs a native EAS APK with Firebase FCM (not Expo Go). See mobile/PUSH_SETUP.md.
+          </Text>
           {pushSyncMsg ? (
             <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{pushSyncMsg}</Text>
           ) : null}

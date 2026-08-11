@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Pressable,
   ScrollView,
@@ -10,10 +10,11 @@ import {
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { authApi, apiErrorMessage } from '@/src/api/client'
-import { DateField } from '@/src/components/SelectFields'
 import { ErrorBanner } from '@/src/components/ui'
+import { DateField } from '@/src/components/SelectFields'
 import { useAuth } from '@/src/context/AuthContext'
+import { getOnboardingDraft, patchOnboardingDraft } from '@/src/onboarding/draft'
+import { wakeServer } from '@/src/api/client'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 
@@ -24,16 +25,29 @@ export default function AboutYouScreen() {
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
-  const { user, refreshUser } = useAuth()
+  const { user, logout } = useAuth()
 
-  const prefill = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim()
+  const draft = getOnboardingDraft()
+  const prefill =
+    draft.name
+    || [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim()
+
   const [name, setName] = useState(prefill)
-  const [dob, setDob] = useState(user?.date_of_birth || '2000-01-01')
-  const [gender, setGender] = useState<Gender | ''>((user?.gender as Gender) || '')
-  const [loading, setLoading] = useState(false)
+  const [dob, setDob] = useState(draft.date_of_birth || user?.date_of_birth || '2000-01-01')
+  const [gender, setGender] = useState<Gender | ''>(draft.gender || (user?.gender as Gender) || '')
   const [error, setError] = useState('')
 
-  const continueNext = async () => {
+  // Warm Railway while the user fills the form so the final save is ready.
+  useEffect(() => {
+    void wakeServer(true)
+  }, [])
+
+  const goBack = async () => {
+    await logout()
+    router.replace('/(auth)/login')
+  }
+
+  const continueNext = () => {
     setError('')
     if (!name.trim()) {
       setError('Please enter your name.')
@@ -47,27 +61,22 @@ export default function AboutYouScreen() {
       setError('Please select your gender.')
       return
     }
-    setLoading(true)
-    try {
-      const parts = name.trim().split(/\s+/)
-      const first_name = parts[0] || ''
-      const last_name = parts.slice(1).join(' ')
-      await authApi.updateMe({ first_name, last_name, date_of_birth: dob, gender })
-      await refreshUser()
-      router.push('/(onboarding)/user-type')
-    } catch (err) {
-      setError(apiErrorMessage(err, 'Could not save your profile.'))
-    } finally {
-      setLoading(false)
-    }
+    // Local only — no network call here (avoids Railway cold-start failures mid-form).
+    patchOnboardingDraft({ name: name.trim(), date_of_birth: dob, gender })
+    router.push('/(onboarding)/user-type')
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + spacing.lg }]}>
+    <View style={[styles.root, { paddingTop: insets.top + spacing.md }]}>
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: insets.bottom + 100 }}
         keyboardShouldPersistTaps="handled"
       >
+        <Pressable onPress={() => void goBack()} hitSlop={10} style={styles.back} accessibilityLabel="Back">
+          <FontAwesome name="chevron-left" size={18} color={colors.text} />
+          <Text style={[styles.backText, { color: colors.textSecondary }]}>Back</Text>
+        </Pressable>
+
         <Text style={styles.title}>Help us know you</Text>
         <ErrorBanner message={error} />
 
@@ -84,11 +93,7 @@ export default function AboutYouScreen() {
           ]}
         />
 
-        <DateField
-          label="Date of birth"
-          value={dob}
-          onChange={(iso) => setDob(iso)}
-        />
+        <DateField label="Date of birth" value={dob} onChange={setDob} />
 
         <Text style={styles.label}>What is your Gender?</Text>
         <View style={styles.genderRow}>
@@ -121,11 +126,10 @@ export default function AboutYouScreen() {
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md, borderTopColor: colors.border }]}>
         <Pressable
-          onPress={() => void continueNext()}
-          disabled={loading}
-          style={[styles.continueBtn, { backgroundColor: colors.primary, opacity: loading ? 0.6 : 1 }]}
+          onPress={continueNext}
+          style={[styles.continueBtn, { backgroundColor: colors.primary }]}
         >
-          <Text style={styles.continueText}>{loading ? 'Saving…' : 'Continue'}</Text>
+          <Text style={styles.continueText}>Continue</Text>
         </Pressable>
       </View>
     </View>
@@ -135,6 +139,15 @@ export default function AboutYouScreen() {
 function makeStyles(colors: ColorTokens) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
+    back: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: spacing.md,
+      alignSelf: 'flex-start',
+      paddingVertical: 4,
+    },
+    backText: { fontWeight: '700', fontSize: typography.body },
     title: {
       fontSize: 26,
       fontWeight: '800',

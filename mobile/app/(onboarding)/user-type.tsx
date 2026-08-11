@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Modal,
   Pressable,
@@ -10,9 +10,14 @@ import {
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { authApi, apiErrorMessage } from '@/src/api/client'
+import { authApi, apiErrorMessage, wakeServer } from '@/src/api/client'
 import { ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
+import {
+  clearOnboardingDraft,
+  getOnboardingDraft,
+  patchOnboardingDraft,
+} from '@/src/onboarding/draft'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 
@@ -43,6 +48,10 @@ const COUNTRIES = [
   'Other',
 ]
 
+async function sleep(ms: number) {
+  await new Promise((r) => setTimeout(r, ms))
+}
+
 export default function UserTypeScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
@@ -50,11 +59,18 @@ export default function UserTypeScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors])
   const { user, refreshUser } = useAuth()
 
-  const [userType, setUserType] = useState<UserType | ''>((user?.user_type as UserType) || '')
-  const [country, setCountry] = useState(user?.country || 'Pakistan')
+  const draft = getOnboardingDraft()
+  const [userType, setUserType] = useState<UserType | ''>(
+    draft.user_type || (user?.user_type as UserType) || '',
+  )
+  const [country, setCountry] = useState(draft.country || user?.country || 'Pakistan')
   const [countryOpen, setCountryOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    void wakeServer(true)
+  }, [])
 
   const finish = async () => {
     setError('')
@@ -66,17 +82,55 @@ export default function UserTypeScreen() {
       setError('Please pick your country.')
       return
     }
+
+    const about = getOnboardingDraft()
+    if (!about.name.trim() || !about.date_of_birth || !about.gender) {
+      setError('Please go back and complete your name, birthday, and gender.')
+      return
+    }
+
+    patchOnboardingDraft({ user_type: userType, country })
     setLoading(true)
+
+    const parts = about.name.trim().split(/\s+/)
+    const first_name = parts[0] || ''
+    const last_name = parts.slice(1).join(' ')
+    const payload = {
+      first_name,
+      last_name,
+      date_of_birth: about.date_of_birth,
+      gender: about.gender,
+      user_type: userType,
+      country,
+      onboarding_complete: true,
+    }
+
     try {
-      await authApi.updateMe({
-        user_type: userType,
-        country,
-        onboarding_complete: true,
-      })
-      await refreshUser()
+      // Wake Railway, then retry the profile save a few times for cold starts.
+      await wakeServer(true)
+      let lastErr: unknown = null
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          await authApi.updateMe(payload)
+          lastErr = null
+          break
+        } catch (err) {
+          lastErr = err
+          await wakeServer(true)
+          await sleep(1500 * (attempt + 1))
+        }
+      }
+      if (lastErr) throw lastErr
+
+      try {
+        await refreshUser()
+      } catch {
+        /* profile saved — continue even if refresh flakes */
+      }
+      clearOnboardingDraft()
       router.replace('/(tabs)')
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not finish setup.'))
+      setError(apiErrorMessage(err, 'Could not finish setup. Wait a few seconds and try again.'))
     } finally {
       setLoading(false)
     }
@@ -87,8 +141,9 @@ export default function UserTypeScreen() {
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: insets.bottom + 110 }}
       >
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back}>
+        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back} accessibilityLabel="Back">
           <FontAwesome name="chevron-left" size={18} color={colors.text} />
+          <Text style={[styles.backText, { color: colors.textSecondary }]}>Back</Text>
         </Pressable>
 
         <Text style={styles.title}>What kind of user are you?</Text>
@@ -98,11 +153,7 @@ export default function UserTypeScreen() {
           {USER_TYPES.map((t) => {
             const active = userType === t.id
             return (
-              <Pressable
-                key={t.id}
-                onPress={() => setUserType(t.id)}
-                style={styles.gridItem}
-              >
+              <Pressable key={t.id} onPress={() => setUserType(t.id)} style={styles.gridItem}>
                 <View
                   style={[
                     styles.circle,
@@ -159,7 +210,11 @@ export default function UserTypeScreen() {
                       setCountry(c)
                       setCountryOpen(false)
                     }}
-                    style={[styles.option, { borderBottomColor: colors.border }, active && { backgroundColor: `${colors.primary}14` }]}
+                    style={[
+                      styles.option,
+                      { borderBottomColor: colors.border },
+                      active && { backgroundColor: `${colors.primary}14` },
+                    ]}
                   >
                     <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>{c}</Text>
                     {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
@@ -177,7 +232,15 @@ export default function UserTypeScreen() {
 function makeStyles(colors: ColorTokens) {
   return StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
-    back: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+    back: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: spacing.md,
+      alignSelf: 'flex-start',
+      paddingVertical: 4,
+    },
+    backText: { fontWeight: '700', fontSize: typography.body },
     title: {
       fontSize: 24,
       fontWeight: '800',
