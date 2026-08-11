@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
-import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { apiErrorMessage, asList, dashboardApi, transactionsApi } from '@/src/api/client'
@@ -221,110 +220,74 @@ export default function HomeScreen() {
             {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
 
             <Reveal index={0}>
-            <LinearGradient
-              colors={[colors.primaryDark, colors.primary, colors.primarySoft]}
-              locations={[0, 0.55, 1]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.hero}
-            >
-              <View style={styles.heroGlow} pointerEvents="none" />
-              <View style={styles.heroGlow2} pointerEvents="none" />
-              <View style={styles.heroSheen} pointerEvents="none" />
-              <View style={styles.heroTop}>
-                <Text style={styles.heroLabel}>Total balance</Text>
-                <AmountEyeToggle tone="light" />
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.cardHead}>
+                <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>What you have</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <AmountEyeToggle />
+                  <Pressable onPress={() => router.push('/(tabs)/wallets')} hitSlop={8}>
+                    <Text style={[styles.link, { color: colors.primary }]}>All wallets →</Text>
+                  </Pressable>
+                </View>
               </View>
+
               <Text
                 style={[
-                  styles.heroAmount,
+                  styles.combinedBalance,
                   money.amountStyle,
-                  balanceNeg && !money.amountsHidden ? { color: '#fecaca' } : null,
+                  { color: balanceNeg ? colors.danger : colors.primaryDark },
                 ]}
               >
                 {money.fmtBalance(data?.total_balance ?? 0)}
               </Text>
-              <Text style={styles.heroHint}>
-                Across {walletCount} wallet{walletCount === 1 ? '' : 's'}
+              <Text style={[styles.combinedHint, { color: colors.textMuted }]}>
+                Across {walletCount} wallet{walletCount === 1 ? '' : 's'} · {monthName} in {money.fmt(data?.month_income ?? 0)} · out {money.fmt(data?.month_expense ?? 0)}
               </Text>
 
-              <View style={styles.balanceChips}>
-                <View style={styles.balanceChip}>
-                  <View style={styles.chipLabelRow}>
-                    <FontAwesome name="arrow-up" size={10} color="rgba(255,255,255,0.8)" />
-                    <Text style={styles.chipLabel}>{monthName} in</Text>
-                  </View>
-                  <Text style={[styles.chipValue, money.amountStyle]}>
-                    {money.fmt(data?.month_income ?? 0)}
-                  </Text>
-                </View>
-                <View style={styles.balanceChip}>
-                  <View style={styles.chipLabelRow}>
-                    <FontAwesome name="arrow-down" size={10} color="rgba(255,255,255,0.8)" />
-                    <Text style={styles.chipLabel}>{monthName} out</Text>
-                  </View>
-                  <Text style={[styles.chipValue, money.amountStyle]}>
-                    {money.fmt(data?.month_expense ?? 0)}
-                  </Text>
-                </View>
-              </View>
-            </LinearGradient>
-            </Reveal>
-
-            {accounts.length > 0 ? (
-              <Reveal index={1}>
-                <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <View style={styles.cardHead}>
-                    <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>What you have</Text>
-                    <Pressable onPress={() => router.push('/(tabs)/wallets')} hitSlop={8}>
-                      <Text style={[styles.link, { color: colors.primary }]}>All wallets →</Text>
-                    </Pressable>
-                  </View>
-                  <View style={styles.acctGrid}>
-                    {accounts.slice(0, 6).map((a) => {
-                      const neg = toMoney(a.balance) < 0
-                      return (
-                        <Pressable
-                          key={a.id ?? a.name}
-                          style={[styles.acctCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
-                          onPress={() => router.push('/(tabs)/wallets')}
-                        >
-                          <View style={styles.acctTop}>
-                            <View style={[styles.acctIcon, { backgroundColor: colors.surface }]}>
-                              <FontAwesome
-                                name={a.type === 'cash' ? 'money' : 'university'}
-                                size={13}
-                                color={colors.primary}
-                              />
-                            </View>
-                            <Text style={[styles.acctName, { color: colors.text }]} numberOfLines={1}>{a.name}</Text>
-                          </View>
-                          <Text
-                            style={[
-                              styles.acctBal,
-                              money.amountStyle,
-                              { color: neg ? colors.danger : colors.primaryDark },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {money.fmtBalance(a.balance)}
-                          </Text>
-                        </Pressable>
-                      )
-                    })}
+              <View style={styles.acctGrid}>
+                {accounts.slice(0, 6).map((a) => {
+                  const neg = toMoney(a.balance) < 0
+                  return (
                     <Pressable
-                      style={[styles.acctCard, styles.acctAdd, { borderColor: colors.borderStrong }]}
+                      key={a.id ?? a.name}
+                      style={[styles.acctCard, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
                       onPress={() => router.push('/(tabs)/wallets')}
                     >
-                      <FontAwesome name="plus" size={16} color={colors.primary} />
-                      <Text style={[styles.acctAddText, { color: colors.primary }]}>Add wallet</Text>
+                      <View style={styles.acctTop}>
+                        <View style={[styles.acctIcon, { backgroundColor: colors.surface }]}>
+                          <FontAwesome
+                            name={a.type === 'cash' ? 'money' : 'university'}
+                            size={13}
+                            color={colors.primary}
+                          />
+                        </View>
+                        <Text style={[styles.acctName, { color: colors.text }]} numberOfLines={1}>{a.name}</Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.acctBal,
+                          money.amountStyle,
+                          { color: neg ? colors.danger : colors.primaryDark },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {money.fmtBalance(a.balance)}
+                      </Text>
                     </Pressable>
-                  </View>
-                </View>
-              </Reveal>
-            ) : null}
+                  )
+                })}
+                <Pressable
+                  style={[styles.acctCard, styles.acctAdd, { borderColor: colors.borderStrong }]}
+                  onPress={() => router.push('/(tabs)/wallets')}
+                >
+                  <FontAwesome name="plus" size={16} color={colors.primary} />
+                  <Text style={[styles.acctAddText, { color: colors.primary }]}>Add wallet</Text>
+                </Pressable>
+              </View>
+            </View>
+            </Reveal>
 
-            <Reveal index={2}>
+            <Reveal index={1}>
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.cardHead}>
                   <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>{monthName} spending</Text>
@@ -430,88 +393,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   error: { color: '#dc2626', marginBottom: spacing.md, fontWeight: '600' },
-  hero: {
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    overflow: 'hidden',
-    ...iosShadow,
-    shadowOpacity: 0.2,
-    shadowRadius: 18,
-  },
-  heroGlow: {
-    position: 'absolute',
-    top: -50,
-    right: -40,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  heroGlow2: {
-    position: 'absolute',
-    top: -16,
-    right: 8,
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  heroSheen: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 40,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  heroTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  heroLabel: {
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: typography.label,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-  },
-  heroAmount: {
-    color: '#ffffff',
-    fontSize: 30,
-    fontWeight: '800',
-    marginTop: spacing.sm,
-    letterSpacing: -0.5,
-  },
-  heroHint: { color: 'rgba(255,255,255,0.58)', fontSize: typography.caption, marginTop: 3 },
-  balanceChips: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  balanceChip: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.22)',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-  },
-  chipLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  chipLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  chipValue: {
-    color: '#ffffff',
-    fontWeight: '800',
-    fontSize: typography.caption,
-    marginTop: 3,
-  },
   card: {
     borderRadius: radii.lg,
     borderWidth: StyleSheet.hairlineWidth,
@@ -526,6 +407,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   cardTitle: { fontSize: typography.subtitle, fontWeight: '800', letterSpacing: -0.2 },
+  combinedBalance: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.4,
+    marginBottom: 4,
+  },
+  combinedHint: { fontSize: typography.caption, marginBottom: spacing.md, lineHeight: 16 },
   acctGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   acctCard: {
     width: '48%',

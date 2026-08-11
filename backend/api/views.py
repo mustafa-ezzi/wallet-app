@@ -69,9 +69,35 @@ class MeView(APIView):
                 )
             user.set_password(data['password'])
         user.save()
+
+        profile = getattr(user, 'profile', None)
+        if profile is None:
+            from .models import UserProfile
+            profile = UserProfile.objects.create(user=user)
+
         if 'currency' in data:
-            user.profile.currency = data['currency']
-            user.profile.save()
+            profile.currency = data['currency']
+        if 'date_of_birth' in data:
+            raw = data.get('date_of_birth')
+            if raw in (None, ''):
+                profile.date_of_birth = None
+            else:
+                try:
+                    profile.date_of_birth = date.fromisoformat(str(raw)[:10])
+                except ValueError:
+                    return Response(
+                        {'detail': 'date_of_birth must be YYYY-MM-DD.'},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+        if 'gender' in data:
+            profile.gender = str(data.get('gender') or '')[:20]
+        if 'user_type' in data:
+            profile.user_type = str(data.get('user_type') or '')[:32]
+        if 'country' in data:
+            profile.country = str(data.get('country') or '')[:64]
+        if 'onboarding_complete' in data:
+            profile.onboarding_complete = bool(data.get('onboarding_complete'))
+        profile.save()
         return Response(UserSerializer(user).data)
 
 

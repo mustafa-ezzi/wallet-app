@@ -13,6 +13,11 @@ export type CachedUser = {
   email: string
   currency: string
   is_premium?: boolean
+  date_of_birth?: string | null
+  gender?: string
+  user_type?: string
+  country?: string
+  onboarding_complete?: boolean
 }
 
 async function getItem(key: string): Promise<string | null> {

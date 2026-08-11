@@ -41,7 +41,7 @@ export function SelectField<T extends string = string>({
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text>
+      {label ? <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text> : null}
       <Pressable
         disabled={disabled}
         onPress={() => setOpen(true)}
@@ -172,7 +172,7 @@ export function DateField({
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text>
+      {label ? <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text> : null}
       <Pressable
         disabled={disabled}
         onPress={() => setOpen(true)}

@@ -3,7 +3,7 @@ import { ActivityIndicator, Text, View } from 'react-native'
 import { useAuth } from '@/src/context/AuthContext'
 import { colors, spacing } from '@/src/theme/colors'
 
-/** Gate: login vs tabs. Never waits on navigation state (that caused infinite spinner). */
+/** Gate: login vs onboarding vs tabs. */
 export default function Index() {
   const { user, loading } = useAuth()
 
@@ -16,6 +16,7 @@ export default function Index() {
     )
   }
 
-  if (user) return <Redirect href="/(tabs)" />
-  return <Redirect href="/(auth)/login" />
+  if (!user) return <Redirect href="/(auth)/login" />
+  if (user.onboarding_complete === false) return <Redirect href="/(onboarding)/about-you" />
+  return <Redirect href="/(tabs)" />
 }

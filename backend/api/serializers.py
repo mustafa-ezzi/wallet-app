@@ -48,10 +48,18 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     currency = serializers.SerializerMethodField()
     is_premium = serializers.SerializerMethodField()
+    date_of_birth = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
+    user_type = serializers.SerializerMethodField()
+    country = serializers.SerializerMethodField()
+    onboarding_complete = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ('id', 'first_name', 'last_name', 'username', 'email', 'currency', 'is_premium')
+        fields = (
+            'id', 'first_name', 'last_name', 'username', 'email', 'currency', 'is_premium',
+            'date_of_birth', 'gender', 'user_type', 'country', 'onboarding_complete',
+        )
 
     def get_currency(self, obj):
         try:
@@ -62,6 +70,32 @@ class UserSerializer(serializers.ModelSerializer):
     def get_is_premium(self, obj):
         from .entitlements import user_is_premium
         return user_is_premium(obj)
+
+    def _profile(self, obj):
+        try:
+            return obj.profile
+        except Exception:
+            return None
+
+    def get_date_of_birth(self, obj):
+        p = self._profile(obj)
+        return p.date_of_birth.isoformat() if p and p.date_of_birth else None
+
+    def get_gender(self, obj):
+        p = self._profile(obj)
+        return p.gender if p else ''
+
+    def get_user_type(self, obj):
+        p = self._profile(obj)
+        return p.user_type if p else ''
+
+    def get_country(self, obj):
+        p = self._profile(obj)
+        return p.country if p else ''
+
+    def get_onboarding_complete(self, obj):
+        p = self._profile(obj)
+        return bool(p.onboarding_complete) if p else False
 
 
 class AccountSerializer(serializers.ModelSerializer):

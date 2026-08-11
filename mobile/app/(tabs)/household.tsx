@@ -42,6 +42,12 @@ import { buildHouseholdInviteMessage } from '@/src/utils/shareInvite'
 import { useAuth } from '@/src/context/AuthContext'
 
 type ViewMode = 'list' | 'detail' | 'ledger'
+type PeriodMode = 'month' | 'all'
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 export default function HouseholdScreen() {
   const insets = useSafeAreaInsets()
@@ -57,6 +63,8 @@ export default function HouseholdScreen() {
   const [ledgers, setLedgers] = useState<HouseholdLedger[]>([])
   const [activeLedger, setActiveLedger] = useState<HouseholdLedger | null>(null)
   const [expenses, setExpenses] = useState<HouseholdExpense[]>([])
+  const [periodSpent, setPeriodSpent] = useState(0)
+  const [period, setPeriod] = useState<PeriodMode>('month')
   const [members, setMembers] = useState<HouseholdMember[]>([])
   const [invite, setInvite] = useState<HouseholdInvite | null>(null)
   const [summary, setSummary] = useState<LedgerSummary | null>(null)
@@ -151,28 +159,60 @@ export default function HouseholdScreen() {
     }
   }
 
-  const openLedger = async (ledger: HouseholdLedger) => {
+  const openLedger = async (ledger: HouseholdLedger, nextPeriod: PeriodMode = 'month') => {
     setActiveLedger(ledger)
     setView('ledger')
     setLedgerTab('feed')
+    setPeriod(nextPeriod)
     setError('')
     setBusy(true)
     try {
+      const now = new Date()
+      const expenseParams: Record<string, number> = { limit: 50, offset: 0 }
+      const reportParams: { year?: number; month?: number } = {}
+      // Ongoing open ledgers default to this calendar month so totals "reset" each month.
+      // All-time is available as an explicit filter. Event/closed ledgers stay all-time.
+      const useMonth =
+        nextPeriod === 'month'
+        && ledger.kind === 'ongoing'
+        && ledger.status === 'open'
+      if (useMonth) {
+        expenseParams.year = now.getFullYear()
+        expenseParams.month = now.getMonth() + 1
+        reportParams.year = now.getFullYear()
+        reportParams.month = now.getMonth() + 1
+      }
       const [eRes, sRes] = await Promise.all([
-        householdsApi.ledgerExpenses(ledger.id, { limit: 50, offset: 0 }),
-        householdsApi.ledgerSummary(ledger.id).catch(() => ({ data: null })),
+        householdsApi.ledgerExpenses(ledger.id, expenseParams),
+        useMonth
+          ? householdsApi.ledgerReport(ledger.id, reportParams).catch(() => ({ data: null }))
+          : householdsApi.ledgerSummary(ledger.id).catch(() => ({ data: null })),
       ])
-      const payload = eRes.data
+      const payload = eRes.data as {
+        results?: HouseholdExpense[]
+        total?: number | string
+      } | HouseholdExpense[]
       const rows = Array.isArray(payload)
         ? payload
-        : asList<HouseholdExpense>((payload as { results?: unknown })?.results)
+        : asList<HouseholdExpense>(payload?.results)
       setExpenses(rows)
-      setSummary(sRes.data as LedgerSummary | null)
+      const totalFromFeed = !Array.isArray(payload) && payload?.total != null
+        ? toMoney(payload.total)
+        : rows.reduce((s, r) => s + toMoney(r.amount), 0)
+      setPeriodSpent(totalFromFeed)
+      const report = sRes.data as (LedgerSummary & { total_spent?: number | string }) | null
+      setSummary(report)
+      if (report?.total_spent != null) setPeriodSpent(toMoney(report.total_spent))
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not load ledger.'))
     } finally {
       setBusy(false)
     }
+  }
+
+  const changePeriod = (next: PeriodMode) => {
+    if (!activeLedger || next === period) return
+    void openLedger(activeLedger, next)
   }
 
   const loadSettlement = async () => {
@@ -622,7 +662,9 @@ export default function HouseholdScreen() {
                       {led.kind} · {led.status}
                     </Text>
                     <Text style={[styles.cardAmt, money.amountStyle]}>
-                      Spent {money.fmt(led.total_spent)}
+                      {led.kind === 'ongoing' && led.status === 'open'
+                        ? `This month ${money.fmt(led.month_spent ?? 0)}`
+                        : `Spent ${money.fmt(led.total_spent)}`}
                       {led.pot_balance != null ? ` · pot ${money.fmt(led.pot_balance)}` : ''}
                     </Text>
                   </View>
@@ -636,11 +678,36 @@ export default function HouseholdScreen() {
 
         {view === 'ledger' && activeLedger ? (
           <>
+            {activeLedger.kind === 'ongoing' && activeLedger.status === 'open' ? (
+              <View style={styles.periodRow}>
+                <Pressable
+                  style={[styles.periodChip, period === 'month' && styles.periodChipOn]}
+                  onPress={() => changePeriod('month')}
+                >
+                  <Text style={[styles.periodText, period === 'month' && styles.periodTextOn]}>
+                    {MONTH_NAMES[new Date().getMonth()]}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.periodChip, period === 'all' && styles.periodChipOn]}
+                  onPress={() => changePeriod('all')}
+                >
+                  <Text style={[styles.periodText, period === 'all' && styles.periodTextOn]}>
+                    All time
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+
             <View style={styles.potRow}>
               <View style={styles.potCard}>
-                <Text style={styles.actualLab}>Total spent</Text>
+                <Text style={styles.actualLab}>
+                  {period === 'month' && activeLedger.kind === 'ongoing' && activeLedger.status === 'open'
+                    ? 'This month'
+                    : 'Total spent'}
+                </Text>
                 <Text style={[styles.actualVal, money.amountStyle]}>
-                  {money.fmt(summary?.total_spent ?? activeLedger.total_spent)}
+                  {money.fmt(periodSpent || summary?.total_spent || activeLedger.total_spent)}
                 </Text>
               </View>
               <View style={styles.potCard}>
@@ -688,7 +755,9 @@ export default function HouseholdScreen() {
 
             {ledgerTab === 'feed' ? (
               expenses.length === 0 ? (
-                <Text style={styles.emptyBody}>No expenses yet.</Text>
+                <Text style={styles.emptyBody}>
+                  {period === 'month' ? 'No expenses this month yet.' : 'No expenses yet.'}
+                </Text>
               ) : (
                 expenses.map((ex) => (
                   <View key={ex.id} style={styles.card}>
@@ -1123,6 +1192,18 @@ function makeStyles(colors: ColorTokens) {
     borderColor: colors.border,
     padding: spacing.md,
   },
+  periodRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
+  periodChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.full,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    backgroundColor: colors.surface,
+  },
+  periodChipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+  periodText: { fontWeight: '700', color: colors.textSecondary, fontSize: 12 },
+  periodTextOn: { color: colors.white },
   actualLab: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' },
   actualVal: { marginTop: 4, fontWeight: '800', fontSize: typography.caption, color: colors.primaryDark },
   tabRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },

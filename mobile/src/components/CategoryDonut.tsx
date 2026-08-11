@@ -159,6 +159,13 @@ export function CategoryDonut({ data }: { data: DonutDatum[] }) {
 
   return (
     <View style={styles.wrap}>
+      <View style={styles.totalBanner}>
+        <Text style={[styles.totalLabel, { color: colors.textMuted }]}>This month you spent</Text>
+        <Text style={[styles.totalValue, money.amountStyle, { color: colors.primaryDark }]}>
+          {money.fmt(total)}
+        </Text>
+      </View>
+
       <Animated.View entering={FadeIn.duration(300)} style={{ width: SIZE, height: SIZE }}>
         <Svg width={SIZE} height={SIZE}>
           <Defs>
@@ -174,12 +181,6 @@ export function CategoryDonut({ data }: { data: DonutDatum[] }) {
             <PetalArc key={p.category} petal={p} gradId={`petal-${i}`} progress={progress} />
           ))}
         </Svg>
-        <View style={styles.center} pointerEvents="none">
-          <Text style={[styles.centerLabel, { color: colors.textMuted }]}>Spent</Text>
-          <Text style={[styles.centerValue, money.amountStyle, { color: colors.text }]} numberOfLines={1}>
-            {money.fmt(total)}
-          </Text>
-        </View>
       </Animated.View>
 
       <View style={styles.legend}>
@@ -221,23 +222,20 @@ export function CategoryDonut({ data }: { data: DonutDatum[] }) {
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'center' },
-  center: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  totalBanner: {
+    width: '100%',
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: spacing.md,
+    gap: 2,
   },
-  centerLabel: {
-    fontSize: 10,
+  totalLabel: {
+    fontSize: typography.caption,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
   },
-  centerValue: { fontSize: 17, fontWeight: '800', marginTop: 2, maxWidth: R0 * 2 - 8 },
-  legend: { width: '100%', marginTop: spacing.lg, gap: spacing.md },
+  totalValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  legend: { width: '100%', marginTop: spacing.md, gap: spacing.md },
   legendRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   legendIcon: {
     width: 26,

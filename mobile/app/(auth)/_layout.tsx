@@ -7,6 +7,9 @@ export default function AuthLayout() {
 
   // While boot finishes, still show auth stack so login is never blocked by a blank spinner gate
   if (!loading && user) {
+    if (user.onboarding_complete === false) {
+      return <Redirect href="/(onboarding)/about-you" />
+    }
     return <Redirect href="/(tabs)" />
   }
 

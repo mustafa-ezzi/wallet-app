@@ -6,8 +6,26 @@ from django.utils import timezone
 
 
 class UserProfile(models.Model):
+    GENDER_CHOICES = [
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+        ('prefer_not', 'Prefer not to say'),
+    ]
+    USER_TYPE_CHOICES = [
+        ('student', 'Student'),
+        ('professional', 'Professional'),
+        ('self_employed', 'Self Employed'),
+        ('retired', 'Retired'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     currency = models.CharField(max_length=10, default='PKR')
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=20, blank=True, default='', choices=GENDER_CHOICES)
+    user_type = models.CharField(max_length=32, blank=True, default='', choices=USER_TYPE_CHOICES)
+    country = models.CharField(max_length=64, blank=True, default='')
+    onboarding_complete = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Profile({self.user.username})"

@@ -33,7 +33,7 @@ import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { useOffline } from '@/src/offline'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
-import { fmtBalance, fmtNum, todayISO } from '@/src/utils/format'
+import { fmtBalance, todayISO } from '@/src/utils/format'
 
 type Kind = 'expense' | 'income' | 'transfer'
 
@@ -279,15 +279,25 @@ export default function AddTransactionScreen() {
           })}
         </View>
 
-        <Pressable style={styles.amountCard} onPress={() => setCalcOpen(true)}>
+        <View style={styles.amountCard}>
           <Text style={[styles.amountCurrency, { color: colors.textMuted }]}>PKR</Text>
-          <Text style={[styles.amountValue, { color: amount ? colors.text : colors.textMuted }]} numberOfLines={1}>
-            {amount ? fmtNum(amount) : '0'}
-          </Text>
-          <View style={[styles.calcBtn, { backgroundColor: colors.surfaceMuted }]}>
+          <TextInput
+            value={amount}
+            onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ''))}
+            keyboardType="decimal-pad"
+            placeholder="0"
+            placeholderTextColor={colors.textMuted}
+            style={[styles.amountValue, { color: colors.text, flex: 1, padding: 0 }]}
+          />
+          <Pressable
+            onPress={() => setCalcOpen(true)}
+            hitSlop={8}
+            style={[styles.calcBtn, { backgroundColor: colors.surfaceMuted }]}
+            accessibilityLabel="Open calculator"
+          >
             <FontAwesome name="calculator" size={18} color={colors.primary} />
-          </View>
-        </Pressable>
+          </Pressable>
+        </View>
       </LinearGradient>
 
       {booting ? (
@@ -515,7 +525,7 @@ function makeStyles(colors: ColorTokens) {
       elevation: 4,
     },
     amountCurrency: { fontSize: typography.subtitle, fontWeight: '800' },
-    amountValue: { flex: 1, fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+    amountValue: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
     calcBtn: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     sectionTitle: { fontSize: typography.subtitle, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
     catRow: { gap: spacing.md, paddingRight: spacing.lg, paddingBottom: spacing.xs },

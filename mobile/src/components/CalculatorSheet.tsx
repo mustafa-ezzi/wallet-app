@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
-import Animated, { FadeIn, SlideInDown } from 'react-native-reanimated'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing } from '@/src/theme/colors'
 
@@ -12,7 +11,6 @@ export function evalExpression(expr: string): number | null {
   const tokens = clean.match(/(\d+\.?\d*|\.\d+|[+\-*/])/g)
   if (!tokens) return null
 
-  // Drop a trailing operator (e.g. "12+")
   while (tokens.length && /[+\-*/]/.test(tokens[tokens.length - 1])) tokens.pop()
   if (!tokens.length) return null
 
@@ -31,7 +29,6 @@ export function evalExpression(expr: string): number | null {
   }
   if (nums.length !== ops.length + 1) return null
 
-  // First pass: * and /
   const n2: number[] = [nums[0]]
   const o2: string[] = []
   for (let i = 0; i < ops.length; i++) {
@@ -44,7 +41,6 @@ export function evalExpression(expr: string): number | null {
       n2.push(next)
     }
   }
-  // Second pass: + and -
   let result = n2[0]
   for (let i = 0; i < o2.length; i++) {
     if (o2[i] === '+') result += n2[i + 1]
@@ -122,13 +118,10 @@ export function CalculatorSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
-      <Animated.View entering={FadeIn.duration(160)} style={styles.backdropWrap}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.backdropWrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View
-          entering={SlideInDown.springify().damping(18)}
-          style={[styles.card, { backgroundColor: colors.surface }]}
-        >
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <View style={[styles.display, { backgroundColor: colors.primary }]}>
             <View style={{ flex: 1 }}>
               <Text style={styles.exprText} numberOfLines={1}>
@@ -183,8 +176,8 @@ export function CalculatorSheet({
               <Text style={[styles.actionText, { color: colors.primary }]}>APPLY</Text>
             </Pressable>
           </View>
-        </Animated.View>
-      </Animated.View>
+        </View>
+      </View>
     </Modal>
   )
 }
@@ -204,6 +197,7 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 12 },
     elevation: 12,
+    zIndex: 2,
   },
   display: {
     minHeight: 88,

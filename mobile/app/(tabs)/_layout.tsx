@@ -17,6 +17,9 @@ function TabsShell() {
   if (!loading && !user) {
     return <Redirect href="/(auth)/login" />
   }
+  if (!loading && user && user.onboarding_complete === false) {
+    return <Redirect href="/(onboarding)/about-you" />
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
