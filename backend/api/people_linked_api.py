@@ -25,6 +25,7 @@ from .models import (
     PeopleLink,
     PeopleNotification,
     PeopleProposal,
+    Transaction,
     UserProfile,
     generate_people_link_code,
 )
@@ -124,6 +125,7 @@ def _create_link_from_users(
     to_user: User,
     display_name: str,
     invitation: PeopleInvitation | None,
+    person_from: Account | None = None,
 ) -> PeopleLink:
     existing = _active_link_between(from_user, to_user)
     if existing:
@@ -133,11 +135,33 @@ def _create_link_from_users(
     name_for_from_on_to = _display_name_for(from_user)
 
     with db_transaction.atomic():
-        person_from = Account.objects.create(
-            user=from_user, name=name_for_to_on_from, type='person', opening_balance=Decimal('0'),
-        )
+        if person_from is not None:
+            if person_from.user_id != from_user.id or person_from.type != 'person':
+                raise ValueError('existing_person must be a person account owned by the inviter.')
+            already = PeopleLink.objects.filter(
+                status='active',
+            ).filter(
+                Q(person_a=person_from) | Q(person_b=person_from),
+            ).exists()
+            if already:
+                raise ValueError('That person is already linked.')
+            # Keep history; optionally refresh display name
+            if name_for_to_on_from and person_from.name != name_for_to_on_from:
+                person_from.name = name_for_to_on_from
+                person_from.save(update_fields=['name'])
+            # Mirror opening so counterparty net inverts when convert has a balance
+            mirror_opening = -Decimal(str(person_from.current_balance))
+        else:
+            person_from = Account.objects.create(
+                user=from_user, name=name_for_to_on_from, type='person', opening_balance=Decimal('0'),
+            )
+            mirror_opening = Decimal('0')
+
         person_to = Account.objects.create(
-            user=to_user, name=name_for_from_on_to, type='person', opening_balance=Decimal('0'),
+            user=to_user,
+            name=name_for_from_on_to,
+            type='person',
+            opening_balance=mirror_opening,
         )
         user_a, user_b = _ordered_users(from_user, to_user)
         if user_a.id == from_user.id:
@@ -153,6 +177,27 @@ def _create_link_from_users(
             status='active',
         )
     return link
+
+
+def _validate_existing_person(user: User, person_id: int | None) -> Account | None:
+    if person_id is None:
+        return None
+    try:
+        person = Account.objects.get(id=person_id, user=user, type='person')
+    except Account.DoesNotExist:
+        raise serializers.ValidationError({'existing_person_id': 'Person not found.'})
+    if PeopleLink.objects.filter(status='active').filter(Q(person_a=person) | Q(person_b=person)).exists():
+        raise serializers.ValidationError({'existing_person_id': 'That person is already linked.'})
+    return person
+
+
+def _reverse_proposer_proposal_txs(proposal: PeopleProposal) -> int:
+    """Delete proposer's posted legs for this proposal. Returns deleted count."""
+    deleted, _ = Transaction.objects.filter(
+        user_id=proposal.proposer_id,
+        people_pair_id=proposal.people_pair_id,
+    ).delete()
+    return deleted
 
 
 def _fx_from_data(data: dict) -> dict:
@@ -179,7 +224,8 @@ class PeopleInvitationSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'from_user', 'to_user', 'from_user_email', 'from_user_name',
             'to_user_email', 'to_user_name', 'display_name', 'status',
-            'invited_via', 'query_snapshot', 'created_at', 'responded_at',
+            'invited_via', 'query_snapshot', 'existing_person',
+            'created_at', 'responded_at',
         )
         read_only_fields = fields
 
@@ -250,11 +296,13 @@ class PeopleNotificationSerializer(serializers.ModelSerializer):
 class InviteCreateSerializer(serializers.Serializer):
     query = serializers.CharField(max_length=255)
     display_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    existing_person_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class JoinByCodeSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=32)
     display_name = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    existing_person_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class ProposeSerializer(serializers.Serializer):
@@ -308,7 +356,7 @@ class PeopleLinkCodeView(APIView):
 
 
 class PeopleInvitationCreateView(APIView):
-    """POST { query, display_name? } — invite by email or username."""
+    """POST { query, display_name?, existing_person_id? } — invite by email or username."""
 
     permission_classes = [IsAuthenticated]
 
@@ -317,6 +365,12 @@ class PeopleInvitationCreateView(APIView):
         ser.is_valid(raise_exception=True)
         query = ser.validated_data['query'].strip()
         display_name = (ser.validated_data.get('display_name') or '').strip()
+        try:
+            existing_person = _validate_existing_person(
+                request.user, ser.validated_data.get('existing_person_id'),
+            )
+        except serializers.ValidationError as exc:
+            return Response(exc.detail, status=status.HTTP_400_BAD_REQUEST)
 
         target = _resolve_user_query(query)
         if not target:
@@ -352,10 +406,11 @@ class PeopleInvitationCreateView(APIView):
         invite = PeopleInvitation.objects.create(
             from_user=request.user,
             to_user=target,
-            display_name=display_name or _display_name_for(target),
+            display_name=display_name or (existing_person.name if existing_person else _display_name_for(target)),
             status='pending',
             invited_via='query',
             query_snapshot=query,
+            existing_person=existing_person,
         )
         _notify_people_user(
             user=target,
@@ -426,22 +481,30 @@ class PeopleInvitationActionView(APIView):
             return Response(PeopleInvitationSerializer(invite).data)
 
         # accept
-        link = _create_link_from_users(
-            from_user=invite.from_user,
-            to_user=invite.to_user,
-            display_name=invite.display_name,
-            invitation=invite,
-        )
+        try:
+            link = _create_link_from_users(
+                from_user=invite.from_user,
+                to_user=invite.to_user,
+                display_name=invite.display_name,
+                invitation=invite,
+                person_from=invite.existing_person,
+            )
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         invite.status = 'accepted'
         invite.responded_at = timezone.now()
         invite.save(update_fields=['status', 'responded_at'])
+        person_id = None
+        my_person = link.person_for(invite.from_user)
+        if my_person:
+            person_id = my_person.id
         _notify_people_user(
             user=invite.from_user,
             actor=request.user,
             kind='link_accepted',
             title=f'{_display_name_for(request.user)} accepted your people link',
             invitation=invite,
-            data={'link_id': link.id, 'route': 'people'},
+            data={'link_id': link.id, 'route': 'people', 'person_id': person_id},
         )
         return Response({
             'invitation': PeopleInvitationSerializer(invite).data,
@@ -463,6 +526,12 @@ class PeopleJoinByCodeView(APIView):
         ser.is_valid(raise_exception=True)
         code = ser.validated_data['code'].strip().upper()
         display_name = (ser.validated_data.get('display_name') or '').strip()
+        try:
+            existing_person = _validate_existing_person(
+                request.user, ser.validated_data.get('existing_person_id'),
+            )
+        except serializers.ValidationError as exc:
+            return Response(exc.detail, status=status.HTTP_400_BAD_REQUEST)
 
         profile = UserProfile.objects.filter(people_link_code__iexact=code).select_related('user').first()
         if not profile:
@@ -490,10 +559,11 @@ class PeopleJoinByCodeView(APIView):
         invite = PeopleInvitation.objects.create(
             from_user=request.user,
             to_user=target,
-            display_name=display_name or _display_name_for(target),
+            display_name=display_name or (existing_person.name if existing_person else _display_name_for(target)),
             status='pending',
             invited_via='code',
             query_snapshot=code,
+            existing_person=existing_person,
         )
         _notify_people_user(
             user=target,
@@ -541,6 +611,12 @@ class PeopleLinkUnlinkView(APIView):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+        # Cancel any leftover pending proposals (should be none when settled)
+        PeopleProposal.objects.filter(link=link, status='pending').update(
+            status='cancelled',
+            responded_at=timezone.now(),
+        )
 
         link.status = 'unlinked'
         link.unlinked_at = timezone.now()
@@ -696,17 +772,30 @@ class PeopleProposalActionView(APIView):
             return Response({'detail': 'Only the counterparty can respond.'}, status=status.HTTP_403_FORBIDDEN)
 
         if action_name == 'decline':
-            proposal.status = 'declined'
-            proposal.responded_at = timezone.now()
-            proposal.save(update_fields=['status', 'responded_at'])
+            with db_transaction.atomic():
+                reversed_count = _reverse_proposer_proposal_txs(proposal)
+                proposal.status = 'declined'
+                proposal.responded_at = timezone.now()
+                proposal.save(update_fields=['status', 'responded_at'])
+            person = proposal.link.person_for(proposal.proposer)
             _notify_people_user(
                 user=proposal.proposer,
                 actor=request.user,
                 kind='proposal_declined',
                 title=f'{_display_name_for(request.user)} declined your {proposal.action}',
+                body='Your entry was reversed on your books.' if reversed_count else '',
                 proposal=proposal,
+                data={
+                    'route': 'people',
+                    'person_id': person.id if person else None,
+                    'reversed': bool(reversed_count),
+                },
             )
-            return Response(PeopleProposalSerializer(proposal).data)
+            return Response({
+                **PeopleProposalSerializer(proposal).data,
+                'reversed': bool(reversed_count),
+                'reversed_tx_count': reversed_count,
+            })
 
         ser = ProposalAcceptSerializer(data=request.data)
         ser.is_valid(raise_exception=True)

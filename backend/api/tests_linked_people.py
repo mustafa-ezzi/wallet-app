@@ -168,13 +168,22 @@ class LinkedPeopleProposalTests(LinkedPeopleBase):
             'amount': '200',
         }, format='json')
         proposal_id = res.data['proposal']['id']
+        self.h_bank.refresh_from_db()
+        self.assertEqual(Decimal(str(self.h_bank.current_balance)), Decimal('7800'))
 
         res = self.m_client.post(f'/api/people/proposals/{proposal_id}/decline/', {}, format='json')
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.data['status'], 'declined')
+        self.assertTrue(res.data.get('reversed'))
 
         m_person = Account.objects.get(user=self.mustafa, type='person')
         self.assertEqual(Decimal(str(m_person.current_balance)), Decimal('0'))
+
+        # Proposer legs reversed
+        self.h_bank.refresh_from_db()
+        self.assertEqual(Decimal(str(self.h_bank.current_balance)), Decimal('8000'))
+        h_person = Account.objects.get(user=self.hussain, type='person')
+        self.assertEqual(Decimal(str(h_person.current_balance)), Decimal('0'))
 
     def test_idempotent_proposal_client_mutation_id(self):
         link_id = self._link()
@@ -206,3 +215,70 @@ class LinkedPeopleProposalTests(LinkedPeopleBase):
         }, format='json')
         self.assertEqual(res.status_code, 201)
         self.assertEqual(PeopleLink.objects.count(), 0)
+
+    def test_unlink_blocked_when_net_nonzero(self):
+        link_id = self._link()
+        res = self.h_client.post('/api/people/proposals/', {
+            'link_id': link_id,
+            'action': 'lend',
+            'wallet_id': self.h_bank.id,
+            'amount': '150',
+        }, format='json')
+        self.assertEqual(res.status_code, 201)
+        # Accept so both sides non-zero
+        proposal_id = res.data['proposal']['id']
+        self.m_client.post(f'/api/people/proposals/{proposal_id}/accept/', {
+            'wallet_id': self.m_bank.id,
+        }, format='json')
+        res = self.m_client.post(f'/api/people/links/{link_id}/unlink/', {}, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('settle', res.data['detail'].lower())
+
+    def test_unlink_ok_when_settled(self):
+        link_id = self._link()
+        res = self.m_client.post(f'/api/people/links/{link_id}/unlink/', {}, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(res.data['status'], 'unlinked')
+        self.assertEqual(PeopleLink.objects.filter(status='active').count(), 0)
+
+
+class LinkedPeopleConvertTests(LinkedPeopleBase):
+    def test_convert_local_person_keeps_history(self):
+        # Local lend creates history on person
+        res = self.m_client.post('/api/people/', {'name': 'Hussain local'}, format='json')
+        self.assertEqual(res.status_code, 201)
+        person_id = res.data['id']
+        res = self.m_client.post('/api/people/actions/', {
+            'action': 'lend',
+            'wallet_id': self.m_bank.id,
+            'person_id': person_id,
+            'amount': '400',
+        }, format='json')
+        self.assertEqual(res.status_code, 201)
+
+        res = self.m_client.post('/api/people/invitations/', {
+            'query': 'hussain@example.com',
+            'display_name': 'Hussain',
+            'existing_person_id': person_id,
+        }, format='json')
+        self.assertEqual(res.status_code, 201, res.data)
+        invite_id = res.data['id']
+        self.assertEqual(res.data.get('existing_person'), person_id)
+
+        res = self.h_client.post(f'/api/people/invitations/{invite_id}/accept/', {}, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+
+        # Same person id on Mustafa's side
+        links = self.m_client.get('/api/people/links/')
+        self.assertEqual(links.data[0]['my_person']['id'], person_id)
+        person = Account.objects.get(id=person_id)
+        self.assertEqual(Decimal(str(person.current_balance)), Decimal('400'))
+
+        # Hussain's person opening mirrors
+        h_person = Account.objects.get(user=self.hussain, type='person')
+        self.assertEqual(Decimal(str(h_person.current_balance)), Decimal('-400'))
+
+        # Only one person on Mustafa (no duplicate)
+        m_people = self.m_client.get('/api/people/')
+        m_list = m_people.data if isinstance(m_people.data, list) else m_people.data.get('results', [])
+        self.assertEqual(len(m_list), 1)

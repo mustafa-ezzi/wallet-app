@@ -663,6 +663,7 @@ class PushDeliveryLog(models.Model):
         ('payable', 'Payable'),
         ('receivable', 'Receivable'),
         ('expense', 'Expense'),
+        ('people_proposal', 'People proposal'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='push_delivery_logs')
@@ -1222,6 +1223,14 @@ class PeopleInvitation(models.Model):
     status = models.CharField(max_length=12, choices=STATUSES, default='pending')
     invited_via = models.CharField(max_length=10, choices=VIA, default='query')
     query_snapshot = models.CharField(max_length=255, blank=True, default='')
+    # Phase J — invite converts an existing local person on from_user's books
+    existing_person = models.ForeignKey(
+        'Account',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='people_convert_invites',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     responded_at = models.DateTimeField(null=True, blank=True)
 

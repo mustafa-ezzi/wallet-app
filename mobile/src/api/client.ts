@@ -390,9 +390,9 @@ export const peopleApi = {
   // Phase G/H — linked people
   linkCode: () => api.get('/people/link-code/'),
   regenerateLinkCode: () => api.post('/people/link-code/'),
-  invite: (data: { query: string; display_name?: string }) =>
+  invite: (data: { query: string; display_name?: string; existing_person_id?: number }) =>
     api.post('/people/invitations/', data),
-  joinByCode: (data: { code: string; display_name?: string }) =>
+  joinByCode: (data: { code: string; display_name?: string; existing_person_id?: number }) =>
     api.post('/people/invitations/join/', data),
   pendingInvites: () => api.get('/people/invitations/pending/'),
   acceptInvite: (id: number) => api.post(`/people/invitations/${id}/accept/`),

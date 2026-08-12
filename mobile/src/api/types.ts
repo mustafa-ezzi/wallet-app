@@ -54,6 +54,7 @@ export type PeopleInvitation = {
   status: 'pending' | 'accepted' | 'declined' | 'cancelled'
   invited_via: string
   query_snapshot?: string
+  existing_person?: number | null
   created_at?: string
   responded_at?: string | null
 }

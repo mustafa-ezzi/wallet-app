@@ -31,6 +31,7 @@ import type {
 } from '@/src/api/types'
 import { DateField } from '@/src/components/SelectFields'
 import { ErrorBanner, Field, PrimaryButton } from '@/src/components/ui'
+import { InvitePersonSheet } from '@/src/people/InvitePersonSheet'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
@@ -128,6 +129,8 @@ export default function PersonHistoryScreen() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [convertOpen, setConvertOpen] = useState(false)
+  const [unlinkBusy, setUnlinkBusy] = useState(false)
 
   const personName = history?.person?.name || nameParam || 'Person'
   const monthLabel = `${MONTH_NAMES[month - 1]} ${year}`
@@ -309,6 +312,21 @@ export default function PersonHistoryScreen() {
     }
   }
 
+  const unlink = async () => {
+    if (!link) return
+    setUnlinkBusy(true)
+    setError('')
+    try {
+      await peopleApi.unlink(link.id)
+      bumpRefresh()
+      await load(true)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not unlink. Settle both sides to zero first.'))
+    } finally {
+      setUnlinkBusy(false)
+    }
+  }
+
   const netStatus = settled
     ? 'No pending debts'
     : pendingNet > 0
@@ -331,6 +349,32 @@ export default function PersonHistoryScreen() {
         </View>
         <View style={{ width: 34 }} />
       </View>
+
+      {!isLinked ? (
+        <Pressable style={styles.linkCta} onPress={() => setConvertOpen(true)}>
+          <FontAwesome name="link" size={13} color={colors.primaryDark} />
+          <Text style={[styles.linkCtaText, { color: colors.primaryDark }]}>
+            Invite CashTrail user to link
+          </Text>
+        </Pressable>
+      ) : settled ? (
+        <Pressable style={styles.linkCta} onPress={() => void unlink()} disabled={unlinkBusy}>
+          {unlinkBusy ? (
+            <ActivityIndicator color={colors.primaryDark} size="small" />
+          ) : (
+            <>
+              <FontAwesome name="unlink" size={13} color={colors.textSecondary} />
+              <Text style={[styles.linkCtaText, { color: colors.textSecondary }]}>
+                Unlink (settled)
+              </Text>
+            </>
+          )}
+        </Pressable>
+      ) : (
+        <Text style={[styles.linkHint, { color: colors.textMuted }]}>
+          Settle to zero to unlink
+        </Text>
+      )}
 
       <ScrollView
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + 40 }}
@@ -626,6 +670,17 @@ export default function PersonHistoryScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <InvitePersonSheet
+        visible={convertOpen}
+        onClose={() => setConvertOpen(false)}
+        existingPersonId={personId}
+        defaultDisplayName={personName}
+        onDone={() => {
+          bumpRefresh()
+          void load(true)
+        }}
+      />
     </View>
   )
 }
@@ -688,6 +743,27 @@ function makeStyles(colors: ColorTokens) {
     backBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
     title: { fontSize: typography.title, fontWeight: '800', color: colors.text },
     headerSub: { fontSize: 11, fontWeight: '700', color: colors.textMuted, marginTop: 2 },
+    linkCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+      paddingVertical: 10,
+      borderRadius: radii.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    linkCtaText: { fontWeight: '800', fontSize: 13 },
+    linkHint: {
+      textAlign: 'center',
+      fontSize: 12,
+      fontWeight: '600',
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+    },
     monthNav: {
       flexDirection: 'row',
       alignItems: 'center',

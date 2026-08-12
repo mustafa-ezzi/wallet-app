@@ -8,6 +8,7 @@ from django.conf import settings
 from .due_push import send_due_reminders
 from .campaign_push import process_due_scheduled_campaigns
 from .models import DeviceToken, NotificationPreference
+from .people_proposal_nudges import send_people_proposal_nudges
 
 
 class DeviceTokenSerializer(serializers.ModelSerializer):
@@ -122,6 +123,41 @@ class DueRemindersJobView(APIView):
             'failed': result['failed'],
             'dry_run': result['dry_run'],
         })
+
+
+class PeopleProposalNudgesJobView(APIView):
+    """
+    Railway cron: POST /api/jobs/people-proposal-nudges/
+    Reminds counterparties of pending proposals older than N days (default 2).
+    Auth: same CRON_SECRET as due-reminders.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        secret = getattr(settings, 'CRON_SECRET', '') or ''
+        provided = (
+            request.headers.get('X-Cron-Secret')
+            or request.META.get('HTTP_X_CRON_SECRET')
+            or ''
+        ).strip()
+        auth = (request.headers.get('Authorization') or '').strip()
+        if auth.lower().startswith('bearer '):
+            provided = auth[7:].strip() or provided
+
+        if not secret or provided != secret:
+            return Response({'detail': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+
+        dry = str(request.query_params.get('dry_run') or request.data.get('dry_run') or '').lower() in {
+            '1', 'true', 'yes',
+        }
+        try:
+            min_age = int(request.query_params.get('min_age_days') or request.data.get('min_age_days') or 2)
+        except (TypeError, ValueError):
+            min_age = 2
+        result = send_people_proposal_nudges(dry_run=dry, min_age_days=min_age)
+        return Response(result)
 
 
 class PushCampaignsJobView(APIView):

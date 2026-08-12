@@ -13,9 +13,18 @@ type Props = {
   open: boolean
   onClose: () => void
   onDone: (result: DoneResult) => void
+  existingPersonId?: number | null
+  defaultDisplayName?: string
 }
 
-export default function InvitePersonModal({ open, onClose, onDone }: Props) {
+export default function InvitePersonModal({
+  open,
+  onClose,
+  onDone,
+  existingPersonId = null,
+  defaultDisplayName = '',
+}: Props) {
+  const convertMode = Boolean(existingPersonId)
   const [mode, setMode] = useState<Mode>('local')
   const [localName, setLocalName] = useState('')
   const [query, setQuery] = useState('')
@@ -43,11 +52,11 @@ export default function InvitePersonModal({ open, onClose, onDone }: Props) {
     setError('')
     setLocalName('')
     setQuery('')
-    setDisplayName('')
+    setDisplayName(defaultDisplayName || '')
     setJoinCode('')
-    setMode('local')
+    setMode(convertMode ? 'invite' : 'local')
     void loadCode()
-  }, [open, loadCode])
+  }, [open, loadCode, convertMode, defaultDisplayName])
 
   if (!open) return null
 
@@ -85,6 +94,7 @@ export default function InvitePersonModal({ open, onClose, onDone }: Props) {
       await peopleApi.invite({
         query: q,
         display_name: displayName.trim() || undefined,
+        ...(existingPersonId ? { existing_person_id: existingPersonId } : {}),
       })
       onDone({ kind: 'invite' })
       onClose()
@@ -108,6 +118,7 @@ export default function InvitePersonModal({ open, onClose, onDone }: Props) {
       await peopleApi.joinByCode({
         code,
         display_name: displayName.trim() || undefined,
+        ...(existingPersonId ? { existing_person_id: existingPersonId } : {}),
       })
       onDone({ kind: 'join' })
       onClose()
@@ -153,18 +164,24 @@ export default function InvitePersonModal({ open, onClose, onDone }: Props) {
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet">
         <div className="modal-header">
-          <h2>Add person</h2>
+          <h2>{convertMode ? 'Link this person' : 'Add person'}</h2>
           <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
             <X size={18} strokeWidth={2} />
           </button>
         </div>
 
         <div className="add-tx-seg" style={{ marginBottom: '0.85rem' }}>
-          {([
-            { key: 'local' as const, label: 'Local' },
-            { key: 'invite' as const, label: 'Invite user' },
-            { key: 'code' as const, label: 'Code' },
-          ]).map((t) => (
+          {(convertMode
+            ? [
+                { key: 'invite' as const, label: 'Invite user' },
+                { key: 'code' as const, label: 'Code' },
+              ]
+            : [
+                { key: 'local' as const, label: 'Local' },
+                { key: 'invite' as const, label: 'Invite user' },
+                { key: 'code' as const, label: 'Code' },
+              ]
+          ).map((t) => (
             <button
               key={t.key}
               type="button"
@@ -178,7 +195,13 @@ export default function InvitePersonModal({ open, onClose, onDone }: Props) {
 
         {error ? <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{error}</div> : null}
 
-        {mode === 'local' ? (
+        {convertMode ? (
+          <p className="page-subtitle" style={{ margin: '0 0 0.75rem' }}>
+            Keep this person’s history and invite a CashTrail user to link.
+          </p>
+        ) : null}
+
+        {mode === 'local' && !convertMode ? (
           <form onSubmit={submitLocal} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <p className="page-subtitle" style={{ margin: 0 }}>
               For people not on CashTrail (e.g. Idrees). You post entries alone.

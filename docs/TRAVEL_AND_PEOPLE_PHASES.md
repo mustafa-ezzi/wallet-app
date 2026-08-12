@@ -1,6 +1,6 @@
 # Travel Mode + People — Development Phases
 
-**Status:** Phase A–D + **G–I** implemented (Linked People backend + mobile + web UI). Phase E–F (full web Travel polish) and J (optional linked polish) not finished.  
+**Status:** Phase A–D + **G–J** implemented (Linked People end-to-end, including polish). Phase E–F (full web Travel hardening) optional remaining.  
 **Home currency:** PKR (from the user profile). All wallet balances, reports, and totals stay in PKR.  
 **Reference:** Hysab Kytab Travel Mode + person History screens.
 
@@ -420,11 +420,13 @@ Phase F can add: daily auto-refresh of the trip rate while the trip is active (s
 - Person History: propose when linked; Accept / Decline proposals + waiting copy.  
 - **Exit:** mobile and web behave the same for linked + local.
 
-### Phase J — Linked People polish (optional)
+### Phase J — Linked People polish ✅
 
-- Convert existing local person → linked via invite.  
-- Reminder nudges on unanswered proposals; void/reverse if declined after proposer already posted.  
-- Block unlink with non-zero net; clear empty states / copy.
+- Convert existing local person → linked via invite (`existing_person_id`; history kept; counterparty opening mirrors net).  
+- Decline voids/reverses proposer’s posted legs; cron nudge job `POST /api/jobs/people-proposal-nudges/` (default ≥2 days pending).  
+- Unlink blocked when net ≠ 0 (API + History UI); Unlink CTA when settled; Invite-to-link CTA for local people.  
+- Migration `0022_linked_people_phase_j`.  
+- **Deploy:** `migrate` for `0022`; optional Railway cron for proposal nudges.
 
 ---
 
@@ -496,4 +498,4 @@ Web (`E`) can start after `C` if needed. Linked web (`I`) waits on `H`.
 
 ---
 
-*Next step when ready: Phase J (optional polish), or finish Phase E/F (web Travel hardening).*
+*Next step when ready: finish Phase E/F (web Travel hardening), or ship Linked People (migrate 0021+0022 + optional nudge cron).*

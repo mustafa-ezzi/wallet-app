@@ -81,6 +81,7 @@ urlpatterns = [
     ),
     path('notification-preferences/', devices_api.NotificationPreferenceView.as_view(), name='notification-preferences'),
     path('jobs/due-reminders/', devices_api.DueRemindersJobView.as_view(), name='jobs-due-reminders'),
+    path('jobs/people-proposal-nudges/', devices_api.PeopleProposalNudgesJobView.as_view(), name='jobs-people-proposal-nudges'),
     path('jobs/push-campaigns/', devices_api.PushCampaignsJobView.as_view(), name='jobs-push-campaigns'),
     path('jobs/refresh-inactivity/', devices_api.RefreshInactivityJobView.as_view(), name='jobs-refresh-inactivity'),
     # Ops panel (staff only)

@@ -13,6 +13,7 @@ import { accountsApi, apiErrorMessage, asList, peopleApi } from '../api/client'
 import { fmtBalance, toMoney } from '../utils/format'
 import { formatForeignSubtitle, foreignToPkr, formatRateLine, todayISO } from '../travel/currencies'
 import { useTravelMode } from '../travel/TravelModeContext'
+import InvitePersonModal from '../people/InvitePersonModal'
 import type { PeopleLink, PeopleProposal } from '../people/types'
 
 type PeopleAction = 'lend' | 'borrow' | 'pay' | 'receive'
@@ -92,6 +93,8 @@ export default function PersonHistoryPage() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [convertOpen, setConvertOpen] = useState(false)
+  const [unlinkBusy, setUnlinkBusy] = useState(false)
 
   const isLinked = Boolean(link)
 
@@ -247,6 +250,20 @@ export default function PersonHistoryPage() {
     }
   }
 
+  const unlink = async () => {
+    if (!link) return
+    setUnlinkBusy(true)
+    setError('')
+    try {
+      await peopleApi.unlink(link.id)
+      await load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not unlink. Settle both sides to zero first.'))
+    } finally {
+      setUnlinkBusy(false)
+    }
+  }
+
   const exportCsv = () => {
     if (!history) return
     const rows = [
@@ -296,9 +313,22 @@ export default function PersonHistoryPage() {
             </p>
           </div>
         </div>
-        <button type="button" className="btn-glass" onClick={exportCsv} disabled={!history?.transactions.length}>
-          <Download size={16} /> CSV
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {!isLinked ? (
+            <button type="button" className="btn-glass" onClick={() => setConvertOpen(true)}>
+              Invite to link
+            </button>
+          ) : settled ? (
+            <button type="button" className="btn-glass" onClick={() => void unlink()} disabled={unlinkBusy}>
+              {unlinkBusy ? <span className="spinner" /> : 'Unlink'}
+            </button>
+          ) : (
+            <span className="travel-muted" style={{ fontSize: '0.78rem' }}>Settle to unlink</span>
+          )}
+          <button type="button" className="btn-glass" onClick={exportCsv} disabled={!history?.transactions.length}>
+            <Download size={16} /> CSV
+          </button>
+        </div>
       </div>
 
       <div className="month-nav glass">
@@ -516,6 +546,14 @@ export default function PersonHistoryPage() {
           </div>
         </div>
       ) : null}
+
+      <InvitePersonModal
+        open={convertOpen}
+        onClose={() => setConvertOpen(false)}
+        existingPersonId={personId}
+        defaultDisplayName={personName}
+        onDone={() => { void load() }}
+      />
     </div>
   )
 }

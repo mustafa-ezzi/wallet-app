@@ -23,14 +23,24 @@ type Mode = 'local' | 'invite' | 'code'
 type Props = {
   visible: boolean
   onClose: () => void
+  /** Convert an existing local person into a linked invite (hides Local tab). */
+  existingPersonId?: number | null
+  defaultDisplayName?: string
   /** Called after a local person is created (with new person id) or a link invite is sent. */
   onDone: (result: { kind: 'local'; personId: number; name: string } | { kind: 'invite' } | { kind: 'join' }) => void
 }
 
-export function InvitePersonSheet({ visible, onClose, onDone }: Props) {
+export function InvitePersonSheet({
+  visible,
+  onClose,
+  onDone,
+  existingPersonId = null,
+  defaultDisplayName = '',
+}: Props) {
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
+  const convertMode = Boolean(existingPersonId)
 
   const [mode, setMode] = useState<Mode>('local')
   const [localName, setLocalName] = useState('')
@@ -59,11 +69,11 @@ export function InvitePersonSheet({ visible, onClose, onDone }: Props) {
     setError('')
     setLocalName('')
     setQuery('')
-    setDisplayName('')
+    setDisplayName(defaultDisplayName || '')
     setJoinCode('')
-    setMode('local')
+    setMode(convertMode ? 'invite' : 'local')
     void loadCode()
-  }, [visible, loadCode])
+  }, [visible, loadCode, convertMode, defaultDisplayName])
 
   const submitLocal = async () => {
     const n = localName.trim()
@@ -96,6 +106,7 @@ export function InvitePersonSheet({ visible, onClose, onDone }: Props) {
       await peopleApi.invite({
         query: q,
         display_name: displayName.trim() || undefined,
+        ...(existingPersonId ? { existing_person_id: existingPersonId } : {}),
       })
       onDone({ kind: 'invite' })
       onClose()
@@ -118,6 +129,7 @@ export function InvitePersonSheet({ visible, onClose, onDone }: Props) {
       await peopleApi.joinByCode({
         code,
         display_name: displayName.trim() || undefined,
+        ...(existingPersonId ? { existing_person_id: existingPersonId } : {}),
       })
       onDone({ kind: 'join' })
       onClose()
@@ -161,18 +173,24 @@ export function InvitePersonSheet({ visible, onClose, onDone }: Props) {
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
           <View style={styles.head}>
-            <Text style={styles.title}>Add person</Text>
+            <Text style={styles.title}>{convertMode ? 'Link this person' : 'Add person'}</Text>
             <Pressable onPress={onClose} hitSlop={10}>
               <FontAwesome name="close" size={18} color={colors.textMuted} />
             </Pressable>
           </View>
 
           <View style={styles.seg}>
-            {([
-              { key: 'local' as const, label: 'Local' },
-              { key: 'invite' as const, label: 'Invite user' },
-              { key: 'code' as const, label: 'Code' },
-            ]).map((t) => (
+            {(convertMode
+              ? [
+                  { key: 'invite' as const, label: 'Invite user' },
+                  { key: 'code' as const, label: 'Code' },
+                ]
+              : [
+                  { key: 'local' as const, label: 'Local' },
+                  { key: 'invite' as const, label: 'Invite user' },
+                  { key: 'code' as const, label: 'Code' },
+                ]
+            ).map((t) => (
               <Pressable
                 key={t.key}
                 onPress={() => { setMode(t.key); setError('') }}
@@ -186,7 +204,13 @@ export function InvitePersonSheet({ visible, onClose, onDone }: Props) {
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
             <ErrorBanner message={error} />
 
-            {mode === 'local' ? (
+            {convertMode ? (
+              <Text style={styles.hint}>
+                Keep this person’s history and invite a CashTrail user to link.
+              </Text>
+            ) : null}
+
+            {mode === 'local' && !convertMode ? (
               <>
                 <Text style={styles.hint}>
                   For people not on CashTrail (e.g. Idrees). You post entries alone.
