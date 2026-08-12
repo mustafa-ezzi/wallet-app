@@ -224,15 +224,18 @@ export default function AddTransactionScreen() {
     a.type === 'cash' ? 'money' : 'university'
 
   const submit = async () => {
-    if (submittingRef.current || loading) return
+    if (submittingRef.current) return
+    submittingRef.current = true
     setError('')
     const value = parseFloat(amount.replace(/,/g, ''))
     if (!Number.isFinite(value) || value <= 0) {
       setError('Enter a valid amount.')
+      submittingRef.current = false
       return
     }
     if (kind !== 'transfer' && kind !== 'people' && !category) {
       setError('Pick a category.')
+      submittingRef.current = false
       return
     }
 
@@ -240,6 +243,7 @@ export default function AddTransactionScreen() {
     const pkrAmount = useTravel ? toPkr(value) : value
     if (useTravel && (!(travelRate > 0) || !(pkrAmount > 0))) {
       setError('Travel rate missing. Open Travel Mode and set a rate.')
+      submittingRef.current = false
       return
     }
     const fxPayload = useTravel
@@ -259,7 +263,6 @@ export default function AddTransactionScreen() {
         }
       : {}
 
-    submittingRef.current = true
     setLoading(true)
     let succeeded = false
     try {

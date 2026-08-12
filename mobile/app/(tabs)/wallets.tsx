@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -61,6 +62,7 @@ export default function WalletsScreen() {
   const [type, setType] = useState<'bank' | 'cash'>('bank')
   const [opening, setOpening] = useState('0')
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [formError, setFormError] = useState('')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [incomingInvites, setIncomingInvites] = useState<PeopleInvitation[]>([])
@@ -156,11 +158,13 @@ export default function WalletsScreen() {
   }
 
   const create = async () => {
+    if (savingRef.current) return
     setFormError('')
     if (!name.trim()) {
       setFormError('Name is required.')
       return
     }
+    savingRef.current = true
     setSaving(true)
     try {
       await accountsApi.create({
@@ -176,6 +180,7 @@ export default function WalletsScreen() {
     } catch (err) {
       setFormError(apiErrorMessage(err, 'Could not create wallet.'))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -240,48 +245,98 @@ export default function WalletsScreen() {
     )
   }
 
+  const deletePerson = (a: Account) => {
+    const bal = toMoney(a.current_balance)
+    if (Math.abs(bal) >= 0.01) {
+      setError('Settle this person to zero before deleting.')
+      return
+    }
+    Alert.alert(
+      'Delete person?',
+      `Remove “${a.name}” from People? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await peopleApi.remove(a.id)
+                bumpRefresh()
+                await load(true)
+              } catch (err) {
+                setError(apiErrorMessage(err, 'Could not delete person. Settle to zero first.'))
+              }
+            })()
+          },
+        },
+      ],
+    )
+  }
+
   const renderPerson = (a: Account, index: number) => {
     const bal = toMoney(a.current_balance)
     const status =
       Math.abs(bal) < 0.01 ? 'Settled' : bal > 0 ? 'They owe you' : 'You owe them'
     const isLinked = linkedPersonIds.has(a.id)
+    const settled = Math.abs(bal) < 0.01
     return (
       <Reveal index={index} key={a.id}>
-        <BouncyPressable
-          style={styles.card}
-          onPress={() =>
-            router.push({ pathname: '/people/[id]', params: { id: String(a.id), name: a.name } })
-          }
-        >
-          <View style={styles.cardTop}>
-            <View style={[styles.icon, styles.iconPerson]}>
-              <FontAwesome name="user" size={16} color="#8b5cf6" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={styles.cardName}>{a.name}</Text>
-                {isLinked ? (
-                  <View style={styles.linkedBadge}>
-                    <Text style={styles.linkedBadgeText}>Linked</Text>
-                  </View>
-                ) : null}
+        <View style={styles.card}>
+          <BouncyPressable
+            onPress={() =>
+              router.push({ pathname: '/people/[id]', params: { id: String(a.id), name: a.name } })
+            }
+          >
+            <View style={styles.cardTop}>
+              <View style={[styles.icon, styles.iconPerson]}>
+                <FontAwesome name="user" size={16} color="#8b5cf6" />
               </View>
-              <Text style={styles.cardType}>{status}</Text>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.cardName}>{a.name}</Text>
+                  {isLinked ? (
+                    <View style={styles.linkedBadge}>
+                      <Text style={styles.linkedBadgeText}>Linked</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.cardType}>{status}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text
+                  style={[
+                    styles.cardBal,
+                    money.amountStyle,
+                    { color: Math.abs(bal) < 0.01 ? colors.text : bal > 0 ? colors.success : colors.danger },
+                  ]}
+                >
+                  {money.fmtBalance(bal)}
+                </Text>
+                <Text style={styles.cardType}>{isLinked ? 'CashTrail user' : 'Local'}</Text>
+              </View>
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text
-                style={[
-                  styles.cardBal,
-                  money.amountStyle,
-                  { color: Math.abs(bal) < 0.01 ? colors.text : bal > 0 ? colors.success : colors.danger },
-                ]}
+          </BouncyPressable>
+          <View style={styles.cardActions}>
+            <BouncyPressable
+              style={styles.actionBtn}
+              onPress={() =>
+                router.push({ pathname: '/people/[id]', params: { id: String(a.id), name: a.name } })
+              }
+            >
+              <Text style={styles.actionText}>History</Text>
+            </BouncyPressable>
+            {settled ? (
+              <BouncyPressable
+                style={[styles.actionBtn, styles.actionBtnDanger]}
+                onPress={() => deletePerson(a)}
               >
-                {money.fmtBalance(bal)}
-              </Text>
-              <Text style={styles.cardType}>{isLinked ? 'CashTrail user' : 'Local'}</Text>
-            </View>
+                <Text style={styles.actionTextDanger}>Delete</Text>
+              </BouncyPressable>
+            ) : null}
           </View>
-        </BouncyPressable>
+        </View>
       </Reveal>
     )
   }

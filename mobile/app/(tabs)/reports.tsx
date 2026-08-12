@@ -140,11 +140,12 @@ export default function ReportsScreen() {
     return Array.from(m.entries()).sort((a, b) => b[1] - a[1])
   }, [monthTxs])
 
-  const deleteExpense = (tx: Transaction) => {
-    if (tx.type !== 'expense' || isTransfer(tx)) return
+  const deleteTransaction = (tx: Transaction) => {
+    if (isTransfer(tx)) return
+    const income = tx.type === 'income'
     Alert.alert(
-      'Delete expense?',
-      `Remove “${tx.category || 'Expense'}” of ${money.fmt(tx.amount)}? This cannot be undone.`,
+      income ? 'Delete income?' : 'Delete expense?',
+      `Remove “${tx.category || (income ? 'Income' : 'Expense')}” of ${money.fmt(tx.amount)}? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -156,7 +157,7 @@ export default function ReportsScreen() {
                 await transactionsApi.remove(tx.id)
                 await load(true)
               } catch (err) {
-                Alert.alert('Delete failed', apiErrorMessage(err, 'Could not delete expense.'))
+                Alert.alert('Delete failed', apiErrorMessage(err, 'Could not delete transaction.'))
               }
             })()
           },
@@ -436,7 +437,7 @@ export default function ReportsScreen() {
             ) : (
               ledgerTxs.slice(0, 40).map((tx, i) => {
                 const income = tx.type === 'income'
-                const canDelete = !income && !isTransfer(tx)
+                const canDelete = !isTransfer(tx)
                 return (
                   <Reveal index={i} key={tx.id}>
                   <View style={styles.txRow}>
@@ -458,9 +459,9 @@ export default function ReportsScreen() {
                       </Text>
                       {canDelete ? (
                         <Pressable
-                          onPress={() => deleteExpense(tx)}
+                          onPress={() => deleteTransaction(tx)}
                           hitSlop={10}
-                          accessibilityLabel="Delete expense"
+                          accessibilityLabel={income ? 'Delete income' : 'Delete expense'}
                           style={styles.txDelete}
                         >
                           <FontAwesome name="trash-o" size={15} color={colors.danger} />

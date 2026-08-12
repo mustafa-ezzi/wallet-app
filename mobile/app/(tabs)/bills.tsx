@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -127,6 +127,7 @@ export default function BillsScreen() {
     start_date: todayISO(),
   })
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
 
   const [recordModal, setRecordModal] = useState<{ kind: RecordKind; id: number; name: string } | null>(null)
   const [recordAmount, setRecordAmount] = useState('')
@@ -196,12 +197,14 @@ export default function BillsScreen() {
 
   const submitRecord = async () => {
     if (!recordModal) return
+    if (savingRef.current) return
     const amt = toMoney(recordAmount)
     const acct = Number(recordAccount)
     if (amt <= 0 || !acct) {
       setError('Pick a wallet and amount.')
       return
     }
+    savingRef.current = true
     setSaving(true)
     setError('')
     try {
@@ -245,6 +248,7 @@ export default function BillsScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not record payment.'))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -270,10 +274,12 @@ export default function BillsScreen() {
   }
 
   const saveExpense = async () => {
+    if (savingRef.current) return
     if (!expForm.name.trim() || toMoney(expForm.amount) <= 0) {
       setError('Name and amount required.')
       return
     }
+    savingRef.current = true
     setSaving(true)
     try {
       const payload = {
@@ -295,6 +301,7 @@ export default function BillsScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, editingExpenseId ? 'Could not update cost.' : 'Could not add expense.'))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -375,10 +382,12 @@ export default function BillsScreen() {
   }
 
   const savePayable = async () => {
+    if (savingRef.current) return
     if (!payForm.name.trim() || toMoney(payForm.monthly_amount) <= 0) {
       setError('Name and monthly amount required.')
       return
     }
+    savingRef.current = true
     setSaving(true)
     try {
       const monthly = toMoney(payForm.monthly_amount)
@@ -404,6 +413,7 @@ export default function BillsScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, editingPayableId ? 'Could not update loan.' : 'Could not add loan.'))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -487,10 +497,12 @@ export default function BillsScreen() {
   }
 
   const saveReceivable = async () => {
+    if (savingRef.current) return
     if (!recForm.linked_project || toMoney(recForm.monthly_amount) <= 0) {
       setError('Pick a project and monthly amount.')
       return
     }
+    savingRef.current = true
     setSaving(true)
     try {
       const monthly = toMoney(recForm.monthly_amount)
@@ -515,6 +527,7 @@ export default function BillsScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not save installment plan.'))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }

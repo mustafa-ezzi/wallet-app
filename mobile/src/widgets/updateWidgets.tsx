@@ -32,10 +32,14 @@ function updatedClockLabel(): string {
   return `${hour12}:${m}${ap}`
 }
 
+function bankCashAccounts<T extends { type?: string }>(accounts: T[]): T[] {
+  return accounts.filter((a) => a.type === 'bank' || a.type === 'cash')
+}
+
 export async function loadBalanceWidgetData(): Promise<BalanceWidgetData> {
   try {
     const store = await getOfflineStore()
-    const accounts = await store.listAccounts()
+    const accounts = bankCashAccounts(await store.listAccounts())
     const total = accounts.reduce((s, a) => s + (Number(a.currentBalance) || 0), 0)
     return {
       balanceLabel: fmtBalance(total),
@@ -94,7 +98,7 @@ export async function loadMonthFlowWidgetData(): Promise<MonthFlowWidgetData> {
 export async function loadWalletsWidgetData(): Promise<WalletsWidgetData> {
   try {
     const store = await getOfflineStore()
-    const accounts = await store.listAccounts()
+    const accounts = bankCashAccounts(await store.listAccounts())
     const total = accounts.reduce((s, a) => s + (Number(a.currentBalance) || 0), 0)
     // Load enough rows for tall widgets; UI slices by height.
     const rows = [...accounts]
@@ -113,7 +117,8 @@ export async function loadWalletsWidgetData(): Promise<WalletsWidgetData> {
 export async function loadQuickGlanceWidgetData(): Promise<QuickGlanceWidgetData> {
   try {
     const store = await getOfflineStore()
-    const [accounts, txs] = await Promise.all([store.listAccounts(), store.listTransactions()])
+    const [allAccounts, txs] = await Promise.all([store.listAccounts(), store.listTransactions()])
+    const accounts = bankCashAccounts(allAccounts)
     const total = accounts.reduce((s, a) => s + (Number(a.currentBalance) || 0), 0)
     const prefix = todayMonthPrefix()
     const monthTx = txs.filter((t) => t.date.startsWith(prefix)).length

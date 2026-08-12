@@ -153,15 +153,16 @@ export default function HomeScreen() {
   const balanceNeg = toMoney(data?.total_balance) < 0
   const accounts = data?.accounts ?? []
 
-  const deleteExpense = (tx: Transaction) => {
-    if (tx.type !== 'expense' || tx.category === 'Bank Transfer') return
+  const deleteTransaction = (tx: Transaction) => {
+    if (tx.category === 'Bank Transfer') return
     if (!online) {
-      Alert.alert('Offline', 'Connect to the internet to delete an expense.')
+      Alert.alert('Offline', 'Connect to the internet to delete a transaction.')
       return
     }
+    const income = tx.type === 'income'
     Alert.alert(
-      'Delete expense?',
-      `Remove “${tx.category || 'Expense'}” of ${money.fmt(tx.amount)}? This cannot be undone.`,
+      income ? 'Delete income?' : 'Delete expense?',
+      `Remove “${tx.category || (income ? 'Income' : 'Expense')}” of ${money.fmt(tx.amount)}? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -174,7 +175,7 @@ export default function HomeScreen() {
                 bumpRefresh()
                 await load(true)
               } catch (err) {
-                Alert.alert('Delete failed', apiErrorMessage(err, 'Could not delete expense.'))
+                Alert.alert('Delete failed', apiErrorMessage(err, 'Could not delete transaction.'))
               }
             })()
           },
@@ -337,7 +338,7 @@ export default function HomeScreen() {
             ) : (
               txs.map((tx, i) => {
                 const income = tx.type === 'income'
-                const canDelete = !income && tx.category !== 'Bank Transfer'
+                const canDelete = tx.category !== 'Bank Transfer'
                 const meta = getCategoryMeta(tx.category)
                 const fxSub = formatForeignSubtitle(tx.original_amount, tx.original_currency, tx.fx_rate)
                 return (
@@ -370,9 +371,9 @@ export default function HomeScreen() {
                       </Text>
                       {canDelete ? (
                         <Pressable
-                          onPress={() => deleteExpense(tx)}
+                          onPress={() => deleteTransaction(tx)}
                           hitSlop={10}
-                          accessibilityLabel="Delete expense"
+                          accessibilityLabel={income ? 'Delete income' : 'Delete expense'}
                           style={styles.txDelete}
                         >
                           <FontAwesome name="trash-o" size={15} color={colors.danger} />

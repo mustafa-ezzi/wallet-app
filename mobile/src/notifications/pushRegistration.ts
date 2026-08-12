@@ -100,7 +100,7 @@ export type RegisterDeviceResult = {
 
 /**
  * Fetch Expo push token and POST to backend /api/devices/.
- * Wakes Railway first and relies on client retries for cold starts.
+ * Wake Railway once, then retry the register POST a few times (interceptor also retries).
  */
 export async function registerDeviceToken(): Promise<string | null> {
   const result = await registerDeviceTokenDetailed()
@@ -117,20 +117,42 @@ export async function registerDeviceTokenDetailed(): Promise<RegisterDeviceResul
     }
   }
   lastToken = token
-  try {
-    await wakeServer(true)
-    await api.post('/devices/', {
-      token,
-      platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown',
-    })
-    return { token, ok: true }
-  } catch (err) {
-    console.warn('[CashTrail] device register failed', err)
-    return {
-      token: null,
-      ok: false,
-      error: apiErrorMessage(err, 'Could not link this device to the server.'),
+
+  // One hard wake (cold start), then a few POSTs — avoid nested wake storms that hang for minutes.
+  const woke = await wakeServer(true)
+  if (!woke) {
+    console.warn('[CashTrail] health wake failed before device register; still trying POST')
+  }
+
+  let lastErr: unknown
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await api.post(
+        '/devices/',
+        {
+          token,
+          platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown',
+        },
+        { timeout: 60000 },
+      )
+      return { token, ok: true }
+    } catch (err) {
+      lastErr = err
+      console.warn('[CashTrail] device register attempt failed', attempt + 1, err)
+      if (attempt < 2) {
+        await wakeServer(true)
+        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
+      }
     }
+  }
+
+  return {
+    token: null,
+    ok: false,
+    error: apiErrorMessage(
+      lastErr,
+      'Could not link this device. Use Connection → Test server connection, then retry.',
+    ),
   }
 }
 

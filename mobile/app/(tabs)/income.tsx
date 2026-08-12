@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -52,6 +52,7 @@ export default function IncomeScreen() {
   const [createOpen, setCreateOpen] = useState(false)
   const [receiveOpen, setReceiveOpen] = useState<Project | null>(null)
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
   const [form, setForm] = useState({
     name: '',
     income_type: 'recurring_monthly' as Project['income_type'],
@@ -93,10 +94,12 @@ export default function IncomeScreen() {
   )
 
   const create = async () => {
+    if (busyRef.current) return
     if (!form.name.trim() || toMoney(form.amount) <= 0) {
       setError('Name and amount are required.')
       return
     }
+    busyRef.current = true
     setBusy(true)
     setError('')
     try {
@@ -127,11 +130,13 @@ export default function IncomeScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create income source.'))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
 
   const recordReceived = async () => {
+    if (busyRef.current) return
     if (!receiveOpen) return
     const amount = toMoney(receiveAmount || receiveOpen.installment_amount || receiveOpen.amount)
     const account = receiveOpen.default_account || accounts[0]?.id
@@ -139,6 +144,7 @@ export default function IncomeScreen() {
       setError('Pick a wallet and amount.')
       return
     }
+    busyRef.current = true
     setBusy(true)
     try {
       await transactionsApi.create({
@@ -158,6 +164,7 @@ export default function IncomeScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not record receipt.'))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -49,6 +49,7 @@ export function InvitePersonSheet({
   const [joinCode, setJoinCode] = useState('')
   const [myCode, setMyCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const loadingRef = useRef(false)
   const [codeBusy, setCodeBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -76,11 +77,13 @@ export function InvitePersonSheet({
   }, [visible, loadCode, convertMode, defaultDisplayName])
 
   const submitLocal = async () => {
+    if (loadingRef.current) return
     const n = localName.trim()
     if (!n) {
       setError('Enter a person name.')
       return
     }
+    loadingRef.current = true
     setLoading(true)
     setError('')
     try {
@@ -90,16 +93,19 @@ export function InvitePersonSheet({
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create person.'))
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
   }
 
   const submitInvite = async () => {
+    if (loadingRef.current) return
     const q = query.trim()
     if (!q) {
       setError('Enter their email or username.')
       return
     }
+    loadingRef.current = true
     setLoading(true)
     setError('')
     try {
@@ -113,16 +119,19 @@ export function InvitePersonSheet({
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not send link request.'))
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
   }
 
   const submitJoin = async () => {
+    if (loadingRef.current) return
     const code = joinCode.trim().toUpperCase()
     if (!code) {
       setError('Enter a people link code.')
       return
     }
+    loadingRef.current = true
     setLoading(true)
     setError('')
     try {
@@ -136,6 +145,7 @@ export function InvitePersonSheet({
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not request link with that code.'))
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
   }

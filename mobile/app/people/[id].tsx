@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ComponentProps } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -128,6 +128,7 @@ export default function PersonHistoryScreen() {
   const [date, setDate] = useState(todayISO())
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
   const [formError, setFormError] = useState('')
   const [convertOpen, setConvertOpen] = useState(false)
   const [unlinkBusy, setUnlinkBusy] = useState(false)
@@ -231,20 +232,24 @@ export default function PersonHistoryScreen() {
   }
 
   const submitAction = async () => {
-    if (!sheetAction) return
+    if (!sheetAction || savingRef.current) return
+    savingRef.current = true
     setFormError('')
     const value = parseFloat(amount.replace(/,/g, ''))
     if (!Number.isFinite(value) || value <= 0) {
       setFormError('Enter a valid amount.')
+      savingRef.current = false
       return
     }
     if (!walletId) {
       setFormError('Pick a wallet.')
+      savingRef.current = false
       return
     }
     const pkrAmount = travelOn ? toPkr(value) : value
     if (travelOn && (!(travelRate > 0) || !(pkrAmount > 0))) {
       setFormError('Travel rate missing. Open Travel Mode and set a rate.')
+      savingRef.current = false
       return
     }
 
@@ -286,6 +291,7 @@ export default function PersonHistoryScreen() {
     } catch (err) {
       setFormError(apiErrorMessage(err, 'Could not save.'))
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }

@@ -389,7 +389,7 @@ export default function SettingsScreen() {
             onPress={() => {
               void (async () => {
                 setMarketingBusy(true)
-                setPushSyncMsg('')
+                setPushSyncMsg('Waking server & linking device…')
                 try {
                   const ok = await requestReminderPermission()
                   if (!ok) {
@@ -449,6 +449,19 @@ export default function SettingsScreen() {
             }}
           >
             <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Refresh premium & ads config</Text>
+          </Pressable>
+        </View>
+
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Family</Text>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+            Shared household ledgers and family expenses.
+          </Text>
+          <Pressable
+            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, marginTop: spacing.md }]}
+            onPress={() => router.push('/(tabs)/household')}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Open Family</Text>
           </Pressable>
         </View>
 

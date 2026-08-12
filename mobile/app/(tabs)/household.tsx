@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -76,6 +76,7 @@ export default function HouseholdScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const busyRef = useRef(false)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
@@ -234,11 +235,12 @@ export default function HouseholdScreen() {
   }
 
   const createHousehold = async () => {
-    if (!requireOnline()) return
+    if (!requireOnline() || busyRef.current) return
     if (!hhName.trim()) {
       setError('Name is required.')
       return
     }
+    busyRef.current = true
     setBusy(true)
     setError('')
     try {
@@ -250,6 +252,7 @@ export default function HouseholdScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create household.'))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
@@ -379,11 +382,12 @@ export default function HouseholdScreen() {
   }
 
   const createLedger = async () => {
-    if (!requireOnline() || !selected) return
+    if (!requireOnline() || !selected || busyRef.current) return
     if (!ledgerForm.name.trim()) {
       setError('Ledger name is required.')
       return
     }
+    busyRef.current = true
     setBusy(true)
     try {
       await householdsApi.createLedger(selected.id, ledgerForm)
@@ -393,12 +397,13 @@ export default function HouseholdScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create ledger.'))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
 
   const addExpense = async () => {
-    if (!requireOnline() || !activeLedger) return
+    if (!requireOnline() || !activeLedger || busyRef.current) return
     const amount = toMoney(expForm.amount)
     if (amount <= 0) {
       setError('Enter a valid amount.')
@@ -413,6 +418,7 @@ export default function HouseholdScreen() {
       setError(`Only ${potBalance} available in the pot.`)
       return
     }
+    busyRef.current = true
     setBusy(true)
     setError('')
     try {
@@ -440,17 +446,19 @@ export default function HouseholdScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not add expense.'))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
 
   const addContribution = async () => {
-    if (!requireOnline() || !activeLedger) return
+    if (!requireOnline() || !activeLedger || busyRef.current) return
     const amount = toMoney(contribForm.amount)
     if (amount <= 0) {
       setError('Enter a valid amount.')
       return
     }
+    busyRef.current = true
     setBusy(true)
     try {
       const payload: Record<string, unknown> = {
@@ -466,6 +474,7 @@ export default function HouseholdScreen() {
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not add contribution.'))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
