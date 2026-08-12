@@ -1,6 +1,6 @@
 # Travel Mode + People — Development Phases
 
-**Status:** Phase A–D + **G** implemented (backend Linked People APIs). Phase E–F (web) and H–J (linked UI) not finished.  
+**Status:** Phase A–D + **G–H** implemented (Linked People backend + mobile UI). Phase E–F (web Travel/People) and I–J (linked web / polish) not finished.  
 **Home currency:** PKR (from the user profile). All wallet balances, reports, and totals stay in PKR.  
 **Reference:** Hysab Kytab Travel Mode + person History screens.
 
@@ -401,9 +401,9 @@ Phase F can add: daily auto-refresh of the trip rate while the trip is active (s
 - Tests: `api.tests_linked_people` (9) + existing travel/people (12) — all OK.  
 - **Local people unchanged.**  
 - **Deploy:** `python manage.py migrate` on Railway (`0021`).  
-- **UI:** Phase H (mobile) / I (web).
+- **UI:** Phase H (mobile) ✅ / I (web).
 
-### Phase H — Linked People mobile UI
+### Phase H — Linked People mobile UI ✅
 
 - “+ New person”: **Local** | **Invite CashTrail user** (email/username field + optional name + Send request).  
 - Share-my-code / join-with-code on the same sheet.  
@@ -494,4 +494,4 @@ Web (`E`) can start after `C` if needed. Linked web (`I`) waits on `H`.
 
 ---
 
-*Next step when ready: Phase H (Linked People mobile UI), or finish Phase E (web parity for local Travel/People).*
+*Next step when ready: Phase I (Linked People web), or finish Phase E (web parity for local Travel/People).*

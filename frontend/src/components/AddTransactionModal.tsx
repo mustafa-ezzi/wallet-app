@@ -31,6 +31,14 @@ interface OpenLedger {
   household_name: string
 }
 
+interface WalletAccount {
+  id: number
+  name: string
+  type?: string
+  opening_balance?: number | string
+  current_balance?: number | string
+}
+
 export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const navigate = useNavigate()
   const { queueTransaction, online, getCachedAccounts } = useOffline()
@@ -51,13 +59,13 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const [fromAccountId, setFromAccountId] = useState('')
   const [toAccountId, setToAccountId] = useState('')
 
-  const [accounts, setAccounts] = useState<any[]>([])
+  const [accounts, setAccounts] = useState<WalletAccount[]>([])
   const [openLedgers, setOpenLedgers] = useState<OpenLedger[]>([])
 
   useEffect(() => {
     accountsApi.list()
       .then(r => {
-        const list = asList(r.data)
+        const list = asList<WalletAccount>(r.data)
         setAccounts(list)
         if (list[0]) {
           setAccountId(String(list[0].id))
@@ -67,7 +75,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
       })
       .catch(async () => {
         const cached = await getCachedAccounts()
-        const list = cached.map(a => ({
+        const list: WalletAccount[] = cached.map(a => ({
           id: a.serverId,
           name: a.name,
           type: a.type,
@@ -83,7 +91,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
       })
     if (online) {
       householdsApi.openLedgers()
-        .then(r => setOpenLedgers(asList(r.data)))
+        .then(r => setOpenLedgers(asList<OpenLedger>(r.data)))
         .catch(() => setOpenLedgers([]))
     } else {
       setOpenLedgers([])

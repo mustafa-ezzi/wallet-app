@@ -13,8 +13,7 @@ import {
   View,
 } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
-import { useFocusEffect } from '@react-navigation/native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   accountsApi,
@@ -22,7 +21,14 @@ import {
   asList,
   peopleApi,
 } from '@/src/api/client'
-import type { Account, PeopleActionKind, PeopleHistory, Transaction } from '@/src/api/types'
+import type {
+  Account,
+  PeopleActionKind,
+  PeopleHistory,
+  PeopleLink,
+  PeopleProposal,
+  Transaction,
+} from '@/src/api/types'
 import { DateField } from '@/src/components/SelectFields'
 import { ErrorBanner, Field, PrimaryButton } from '@/src/components/ui'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
@@ -106,12 +112,17 @@ export default function PersonHistoryScreen() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [history, setHistory] = useState<PeopleHistory | null>(null)
   const [wallets, setWallets] = useState<Account[]>([])
+  const [link, setLink] = useState<PeopleLink | null>(null)
+  const [incomingProposals, setIncomingProposals] = useState<PeopleProposal[]>([])
+  const [outgoingProposals, setOutgoingProposals] = useState<PeopleProposal[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [proposalBusyId, setProposalBusyId] = useState<number | null>(null)
 
   const [sheetAction, setSheetAction] = useState<PeopleActionKind | null>(null)
   const [walletId, setWalletId] = useState('')
+  const [acceptWalletId, setAcceptWalletId] = useState('')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(todayISO())
   const [notes, setNotes] = useState('')
@@ -122,6 +133,7 @@ export default function PersonHistoryScreen() {
   const monthLabel = `${MONTH_NAMES[month - 1]} ${year}`
   const pendingNet = toMoney(history?.pending_net)
   const settled = Math.abs(pendingNet) < 0.01
+  const isLinked = Boolean(link)
 
   const load = useCallback(
     async (soft = false) => {
@@ -144,6 +156,29 @@ export default function PersonHistoryScreen() {
           if (prev && list.some((w) => String(w.id) === prev)) return prev
           return list[0] ? String(list[0].id) : ''
         })
+        setAcceptWalletId((prev) => {
+          if (prev && list.some((w) => String(w.id) === prev)) return prev
+          return list[0] ? String(list[0].id) : ''
+        })
+
+        try {
+          const [linkRes, propRes] = await Promise.all([
+            peopleApi.links(),
+            peopleApi.pendingProposals(),
+          ])
+          const allLinks = asList<PeopleLink>(linkRes.data)
+          const mine = allLinks.find((l) => l.my_person?.id === personId) || null
+          setLink(mine)
+          const linkId = mine?.id
+          const incoming = (propRes.data?.incoming || []) as PeopleProposal[]
+          const outgoing = (propRes.data?.outgoing || []) as PeopleProposal[]
+          setIncomingProposals(linkId ? incoming.filter((p) => p.link === linkId) : [])
+          setOutgoingProposals(linkId ? outgoing.filter((p) => p.link === linkId) : [])
+        } catch {
+          setLink(null)
+          setIncomingProposals([])
+          setOutgoingProposals([])
+        }
       } catch (err) {
         setError(apiErrorMessage(err, 'Could not load person history.'))
         setHistory(null)
@@ -212,22 +247,36 @@ export default function PersonHistoryScreen() {
 
     setSaving(true)
     try {
-      await peopleApi.action({
-        action: sheetAction,
-        wallet_id: Number(walletId),
-        person_id: personId,
-        amount: pkrAmount,
-        date,
-        notes: notes.trim(),
-        ...(travelOn
-          ? {
-              original_amount: value,
-              original_currency: travelCurrency,
-              fx_rate: travelRate,
-              fx_source: 'manual',
-            }
-          : {}),
-      })
+      const fx = travelOn
+        ? {
+            original_amount: value,
+            original_currency: travelCurrency,
+            fx_rate: travelRate,
+            fx_source: 'manual',
+          }
+        : {}
+
+      if (link) {
+        await peopleApi.propose({
+          link_id: link.id,
+          action: sheetAction,
+          wallet_id: Number(walletId),
+          amount: pkrAmount,
+          date,
+          notes: notes.trim(),
+          ...fx,
+        })
+      } else {
+        await peopleApi.action({
+          action: sheetAction,
+          wallet_id: Number(walletId),
+          person_id: personId,
+          amount: pkrAmount,
+          date,
+          notes: notes.trim(),
+          ...fx,
+        })
+      }
       setSheetAction(null)
       bumpRefresh()
       await load(true)
@@ -235,6 +284,28 @@ export default function PersonHistoryScreen() {
       setFormError(apiErrorMessage(err, 'Could not save.'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const respondProposal = async (id: number, action: 'accept' | 'decline') => {
+    setProposalBusyId(id)
+    setError('')
+    try {
+      if (action === 'accept') {
+        if (!acceptWalletId) {
+          setError('Pick a wallet to accept into.')
+          return
+        }
+        await peopleApi.acceptProposal(id, { wallet_id: Number(acceptWalletId) })
+      } else {
+        await peopleApi.declineProposal(id)
+      }
+      bumpRefresh()
+      await load(true)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update proposal.'))
+    } finally {
+      setProposalBusyId(null)
     }
   }
 
@@ -256,7 +327,7 @@ export default function PersonHistoryScreen() {
           <Text style={styles.title} numberOfLines={1}>
             {personName}
           </Text>
-          <Text style={styles.headerSub}>History</Text>
+          <Text style={styles.headerSub}>{isLinked ? 'Linked · History' : 'History'}</Text>
         </View>
         <View style={{ width: 34 }} />
       </View>
@@ -331,7 +402,87 @@ export default function PersonHistoryScreen() {
               </View>
             </View>
 
+            {incomingProposals.length > 0 ? (
+              <View style={styles.proposalBox}>
+                <Text style={styles.sectionTitle}>Waiting for you</Text>
+                <Text style={styles.fieldLabel}>Wallet to post into</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
+                  {wallets.map((w) => {
+                    const active = acceptWalletId === String(w.id)
+                    return (
+                      <Pressable
+                        key={w.id}
+                        onPress={() => setAcceptWalletId(String(w.id))}
+                        style={[
+                          styles.walletChip,
+                          {
+                            backgroundColor: active ? colors.primary : colors.surfaceMuted,
+                            borderColor: active ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: active ? '#fff' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                          {w.name}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                </ScrollView>
+                {incomingProposals.map((p) => {
+                  const meta = actionMeta(p.action)
+                  return (
+                    <View key={p.id} style={styles.proposalRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.txTitle}>{meta.label} · {fmtBalance(p.amount)}</Text>
+                        <Text style={styles.txSub}>{p.date}{p.notes ? ` · ${p.notes}` : ''}</Text>
+                      </View>
+                      <Pressable
+                        style={[styles.smallBtn, { borderColor: colors.border }]}
+                        onPress={() => void respondProposal(p.id, 'decline')}
+                        disabled={proposalBusyId === p.id}
+                      >
+                        <Text style={{ fontWeight: '700', fontSize: 12, color: colors.textSecondary }}>Decline</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.smallBtn, { backgroundColor: colors.primary }]}
+                        onPress={() => void respondProposal(p.id, 'accept')}
+                        disabled={proposalBusyId === p.id}
+                      >
+                        {proposalBusyId === p.id ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={{ fontWeight: '800', fontSize: 12, color: '#fff' }}>Accept</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  )
+                })}
+              </View>
+            ) : null}
+
+            {outgoingProposals.length > 0 ? (
+              <View style={[styles.proposalBox, { marginBottom: spacing.md }]}>
+                <Text style={styles.sectionTitle}>Waiting for {link?.other_user?.name || personName}</Text>
+                {outgoingProposals.map((p) => {
+                  const meta = actionMeta(p.action)
+                  return (
+                    <View key={p.id} style={styles.proposalRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.txTitle}>{meta.label} · {fmtBalance(p.amount)}</Text>
+                        <Text style={styles.txSub}>Posted on your side · awaiting their accept</Text>
+                      </View>
+                    </View>
+                  )
+                })}
+              </View>
+            ) : null}
+
             <Text style={styles.sectionTitle}>Actions</Text>
+            {isLinked ? (
+              <Text style={[styles.hintLine, { color: colors.textMuted }]}>
+                Linked: they’ll get a notification to accept before their books update.
+              </Text>
+            ) : null}
             <View style={styles.actionGrid}>
               {ACTIONS.map((a) => (
                 <Pressable
@@ -454,8 +605,20 @@ export default function PersonHistoryScreen() {
               autoCapitalize="sentences"
             />
 
+            {isLinked ? (
+              <Text style={[styles.hintLine, { color: colors.textMuted, marginBottom: spacing.md }]}>
+                Posts on your books now. {link?.other_user?.name || personName} gets a request to accept.
+              </Text>
+            ) : null}
+
             <PrimaryButton
-              title={sheetMeta ? `Record ${sheetMeta.label}` : 'Save'}
+              title={
+                sheetMeta
+                  ? isLinked
+                    ? `Send ${sheetMeta.label} request`
+                    : `Record ${sheetMeta.label}`
+                  : 'Save'
+              }
               onPress={() => void submitAction()}
               loading={saving}
               color={sheetMeta?.color}
@@ -589,6 +752,28 @@ function makeStyles(colors: ColorTokens) {
     },
     actionLabel: { fontWeight: '800', color: colors.text, fontSize: typography.body },
     actionHint: { color: colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 2 },
+    hintLine: { fontSize: 12, fontWeight: '600', marginBottom: spacing.sm, lineHeight: 17 },
+    proposalBox: { marginBottom: spacing.md },
+    proposalRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    smallBtn: {
+      borderRadius: radii.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      minWidth: 64,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     empty: {
       backgroundColor: colors.surface,
       borderRadius: radii.md,

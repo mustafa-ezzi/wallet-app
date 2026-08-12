@@ -109,6 +109,8 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
           family: '/(tabs)/household',
           household: '/(tabs)/household',
           support: '/support',
+          people: '/(tabs)/wallets',
+          'people-invites': '/(tabs)/wallets',
         }
         const path = map[route]
         if (path) {
@@ -116,7 +118,23 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
             router.push(`/support?threadId=${data.thread_id}` as never)
             return
           }
+          // Linked people: open person history when person_id is present
+          const personId = (data as { person_id?: number })?.person_id
+          if ((route === 'people' || data?.type === 'people') && personId) {
+            router.push({ pathname: '/people/[id]', params: { id: String(personId) } } as never)
+            return
+          }
           router.push(path as never)
+          return
+        }
+
+        if (data?.type === 'people') {
+          const personId = (data as { person_id?: number })?.person_id
+          if (personId) {
+            router.push({ pathname: '/people/[id]', params: { id: String(personId) } } as never)
+          } else {
+            router.push('/(tabs)/wallets' as never)
+          }
           return
         }
       }

@@ -14,12 +14,13 @@ import {
 import { useRouter } from 'expo-router'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { accountsApi, apiErrorMessage, asList } from '@/src/api/client'
-import type { Account } from '@/src/api/types'
+import { accountsApi, apiErrorMessage, asList, peopleApi } from '@/src/api/client'
+import type { Account, PeopleInvitation, PeopleLink } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
 import { BouncyPressable, Reveal } from '@/src/components/motion'
 import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
+import { InvitePersonSheet } from '@/src/people/InvitePersonSheet'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
@@ -46,6 +47,11 @@ export default function WalletsScreen() {
   const [opening, setOpening] = useState('0')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [incomingInvites, setIncomingInvites] = useState<PeopleInvitation[]>([])
+  const [outgoingInvites, setOutgoingInvites] = useState<PeopleInvitation[]>([])
+  const [links, setLinks] = useState<PeopleLink[]>([])
+  const [inviteBusyId, setInviteBusyId] = useState<number | null>(null)
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
@@ -53,6 +59,19 @@ export default function WalletsScreen() {
     try {
       const { data } = await accountsApi.list()
       setAccounts(asList<Account>(data))
+      try {
+        const [invRes, linkRes] = await Promise.all([
+          peopleApi.pendingInvites(),
+          peopleApi.links(),
+        ])
+        setIncomingInvites(invRes.data?.incoming || [])
+        setOutgoingInvites(invRes.data?.outgoing || [])
+        setLinks(asList<PeopleLink>(linkRes.data))
+      } catch {
+        setIncomingInvites([])
+        setOutgoingInvites([])
+        setLinks([])
+      }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not load wallets.'))
     } finally {
@@ -64,6 +83,28 @@ export default function WalletsScreen() {
   useEffect(() => {
     void load()
   }, [load, refreshKey])
+
+  const linkedPersonIds = useMemo(() => {
+    const ids = new Set<number>()
+    for (const link of links) {
+      if (link.my_person?.id) ids.add(link.my_person.id)
+    }
+    return ids
+  }, [links])
+
+  const respondInvite = async (id: number, action: 'accept' | 'decline') => {
+    setInviteBusyId(id)
+    try {
+      if (action === 'accept') await peopleApi.acceptInvite(id)
+      else await peopleApi.declineInvite(id)
+      bumpRefresh()
+      await load(true)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update invitation.'))
+    } finally {
+      setInviteBusyId(null)
+    }
+  }
 
   const create = async () => {
     setFormError('')
@@ -154,6 +195,7 @@ export default function WalletsScreen() {
     const bal = toMoney(a.current_balance)
     const status =
       Math.abs(bal) < 0.01 ? 'Settled' : bal > 0 ? 'They owe you' : 'You owe them'
+    const isLinked = linkedPersonIds.has(a.id)
     return (
       <Reveal index={index} key={a.id}>
         <BouncyPressable
@@ -167,7 +209,14 @@ export default function WalletsScreen() {
               <FontAwesome name="user" size={16} color="#8b5cf6" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardName}>{a.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.cardName}>{a.name}</Text>
+                {isLinked ? (
+                  <View style={styles.linkedBadge}>
+                    <Text style={styles.linkedBadgeText}>Linked</Text>
+                  </View>
+                ) : null}
+              </View>
               <Text style={styles.cardType}>{status}</Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -180,7 +229,7 @@ export default function WalletsScreen() {
               >
                 {money.fmtBalance(bal)}
               </Text>
-              <Text style={styles.cardType}>Person</Text>
+              <Text style={styles.cardType}>{isLinked ? 'CashTrail user' : 'Local'}</Text>
             </View>
           </View>
         </BouncyPressable>
@@ -257,11 +306,63 @@ export default function WalletsScreen() {
             <View style={styles.sectionHead}>
               <FontAwesome name="users" size={13} color={colors.text} />
               <Text style={styles.sectionTitle}>People</Text>
+              <BouncyPressable style={styles.peopleAddBtn} onPress={() => setInviteOpen(true)}>
+                <Text style={styles.peopleAddText}>+ Add</Text>
+              </BouncyPressable>
             </View>
-            {people.length === 0 ? (
+
+            {incomingInvites.length > 0 ? (
+              <View style={styles.inviteBox}>
+                <Text style={styles.inviteTitle}>Link requests</Text>
+                {incomingInvites.map((inv) => (
+                  <View key={inv.id} style={styles.inviteRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardName}>{inv.from_user_name || inv.from_user_email}</Text>
+                      <Text style={styles.cardType}>Wants to link for lend/borrow</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <BouncyPressable
+                        style={[styles.inviteBtn, styles.inviteDecline]}
+                        onPress={() => void respondInvite(inv.id, 'decline')}
+                        disabled={inviteBusyId === inv.id}
+                      >
+                        <Text style={styles.inviteDeclineText}>Decline</Text>
+                      </BouncyPressable>
+                      <BouncyPressable
+                        style={[styles.inviteBtn, styles.inviteAccept]}
+                        onPress={() => void respondInvite(inv.id, 'accept')}
+                        disabled={inviteBusyId === inv.id}
+                      >
+                        {inviteBusyId === inv.id ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={styles.inviteAcceptText}>Accept</Text>
+                        )}
+                      </BouncyPressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {outgoingInvites.length > 0 ? (
+              <View style={[styles.inviteBox, { marginTop: spacing.sm }]}>
+                <Text style={styles.inviteTitle}>Waiting for them</Text>
+                {outgoingInvites.map((inv) => (
+                  <View key={inv.id} style={styles.inviteRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardName}>{inv.display_name || inv.to_user_name || inv.to_user_email}</Text>
+                      <Text style={styles.cardType}>Link request pending</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {people.length === 0 && incomingInvites.length === 0 ? (
               <View style={styles.emptyPeople}>
                 <Text style={styles.emptyBody}>
-                  No people yet. Use People → Lend / Borrow on Add Transaction to create one.
+                  No people yet. Tap + Add for a local person or invite a CashTrail user.
                 </Text>
               </View>
             ) : (
@@ -270,6 +371,15 @@ export default function WalletsScreen() {
           </>
         )}
       </ScrollView>
+
+      <InvitePersonSheet
+        visible={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onDone={() => {
+          bumpRefresh()
+          void load(true)
+        }}
+      />
 
       <Modal visible={createOpen} animationType="fade" transparent onRequestClose={() => setCreateOpen(false)}>
         <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
@@ -344,7 +454,47 @@ function makeStyles(colors: ColorTokens) {
       marginBottom: spacing.sm,
       marginTop: spacing.xs,
     },
-    sectionTitle: { fontWeight: '800', color: colors.text, fontSize: typography.body },
+    sectionTitle: { fontWeight: '800', color: colors.text, fontSize: typography.body, flex: 1 },
+    peopleAddBtn: {
+      backgroundColor: '#8b5cf6',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: radii.sm,
+    },
+    peopleAddText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+    linkedBadge: {
+      backgroundColor: '#8b5cf622',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+    },
+    linkedBadgeText: { color: '#8b5cf6', fontWeight: '800', fontSize: 10 },
+    inviteBox: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    inviteTitle: { fontWeight: '800', color: colors.text, marginBottom: spacing.sm, fontSize: 13 },
+    inviteRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: spacing.sm,
+    },
+    inviteBtn: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: radii.sm,
+      minWidth: 72,
+      alignItems: 'center',
+    },
+    inviteAccept: { backgroundColor: colors.primary },
+    inviteAcceptText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+    inviteDecline: { borderWidth: 1, borderColor: colors.border },
+    inviteDeclineText: { color: colors.textSecondary, fontWeight: '700', fontSize: 12 },
     card: {
       backgroundColor: colors.surface,
       borderRadius: radii.md,

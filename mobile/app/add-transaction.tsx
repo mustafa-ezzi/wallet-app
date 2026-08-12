@@ -37,6 +37,7 @@ import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors
 import { fmtBalance, todayISO } from '@/src/utils/format'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { formatRateLine, foreignToPkr } from '@/src/travel/currencies'
+import { InvitePersonSheet } from '@/src/people/InvitePersonSheet'
 
 type Kind = 'expense' | 'income' | 'transfer' | 'people'
 type PeopleAction = 'lend' | 'borrow'
@@ -80,6 +81,7 @@ export default function AddTransactionScreen() {
   const [peopleAction, setPeopleAction] = useState<PeopleAction>('lend')
   const [newPersonName, setNewPersonName] = useState('')
   const [creatingPerson, setCreatingPerson] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(todayISO())
   const [category, setCategory] = useState('')
@@ -159,7 +161,7 @@ export default function AddTransactionScreen() {
   const createPerson = async () => {
     const n = newPersonName.trim()
     if (!n) {
-      setError('Enter a person name.')
+      setInviteOpen(true)
       return
     }
     if (!online) {
@@ -586,7 +588,7 @@ export default function AddTransactionScreen() {
                 <TextInput
                   value={newPersonName}
                   onChangeText={setNewPersonName}
-                  placeholder="+ New person"
+                  placeholder="Local name, or tap Invite"
                   placeholderTextColor={colors.textMuted}
                   autoCapitalize="words"
                   style={[styles.newPersonInput, { color: colors.text }]}
@@ -602,9 +604,15 @@ export default function AddTransactionScreen() {
                     <Text style={styles.newPersonBtnText}>Add</Text>
                   )}
                 </Pressable>
+                <Pressable
+                  onPress={() => setInviteOpen(true)}
+                  style={[styles.newPersonBtn, { backgroundColor: '#8b5cf6' }]}
+                >
+                  <Text style={styles.newPersonBtnText}>Invite</Text>
+                </Pressable>
               </View>
               <Text style={styles.hint}>
-                Pay & Receive live on the person History screen. Positive balance = they owe you.
+                Local = name only. Invite = CashTrail user (email/username or code). Pay & Receive on History.
               </Text>
             </>
           ) : (
@@ -762,6 +770,15 @@ export default function AddTransactionScreen() {
         initial={amount}
         onApply={(v) => setAmount(v)}
         onClose={() => setCalcOpen(false)}
+      />
+
+      <InvitePersonSheet
+        visible={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onDone={async (result) => {
+          await loadPeople()
+          if (result.kind === 'local') setPersonId(String(result.personId))
+        }}
       />
     </View>
   )
