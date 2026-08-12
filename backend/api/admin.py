@@ -23,6 +23,10 @@ from .models import (
     HouseholdMembership,
     NotificationPreference,
     PayableInstallment,
+    PeopleInvitation,
+    PeopleLink,
+    PeopleNotification,
+    PeopleProposal,
     Project,
     PromoCode,
     PromoRedemption,
@@ -100,6 +104,31 @@ class TravelModeAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
 class FxRateCacheAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
     list_display = ('base', 'quote', 'rate', 'source', 'fetched_at')
     list_filter = ('base', 'quote')
+
+
+@admin.register(PeopleInvitation)
+class PeopleInvitationAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
+    list_display = ('id', 'from_user', 'to_user', 'status', 'invited_via', 'created_at')
+    list_filter = ('status', 'invited_via')
+    search_fields = ('from_user__email', 'to_user__email', 'query_snapshot')
+
+
+@admin.register(PeopleLink)
+class PeopleLinkAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
+    list_display = ('id', 'user_a', 'user_b', 'status', 'created_at')
+    list_filter = ('status',)
+
+
+@admin.register(PeopleProposal)
+class PeopleProposalAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
+    list_display = ('id', 'action', 'amount', 'proposer', 'counterparty', 'status', 'created_at')
+    list_filter = ('status', 'action')
+
+
+@admin.register(PeopleNotification)
+class PeopleNotificationAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
+    list_display = ('id', 'user', 'kind', 'title', 'read', 'created_at')
+    list_filter = ('kind', 'read')
 
 
 @admin.register(RecurringExpense)

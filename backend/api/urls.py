@@ -13,6 +13,7 @@ from . import phase5_api
 from . import health
 
 from . import travel_people_api
+from . import people_linked_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -40,6 +41,36 @@ urlpatterns = [
     path('forecast/<int:year>/<int:month>/', views.ForecastView.as_view(), name='forecast'),
     path('fx/', travel_people_api.FxQuoteView.as_view(), name='fx-quote'),
     path('travel-mode/', travel_people_api.TravelModeView.as_view(), name='travel-mode'),
+    # Linked People (Phase G)
+    path('people/link-code/', people_linked_api.PeopleLinkCodeView.as_view(), name='people-link-code'),
+    path('people/invitations/', people_linked_api.PeopleInvitationCreateView.as_view(), name='people-invitations-create'),
+    path('people/invitations/pending/', people_linked_api.PeopleInvitationPendingView.as_view(), name='people-invitations-pending'),
+    path('people/invitations/join/', people_linked_api.PeopleJoinByCodeView.as_view(), name='people-invitations-join'),
+    path(
+        'people/invitations/<int:pk>/<str:action_name>/',
+        people_linked_api.PeopleInvitationActionView.as_view(),
+        name='people-invitations-action',
+    ),
+    path('people/links/', people_linked_api.PeopleLinkListView.as_view(), name='people-links'),
+    path('people/links/<int:pk>/unlink/', people_linked_api.PeopleLinkUnlinkView.as_view(), name='people-links-unlink'),
+    path('people/proposals/', people_linked_api.PeopleProposalCreateView.as_view(), name='people-proposals-create'),
+    path('people/proposals/pending/', people_linked_api.PeopleProposalPendingView.as_view(), name='people-proposals-pending'),
+    path(
+        'people/proposals/<int:pk>/<str:action_name>/',
+        people_linked_api.PeopleProposalActionView.as_view(),
+        name='people-proposals-action',
+    ),
+    path('people/notifications/', people_linked_api.PeopleNotificationListView.as_view(), name='people-notifications'),
+    path(
+        'people/notifications/mark_all_read/',
+        people_linked_api.PeopleNotificationMarkReadView.as_view(),
+        name='people-notifications-mark-all',
+    ),
+    path(
+        'people/notifications/<int:pk>/mark_read/',
+        people_linked_api.PeopleNotificationMarkReadView.as_view(),
+        name='people-notifications-mark-one',
+    ),
     path('households/join/preview/', household_api.JoinPreviewView.as_view(), name='household-join-preview'),
     path('households/join/', household_api.JoinAcceptView.as_view(), name='household-join'),
     path('households/invitations/pending/', household_api.PendingInvitationsView.as_view(), name='household-pending'),

@@ -5,6 +5,7 @@ import { OfflineProvider } from './offline'
 import Layout from './components/Layout'
 import AppUpdateGate from './hooks/AppUpdateGate'
 import { ThemeProvider } from './theme/ThemeProvider'
+import { TravelModeProvider } from './travel/TravelModeContext'
 import { capturePageview } from './lib/analytics'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -17,6 +18,8 @@ import Expenses from './pages/Expenses'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
 import HouseholdPage from './pages/Household'
+import TravelModePage from './pages/TravelMode'
+import PersonHistoryPage from './pages/PersonHistory'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -82,6 +85,8 @@ function AppRoutes() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/household" element={<HouseholdPage />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/travel-mode" element={<TravelModePage />} />
+          <Route path="/people/:id" element={<PersonHistoryPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -94,11 +99,13 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <OfflineProvider>
-          <BrowserRouter>
-            <AppUpdateGate>
-              <AppRoutes />
-            </AppUpdateGate>
-          </BrowserRouter>
+          <TravelModeProvider>
+            <BrowserRouter>
+              <AppUpdateGate>
+                <AppRoutes />
+              </AppUpdateGate>
+            </BrowserRouter>
+          </TravelModeProvider>
         </OfflineProvider>
       </AuthProvider>
     </ThemeProvider>

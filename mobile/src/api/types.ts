@@ -28,6 +28,20 @@ export type Transaction = {
   people_action?: string | null
 }
 
+export type PeopleHistory = {
+  person: Account
+  year: number
+  month: number
+  opening_balance: number
+  inflow: number
+  outflow: number
+  closing_balance: number
+  pending_net: number
+  transactions: Transaction[]
+}
+
+export type PeopleActionKind = 'lend' | 'borrow' | 'pay' | 'receive'
+
 export type Dashboard = {
   total_balance: number | string
   accounts: { id: number; name: string; type: string; balance: number | string }[]

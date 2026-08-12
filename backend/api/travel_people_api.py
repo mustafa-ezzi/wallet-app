@@ -103,6 +103,74 @@ PEOPLE_ACTION_LEGS = {
     'receive': ('income', 'expense', 'Money Received', 'Money Received'),
 }
 
+MIRROR_PEOPLE_ACTION = {
+    'lend': 'borrow',
+    'borrow': 'lend',
+    'pay': 'receive',
+    'receive': 'pay',
+}
+
+
+def post_people_double_entry(
+    *,
+    user,
+    action_name: str,
+    wallet: Account,
+    person: Account,
+    amount: Decimal,
+    tx_date=None,
+    notes: str = '',
+    pair_id: str | None = None,
+    client_mutation_id: str | None = None,
+    fx_kwargs: dict | None = None,
+):
+    """
+    Create wallet + person legs for a people action.
+    Returns (pair_id, wallet_tx, person_tx, created: bool).
+    Idempotent on people_pair_id for this user.
+    """
+    tx_date = tx_date or date.today()
+    pair_id = (pair_id or '').strip() or str(uuid.uuid4())
+    fx_kwargs = fx_kwargs or {}
+
+    existing = Transaction.objects.filter(user=user, people_pair_id=pair_id)
+    if existing.exists():
+        rows = list(existing.order_by('id'))
+        wallet_tx = next((t for t in rows if t.account_id == wallet.id), rows[0])
+        person_tx = next((t for t in rows if t.account_id == person.id), rows[-1])
+        return pair_id, wallet_tx, person_tx, False
+
+    wallet_type, person_type, wallet_cat, person_cat = PEOPLE_ACTION_LEGS[action_name]
+    note_suffix = f' · {notes}' if notes else ''
+    with db_transaction.atomic():
+        wallet_tx = Transaction.objects.create(
+            user=user,
+            type=wallet_type,
+            amount=amount,
+            date=tx_date,
+            account=wallet,
+            category=f'People: {wallet_cat}',
+            notes=f'{wallet_cat}: {wallet.name} ↔ {person.name}{note_suffix}',
+            people_pair_id=pair_id,
+            people_action=action_name,
+            client_mutation_id=f'{client_mutation_id}:wallet' if client_mutation_id else None,
+            **fx_kwargs,
+        )
+        person_tx = Transaction.objects.create(
+            user=user,
+            type=person_type,
+            amount=amount,
+            date=tx_date,
+            account=person,
+            category=f'People: {person_cat}',
+            notes=f'{person_cat}: {wallet.name} ↔ {person.name}{note_suffix}',
+            people_pair_id=pair_id,
+            people_action=action_name,
+            client_mutation_id=f'{client_mutation_id}:person' if client_mutation_id else None,
+            **fx_kwargs,
+        )
+    return pair_id, wallet_tx, person_tx, True
+
 
 class PeopleActionSerializer(serializers.Serializer):
     action = serializers.ChoiceField(choices=['lend', 'borrow', 'pay', 'receive'])
@@ -274,23 +342,8 @@ class PeopleViewSet(viewsets.ModelViewSet):
         tx_date = data.get('date') or date.today()
         notes = (data.get('notes') or '').strip()
         pair_id = (data.get('client_mutation_id') or '').strip() or str(uuid.uuid4())
+        client_mutation_id = (data.get('client_mutation_id') or '').strip() or None
 
-        # Idempotent retry
-        existing = Transaction.objects.filter(user=user, people_pair_id=pair_id)
-        if existing.exists():
-            rows = TransactionSerializer(existing.order_by('id'), many=True).data
-            return Response(
-                {
-                    'people_pair_id': pair_id,
-                    'action': action_name,
-                    'transactions': rows,
-                    'wallet_balance': float(wallet.current_balance),
-                    'person_balance': float(person.current_balance),
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        wallet_type, person_type, wallet_cat, person_cat = PEOPLE_ACTION_LEGS[action_name]
         fx_kwargs = {}
         if data.get('original_amount') is not None:
             fx_kwargs = {
@@ -300,35 +353,18 @@ class PeopleViewSet(viewsets.ModelViewSet):
                 'fx_source': data.get('fx_source') or '',
             }
 
-        note_suffix = f' · {notes}' if notes else ''
-        with db_transaction.atomic():
-            wallet_tx = Transaction.objects.create(
-                user=user,
-                type=wallet_type,
-                amount=amount,
-                date=tx_date,
-                account=wallet,
-                category=f'People: {wallet_cat}',
-                notes=f'{wallet_cat}: {wallet.name} ↔ {person.name}{note_suffix}',
-                people_pair_id=pair_id,
-                people_action=action_name,
-                client_mutation_id=f'{pair_id}:wallet' if data.get('client_mutation_id') else None,
-                **fx_kwargs,
-            )
-            person_tx = Transaction.objects.create(
-                user=user,
-                type=person_type,
-                amount=amount,
-                date=tx_date,
-                account=person,
-                category=f'People: {person_cat}',
-                notes=f'{person_cat}: {wallet.name} ↔ {person.name}{note_suffix}',
-                people_pair_id=pair_id,
-                people_action=action_name,
-                client_mutation_id=f'{pair_id}:person' if data.get('client_mutation_id') else None,
-                **fx_kwargs,
-            )
-
+        pair_id, wallet_tx, person_tx, created = post_people_double_entry(
+            user=user,
+            action_name=action_name,
+            wallet=wallet,
+            person=person,
+            amount=amount,
+            tx_date=tx_date,
+            notes=notes,
+            pair_id=pair_id,
+            client_mutation_id=client_mutation_id,
+            fx_kwargs=fx_kwargs,
+        )
         wallet.refresh_from_db()
         person.refresh_from_db()
         return Response(
@@ -339,7 +375,7 @@ class PeopleViewSet(viewsets.ModelViewSet):
                 'wallet_balance': float(wallet.current_balance),
                 'person_balance': float(person.current_balance),
             },
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
     @action(detail=True, methods=['get'], url_path='history')

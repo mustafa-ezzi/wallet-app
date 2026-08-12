@@ -26,6 +26,8 @@ class UserProfile(models.Model):
     user_type = models.CharField(max_length=32, blank=True, default='', choices=USER_TYPE_CHOICES)
     country = models.CharField(max_length=64, blank=True, default='')
     onboarding_complete = models.BooleanField(default=False)
+    # Phase G — shareable code so others can request a People link (PEEP-XXXXXX)
+    people_link_code = models.CharField(max_length=16, blank=True, null=True, unique=True)
 
     def __str__(self):
         return f"Profile({self.user.username})"
@@ -1186,3 +1188,189 @@ class PromoRedemption(models.Model):
 
     def __str__(self):
         return f'Redeem({self.promo_id} by {self.user_id})'
+
+
+# ── Linked People (Phase G) ───────────────────────────────────────────────────
+
+def generate_people_link_code():
+    """Human-friendly people invite code (no ambiguous 0/O/1/I)."""
+    import secrets
+    alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    body = ''.join(secrets.choice(alphabet) for _ in range(6))
+    return f'PEEP-{body}'
+
+
+class PeopleInvitation(models.Model):
+    STATUSES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+        ('cancelled', 'Cancelled'),
+    ]
+    VIA = [
+        ('query', 'Email or username'),
+        ('code', 'Link code'),
+    ]
+
+    from_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='people_invites_sent',
+    )
+    to_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='people_invites_received',
+    )
+    display_name = models.CharField(max_length=100, blank=True, default='')
+    status = models.CharField(max_length=12, choices=STATUSES, default='pending')
+    invited_via = models.CharField(max_length=10, choices=VIA, default='query')
+    query_snapshot = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['from_user', 'to_user'],
+                condition=models.Q(status='pending'),
+                name='uniq_pending_people_invitation_pair',
+            ),
+        ]
+
+    def __str__(self):
+        return f'PeopleInvite({self.from_user_id}→{self.to_user_id} {self.status})'
+
+
+class PeopleLink(models.Model):
+    STATUSES = [
+        ('active', 'Active'),
+        ('unlinked', 'Unlinked'),
+    ]
+
+    # Ordered so user_a.id < user_b.id
+    user_a = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='people_links_as_a',
+    )
+    user_b = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='people_links_as_b',
+    )
+    person_a = models.ForeignKey(
+        Account, on_delete=models.CASCADE, related_name='people_link_as_a',
+    )
+    person_b = models.ForeignKey(
+        Account, on_delete=models.CASCADE, related_name='people_link_as_b',
+    )
+    invitation = models.ForeignKey(
+        PeopleInvitation, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='links',
+    )
+    status = models.CharField(max_length=12, choices=STATUSES, default='active')
+    created_at = models.DateTimeField(auto_now_add=True)
+    unlinked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user_a', 'user_b'],
+                condition=models.Q(status='active'),
+                name='uniq_active_people_link_pair',
+            ),
+        ]
+
+    def __str__(self):
+        return f'PeopleLink({self.user_a_id}↔{self.user_b_id} {self.status})'
+
+    def person_for(self, user):
+        if user.id == self.user_a_id:
+            return self.person_a
+        if user.id == self.user_b_id:
+            return self.person_b
+        return None
+
+    def other_user(self, user):
+        if user.id == self.user_a_id:
+            return self.user_b
+        if user.id == self.user_b_id:
+            return self.user_a
+        return None
+
+
+class PeopleProposal(models.Model):
+    ACTIONS = [
+        ('lend', 'Lend'),
+        ('borrow', 'Borrow'),
+        ('pay', 'Pay'),
+        ('receive', 'Receive'),
+    ]
+    STATUSES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    link = models.ForeignKey(PeopleLink, on_delete=models.CASCADE, related_name='proposals')
+    proposer = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='people_proposals_sent',
+    )
+    counterparty = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='people_proposals_received',
+    )
+    action = models.CharField(max_length=10, choices=ACTIONS)
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    date = models.DateField()
+    notes = models.CharField(max_length=255, blank=True, default='')
+    proposer_wallet = models.ForeignKey(
+        Account, on_delete=models.PROTECT, related_name='people_proposals_as_proposer_wallet',
+    )
+    counterparty_wallet = models.ForeignKey(
+        Account, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='people_proposals_as_counterparty_wallet',
+    )
+    status = models.CharField(max_length=12, choices=STATUSES, default='pending')
+    people_pair_id = models.CharField(max_length=64, db_index=True)
+    client_mutation_id = models.CharField(max_length=64, blank=True, default='')
+    original_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    original_currency = models.CharField(max_length=10, blank=True, default='')
+    fx_rate = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    fx_source = models.CharField(max_length=20, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'PeopleProposal({self.action} {self.amount} {self.status})'
+
+
+class PeopleNotification(models.Model):
+    KINDS = [
+        ('link_invite', 'Link invite'),
+        ('link_accepted', 'Link accepted'),
+        ('link_declined', 'Link declined'),
+        ('proposal', 'Proposal'),
+        ('proposal_accepted', 'Proposal accepted'),
+        ('proposal_declined', 'Proposal declined'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='people_notifications')
+    actor = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='people_notifications_acted',
+    )
+    kind = models.CharField(max_length=24, choices=KINDS)
+    title = models.CharField(max_length=160)
+    body = models.CharField(max_length=255, blank=True, default='')
+    invitation = models.ForeignKey(
+        PeopleInvitation, null=True, blank=True, on_delete=models.CASCADE, related_name='notifications',
+    )
+    proposal = models.ForeignKey(
+        PeopleProposal, null=True, blank=True, on_delete=models.CASCADE, related_name='notifications',
+    )
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'PeopleNotification({self.kind} → {self.user_id})'

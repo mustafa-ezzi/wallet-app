@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Pressable,
@@ -18,6 +18,7 @@ import {
   apiErrorMessage,
   asList,
   householdsApi,
+  peopleApi,
   transactionsApi,
 } from '@/src/api/client'
 import type { Account } from '@/src/api/types'
@@ -37,7 +38,8 @@ import { fmtBalance, todayISO } from '@/src/utils/format'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { formatRateLine, foreignToPkr } from '@/src/travel/currencies'
 
-type Kind = 'expense' | 'income' | 'transfer'
+type Kind = 'expense' | 'income' | 'transfer' | 'people'
+type PeopleAction = 'lend' | 'borrow'
 
 type OpenLedger = {
   id: number
@@ -50,6 +52,7 @@ const KIND_META: Record<Kind, { label: string; accent: string; icon: React.Compo
   expense: { label: 'Expense', accent: '#ef4444', icon: 'arrow-down' },
   income: { label: 'Income', accent: '#22c55e', icon: 'arrow-up' },
   transfer: { label: 'Transfer', accent: '#0ea5e9', icon: 'exchange' },
+  people: { label: 'People', accent: '#8b5cf6', icon: 'users' },
 }
 
 export default function AddTransactionScreen() {
@@ -69,9 +72,14 @@ export default function AddTransactionScreen() {
 
   const [kind, setKind] = useState<Kind>('expense')
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [people, setPeople] = useState<Account[]>([])
   const [openLedgers, setOpenLedgers] = useState<OpenLedger[]>([])
   const [accountId, setAccountId] = useState('')
   const [toAccountId, setToAccountId] = useState('')
+  const [personId, setPersonId] = useState('')
+  const [peopleAction, setPeopleAction] = useState<PeopleAction>('lend')
+  const [newPersonName, setNewPersonName] = useState('')
+  const [creatingPerson, setCreatingPerson] = useState(false)
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(todayISO())
   const [category, setCategory] = useState('')
@@ -83,6 +91,20 @@ export default function AddTransactionScreen() {
   const [booting, setBooting] = useState(true)
   const [error, setError] = useState('')
   const submittingRef = useRef(false)
+
+  const loadPeople = useCallback(async () => {
+    try {
+      const { data } = await peopleApi.list()
+      const list = asList<Account>(data)
+      setPeople(list)
+      setPersonId((prev) => {
+        if (prev && list.some((p) => String(p.id) === prev)) return prev
+        return list[0] ? String(list[0].id) : ''
+      })
+    } catch {
+      /* people need online API */
+    }
+  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -98,6 +120,7 @@ export default function AddTransactionScreen() {
             setAccountId(list[0] ? String(list[0].id) : '')
             setToAccountId(list[1] ? String(list[1].id) : list[0] ? String(list[0].id) : '')
             setOpenLedgers(asList<OpenLedger>(ledgersRes.data))
+            await loadPeople()
             void hydrateNow()
             return
           } catch {
@@ -106,13 +129,15 @@ export default function AddTransactionScreen() {
         }
         setOpenLedgers([])
         const cached = await getCachedAccounts()
-        const list: Account[] = cached.map((a) => ({
-          id: a.serverId,
-          name: a.name,
-          type: a.type === 'cash' ? 'cash' : 'bank',
-          opening_balance: a.openingBalance,
-          current_balance: a.currentBalance,
-        }))
+        const list: Account[] = cached
+          .filter((a) => a.type !== 'person')
+          .map((a) => ({
+            id: a.serverId,
+            name: a.name,
+            type: a.type === 'cash' ? 'cash' : 'bank',
+            opening_balance: a.openingBalance,
+            current_balance: a.currentBalance,
+          }))
         setAccounts(list)
         setAccountId(list[0] ? String(list[0].id) : '')
         setToAccountId(list[1] ? String(list[1].id) : list[0] ? String(list[0].id) : '')
@@ -130,6 +155,30 @@ export default function AddTransactionScreen() {
     setCategory('')
     setHouseholdLedgerId('')
   }, [kind])
+
+  const createPerson = async () => {
+    const n = newPersonName.trim()
+    if (!n) {
+      setError('Enter a person name.')
+      return
+    }
+    if (!online) {
+      setError('Creating a person needs an internet connection.')
+      return
+    }
+    setCreatingPerson(true)
+    setError('')
+    try {
+      const { data } = await peopleApi.create({ name: n })
+      setNewPersonName('')
+      await loadPeople()
+      if (data?.id) setPersonId(String(data.id))
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not create person.'))
+    } finally {
+      setCreatingPerson(false)
+    }
+  }
 
   const categories: CategoryMeta[] = kind === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
 
@@ -164,7 +213,7 @@ export default function AddTransactionScreen() {
       setError('Enter a valid amount.')
       return
     }
-    if (kind !== 'transfer' && !category) {
+    if (kind !== 'transfer' && kind !== 'people' && !category) {
       setError('Pick a category.')
       return
     }
@@ -181,6 +230,14 @@ export default function AddTransactionScreen() {
           originalCurrency: travelCurrency,
           fxRate: travelRate,
           fxSource: 'manual' as const,
+        }
+      : {}
+    const fxApiFields = useTravel
+      ? {
+          original_amount: value,
+          original_currency: travelCurrency,
+          fx_rate: travelRate,
+          fx_source: 'manual' as const,
         }
       : {}
 
@@ -214,6 +271,34 @@ export default function AddTransactionScreen() {
           category: 'Bank Transfer',
           notes: `${note} (in)`,
         })
+        succeeded = true
+        finishOk()
+        return
+      }
+
+      if (kind === 'people') {
+        if (!online) {
+          setError('People actions need an internet connection.')
+          return
+        }
+        if (!accountId) {
+          setError('Pick a wallet.')
+          return
+        }
+        if (!personId) {
+          setError('Pick or create a person.')
+          return
+        }
+        await peopleApi.action({
+          action: peopleAction,
+          wallet_id: Number(accountId),
+          person_id: Number(personId),
+          amount: pkrAmount,
+          date,
+          notes: notes.trim(),
+          ...fxApiFields,
+        })
+        void hydrateNow()
         succeeded = true
         finishOk()
         return
@@ -298,7 +383,7 @@ export default function AddTransactionScreen() {
         </View>
 
         <View style={styles.seg}>
-          {(['expense', 'income', 'transfer'] as Kind[]).map((k) => {
+          {(['expense', 'income', 'transfer', 'people'] as Kind[]).map((k) => {
             const active = kind === k
             return (
               <Pressable
@@ -389,6 +474,139 @@ export default function AddTransactionScreen() {
                 Moves money between your wallets. Transfers don’t count as income or expense.
               </Text>
             </View>
+          ) : kind === 'people' ? (
+            <>
+              <Text style={styles.sectionTitle}>Action</Text>
+              <View style={styles.actionRow}>
+                {([
+                  { key: 'lend' as const, label: 'Lend', hint: 'They owe you', color: '#8b5cf6' },
+                  { key: 'borrow' as const, label: 'Borrow', hint: 'You owe them', color: '#f59e0b' },
+                ]).map((a) => {
+                  const active = peopleAction === a.key
+                  return (
+                    <Pressable
+                      key={a.key}
+                      onPress={() => setPeopleAction(a.key)}
+                      style={[
+                        styles.actionChip,
+                        {
+                          backgroundColor: active ? a.color : colors.surface,
+                          borderColor: active ? a.color : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.actionChipLabel, { color: active ? '#fff' : colors.text }]}>{a.label}</Text>
+                      <Text style={[styles.actionChipHint, { color: active ? 'rgba(255,255,255,0.85)' : colors.textMuted }]}>
+                        {a.hint}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
+
+              <Text style={[styles.sectionTitle, { marginTop: spacing.lg }]}>
+                {peopleAction === 'lend' ? 'From wallet' : 'Into wallet'}
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.catRow}
+              >
+                {accounts.map((a) => {
+                  const active = accountId === String(a.id)
+                  return (
+                    <Pressable key={a.id} style={styles.catItem} onPress={() => setAccountId(String(a.id))}>
+                      <View
+                        style={[
+                          styles.acctIcon,
+                          {
+                            backgroundColor: active ? colors.primary : colors.surfaceMuted,
+                            borderColor: active ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <FontAwesome name={accountIcon(a)} size={20} color={active ? '#fff' : colors.primary} />
+                      </View>
+                      <Text
+                        style={[styles.catLabel, { color: active ? colors.text : colors.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {a.name}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </ScrollView>
+
+              <Text style={[styles.sectionTitle, { marginTop: spacing.lg }]}>Person</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.catRow}
+              >
+                {people.map((p) => {
+                  const active = personId === String(p.id)
+                  const bal = Number(p.current_balance) || 0
+                  return (
+                    <Pressable key={p.id} style={styles.catItem} onPress={() => setPersonId(String(p.id))}>
+                      <View
+                        style={[
+                          styles.acctIcon,
+                          {
+                            backgroundColor: active ? '#8b5cf6' : colors.surfaceMuted,
+                            borderColor: active ? '#8b5cf6' : colors.border,
+                          },
+                        ]}
+                      >
+                        <FontAwesome name="user" size={20} color={active ? '#fff' : '#8b5cf6'} />
+                      </View>
+                      <Text
+                        style={[styles.catLabel, { color: active ? colors.text : colors.textMuted }]}
+                        numberOfLines={1}
+                      >
+                        {p.name}
+                      </Text>
+                      {bal !== 0 ? (
+                        <Text
+                          style={[
+                            styles.personBal,
+                            { color: bal > 0 ? colors.success : colors.danger },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {fmtBalance(bal)}
+                        </Text>
+                      ) : null}
+                    </Pressable>
+                  )
+                })}
+              </ScrollView>
+
+              <View style={[styles.newPersonRow, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                <TextInput
+                  value={newPersonName}
+                  onChangeText={setNewPersonName}
+                  placeholder="+ New person"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="words"
+                  style={[styles.newPersonInput, { color: colors.text }]}
+                />
+                <Pressable
+                  onPress={() => void createPerson()}
+                  disabled={creatingPerson}
+                  style={[styles.newPersonBtn, { backgroundColor: colors.primary, opacity: creatingPerson ? 0.6 : 1 }]}
+                >
+                  {creatingPerson ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.newPersonBtnText}>Add</Text>
+                  )}
+                </Pressable>
+              </View>
+              <Text style={styles.hint}>
+                Pay & Receive live on the person History screen. Positive balance = they owe you.
+              </Text>
+            </>
           ) : (
             <>
               <Text style={styles.sectionTitle}>Select Category</Text>
@@ -421,11 +639,7 @@ export default function AddTransactionScreen() {
                   )
                 })}
               </ScrollView>
-            </>
-          )}
 
-          {kind !== 'transfer' ? (
-            <>
               <Text style={[styles.sectionTitle, { marginTop: spacing.lg }]}>Select Account</Text>
               <ScrollView
                 horizontal
@@ -466,7 +680,7 @@ export default function AddTransactionScreen() {
                 </Pressable>
               </ScrollView>
             </>
-          ) : null}
+          )}
 
           <Pressable
             style={[styles.detailsToggle, { borderColor: colors.border, backgroundColor: colors.surface }]}
@@ -528,7 +742,15 @@ export default function AddTransactionScreen() {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.finishText}>
-                {kind === 'income' ? 'Add Income' : kind === 'expense' ? 'Add Expense' : 'Record Transfer'}
+                {kind === 'income'
+                  ? 'Add Income'
+                  : kind === 'expense'
+                    ? 'Add Expense'
+                    : kind === 'people'
+                      ? peopleAction === 'lend'
+                        ? 'Record Lend'
+                        : 'Record Borrow'
+                      : 'Record Transfer'}
               </Text>
             )}
           </LinearGradient>
@@ -563,10 +785,42 @@ function makeStyles(colors: ColorTokens) {
       padding: 4,
       marginTop: spacing.lg,
     },
-    segBtn: { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: radii.full },
+    segBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: radii.full },
     segBtnActive: { backgroundColor: '#fff' },
-    segText: { color: 'rgba(255,255,255,0.9)', fontWeight: '700', fontSize: typography.body },
+    segText: { color: 'rgba(255,255,255,0.9)', fontWeight: '700', fontSize: 12 },
     segTextActive: { color: colors.primaryDark, fontWeight: '800' },
+    actionRow: { flexDirection: 'row', gap: spacing.sm },
+    actionChip: {
+      flex: 1,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      alignItems: 'center',
+    },
+    actionChipLabel: { fontWeight: '800', fontSize: typography.subtitle },
+    actionChipHint: { fontWeight: '600', fontSize: 11, marginTop: 4 },
+    personBal: { fontSize: 10, fontWeight: '700', marginTop: 2 },
+    newPersonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      paddingLeft: spacing.md,
+      paddingRight: 6,
+      paddingVertical: 6,
+      marginTop: spacing.md,
+    },
+    newPersonInput: { flex: 1, fontSize: typography.body, fontWeight: '600', paddingVertical: 8 },
+    newPersonBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: radii.sm,
+      minWidth: 56,
+      alignItems: 'center',
+    },
+    newPersonBtnText: { color: '#fff', fontWeight: '800', fontSize: 13 },
     amountCard: {
       marginTop: spacing.lg,
       backgroundColor: colors.surface,

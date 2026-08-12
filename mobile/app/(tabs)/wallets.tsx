@@ -90,10 +90,16 @@ export default function WalletsScreen() {
     }
   }
 
-  const total = sumBalances(accounts)
-  const banks = accounts.filter((a) => a.type !== 'cash')
+  const walletAccounts = accounts.filter((a) => a.type === 'bank' || a.type === 'cash')
+  const total = sumBalances(walletAccounts)
+  const banks = accounts.filter((a) => a.type === 'bank')
   const cash = accounts.filter((a) => a.type === 'cash')
-  const maxAbsBalance = Math.max(1, ...accounts.map((a) => Math.abs(toMoney(a.current_balance))))
+  const people = accounts.filter((a) => a.type === 'person')
+  const maxAbsBalance = Math.max(
+    1,
+    ...walletAccounts.map((a) => Math.abs(toMoney(a.current_balance))),
+    ...people.map((a) => Math.abs(toMoney(a.current_balance))),
+  )
 
   const renderWallet = (a: Account, index: number) => {
     const bal = toMoney(a.current_balance)
@@ -144,6 +150,44 @@ export default function WalletsScreen() {
     )
   }
 
+  const renderPerson = (a: Account, index: number) => {
+    const bal = toMoney(a.current_balance)
+    const status =
+      Math.abs(bal) < 0.01 ? 'Settled' : bal > 0 ? 'They owe you' : 'You owe them'
+    return (
+      <Reveal index={index} key={a.id}>
+        <BouncyPressable
+          style={styles.card}
+          onPress={() =>
+            router.push({ pathname: '/people/[id]', params: { id: String(a.id), name: a.name } })
+          }
+        >
+          <View style={styles.cardTop}>
+            <View style={[styles.icon, styles.iconPerson]}>
+              <FontAwesome name="user" size={16} color="#8b5cf6" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardName}>{a.name}</Text>
+              <Text style={styles.cardType}>{status}</Text>
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text
+                style={[
+                  styles.cardBal,
+                  money.amountStyle,
+                  { color: Math.abs(bal) < 0.01 ? colors.text : bal > 0 ? colors.success : colors.danger },
+                ]}
+              >
+                {money.fmtBalance(bal)}
+              </Text>
+              <Text style={styles.cardType}>Person</Text>
+            </View>
+          </View>
+        </BouncyPressable>
+      </Reveal>
+    )
+  }
+
   return (
     <Screen>
       <ScrollView
@@ -165,7 +209,7 @@ export default function WalletsScreen() {
               <Text style={styles.title}>Wallets</Text>
               <AmountEyeToggle />
             </View>
-            <Text style={styles.sub}>Manage your bank and cash wallets.</Text>
+            <Text style={styles.sub}>Manage bank, cash, and people balances.</Text>
           </View>
           <BouncyPressable style={styles.addBtn} onPress={() => setCreateOpen(true)}>
             <Text style={styles.addBtnText}>+ Create Wallet</Text>
@@ -209,6 +253,20 @@ export default function WalletsScreen() {
                 {cash.map((a, i) => renderWallet(a, banks.length + i))}
               </>
             ) : null}
+
+            <View style={styles.sectionHead}>
+              <FontAwesome name="users" size={13} color={colors.text} />
+              <Text style={styles.sectionTitle}>People</Text>
+            </View>
+            {people.length === 0 ? (
+              <View style={styles.emptyPeople}>
+                <Text style={styles.emptyBody}>
+                  No people yet. Use People → Lend / Borrow on Add Transaction to create one.
+                </Text>
+              </View>
+            ) : (
+              people.map((a, i) => renderPerson(a, banks.length + cash.length + i))
+            )}
           </>
         )}
       </ScrollView>
@@ -305,6 +363,15 @@ function makeStyles(colors: ColorTokens) {
     },
     iconBank: { backgroundColor: colors.primarySoft + '26' },
     iconCash: { backgroundColor: '#dcfce7' },
+    iconPerson: { backgroundColor: '#8b5cf618' },
+    emptyPeople: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
     cardName: { fontWeight: '800', color: colors.text, fontSize: typography.body },
     cardType: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
     cardBal: { fontWeight: '800', color: colors.text, fontSize: typography.body },

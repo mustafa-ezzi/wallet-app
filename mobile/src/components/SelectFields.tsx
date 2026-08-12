@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { createElement, useMemo, useState } from 'react'
 import {
   FlatList,
   Modal,
@@ -9,7 +9,10 @@ import {
   View,
 } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
+import DateTimePicker, {
+  DateTimePickerAndroid,
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography } from '@/src/theme/colors'
 
@@ -157,17 +160,29 @@ export function DateField({
   const date = useMemo(() => parseISODate(value), [value])
 
   const onPick = (event: DateTimePickerEvent, selected?: Date) => {
-    if (Platform.OS === 'android') setOpen(false)
     if (event.type === 'dismissed') {
       setOpen(false)
       return
     }
     if (selected) {
       onChange(toISODate(selected))
-      if (Platform.OS === 'ios') {
-        /* keep open until Done */
-      }
+      if (Platform.OS === 'android') setOpen(false)
     }
+  }
+
+  const openPicker = () => {
+    if (disabled) return
+    // Android: imperative dialog is the reliable system calendar (declarative often fails to show).
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: date,
+        mode: 'date',
+        display: 'calendar',
+        onChange: onPick,
+      })
+      return
+    }
+    setOpen(true)
   }
 
   return (
@@ -175,7 +190,7 @@ export function DateField({
       {label ? <Text style={[styles.label, { color: colors.textMuted }]}>{label}</Text> : null}
       <Pressable
         disabled={disabled}
-        onPress={() => setOpen(true)}
+        onPress={openPicker}
         style={[
           styles.trigger,
           {
@@ -189,11 +204,8 @@ export function DateField({
         <FontAwesome name="calendar" size={14} color={colors.textMuted} />
       </Pressable>
 
-      {open && Platform.OS === 'android' ? (
-        <DateTimePicker value={date} mode="date" display="default" onChange={onPick} />
-      ) : null}
-
-      {Platform.OS === 'ios' ? (
+      {/* iOS: spinner sheet. Web: native <input type="date"> (community picker is blank on web). */}
+      {Platform.OS === 'ios' || Platform.OS === 'web' ? (
         <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
           <View style={styles.modalRoot}>
             <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
@@ -204,32 +216,48 @@ export function DateField({
                   <Text style={{ color: colors.primary, fontWeight: '800' }}>Done</Text>
                 </Pressable>
               </View>
-              <DateTimePicker
-                value={date}
-                mode="date"
-                display="spinner"
-                onChange={onPick}
-                style={{ alignSelf: 'center' }}
-              />
-            </View>
-          </View>
-        </Modal>
-      ) : null}
 
-      {/* Web / other: fallback modal with HTML-like feel via spinner if available */}
-      {open && Platform.OS === 'web' ? (
-        <Modal visible transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-          <View style={styles.modalRoot}>
-            <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
-            <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-              <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>{label}</Text>
-              <DateTimePicker value={date} mode="date" display="default" onChange={onPick} />
-              <Pressable
-                onPress={() => setOpen(false)}
-                style={[styles.doneBtn, { backgroundColor: colors.primary }]}
-              >
-                <Text style={{ color: '#fff', fontWeight: '800' }}>Done</Text>
-              </Pressable>
+              {Platform.OS === 'web' ? (
+                <View style={styles.webDateWrap}>
+                  {createElement('input', {
+                    type: 'date',
+                    value: value || toISODate(new Date()),
+                    onChange: (e: { target: { value: string } }) => {
+                      if (e.target.value) onChange(e.target.value)
+                    },
+                    style: {
+                      width: '100%',
+                      padding: 12,
+                      fontSize: 18,
+                      fontWeight: '600',
+                      borderWidth: 1,
+                      borderStyle: 'solid',
+                      borderColor: colors.border,
+                      borderRadius: 10,
+                      color: colors.text,
+                      backgroundColor: colors.surfaceMuted,
+                      boxSizing: 'border-box',
+                    },
+                  })}
+                </View>
+              ) : (
+                <DateTimePicker
+                  value={date}
+                  mode="date"
+                  display="spinner"
+                  onChange={onPick}
+                  style={styles.iosSpinner}
+                />
+              )}
+
+              {Platform.OS === 'web' ? (
+                <Pressable
+                  onPress={() => setOpen(false)}
+                  style={[styles.doneBtn, { backgroundColor: colors.primary }]}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>Done</Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         </Modal>
@@ -300,6 +328,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
+  },
+  iosSpinner: {
+    alignSelf: 'stretch',
+    height: 216,
+    width: '100%',
+  },
+  webDateWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
   doneBtn: {
     marginHorizontal: spacing.lg,

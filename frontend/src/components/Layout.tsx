@@ -13,12 +13,14 @@ import {
   Download,
   Settings,
   Users,
+  Plane,
 } from 'lucide-react'
 import anime from 'animejs'
 import AddTransactionModal from './AddTransactionModal'
 import InstallAppDialog from './InstallAppDialog'
 import OnboardingTour from './OnboardingTour'
 import { usePwaInstall } from '../hooks/usePwaInstall'
+import { useTravelMode } from '../travel/TravelModeContext'
 
 const NAV: { path: string; label: string; short: string; tour: string; icon: ReactNode }[] = [
   { path: '/',          label: 'Home',     icon: <LayoutDashboard size={18} strokeWidth={1.75} />, short: 'Home', tour: 'nav-overview' },
@@ -36,6 +38,13 @@ const SIDE_EXTRA: { path: string; label: string; icon: ReactNode }[] = [
 export default function Layout() {
   const { user, logout } = useAuth()
   const { online, pending, syncing, syncNow } = useOffline()
+  const {
+    isActive: travelOn,
+    currency: travelCurrency,
+    tripEnded,
+    tripEndedDismissed,
+    dismissTripEnded,
+  } = useTravelMode()
   const location = useLocation()
   const navigate = useNavigate()
   const [showAdd, setShowAdd] = useState(false)
@@ -93,6 +102,15 @@ export default function Layout() {
           {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
         </div>
         <div className="mobile-header-actions">
+          <button
+            type="button"
+            className={`sync-chip ${travelOn ? 'sync-chip-pending travel-chip-on' : 'travel-chip-off'}`}
+            onClick={() => navigate('/travel-mode')}
+            title={travelOn ? `Travel Mode · ${travelCurrency}` : 'Travel Mode'}
+          >
+            <Plane size={13} strokeWidth={2.25} style={{ marginRight: 4 }} />
+            {travelOn ? travelCurrency : 'Travel'}
+          </button>
           {(!online || pending > 0) && (
             <button
               type="button"
@@ -215,6 +233,17 @@ export default function Layout() {
       </aside>
 
       <main>
+        {tripEnded && !tripEndedDismissed ? (
+          <div className="travel-ended-banner">
+            <span>Your travel end date has passed. Turn off Travel Mode?</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="btn-glass" onClick={dismissTripEnded}>Later</button>
+              <button type="button" className="btn-primary" onClick={() => navigate('/travel-mode')}>
+                Open Travel Mode
+              </button>
+            </div>
+          </div>
+        ) : null}
         <Outlet />
       </main>
 

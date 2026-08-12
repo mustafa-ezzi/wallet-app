@@ -379,6 +379,16 @@ export const fxApi = {
     api.get('/fx/', { params: { base, quote, refresh: refresh ? '1' : undefined } }),
 }
 
+export const peopleApi = {
+  list: () => api.get('/people/'),
+  create: (data: { name: string }) => api.post('/people/', data),
+  update: (id: number, data: object) => api.patch(`/people/${id}/`, data),
+  remove: (id: number) => api.delete(`/people/${id}/`),
+  action: (data: object) => api.post('/people/actions/', data),
+  history: (id: number, params?: { year?: number; month?: number }) =>
+    api.get(`/people/${id}/history/`, { params }),
+}
+
 export const householdsApi = {
   list: () => api.get('/households/'),
   create: (data: object) => api.post('/households/', data),

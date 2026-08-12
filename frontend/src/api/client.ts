@@ -161,7 +161,7 @@ export const authApi = {
 }
 
 export const accountsApi = {
-  list: () => api.get('/accounts/'),
+  list: (params?: object) => api.get('/accounts/', { params }),
   create: (data: object) => api.post('/accounts/', data),
   update: (id: number, data: object) => api.patch(`/accounts/${id}/`, data),
   remove: (id: number) => api.delete(`/accounts/${id}/`),
@@ -259,5 +259,25 @@ export const householdsApi = {
   unreadNotificationCount: () => api.get('/household-notifications/unread_count/'),
   markNotificationRead: (id: number) => api.post(`/household-notifications/${id}/mark_read/`),
   markAllNotificationsRead: () => api.post('/household-notifications/mark_all_read/'),
+}
+
+export const travelApi = {
+  get: () => api.get('/travel-mode/'),
+  set: (data: object) => api.put('/travel-mode/', data),
+}
+
+export const fxApi = {
+  quote: (base: string, quote = 'PKR', refresh = false) =>
+    api.get('/fx/', { params: { base, quote, refresh: refresh ? '1' : undefined } }),
+}
+
+export const peopleApi = {
+  list: () => api.get('/people/'),
+  create: (data: { name: string }) => api.post('/people/', data),
+  update: (id: number, data: object) => api.patch(`/people/${id}/`, data),
+  remove: (id: number) => api.delete(`/people/${id}/`),
+  action: (data: object) => api.post('/people/actions/', data),
+  history: (id: number, params?: { year?: number; month?: number }) =>
+    api.get(`/people/${id}/history/`, { params }),
 }
 
