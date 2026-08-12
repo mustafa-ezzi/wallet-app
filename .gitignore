@@ -1,2 +1,11 @@
 # Research notes / docs (local only)
 researches/
+
+# Android signing / Firebase secrets (never commit)
+*.jks
+*.keystore
+*.p12
+**/google-services.json
+**/firebase-service-account*.json
+**/*-firebase-adminsdk-*.json
+

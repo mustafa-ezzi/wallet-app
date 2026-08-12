@@ -12,6 +12,7 @@ import { PrivacyLockProvider } from '@/src/privacy/PrivacyLockContext'
 import { RemoteConfigProvider } from '@/src/config/RemoteConfigContext'
 import { ForceUpdateGate, MaintenanceBanner } from '@/src/config/ForceUpdateGate'
 import { ThemeProvider, ThemeRevealOverlay, useColors } from '@/src/theme/ThemeContext'
+import { TravelModeProvider } from '@/src/travel/TravelModeContext'
 
 export { ErrorBoundary } from 'expo-router'
 
@@ -31,6 +32,7 @@ function ThemedStack() {
         <Stack.Screen name="(onboarding)" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="add-transaction" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="travel-mode" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: 'card' }} />
       </Stack>
       <ForceUpdateGate />
@@ -55,7 +57,9 @@ export default function RootLayout() {
               <PrivacyLockProvider>
                 <RemoteConfigProvider>
                   <MoneyUiProvider>
-                    <ThemedStack />
+                    <TravelModeProvider>
+                      <ThemedStack />
+                    </TravelModeProvider>
                   </MoneyUiProvider>
                 </RemoteConfigProvider>
               </PrivacyLockProvider>

@@ -110,6 +110,20 @@ class AccountSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'type', 'opening_balance', 'current_balance', 'created_at')
         read_only_fields = ('created_at',)
 
+    def validate_type(self, value):
+        allowed = {c[0] for c in Account.ACCOUNT_TYPES}
+        if value not in allowed:
+            raise serializers.ValidationError('Invalid account type.')
+        return value
+
+    def validate(self, attrs):
+        # People are created via /api/people/ with opening 0; allow type=person here too.
+        acc_type = attrs.get('type', getattr(self.instance, 'type', 'bank'))
+        if acc_type == 'person' and 'opening_balance' in attrs:
+            # Keep person opening at 0 unless staff/migration needs otherwise
+            pass
+        return attrs
+
 
 class ProjectSerializer(serializers.ModelSerializer):
     default_account_name = serializers.SerializerMethodField()
@@ -164,10 +178,16 @@ class TransactionSerializer(serializers.ModelSerializer):
             'linked_project', 'project_name', 'linked_receivable', 'linked_payable',
             'category', 'notes', 'client_mutation_id', 'created_at',
             'household_ledger', 'household_expense_id', 'household_ledger_name',
+            'original_amount', 'original_currency', 'fx_rate', 'fx_source',
+            'people_pair_id', 'people_action',
         )
-        read_only_fields = ('created_at',)
+        read_only_fields = ('created_at', 'people_pair_id', 'people_action')
         extra_kwargs = {
             'client_mutation_id': {'required': False, 'allow_null': True, 'allow_blank': True},
+            'original_amount': {'required': False, 'allow_null': True},
+            'original_currency': {'required': False, 'allow_blank': True},
+            'fx_rate': {'required': False, 'allow_null': True},
+            'fx_source': {'required': False, 'allow_blank': True},
         }
 
     def get_account_name(self, obj):
@@ -208,6 +228,30 @@ class TransactionSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'household_ledger': 'Bank transfers cannot be linked to a household.',
             })
+
+        orig = attrs.get('original_amount', getattr(self.instance, 'original_amount', None) if self.instance else None)
+        rate = attrs.get('fx_rate', getattr(self.instance, 'fx_rate', None) if self.instance else None)
+        currency = attrs.get(
+            'original_currency',
+            getattr(self.instance, 'original_currency', '') if self.instance else '',
+        )
+        currency = (currency or '').strip().upper()
+        if attrs.get('original_currency') is not None:
+            attrs['original_currency'] = currency
+
+        # If foreign amount + rate provided, PKR amount is derived server-side
+        if orig is not None and rate is not None:
+            from .fx import convert_to_pkr, validate_rate
+            try:
+                validate_rate(rate)
+            except ValueError as exc:
+                raise serializers.ValidationError({'fx_rate': str(exc)}) from exc
+            if not currency:
+                raise serializers.ValidationError({
+                    'original_currency': 'Required when using a foreign amount.',
+                })
+            attrs['amount'] = convert_to_pkr(orig, rate)
+            attrs['original_currency'] = currency
         return attrs
 
     def create(self, validated_data):

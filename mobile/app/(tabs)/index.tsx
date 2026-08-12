@@ -28,6 +28,8 @@ import { useColors } from '@/src/theme/ThemeContext'
 import { iosShadow, radii, spacing, typography } from '@/src/theme/colors'
 import { toMoney } from '@/src/utils/format'
 import { AdBanner } from '@/src/ads/AdBanner'
+import { useTravelMode } from '@/src/travel/TravelModeContext'
+import { formatForeignSubtitle } from '@/src/travel/currencies'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -57,6 +59,7 @@ function breakdownFromTxs(
 export default function HomeScreen() {
   const { user } = useAuth()
   const { premium } = useRemoteConfig()
+  const { isActive: travelOn, currency: travelCurrency } = useTravelMode()
   const router = useRouter()
   const { refreshKey, bumpRefresh } = useMoneyUi()
   const { online, syncNow, hydrateNow, getCachedAccounts, getCachedTransactions } = useOffline()
@@ -211,6 +214,26 @@ export default function HomeScreen() {
               ) : null}
             </View>
           </View>
+          <Pressable
+            onPress={() => router.push('/travel-mode')}
+            style={[
+              styles.travelChip,
+              {
+                backgroundColor: travelOn ? colors.primary : colors.surface,
+                borderColor: travelOn ? colors.primaryDark : colors.border,
+              },
+            ]}
+            hitSlop={6}
+          >
+            <FontAwesome
+              name="plane"
+              size={12}
+              color={travelOn ? '#fff' : colors.textMuted}
+            />
+            <Text style={{ color: travelOn ? '#fff' : colors.textMuted, fontWeight: '800', fontSize: 11 }}>
+              {travelOn ? travelCurrency : 'Travel'}
+            </Text>
+          </Pressable>
         </View>
 
         {loading && !data ? (
@@ -316,6 +339,7 @@ export default function HomeScreen() {
                 const income = tx.type === 'income'
                 const canDelete = !income && tx.category !== 'Bank Transfer'
                 const meta = getCategoryMeta(tx.category)
+                const fxSub = formatForeignSubtitle(tx.original_amount, tx.original_currency, tx.fx_rate)
                 return (
                   <Reveal index={i} key={tx.id}>
                   <View style={[styles.txRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -331,6 +355,7 @@ export default function HomeScreen() {
                       {tx.notes ? <Text style={styles.txNotes} numberOfLines={2}>{tx.notes}</Text> : null}
                       <Text style={styles.txMeta}>
                         {tx.account_name || 'Wallet'} · {tx.date}
+                        {fxSub ? ` · ${fxSub}` : ''}
                       </Text>
                     </View>
                     <View style={styles.txRight}>
@@ -371,9 +396,18 @@ const styles = StyleSheet.create({
   welcomeRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: 6,
     marginBottom: spacing.lg,
+  },
+  travelChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   hi: { fontSize: typography.body, fontWeight: '600', color: '#7fa393' },
   nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 2 },

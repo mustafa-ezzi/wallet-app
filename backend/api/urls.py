@@ -12,6 +12,8 @@ from . import remote_config_api
 from . import phase5_api
 from . import health
 
+from . import travel_people_api
+
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
 router.register('projects', views.ProjectViewSet, basename='project')
@@ -19,6 +21,7 @@ router.register('transactions', views.TransactionViewSet, basename='transaction'
 router.register('expenses', views.RecurringExpenseViewSet, basename='expense')
 router.register('receivables', views.ReceivableViewSet, basename='receivable')
 router.register('payables', views.PayableViewSet, basename='payable')
+router.register('people', travel_people_api.PeopleViewSet, basename='people')
 router.register('households', household_api.HouseholdViewSet, basename='household')
 router.register('household-ledgers', household_api.HouseholdLedgerViewSet, basename='household-ledger')
 router.register('household-expenses', household_api.HouseholdExpenseViewSet, basename='household-expense')
@@ -35,6 +38,8 @@ urlpatterns = [
     path('me/', views.MeView.as_view(), name='me'),
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
     path('forecast/<int:year>/<int:month>/', views.ForecastView.as_view(), name='forecast'),
+    path('fx/', travel_people_api.FxQuoteView.as_view(), name='fx-quote'),
+    path('travel-mode/', travel_people_api.TravelModeView.as_view(), name='travel-mode'),
     path('households/join/preview/', household_api.JoinPreviewView.as_view(), name='household-join-preview'),
     path('households/join/', household_api.JoinAcceptView.as_view(), name='household-join'),
     path('households/invitations/pending/', household_api.PendingInvitationsView.as_view(), name='household-pending'),

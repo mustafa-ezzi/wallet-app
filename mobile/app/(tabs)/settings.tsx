@@ -21,6 +21,7 @@ import type { PrivacyTimeout } from '@/src/privacy/storage'
 import { useTheme } from '@/src/theme/ThemeContext'
 import { useRemoteConfig } from '@/src/config/RemoteConfigContext'
 import { radii, spacing, typography } from '@/src/theme/colors'
+import { useTravelMode } from '@/src/travel/TravelModeContext'
 
 const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
   { id: 'immediate', label: 'Immediate' },
@@ -36,6 +37,7 @@ export default function SettingsScreen() {
   const privacy = usePrivacyLock()
   const { themeId, themes, setThemeAnimated, colors } = useTheme()
   const { premium, config, refresh: refreshConfig, shouldShowAds } = useRemoteConfig()
+  const { isActive: travelOn, currency: travelCurrency, rateLine } = useTravelMode()
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email
 
   const [pin, setPin] = useState('')
@@ -115,6 +117,24 @@ export default function SettingsScreen() {
           <Text style={[styles.meta, { color: colors.textSecondary }]}>{user?.email}</Text>
           <Text style={[styles.meta, { color: colors.textSecondary }]}>Currency: {user?.currency || 'PKR'}</Text>
         </View>
+
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Travel</Text>
+        <Pressable
+          onPress={() => router.push('/travel-mode')}
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <View style={styles.rowBetween}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Travel Mode</Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                {travelOn
+                  ? `On · ${travelCurrency}${rateLine ? ` · ${rateLine}` : ''}`
+                  : 'Off — track spending in a foreign currency'}
+              </Text>
+            </View>
+            <Text style={{ color: colors.primary, fontWeight: '800' }}>{travelOn ? 'Manage' : 'Set up'} →</Text>
+          </View>
+        </Pressable>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Theme</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -605,6 +625,7 @@ const styles = StyleSheet.create({
   },
   meta: { marginTop: 4, fontSize: typography.caption, color: '#3f6153' },
   row: { flexDirection: 'row', alignItems: 'center' },
+  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowTitle: { fontWeight: '800', fontSize: typography.body, color: '#122a20' },
   rowLabel: { fontWeight: '800', fontSize: typography.body },
   rowHint: { fontSize: typography.caption, marginTop: 4, lineHeight: 18, color: '#5f7569' },

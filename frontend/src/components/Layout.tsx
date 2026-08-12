@@ -21,16 +21,16 @@ import OnboardingTour from './OnboardingTour'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 
 const NAV: { path: string; label: string; short: string; tour: string; icon: ReactNode }[] = [
-  { path: '/',          label: 'Overview', icon: <LayoutDashboard size={18} strokeWidth={1.75} />, short: 'Overview', tour: 'nav-overview' },
+  { path: '/',          label: 'Home',     icon: <LayoutDashboard size={18} strokeWidth={1.75} />, short: 'Home', tour: 'nav-overview' },
   { path: '/accounts',  label: 'Wallets',  icon: <Wallet size={18} strokeWidth={1.75} />, short: 'Wallets', tour: 'nav-accounts' },
   { path: '/income',    label: 'Income',   icon: <Coins size={18} strokeWidth={1.75} />, short: 'Income', tour: 'nav-income' },
   { path: '/expenses',  label: 'Bills',    icon: <Receipt size={18} strokeWidth={1.75} />, short: 'Bills', tour: 'nav-bills' },
-  { path: '/reports',   label: 'Reports',  icon: <BarChart3 size={18} strokeWidth={1.75} />, short: 'Reports', tour: 'nav-reports' },
+  { path: '/household', label: 'Family',   icon: <Users size={18} strokeWidth={1.75} />, short: 'Family', tour: 'nav-family' },
 ]
 
-/** Sidebar-only — keeps bottom nav at 5 items (Dashboard entry for Household on mobile). */
+/** Sidebar-only extras (Reports lives in header on mobile; keep in sidebar on desktop). */
 const SIDE_EXTRA: { path: string; label: string; icon: ReactNode }[] = [
-  { path: '/household', label: 'Household', icon: <Users size={18} strokeWidth={1.75} /> },
+  { path: '/reports', label: 'Reports', icon: <BarChart3 size={18} strokeWidth={1.75} /> },
 ]
 
 export default function Layout() {
@@ -111,6 +111,14 @@ export default function Layout() {
           )}
           <button
             className="mobile-header-settings"
+            onClick={() => navigate('/reports')}
+            aria-label="Reports"
+            title="Reports"
+          >
+            <BarChart3 size={18} strokeWidth={2} />
+          </button>
+          <button
+            className="mobile-header-settings"
             onClick={() => navigate('/settings')}
             aria-label="Settings"
           >
@@ -146,6 +154,11 @@ export default function Layout() {
             >
               <span className="nav-icon">{n.icon}</span>
               {n.label}
+              {n.path === '/household' && hhUnread > 0 && (
+                <span className="badge badge-red" style={{ marginLeft: 'auto', fontSize: '0.65rem' }}>
+                  {hhUnread > 9 ? '9+' : hhUnread}
+                </span>
+              )}
             </button>
           ))}
           {SIDE_EXTRA.map(n => (
@@ -156,11 +169,6 @@ export default function Layout() {
             >
               <span className="nav-icon">{n.icon}</span>
               {n.label}
-              {n.path === '/household' && hhUnread > 0 && (
-                <span className="badge badge-red" style={{ marginLeft: 'auto', fontSize: '0.65rem' }}>
-                  {hhUnread > 9 ? '9+' : hhUnread}
-                </span>
-              )}
             </button>
           ))}
         </nav>

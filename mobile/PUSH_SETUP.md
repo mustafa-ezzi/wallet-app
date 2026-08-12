@@ -2,43 +2,67 @@
 
 Campaigns / product updates need an **Expo push token** on each phone. Local test banners work without this; **remote** ops campaigns do not.
 
-## Why you see “no push token”
+## Why you see “Android FCM is not configured”
 
-Usual causes:
+That message means the **installed APK was built without Firebase** in the native layer. Common causes:
 
-1. App is **Expo Go** — use a native EAS APK instead.
-2. **Firebase FCM** was never wired into the Android build (`google-services.json` + FCM V1 key on EAS).
-3. Notifications permission is denied.
-4. Running on an **emulator** instead of a real phone.
+1. `google-services.json` was gitignored and **never uploaded** to the EAS builder.
+2. `GOOGLE_SERVICES_JSON` file env was never created on expo.dev.
+3. You installed an **older APK** (or Expo Go) instead of the new build.
+4. FCM V1 service account is missing under EAS **Credentials** (needed for Expo to deliver pushes).
 
-## One-time Firebase + EAS setup
+## Fix (do all of these, then rebuild)
 
-1. Create a Firebase project → add an Android app with package `com.cashtrail.app`.
-2. Download **`google-services.json`** into `mobile/google-services.json` (same folder as `app.json`).
-3. `app.config.js` will pick it up automatically for the next build.
-4. In Firebase → Project settings → **Service accounts** → Generate new private key (JSON).
-5. Upload that key to Expo:
+### 1. Keep the file locally
+
+Put Firebase’s Android config at:
+
+`mobile/google-services.json`
+
+Package must be `com.cashtrail.app`.
+
+### 2. Make EAS upload it (repo-root `.easignore`)
+
+This repo has a **root** `.easignore` with:
+
+`!mobile/google-services.json`
+
+So the next `eas build` from `mobile/` should include the file even though git ignores it.
+
+### 3. Also set the EAS file env (recommended backup)
 
 ```bash
 cd mobile
-npx eas credentials
-# Android → production (and preview if you use preview APKs)
-# Google Service Account → Push Notifications (FCM V1) → Upload key
+npx eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --environment preview --visibility sensitive
+npx eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --environment production --visibility sensitive
 ```
 
-Or: [expo.dev](https://expo.dev) → CashTrail project → Credentials → Android → FCM V1.
+Use **sensitive** (not secret) so config resolution can see the path. Or create the same on expo.dev → Environment variables (type **File**).
 
-6. Rebuild and install a fresh APK (OTA JS updates are **not** enough):
+### 4. FCM V1 credentials
+
+expo.dev → Credentials → Android (`com.cashtrail.app`) → **Google Service Account (FCM V1)**  
+Upload the Firebase **service account private key** JSON (Project settings → Service accounts → Generate new private key).  
+This is **not** the same file as `google-services.json`.
+
+### 5. Rebuild and install the new APK
 
 ```bash
+cd mobile
 npx eas build -p android --profile preview
 ```
 
-7. Open the app → **Settings → Product updates → Link this device for push**.
+Before building, confirm the archive includes the file:
 
-You should see “Push linked…”. Ops Users should then show a device token for that account.
+```bash
+npx eas build:inspect --platform android --profile preview --stage archive --output ./eas-archive-check
+```
+
+Look for `google-services.json` inside that folder. If it’s missing, stop and fix env/easignore first.
+
+Install the **new** APK (uninstall the old CashTrail first if the phone still has the previous build), open Settings → **Link this device for push**.
 
 ## After linking
 
 - Admin **Campaigns** only reach users with a registered token and marketing enabled.
-- Due reminders can still be local; campaigns always go through Expo’s push service + FCM.
+- Due reminders can still be local; campaigns go through Expo push + FCM.

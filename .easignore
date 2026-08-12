@@ -1,0 +1,36 @@
+# EAS upload rules (repo root). When this file exists, EAS ignores .gitignore.
+# Keep secrets out of git, but DO upload google-services.json for Android FCM.
+
+node_modules/
+**/node_modules/
+.expo/
+**/.expo/
+dist/
+web-build/
+npm-debug.*
+yarn-error.*
+*.log
+.git/
+coverage/
+.vscode/
+.idea/
+.env
+.env*.local
+*.jks
+*.keystore
+*.p12
+*.pem
+researches/
+**/firebase-service-account*.json
+**/*-firebase-adminsdk-*.json
+mobile/ios/
+mobile/android/
+frontend/node_modules/
+frontend-admin/node_modules/
+backend/**/__pycache__/
+backend/.venv/
+backend/venv/
+**/*.pyc
+
+# Force-include FCM config for Android native builds (still gitignored).
+!mobile/google-services.json

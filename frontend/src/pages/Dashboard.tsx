@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownRight,
   ArrowUpRight,
   Landmark,
-  TrendingDown,
-  TrendingUp,
+  Plus,
   Wallet,
   FileText,
   Users,
 } from 'lucide-react'
-import { dashboardApi, forecastApi, householdsApi } from '../api/client'
+import { dashboardApi, householdsApi, transactionsApi } from '../api/client'
+import { CategoryDonut, type DonutDatum } from '../components/CategoryDonut'
+import { getCategoryMeta } from '../constants/categories'
 import { useAuth } from '../context/AuthContext'
 import { useOffline } from '../offline'
 import { fmt, fmtBalance } from '../utils/format'
@@ -27,24 +28,37 @@ interface DashboardData {
   }[]
 }
 
-interface Forecast {
-  total_expected_income: number
-  total_expected_outgoing: number
-  net_forecast: number
-  actual_income: number
-  actual_expense: number
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+function monthPrefix(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December']
+function breakdownFromTxs(
+  txs: { type: string; category: string; amount: number; date: string }[],
+): DonutDatum[] {
+  const prefix = monthPrefix()
+  const map = new Map<string, number>()
+  for (const t of txs) {
+    if (!t.date.startsWith(prefix)) continue
+    if (t.type !== 'expense') continue
+    if (t.category === 'Bank Transfer') continue
+    const key = t.category || 'Uncategorized'
+    map.set(key, (map.get(key) ?? 0) + Number(t.amount || 0))
+  }
+  return Array.from(map.entries()).map(([category, amount]) => ({ category, amount }))
+}
 
 export default function Dashboard() {
   const { user } = useAuth()
   const { getCachedAccounts, getCachedTransactions, online, pending } = useOffline()
   const navigate = useNavigate()
-  const [data, setData]         = useState<DashboardData | null>(null)
-  const [forecast, setForecast] = useState<Forecast | null>(null)
-  const [loading, setLoading]   = useState(true)
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [breakdown, setBreakdown] = useState<DonutDatum[]>([])
+  const [loading, setLoading] = useState(true)
   const [hhUnread, setHhUnread] = useState(0)
   const [fromCache, setFromCache] = useState(false)
 
@@ -57,23 +71,25 @@ export default function Dashboard() {
       ])
       if (!accounts.length && !txs.length) {
         setData(null)
+        setBreakdown([])
         return
       }
       const total = accounts.reduce((s, a) => s + a.currentBalance, 0)
-      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      const monthTxs = txs.filter(t => t.date.startsWith(month))
-      const monthIncome = monthTxs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-      const monthExpense = monthTxs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-      const nameById = new Map(accounts.map(a => [a.serverId, a.name]))
+      const month = monthPrefix(now)
+      const monthTxs = txs.filter((t) => t.date.startsWith(month) && t.category !== 'Bank Transfer')
+      const monthIncome = monthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+      const monthExpense = monthTxs.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      const nameById = new Map(accounts.map((a) => [a.serverId, a.name]))
+      setBreakdown(breakdownFromTxs(txs))
       setData({
         total_balance: total,
-        accounts: accounts.map(a => ({
+        accounts: accounts.map((a) => ({
           id: a.serverId, name: a.name, type: a.type, balance: a.currentBalance,
         })),
         month_income: monthIncome,
         month_expense: monthExpense,
         month_net: monthIncome - monthExpense,
-        recent_transactions: txs.slice(0, 8).map(t => ({
+        recent_transactions: txs.slice(0, 8).map((t) => ({
           id: t.serverId ?? Number.NaN,
           type: t.type,
           amount: t.amount,
@@ -91,36 +107,46 @@ export default function Dashboard() {
 
     Promise.all([
       dashboardApi.get(),
-      forecastApi.get(now.getFullYear(), now.getMonth() + 1),
+      transactionsApi.list().catch(() => ({ data: [] })),
       householdsApi.unreadNotificationCount().catch(() => ({ data: { count: 0 } })),
-    ]).then(([dRes, fRes, uRes]) => {
+    ]).then(([dRes, tRes, uRes]) => {
       const d = dRes.data ?? {}
+      const rawTx = tRes.data
+      const txs = Array.isArray(rawTx)
+        ? rawTx
+        : Array.isArray((rawTx as { results?: unknown })?.results)
+          ? ((rawTx as { results: unknown[] }).results)
+          : []
       setData({
         ...d,
         accounts: Array.isArray(d.accounts) ? d.accounts : [],
         recent_transactions: Array.isArray(d.recent_transactions) ? d.recent_transactions : [],
       })
-      setForecast(fRes.data ?? null)
+      setBreakdown(breakdownFromTxs(txs as { type: string; category: string; amount: number; date: string }[]))
       setHhUnread(Number(uRes.data?.count) || 0)
       setFromCache(false)
     }).catch(async () => {
-      setForecast(null)
       await loadCached()
     }).finally(() => setLoading(false))
   }, [getCachedAccounts, getCachedTransactions])
 
-  const now = new Date()
-  const monthName = MONTH_NAMES[now.getMonth()]
-  const net = forecast?.net_forecast ?? 0
+  const monthName = MONTH_NAMES[new Date().getMonth()]
+  const accounts = data?.accounts ?? []
+  const walletCount = accounts.length
+  const balanceNeg = (data?.total_balance ?? 0) < 0
 
-  if (loading) return (
-    <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
-      <div className="spinner spinner-dark" style={{ width: '2rem', height: '2rem' }} />
-    </div>
-  )
+  const recent = useMemo(() => data?.recent_transactions ?? [], [data])
+
+  if (loading) {
+    return (
+      <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div className="spinner spinner-dark" style={{ width: '2rem', height: '2rem' }} />
+      </div>
+    )
+  }
 
   return (
-    <div className="page">
+    <div className="page home-page">
       <div className="welcome-row">
         <span className="welcome-hi">Welcome back,</span>
         <span className="welcome-name">
@@ -136,196 +162,126 @@ export default function Dashboard() {
             : `${pending} transaction${pending === 1 ? '' : 's'} waiting to sync.`}
         </div>
       )}
-      {/* ── Hero balance card ── */}
-      <div className="hero-balance">
-        <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>
-          Total Balance
-        </p>
-        <div className="balance-amount" style={{ color: (data?.total_balance ?? 0) < 0 ? '#fecaca' : undefined }}>
+
+      {/* What you have — balance + wallets in one card (mobile parity) */}
+      <section className="home-card">
+        <div className="home-card-head">
+          <h3>What you have</h3>
+          <button type="button" className="section-link" onClick={() => navigate('/accounts')}>
+            All wallets →
+          </button>
+        </div>
+        <div className={`home-balance ${balanceNeg ? 'neg' : ''}`}>
           {fmtBalance(data?.total_balance ?? 0)}
         </div>
-        <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.6)' }}>
-          Across {data?.accounts?.length ?? 0} wallet{(data?.accounts?.length ?? 0) !== 1 ? 's' : ''}
+        <p className="home-balance-hint">
+          Across {walletCount} wallet{walletCount === 1 ? '' : 's'} · {monthName} in {fmt(data?.month_income ?? 0)} · out {fmt(data?.month_expense ?? 0)}
         </p>
-        <div className="balance-chips">
-          <div className="balance-chip">
-            <div className="chip-label">
-              <ArrowUpRight size={12} strokeWidth={2.25} /> {monthName} In
-            </div>
-            <div className="chip-value">{fmt(data?.month_income ?? 0)}</div>
-          </div>
-          <div className="balance-chip">
-            <div className="chip-label">
-              <ArrowDownRight size={12} strokeWidth={2.25} /> {monthName} Out
-            </div>
-            <div className="chip-value">{fmt(data?.month_expense ?? 0)}</div>
-          </div>
-        </div>
-      </div>
 
-      {/* ── Monthly forecast summary (req 4.1) ── */}
-      {forecast && (
-        <div className="forecast-summary-card">
-          <div className="section-row" style={{ marginBottom: '0.6rem' }}>
-            <h3>Expected Net This Month</h3>
-            <button className="section-link" onClick={() => navigate('/reports')}>Full report →</button>
-          </div>
-
-          <div style={{ fontSize: '1.75rem', fontFamily: 'var(--font-heading)', fontWeight: 700, color: net >= 0 ? 'var(--success)' : 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            {fmtBalance(net)}
-            <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-              {net >= 0
-                ? <TrendingUp size={18} strokeWidth={2} />
-                : <TrendingDown size={18} strokeWidth={2} />}
-            </span>
-          </div>
-          <p className="page-subtitle" style={{ marginTop: '0.25rem' }}>
-            Based on scheduled income &amp; expenses
-          </p>
-
-          <div className="forecast-net-row">
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 400 }}>Actual net this month</span>
-            <span style={{ color: data?.month_net && data.month_net >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: '0.88rem' }}>
-              {fmtBalance(data?.month_net ?? 0)}
-            </span>
-          </div>
-
-          {/* Progress bars */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
-            {[
-              { label: 'Income received', actual: forecast.actual_income,  expected: forecast.total_expected_income,   color: 'var(--green-700)' },
-              { label: 'Expenses paid',   actual: forecast.actual_expense, expected: forecast.total_expected_outgoing, color: 'var(--red-600)' },
-            ].map(bar => {
-              const pct = bar.expected > 0 ? Math.min(100, (bar.actual / bar.expected) * 100) : 0
-              return (
-                <div key={bar.label}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{bar.label}</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                      {fmt(bar.actual)} / {fmt(bar.expected)}
-                    </span>
-                  </div>
-                  <div className="progress-bar" style={{ height: '5px' }}>
-                    <div style={{ height: '100%', borderRadius: '99px', background: bar.color, width: `${pct}%`, transition: 'width 0.5s' }} />
-                  </div>
+        <div className="wallet-grid">
+          {accounts.slice(0, 6).map((acc) => {
+            const neg = acc.balance < 0
+            return (
+              <button
+                key={acc.id}
+                type="button"
+                className="wallet-tile"
+                onClick={() => navigate('/accounts')}
+              >
+                <div className="wallet-tile-top">
+                  <span className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : 'account-icon-bank'}`}>
+                    {acc.type === 'cash'
+                      ? <Wallet size={14} strokeWidth={1.75} />
+                      : <Landmark size={14} strokeWidth={1.75} />}
+                  </span>
+                  <span className="wallet-tile-name">{acc.name}</span>
                 </div>
-              )
-            })}
-          </div>
+                <div className={`wallet-tile-bal ${neg ? 'neg' : ''}`}>{fmtBalance(acc.balance)}</div>
+              </button>
+            )
+          })}
+          <button type="button" className="wallet-tile wallet-tile-add" onClick={() => navigate('/accounts')}>
+            <Plus size={16} strokeWidth={2.25} />
+            <span>Add wallet</span>
+          </button>
         </div>
-      )}
+      </section>
 
-      {/* ── Household entry (nav crowded on mobile — card here) ── */}
-      <button
-        type="button"
-        className="glass glass-hover"
-        onClick={() => navigate('/household')}
-        style={{
-          width: '100%', marginBottom: '1rem', padding: '0.9rem 1rem', borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', textAlign: 'left',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className="account-icon account-icon-bank"><Users size={16} strokeWidth={1.75} /></div>
+      {/* Monthly spending bloom chart */}
+      <section className="home-card">
+        <div className="home-card-head">
+          <h3>{monthName} spending</h3>
+          <button type="button" className="section-link" onClick={() => navigate('/reports')}>
+            Reports →
+          </button>
+        </div>
+        <CategoryDonut data={breakdown} />
+      </section>
+
+      {/* Household shortcut */}
+      <button type="button" className="home-card home-hh-btn" onClick={() => navigate('/household')}>
+        <div className="home-hh-left">
+          <span className="account-icon account-icon-bank"><Users size={16} strokeWidth={1.75} /></span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <div className="home-hh-title">
               Household
-              {hhUnread > 0 && (
-                <span className="badge badge-red" style={{ fontSize: '0.62rem' }}>{hhUnread} new</span>
-              )}
+              {hhUnread > 0 && <span className="badge badge-red">{hhUnread} new</span>}
             </div>
             <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-              {hhUnread > 0 ? 'Someone posted a shared expense' : 'Shared expenses with family or friends'}
+              {hhUnread > 0 ? 'Someone posted a shared expense' : 'Shared expenses with family'}
             </div>
           </div>
         </div>
         <span className="section-link">Open →</span>
       </button>
 
-      {/* ── Accounts ── */}
-      <div style={{ marginBottom: '1rem' }}>
-        <div className="section-row">
-          <h3>Wallets</h3>
-          <button className="section-link" onClick={() => navigate('/accounts')}>Manage →</button>
+      {/* Recent */}
+      <div className="section-row">
+        <h3>Recent</h3>
+        <button type="button" className="section-link" onClick={() => navigate('/reports')}>
+          View all →
+        </button>
+      </div>
+      {!recent.length ? (
+        <div className="home-card empty-state">
+          <div className="empty-icon"><FileText size={36} strokeWidth={1.5} /></div>
+          <p>No transactions yet. Tap + to add your first one.</p>
         </div>
-        {!data?.accounts?.length ? (
-          <div className="glass empty-state">
-            <div className="empty-icon"><Wallet size={36} strokeWidth={1.5} /></div>
-            <p>No wallets yet.</p>
-            <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={() => navigate('/accounts')}>Create wallet</button>
-          </div>
-        ) : (
-          <div className="list">
-            {data.accounts.map(acc => (
-              <div key={acc.id} className="list-item glass-hover" style={{ cursor: 'pointer' }} onClick={() => navigate('/accounts')}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : 'account-icon-bank'}`}>
-                    {acc.type === 'cash'
-                      ? <Wallet size={16} strokeWidth={1.75} />
-                      : <Landmark size={16} strokeWidth={1.75} />}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{acc.name}</div>
-                    <div className="text-muted">{acc.type === 'cash' ? 'Cash' : 'Bank'}</div>
-                  </div>
+      ) : (
+        <div className="home-tx-list">
+          {recent.map((tx, i) => {
+            const income = tx.type === 'income'
+            const title = tx.project_name || tx.category || (income ? 'Income' : 'Expense')
+            const meta = getCategoryMeta(tx.category)
+            const Icon = income ? ArrowUpRight : meta.icon
+            const note = (tx.notes || '').trim()
+            return (
+              <div
+                key={tx.id && !Number.isNaN(tx.id) ? tx.id : `tx-${tx.date}-${i}`}
+                className="home-tx-row"
+              >
+                <div
+                  className="home-tx-icon"
+                  style={{
+                    background: income ? '#ecfdf5' : `${meta.color}1f`,
+                    color: income ? 'var(--success)' : meta.color,
+                  }}
+                >
+                  <Icon size={14} strokeWidth={2.25} />
                 </div>
-                <div style={{ fontWeight: 700, color: acc.balance >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  {fmtBalance(acc.balance)}
+                <div className="home-tx-body">
+                  <div className="home-tx-title">{title}</div>
+                  {note ? <div className="home-tx-notes">{note}</div> : null}
+                  <div className="home-tx-meta">{tx.account_name} · {tx.date}</div>
+                </div>
+                <div className={`home-tx-amt ${income ? 'in' : 'out'}`}>
+                  {income ? '+' : '−'} {fmt(Math.abs(tx.amount))}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Recent transactions ── */}
-      <div>
-        <div className="section-row">
-          <h3>Recent Transactions</h3>
-          <button className="section-link" onClick={() => navigate('/reports')}>View all →</button>
+            )
+          })}
         </div>
-        {!data?.recent_transactions?.length ? (
-          <div className="glass empty-state">
-            <div className="empty-icon"><FileText size={36} strokeWidth={1.5} /></div>
-            <p>No transactions yet. Tap + to add your first one.</p>
-          </div>
-        ) : (
-          <div className="list">
-            {data.recent_transactions.map((tx, i) => {
-              const title = tx.project_name || tx.category || (tx.type === 'income' ? 'Income' : 'Expense')
-              const note = (tx.notes || '').trim()
-              return (
-                <div
-                  key={tx.id && !Number.isNaN(tx.id) ? tx.id : `tx-${tx.date}-${i}`}
-                  className="list-item glass-hover dash-tx-item"
-                >
-                  <div className="dash-tx-left">
-                    <div className={`tx-icon ${tx.type === 'income' ? 'tx-icon-income' : 'tx-icon-expense'}`}>
-                      {tx.type === 'income'
-                        ? <ArrowUpRight size={14} strokeWidth={2.25} />
-                        : <ArrowDownRight size={14} strokeWidth={2.25} />}
-                    </div>
-                    <div className="dash-tx-body">
-                      <div className="dash-tx-title">{title}</div>
-                      {note ? <div className="dash-tx-notes">{note}</div> : null}
-                      <div className="dash-tx-meta text-muted">
-                        {tx.account_name} · {tx.date}
-                      </div>
-                    </div>
-                  </div>
-                  <div
-                    className="dash-tx-amount"
-                    style={{ color: tx.type === 'income' ? 'var(--success)' : 'var(--danger)' }}
-                  >
-                    {tx.type === 'income' ? '+' : '−'} {fmt(tx.amount)}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   )
 }

@@ -32,7 +32,11 @@ class UserProfile(models.Model):
 
 
 class Account(models.Model):
-    ACCOUNT_TYPES = [('bank', 'Bank'), ('cash', 'Cash')]
+    ACCOUNT_TYPES = [
+        ('bank', 'Bank'),
+        ('cash', 'Cash'),
+        ('person', 'Person'),
+    ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='accounts')
     name = models.CharField(max_length=100)
@@ -45,6 +49,10 @@ class Account(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.user.username})"
+
+    @property
+    def is_person(self):
+        return self.type == 'person'
 
     @property
     def current_balance(self):
@@ -116,6 +124,18 @@ class Project(models.Model):
 
 class Transaction(models.Model):
     TYPES = [('income', 'Income'), ('expense', 'Expense')]
+    PEOPLE_ACTIONS = [
+        ('lend', 'Lend'),
+        ('borrow', 'Borrow'),
+        ('pay', 'Pay'),
+        ('receive', 'Receive'),
+    ]
+    FX_SOURCES = [
+        ('live', 'Live'),
+        ('manual', 'Manual'),
+        ('cached', 'Cached'),
+        ('offline', 'Offline'),
+    ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
     type = models.CharField(max_length=10, choices=TYPES)
@@ -134,6 +154,14 @@ class Transaction(models.Model):
     notes = models.TextField(blank=True)
     # Client-generated UUID for offline sync retries (unique per user when set)
     client_mutation_id = models.CharField(max_length=64, null=True, blank=True, db_index=True)
+    # Travel Mode — amount is always PKR; optional foreign snapshot for display
+    original_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    original_currency = models.CharField(max_length=10, blank=True, default='')
+    fx_rate = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    fx_source = models.CharField(max_length=16, blank=True, default='', choices=FX_SOURCES)
+    # People double-entry: shared pair id + action label
+    people_pair_id = models.CharField(max_length=64, null=True, blank=True, db_index=True)
+    people_action = models.CharField(max_length=16, blank=True, default='', choices=PEOPLE_ACTIONS)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -182,6 +210,59 @@ class Transaction(models.Model):
                 if proj.remaining_amount <= 0.01:
                     proj.status = 'completed'
                     proj.save(update_fields=['status'])
+
+
+class TravelMode(models.Model):
+    """One active travel session per user. Books stay PKR; rate is PKR per 1 travel unit."""
+
+    RATE_SOURCES = [
+        ('live', 'Live'),
+        ('manual', 'Manual'),
+        ('cached', 'Cached'),
+        ('offline', 'Offline'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='travel_mode')
+    enabled = models.BooleanField(default=False)
+    travel_currency = models.CharField(max_length=10, blank=True, default='')
+    rate = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    rate_as_of = models.DateTimeField(null=True, blank=True)
+    rate_source = models.CharField(max_length=16, blank=True, default='', choices=RATE_SOURCES)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Travel mode'
+        verbose_name_plural = 'Travel modes'
+
+    def __str__(self):
+        state = f'{self.travel_currency}@{self.rate}' if self.enabled else 'off'
+        return f'TravelMode({self.user_id}, {state})'
+
+
+class FxRateCache(models.Model):
+    """Cached mid-market quote: quote currency units per 1 base unit (e.g. PKR per 1 AED)."""
+
+    base = models.CharField(max_length=10)
+    quote = models.CharField(max_length=10)
+    rate = models.DecimalField(max_digits=18, decimal_places=6)
+    source = models.CharField(max_length=64, blank=True, default='')
+    fetched_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = 'FX rate cache'
+        verbose_name_plural = 'FX rate cache'
+        constraints = [
+            models.UniqueConstraint(fields=['base', 'quote'], name='uniq_fx_base_quote'),
+        ]
+        indexes = [
+            models.Index(fields=['base', 'quote'], name='fx_base_quote_idx'),
+        ]
+
+    def __str__(self):
+        return f'1 {self.base} = {self.rate} {self.quote} ({self.source})'
 
 
 class RecurringExpense(models.Model):

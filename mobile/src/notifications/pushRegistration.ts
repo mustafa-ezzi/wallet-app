@@ -76,7 +76,7 @@ export async function getExpoPushToken(): Promise<{ token: string | null; error?
       return {
         token: null,
         error:
-          'Android FCM is not configured for this build. Add google-services.json + upload an FCM V1 service account in EAS credentials, then rebuild the APK.',
+          `Android FCM missing in this APK. Rebuild after google-services.json is on the EAS upload (see PUSH_SETUP.md). Detail: ${msg.slice(0, 120)}`,
       }
     }
     if (lower.includes('projectid') || lower.includes('project id')) {

@@ -25,6 +25,10 @@ export interface OfflineTransaction {
   createdAt: string
   clientMutationId: string
   lastError?: string
+  originalAmount?: number | null
+  originalCurrency?: string | null
+  fxRate?: number | null
+  fxSource?: string | null
 }
 
 export interface OutboxItem {
@@ -39,6 +43,10 @@ export interface OutboxItem {
     category: string
     notes: string
     client_mutation_id: string
+    original_amount?: number
+    original_currency?: string
+    fx_rate?: number
+    fx_source?: string
   }
   attempts: number
   lastError?: string

@@ -1,7 +1,7 @@
 export type Account = {
   id: number
   name: string
-  type: 'bank' | 'cash'
+  type: 'bank' | 'cash' | 'person'
   opening_balance: number | string
   current_balance: number | string
   created_at?: string
@@ -20,15 +20,44 @@ export type Transaction = {
   linked_payable?: number | null
   linked_receivable?: number | null
   linked_project?: number | null
+  original_amount?: number | string | null
+  original_currency?: string | null
+  fx_rate?: number | string | null
+  fx_source?: string | null
+  people_pair_id?: string | null
+  people_action?: string | null
 }
 
 export type Dashboard = {
   total_balance: number | string
   accounts: { id: number; name: string; type: string; balance: number | string }[]
+  people?: { id: number; name: string; type: string; balance: number | string }[]
   month_income: number | string
   month_expense: number | string
   month_net: number | string
   recent_transactions: Transaction[]
+}
+
+export type TravelModeState = {
+  enabled: boolean
+  travel_currency: string
+  rate: number | string | null
+  rate_as_of?: string | null
+  rate_source?: string
+  start_date?: string | null
+  end_date?: string | null
+  updated_at?: string
+  created_at?: string
+}
+
+export type FxQuote = {
+  base: string
+  quote: string
+  rate: string
+  as_of: string
+  source: string
+  stale: boolean
+  warning?: string
 }
 
 export type RecurringExpense = {

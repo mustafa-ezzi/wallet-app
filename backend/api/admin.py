@@ -15,6 +15,7 @@ from .models import (
     AppRemoteConfig,
     DeviceToken,
     Entitlement,
+    FxRateCache,
     Household,
     HouseholdExpense,
     HouseholdInvite,
@@ -33,6 +34,7 @@ from .models import (
     SupportMessage,
     SupportThread,
     Transaction,
+    TravelMode,
     UserOpsMeta,
     UserProfile,
 )
@@ -82,9 +84,22 @@ class ProjectAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
-    list_display = ('id', 'date', 'type', 'category', 'user')
-    list_filter = ('type',)
-    search_fields = ('description', 'user__username')
+    list_display = ('id', 'date', 'type', 'category', 'user', 'people_action')
+    list_filter = ('type', 'people_action')
+    search_fields = ('notes', 'user__username', 'category')
+
+
+@admin.register(TravelMode)
+class TravelModeAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
+    list_display = ('user', 'enabled', 'travel_currency', 'rate', 'updated_at')
+    list_filter = ('enabled', 'travel_currency')
+    search_fields = ('user__username', 'user__email')
+
+
+@admin.register(FxRateCache)
+class FxRateCacheAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
+    list_display = ('base', 'quote', 'rate', 'source', 'fetched_at')
+    list_filter = ('base', 'quote')
 
 
 @admin.register(RecurringExpense)

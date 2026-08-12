@@ -324,7 +324,7 @@ export const dashboardApi = {
 }
 
 export const accountsApi = {
-  list: () => api.get('/accounts/'),
+  list: (params?: object) => api.get('/accounts/', { params }),
   create: (data: object) => api.post('/accounts/', data),
   update: (id: number, data: object) => api.patch(`/accounts/${id}/`, data),
   remove: (id: number) => api.delete(`/accounts/${id}/`),
@@ -367,6 +367,16 @@ export const projectsApi = {
   create: (data: object) => api.post('/projects/', data),
   update: (id: number, data: object) => api.patch(`/projects/${id}/`, data),
   remove: (id: number) => api.delete(`/projects/${id}/`),
+}
+
+export const travelApi = {
+  get: () => api.get('/travel-mode/'),
+  set: (data: object) => api.put('/travel-mode/', data),
+}
+
+export const fxApi = {
+  quote: (base: string, quote = 'PKR', refresh = false) =>
+    api.get('/fx/', { params: { base, quote, refresh: refresh ? '1' : undefined } }),
 }
 
 export const householdsApi = {

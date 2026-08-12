@@ -34,6 +34,8 @@ import { useOffline } from '@/src/offline'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { fmtBalance, todayISO } from '@/src/utils/format'
+import { useTravelMode } from '@/src/travel/TravelModeContext'
+import { formatRateLine, foreignToPkr } from '@/src/travel/currencies'
 
 type Kind = 'expense' | 'income' | 'transfer'
 
@@ -57,6 +59,13 @@ export default function AddTransactionScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors])
   const { bumpRefresh } = useMoneyUi()
   const { online, queueTransaction, getCachedAccounts, hydrateNow } = useOffline()
+  const {
+    isActive: travelOn,
+    currency: travelCurrency,
+    rate: travelRate,
+    rateLine,
+    toPkr,
+  } = useTravelMode()
 
   const [kind, setKind] = useState<Kind>('expense')
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -81,10 +90,10 @@ export default function AddTransactionScreen() {
         if (online) {
           try {
             const [{ data }, ledgersRes] = await Promise.all([
-              accountsApi.list(),
+              accountsApi.list({ type: 'bank,cash' }),
               householdsApi.openLedgers().catch(() => ({ data: [] })),
             ])
-            const list = asList<Account>(data)
+            const list = asList<Account>(data).filter((a) => a.type !== 'person')
             setAccounts(list)
             setAccountId(list[0] ? String(list[0].id) : '')
             setToAccountId(list[1] ? String(list[1].id) : list[0] ? String(list[0].id) : '')
@@ -160,6 +169,21 @@ export default function AddTransactionScreen() {
       return
     }
 
+    const useTravel = travelOn && kind !== 'transfer'
+    const pkrAmount = useTravel ? toPkr(value) : value
+    if (useTravel && (!(travelRate > 0) || !(pkrAmount > 0))) {
+      setError('Travel rate missing. Open Travel Mode and set a rate.')
+      return
+    }
+    const fxPayload = useTravel
+      ? {
+          originalAmount: value,
+          originalCurrency: travelCurrency,
+          fxRate: travelRate,
+          fxSource: 'manual' as const,
+        }
+      : {}
+
     submittingRef.current = true
     setLoading(true)
     let succeeded = false
@@ -207,12 +231,20 @@ export default function AddTransactionScreen() {
         }
         await transactionsApi.create({
           type: 'expense',
-          amount: value,
+          amount: pkrAmount,
           date,
           account: Number(accountId),
           category,
           notes: notes.trim(),
           household_ledger: Number(householdLedgerId),
+          ...(useTravel
+            ? {
+                original_amount: value,
+                original_currency: travelCurrency,
+                fx_rate: travelRate,
+                fx_source: 'manual',
+              }
+            : {}),
         })
         void hydrateNow()
         succeeded = true
@@ -222,11 +254,12 @@ export default function AddTransactionScreen() {
 
       await queueTransaction({
         type: kind,
-        amount: value,
+        amount: pkrAmount,
         date,
         accountServerId: Number(accountId),
         category,
         notes: notes.trim(),
+        ...fxPayload,
       })
       succeeded = true
       finishOk()
@@ -280,7 +313,9 @@ export default function AddTransactionScreen() {
         </View>
 
         <View style={styles.amountCard}>
-          <Text style={[styles.amountCurrency, { color: colors.textMuted }]}>PKR</Text>
+          <Text style={[styles.amountCurrency, { color: colors.textMuted }]}>
+            {travelOn && kind !== 'transfer' ? travelCurrency : 'PKR'}
+          </Text>
           <TextInput
             value={amount}
             onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ''))}
@@ -298,6 +333,11 @@ export default function AddTransactionScreen() {
             <FontAwesome name="calculator" size={18} color={colors.primary} />
           </Pressable>
         </View>
+        {travelOn && kind !== 'transfer' && amount && Number(amount) > 0 ? (
+          <Text style={styles.pkrHint}>
+            ≈ PKR {foreignToPkr(Number(amount), travelRate).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          </Text>
+        ) : null}
       </LinearGradient>
 
       {booting ? (
@@ -309,6 +349,24 @@ export default function AddTransactionScreen() {
           showsVerticalScrollIndicator={false}
         >
           <ErrorBanner message={error} />
+
+          {travelOn && kind !== 'transfer' ? (
+            <Pressable
+              style={[styles.travelBanner, { backgroundColor: `${colors.primary}18`, borderColor: colors.primary }]}
+              onPress={() => router.push('/travel-mode')}
+            >
+              <FontAwesome name="plane" size={14} color={colors.primaryDark} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.travelBannerTitle, { color: colors.primaryDark }]}>
+                  Travel Mode · amounts in {travelCurrency}
+                </Text>
+                <Text style={[styles.travelBannerSub, { color: colors.textSecondary }]}>
+                  {rateLine || formatRateLine(travelCurrency, travelRate)}
+                </Text>
+              </View>
+              <FontAwesome name="chevron-right" size={12} color={colors.primary} />
+            </Pressable>
+          ) : null}
 
           {kind === 'transfer' ? (
             <View style={styles.block}>
@@ -527,6 +585,24 @@ function makeStyles(colors: ColorTokens) {
     amountCurrency: { fontSize: typography.subtitle, fontWeight: '800' },
     amountValue: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
     calcBtn: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+    pkrHint: {
+      marginTop: spacing.sm,
+      color: 'rgba(255,255,255,0.9)',
+      fontWeight: '700',
+      fontSize: 13,
+      textAlign: 'center',
+    },
+    travelBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    travelBannerTitle: { fontWeight: '800', fontSize: 13 },
+    travelBannerSub: { fontWeight: '600', fontSize: 12, marginTop: 2 },
     sectionTitle: { fontSize: typography.subtitle, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
     catRow: { gap: spacing.md, paddingRight: spacing.lg, paddingBottom: spacing.xs },
     catItem: { width: 74, alignItems: 'center' },

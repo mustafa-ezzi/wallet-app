@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import { accountsApi, forecastApi, transactionsApi, asList } from '../api/client'
+import { getCategoryMeta } from '../constants/categories'
 import { useAuth } from '../context/AuthContext'
 import { track } from '../lib/analytics'
 import { fmt, fmtBalance, sumMoney, toMoney } from '../utils/format'
@@ -488,9 +489,20 @@ export default function Reports() {
                 const { day, mon } = dayLabel(tx.date)
                 const income = tx.type === 'income'
                 const transfer = isTransfer(tx)
+                const meta = getCategoryMeta(tx.category)
+                const Icon = meta.icon
                 return (
                   <div key={tx.id} className="rpt-led-item">
                     <button className="rpt-led-row" onClick={() => setExpanded(open ? null : tx.id)}>
+                      <span
+                        className="rpt-led-icon"
+                        style={{
+                          background: income ? '#ecfdf5' : `${meta.color}1f`,
+                          color: income ? 'var(--success)' : meta.color,
+                        }}
+                      >
+                        <Icon size={14} strokeWidth={2.25} />
+                      </span>
                       <span className="rpt-led-date">{day}<small>{mon}</small></span>
                       <span className="rpt-led-desc">
                         <span className="rpt-led-desc-main">{txTitle(tx)}</span>

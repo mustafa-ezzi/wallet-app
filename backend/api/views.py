@@ -119,10 +119,31 @@ class AccountViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Account.objects.filter(user=self.request.user)
+        qs = Account.objects.filter(user=self.request.user)
+        type_filter = self.request.query_params.get('type')
+        if type_filter:
+            types = [t.strip() for t in type_filter.split(',') if t.strip()]
+            if types:
+                qs = qs.filter(type__in=types)
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        acc = self.get_object()
+        if acc.type == 'person':
+            from decimal import Decimal
+            bal = Decimal(str(acc.current_balance))
+            if abs(bal) > Decimal('0.01'):
+                return Response(
+                    {
+                        'detail': 'Settle this person to zero before deleting.',
+                        'balance': float(bal),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        return super().destroy(request, *args, **kwargs)
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -243,10 +264,11 @@ class DashboardView(APIView):
 
     def get(self, request):
         user = request.user
-        accounts = Account.objects.filter(user=user)
+        wallets = Account.objects.filter(user=user).exclude(type='person')
+        people = Account.objects.filter(user=user, type='person')
         account_data = []
         total_balance = Decimal('0')
-        for acc in accounts:
+        for acc in wallets:
             bal = Decimal(str(acc.current_balance))
             total_balance += bal
             account_data.append({
@@ -256,27 +278,45 @@ class DashboardView(APIView):
                 'balance': float(bal),
             })
 
+        people_data = []
+        for p in people:
+            bal = Decimal(str(p.current_balance))
+            people_data.append({
+                'id': p.id,
+                'name': p.name,
+                'type': 'person',
+                'balance': float(bal),
+            })
+
         today = date.today()
         month_start = today.replace(day=1)
         month_end = today.replace(day=calendar.monthrange(today.year, today.month)[1])
 
-        # Bank transfers are internal moves — exclude from income/expense totals
+        # Bank transfers + people double-entry are not personal income/expense
         month_income = Transaction.objects.filter(
             user=user, type='income',
             date__gte=month_start, date__lte=month_end,
-        ).exclude(category='Bank Transfer').aggregate(total=Sum('amount'))['total'] or 0
+        ).exclude(category='Bank Transfer').exclude(
+            people_action__gt='',
+        ).aggregate(total=Sum('amount'))['total'] or 0
 
         month_expense = Transaction.objects.filter(
             user=user, type='expense',
             date__gte=month_start, date__lte=month_end,
-        ).exclude(category='Bank Transfer').aggregate(total=Sum('amount'))['total'] or 0
+        ).exclude(category='Bank Transfer').exclude(
+            people_action__gt='',
+        ).aggregate(total=Sum('amount'))['total'] or 0
 
-        recent_transactions = Transaction.objects.filter(user=user)[:8]
+        # Recent: prefer wallet activity (exclude person-leg rows so pairs aren't doubled)
+        recent_transactions = Transaction.objects.filter(user=user).exclude(
+            account__type='person',
+        )[:8]
         tx_data = TransactionSerializer(recent_transactions, many=True).data
 
         return Response({
             'total_balance': float(total_balance),
             'accounts': account_data,
+            'people': people_data,
             'month_income': float(month_income),
             'month_expense': float(month_expense),
             'month_net': float(month_income) - float(month_expense),

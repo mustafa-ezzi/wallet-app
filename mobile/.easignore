@@ -1,4 +1,4 @@
-# Keep the EAS upload small — local caches/logs must not ship.
+# Prefer repo-root .easignore. This file helps when EAS_PROJECT_ROOT=mobile.
 .expo/
 .expo-shared/
 dist/
@@ -17,5 +17,8 @@ coverage/
 .env*.local
 *.jks
 *.keystore
-# Keep google-services.json in the EAS upload when present (required for Android FCM push).
-# Still gitignored locally if you prefer secrets via CI — place the file before `eas build`.
+*.p12
+*.pem
+
+# Upload FCM config even though gitignored
+!google-services.json

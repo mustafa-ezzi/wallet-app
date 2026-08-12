@@ -10,6 +10,11 @@ export interface QueueTxInput {
   notes?: string
   /** Household shared writes stay online-only in P4. */
   householdLedger?: number | null
+  /** Travel Mode snapshot (amount is already PKR). */
+  originalAmount?: number | null
+  originalCurrency?: string | null
+  fxRate?: number | null
+  fxSource?: string | null
 }
 
 export interface QueueTxResult {
@@ -53,6 +58,10 @@ export async function queuePersonalTransaction(
     notes: input.notes || '',
     createdAt,
     clientMutationId,
+    originalAmount: input.originalAmount ?? null,
+    originalCurrency: input.originalCurrency ?? null,
+    fxRate: input.fxRate ?? null,
+    fxSource: input.fxSource ?? null,
   }
 
   const outbox: OutboxItem = {
@@ -67,6 +76,14 @@ export async function queuePersonalTransaction(
       category: input.category || '',
       notes: input.notes || '',
       client_mutation_id: clientMutationId,
+      ...(input.originalAmount != null && input.originalCurrency && input.fxRate != null
+        ? {
+            original_amount: input.originalAmount,
+            original_currency: input.originalCurrency,
+            fx_rate: input.fxRate,
+            fx_source: input.fxSource || 'offline',
+          }
+        : {}),
     },
     attempts: 0,
     createdAt,

@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react'
 import { accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
 import { fmt, fmtBalance, toMoney } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
 import { track } from '../lib/analytics'
@@ -25,9 +26,6 @@ interface Tx {
   category: string; notes: string
   project_name: string | null
 }
-
-const EXPENSE_CATS = ['Utilities','Server Charges','Rent','Food','Transport','Salary','Loan Repayment','Bank Transfer','Miscellaneous']
-const INCOME_CATS  = ['Monthly Income','Installment Receipt','Bank Transfer','Salary','Freelance','Other']
 
 const EMPTY_ACCOUNT = { name: '', type: 'bank', opening_balance: '0' }
 
@@ -223,8 +221,11 @@ export default function Accounts() {
   const totalBalance = accounts.reduce((s, a) => s + toMoney(a.current_balance), 0)
   const banks = accounts.filter(a => a.type === 'bank')
   const cash  = accounts.filter(a => a.type === 'cash')
+  const maxAbsBalance = Math.max(1, ...accounts.map(a => Math.abs(toMoney(a.current_balance))))
 
-  const catOptions = txForm.type === 'income' ? INCOME_CATS : EXPENSE_CATS
+  const catOptions = txForm.type === 'income'
+    ? INCOME_CATEGORIES.map(c => c.key)
+    : EXPENSE_CATEGORIES.map(c => c.key)
 
   // ─────────────────────────────────────────────────────────────────────
   return (
@@ -239,9 +240,9 @@ export default function Accounts() {
       </div>
 
       {/* Combined balance strip */}
-      <div className="glass" style={{ padding: '0.85rem 1rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 500 }}>Combined Balance</span>
-        <span style={{ fontWeight: 800, fontSize: '1.15rem', color: totalBalance < 0 ? 'var(--danger)' : 'var(--primary)' }}>
+      <div className="glass wallet-combined">
+        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Combined Balance</span>
+        <span style={{ fontWeight: 800, fontSize: '1.2rem', color: totalBalance < 0 ? 'var(--danger)' : 'var(--primary)' }}>
           {fmtBalance(totalBalance)}
         </span>
       </div>
@@ -263,13 +264,13 @@ export default function Accounts() {
       ) : (
         <>
           {banks.length > 0 && (
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                <Landmark size={16} strokeWidth={1.75} /><h3>Bank Wallets</h3>
+            <div style={{ marginBottom: '1.1rem' }}>
+              <div className="wallet-section-head">
+                <Landmark size={15} strokeWidth={1.75} /><h3>Bank Wallets</h3>
               </div>
               <div className="list">
                 {banks.map(acc => (
-                  <AccountCard key={acc.id} acc={acc} totalBalance={totalBalance}
+                  <AccountCard key={acc.id} acc={acc} maxAbs={maxAbsBalance}
                     onEdit={openEditAcc} onDelete={deleteAcc} onView={viewTxs} />
                 ))}
               </div>
@@ -277,12 +278,12 @@ export default function Accounts() {
           )}
           {cash.length > 0 && (
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                <Wallet size={16} strokeWidth={1.75} /><h3>Cash &amp; Wallets</h3>
+              <div className="wallet-section-head">
+                <Wallet size={15} strokeWidth={1.75} /><h3>Cash &amp; Wallets</h3>
               </div>
               <div className="list">
                 {cash.map(acc => (
-                  <AccountCard key={acc.id} acc={acc} totalBalance={totalBalance}
+                  <AccountCard key={acc.id} acc={acc} maxAbs={maxAbsBalance}
                     onEdit={openEditAcc} onDelete={deleteAcc} onView={viewTxs} />
                 ))}
               </div>
@@ -483,20 +484,22 @@ export default function Accounts() {
 
 // ── AccountCard ──────────────────────────────────────────────────────────────
 
-function AccountCard({ acc, totalBalance, onEdit, onDelete, onView }: {
-  acc: Account; totalBalance: number
+function AccountCard({ acc, maxAbs, onEdit, onDelete, onView }: {
+  acc: Account; maxAbs: number
   onEdit:   (a: Account) => void
   onDelete: (id: number) => void
   onView:   (a: Account) => void
 }) {
-  const prog = totalBalance > 0 ? Math.min(100, (acc.current_balance / totalBalance) * 100) : 0
+  const bal = toMoney(acc.current_balance)
+  const prog = Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / maxAbs) * 100)))
+  const isCash = acc.type === 'cash'
   return (
     <div className="glass glass-hover" style={{ padding: '1rem', borderRadius: 'var(--radius-md)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.65rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : 'account-icon-bank'}`}
+          <div className={`account-icon ${isCash ? 'account-icon-cash' : 'account-icon-bank'}`}
             style={{ width: '2.5rem', height: '2.5rem' }}>
-            {acc.type === 'cash'
+            {isCash
               ? <Wallet size={18} strokeWidth={1.75} />
               : <Landmark size={18} strokeWidth={1.75} />}
           </div>
@@ -506,28 +509,36 @@ function AccountCard({ acc, totalBalance, onEdit, onDelete, onView }: {
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 800, fontSize: '1.15rem', color: acc.current_balance >= 0 ? 'var(--text-primary)' : 'var(--danger)' }}>
-            {fmtBalance(acc.current_balance)}
+          <div style={{ fontWeight: 800, fontSize: '1.15rem', color: bal >= 0 ? 'var(--text-primary)' : 'var(--danger)' }}>
+            {fmtBalance(bal)}
           </div>
           <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-            {acc.type === 'bank' ? 'Bank Account' : 'Cash / Wallet'}
+            {isCash ? 'Cash / Wallet' : 'Bank Account'}
           </div>
         </div>
       </div>
 
       <div className="progress-bar" style={{ marginBottom: '0.7rem' }}>
-        <div className="progress-bar-fill" style={{ width: `${prog}%` }} />
+        <div
+          className="progress-bar-fill"
+          style={{
+            width: `${prog}%`,
+            background: isCash
+              ? 'linear-gradient(90deg, var(--success), #34d399)'
+              : undefined,
+          }}
+        />
       </div>
 
-      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-        <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }} onClick={() => onView(acc)}>
-          Transactions
-        </button>
-        <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem' }} onClick={() => onEdit(acc)}>
-          Edit
-        </button>
-        <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.75rem', color: 'var(--red-600)', borderColor: '#f5c4c0' }}
-          onClick={() => onDelete(acc.id)}>
+      <div className="wallet-card-actions">
+        <button type="button" className="btn-glass" onClick={() => onView(acc)}>Transactions</button>
+        <button type="button" className="btn-glass" onClick={() => onEdit(acc)}>Edit</button>
+        <button
+          type="button"
+          className="btn-glass"
+          style={{ color: 'var(--red-600)', borderColor: '#f5c4c0' }}
+          onClick={() => onDelete(acc.id)}
+        >
           Delete
         </button>
       </div>
