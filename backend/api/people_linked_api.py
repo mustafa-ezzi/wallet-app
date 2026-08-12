@@ -272,15 +272,33 @@ class PeopleLinkSerializer(serializers.ModelSerializer):
 
 
 class PeopleProposalSerializer(serializers.ModelSerializer):
+    proposer_name = serializers.SerializerMethodField()
+    counterparty_person_id = serializers.SerializerMethodField()
+    mirror_action = serializers.SerializerMethodField()
+
     class Meta:
         model = PeopleProposal
         fields = (
-            'id', 'link', 'proposer', 'counterparty', 'action', 'amount', 'date', 'notes',
+            'id', 'link', 'proposer', 'counterparty', 'proposer_name',
+            'counterparty_person_id', 'mirror_action',
+            'action', 'amount', 'date', 'notes',
             'proposer_wallet', 'counterparty_wallet', 'status', 'people_pair_id',
             'client_mutation_id', 'original_amount', 'original_currency', 'fx_rate', 'fx_source',
             'created_at', 'responded_at',
         )
         read_only_fields = fields
+
+    def get_proposer_name(self, obj):
+        return _display_name_for(obj.proposer)
+
+    def get_counterparty_person_id(self, obj):
+        request = self.context.get('request')
+        user = request.user if request else obj.counterparty
+        person = obj.link.person_for(user) if obj.link_id else None
+        return person.id if person else None
+
+    def get_mirror_action(self, obj):
+        return MIRROR_PEOPLE_ACTION.get(obj.action)
 
 
 class PeopleNotificationSerializer(serializers.ModelSerializer):
@@ -744,8 +762,8 @@ class PeopleProposalPendingView(APIView):
         incoming = PeopleProposal.objects.filter(counterparty=request.user, status='pending')
         outgoing = PeopleProposal.objects.filter(proposer=request.user, status='pending')
         return Response({
-            'incoming': PeopleProposalSerializer(incoming, many=True).data,
-            'outgoing': PeopleProposalSerializer(outgoing, many=True).data,
+            'incoming': PeopleProposalSerializer(incoming, many=True, context={'request': request}).data,
+            'outgoing': PeopleProposalSerializer(outgoing, many=True, context={'request': request}).data,
         })
 
 

@@ -18,6 +18,7 @@ import { fmtBalance } from '../utils/format'
 import { track } from '../lib/analytics'
 import { useOffline } from '../offline'
 import InvitePersonModal from '../people/InvitePersonModal'
+import type { PeopleLink } from '../people/types'
 import { formatRateLine, foreignToPkr } from '../travel/currencies'
 import { useTravelMode } from '../travel/TravelModeContext'
 
@@ -74,6 +75,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
   const [accounts, setAccounts] = useState<WalletAccount[]>([])
   const [openLedgers, setOpenLedgers] = useState<OpenLedger[]>([])
+  const [links, setLinks] = useState<PeopleLink[]>([])
   const [personId, setPersonId] = useState('')
   const [peopleAction, setPeopleAction] = useState<PeopleAction>('lend')
 
@@ -85,6 +87,14 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
     () => accounts.filter((a) => a.type === 'person'),
     [accounts],
   )
+  const linkedByPersonId = useMemo(() => {
+    const map = new Map<number, PeopleLink>()
+    for (const link of links) {
+      if (link.my_person?.id) map.set(link.my_person.id, link)
+    }
+    return map
+  }, [links])
+  const selectedLink = personId ? linkedByPersonId.get(Number(personId)) : undefined
 
   const applyAccountDefaults = (list: WalletAccount[]) => {
     setAccounts(list)
@@ -116,6 +126,9 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
           current_balance: a.currentBalance,
         })))
       })
+    peopleApi.links()
+      .then(r => setLinks(asList<PeopleLink>(r.data)))
+      .catch(() => setLinks([]))
     if (online) {
       householdsApi.openLedgers()
         .then(r => setOpenLedgers(asList<OpenLedger>(r.data)))
@@ -159,23 +172,37 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
       }
       setLoading(true)
       try {
-        await peopleApi.action({
-          action: peopleAction,
-          wallet_id: Number(accountId),
-          person_id: Number(personId),
-          amount: pkrAmount,
-          date,
-          notes: notes.trim(),
-          ...(travelOn
-            ? {
-                original_amount: value,
-                original_currency: travelCurrency,
-                fx_rate: travelRate,
-                fx_source: 'manual',
-              }
-            : {}),
-        })
-        track('people_action_created', { action: peopleAction })
+        const fx = travelOn
+          ? {
+              original_amount: value,
+              original_currency: travelCurrency,
+              fx_rate: travelRate,
+              fx_source: 'manual',
+            }
+          : {}
+        const link = linkedByPersonId.get(Number(personId))
+        if (link) {
+          await peopleApi.propose({
+            link_id: link.id,
+            action: peopleAction,
+            wallet_id: Number(accountId),
+            amount: pkrAmount,
+            date,
+            notes: notes.trim(),
+            ...fx,
+          })
+        } else {
+          await peopleApi.action({
+            action: peopleAction,
+            wallet_id: Number(accountId),
+            person_id: Number(personId),
+            amount: pkrAmount,
+            date,
+            notes: notes.trim(),
+            ...fx,
+          })
+        }
+        track('people_action_created', { action: peopleAction, linked: Boolean(link) })
         onAdded()
       } catch (err) {
         setError(apiErrorMessage(err, 'Could not save people entry.'))
@@ -463,7 +490,9 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 </button>
               </div>
               <p className="add-tx-hint">
-                Local = name only. Invite = CashTrail user (email/username or code). Pay &amp; Receive on History.
+                {selectedLink
+                  ? `Linked: posts on your books now and sends ${selectedLink.other_user?.name || 'them'} an Accept request to pick their wallet.`
+                  : 'Local = name only. Invite = CashTrail user (email/username or code). Pay & Receive on History.'}
               </p>
             </div>
           ) : (
@@ -581,7 +610,9 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
               : type === 'transfer'
                 ? <><ArrowLeftRight size={15} strokeWidth={2} /> Record Transfer</>
                 : type === 'people'
-                  ? `${peopleAction === 'lend' ? 'Lend' : 'Borrow'}`
+                  ? selectedLink
+                    ? `Send ${peopleAction === 'lend' ? 'Lend' : 'Borrow'} request`
+                    : `${peopleAction === 'lend' ? 'Lend' : 'Borrow'}`
                   : `Add ${type === 'income' ? 'Income' : 'Expense'}`}
           </button>
         </form>

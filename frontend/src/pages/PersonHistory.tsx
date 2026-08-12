@@ -358,9 +358,12 @@ export default function PersonHistoryPage() {
 
           {incomingProposals.length > 0 ? (
             <div className="people-proposal-box glass" style={{ marginBottom: '1rem' }}>
-              <h3 style={{ margin: '0 0 0.65rem' }}>Waiting for you</h3>
+              <h3 style={{ margin: '0 0 0.35rem' }}>Waiting for you</h3>
+              <p className="page-subtitle" style={{ marginTop: 0 }}>
+                Accept posts the matching entry on your books. Pick the wallet that received (or paid) the money.
+              </p>
               <div className="form-group">
-                <label>Wallet to post into</label>
+                <label>Your wallet</label>
                 <select value={acceptWalletId} onChange={(e) => setAcceptWalletId(e.target.value)}>
                   {wallets.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
@@ -370,9 +373,11 @@ export default function PersonHistoryPage() {
                 return (
                   <div key={p.id} className="people-invite-row">
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 800 }}>{meta.label} · {fmtBalance(p.amount)}</div>
+                      <div style={{ fontWeight: 800 }}>
+                        {p.proposer_name || 'Them'}: {meta.label} · {fmtBalance(p.amount)}
+                      </div>
                       <div className="travel-muted" style={{ fontSize: '0.78rem' }}>
-                        {p.date}{p.notes ? ` · ${p.notes}` : ''}
+                        {p.date}{p.notes ? ` · ${p.notes}` : ''} · Accept to settle on your side
                       </div>
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>

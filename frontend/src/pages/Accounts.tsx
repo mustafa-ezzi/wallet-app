@@ -17,7 +17,7 @@ import { useConfirm } from '../hooks/useConfirm'
 import { track } from '../lib/analytics'
 import { useOffline } from '../offline'
 import InvitePersonModal from '../people/InvitePersonModal'
-import type { PeopleInvitation, PeopleLink } from '../people/types'
+import type { PeopleInvitation, PeopleLink, PeopleProposal } from '../people/types'
 
 interface Account {
   id: number; name: string; type: string
@@ -47,8 +47,11 @@ export default function Accounts() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [incomingInvites, setIncomingInvites] = useState<PeopleInvitation[]>([])
   const [outgoingInvites, setOutgoingInvites] = useState<PeopleInvitation[]>([])
+  const [incomingProposals, setIncomingProposals] = useState<PeopleProposal[]>([])
   const [links, setLinks] = useState<PeopleLink[]>([])
   const [inviteBusyId, setInviteBusyId] = useState<number | null>(null)
+  const [proposalBusyId, setProposalBusyId] = useState<number | null>(null)
+  const [acceptWalletId, setAcceptWalletId] = useState('')
 
   // account modal
   const [showAccModal, setShowAccModal] = useState(false)
@@ -75,20 +78,31 @@ export default function Accounts() {
     setAccError('')
     accountsApi.list()
       .then(async (r) => {
-        setAccounts(asList<Account>(r.data))
+        const list = asList<Account>(r.data)
+        setAccounts(list)
+        const walletList = list.filter((a) => a.type === 'bank' || a.type === 'cash')
+        if (walletList[0]) {
+          setAcceptWalletId((prev) =>
+            prev && walletList.some((w) => String(w.id) === prev) ? prev : String(walletList[0].id),
+          )
+        }
         try {
-          const [invRes, linkRes] = await Promise.all([
+          const [invRes, linkRes, propRes] = await Promise.all([
             peopleApi.pendingInvites(),
             peopleApi.links(),
+            peopleApi.pendingProposals(),
           ])
           const inv = invRes.data as { incoming?: PeopleInvitation[]; outgoing?: PeopleInvitation[] }
           setIncomingInvites(inv?.incoming || [])
           setOutgoingInvites(inv?.outgoing || [])
           setLinks(asList<PeopleLink>(linkRes.data))
+          const pending = propRes.data as { incoming?: PeopleProposal[] }
+          setIncomingProposals(pending?.incoming || [])
         } catch {
           setIncomingInvites([])
           setOutgoingInvites([])
           setLinks([])
+          setIncomingProposals([])
         }
       })
       .catch(async (err) => {
@@ -109,6 +123,7 @@ export default function Accounts() {
         setIncomingInvites([])
         setOutgoingInvites([])
         setLinks([])
+        setIncomingProposals([])
       })
       .finally(() => setLoading(false))
   }, [getCachedAccounts])
@@ -161,6 +176,27 @@ export default function Accounts() {
       setAccError(apiErrorMessage(err, 'Could not update invitation.'))
     } finally {
       setInviteBusyId(null)
+    }
+  }
+
+  const respondProposal = async (id: number, action: 'accept' | 'decline') => {
+    setProposalBusyId(id)
+    setAccError('')
+    try {
+      if (action === 'accept') {
+        if (!acceptWalletId) {
+          setAccError('Pick a wallet to accept into.')
+          return
+        }
+        await peopleApi.acceptProposal(id, { wallet_id: Number(acceptWalletId) })
+      } else {
+        await peopleApi.declineProposal(id)
+      }
+      loadAccounts()
+    } catch (err) {
+      setAccError(apiErrorMessage(err, 'Could not update money request.'))
+    } finally {
+      setProposalBusyId(null)
     }
   }
   const openAddAcc = () => {
@@ -385,6 +421,56 @@ export default function Accounts() {
                         onClick={() => void respondInvite(inv.id, 'accept')}
                       >
                         {inviteBusyId === inv.id ? <span className="spinner" /> : 'Accept'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {incomingProposals.length > 0 ? (
+              <div className="people-invite-box glass" style={{ marginTop: '0.65rem' }}>
+                <h4>Waiting for you</h4>
+                <p className="page-subtitle" style={{ margin: '0 0 0.65rem' }}>
+                  Accept to post the matching entry — pick your wallet first.
+                </p>
+                <div className="form-group">
+                  <label>Your wallet</label>
+                  <select value={acceptWalletId} onChange={(e) => setAcceptWalletId(e.target.value)}>
+                    {wallets.map((w) => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {incomingProposals.map((p) => (
+                  <div key={p.id} className="people-invite-row">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800 }}>
+                        {p.proposer_name || 'Someone'} · {(p.action || '').replace(/^./, (c) => c.toUpperCase())}{' '}
+                        {fmtBalance(p.amount)}
+                      </div>
+                      <div className="travel-muted" style={{ fontSize: '0.78rem' }}>
+                        Accept to settle on your side
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn-glass"
+                        style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                        disabled={proposalBusyId === p.id}
+                        onClick={() => void respondProposal(p.id, 'decline')}
+                      >
+                        Decline
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }}
+                        disabled={proposalBusyId === p.id}
+                        onClick={() => void respondProposal(p.id, 'accept')}
+                      >
+                        {proposalBusyId === p.id ? <span className="spinner" /> : 'Accept'}
                       </button>
                     </div>
                   </div>

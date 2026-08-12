@@ -21,7 +21,7 @@ import {
   peopleApi,
   transactionsApi,
 } from '@/src/api/client'
-import type { Account } from '@/src/api/types'
+import type { Account, PeopleLink } from '@/src/api/types'
 import { CalculatorSheet } from '@/src/components/CalculatorSheet'
 import { DateField, SelectField } from '@/src/components/SelectFields'
 import { ErrorBanner } from '@/src/components/ui'
@@ -74,6 +74,7 @@ export default function AddTransactionScreen() {
   const [kind, setKind] = useState<Kind>('expense')
   const [accounts, setAccounts] = useState<Account[]>([])
   const [people, setPeople] = useState<Account[]>([])
+  const [links, setLinks] = useState<PeopleLink[]>([])
   const [openLedgers, setOpenLedgers] = useState<OpenLedger[]>([])
   const [accountId, setAccountId] = useState('')
   const [toAccountId, setToAccountId] = useState('')
@@ -96,17 +97,32 @@ export default function AddTransactionScreen() {
 
   const loadPeople = useCallback(async () => {
     try {
-      const { data } = await peopleApi.list()
+      const [{ data }, linkRes] = await Promise.all([
+        peopleApi.list(),
+        peopleApi.links().catch(() => ({ data: [] })),
+      ])
       const list = asList<Account>(data)
       setPeople(list)
+      setLinks(asList<PeopleLink>(linkRes.data))
       setPersonId((prev) => {
         if (prev && list.some((p) => String(p.id) === prev)) return prev
         return list[0] ? String(list[0].id) : ''
       })
     } catch {
-      /* people need online API */
+      setPeople([])
+      setLinks([])
     }
   }, [])
+
+  const linkedByPersonId = useMemo(() => {
+    const map = new Map<number, PeopleLink>()
+    for (const link of links) {
+      if (link.my_person?.id) map.set(link.my_person.id, link)
+    }
+    return map
+  }, [links])
+
+  const selectedLink = personId ? linkedByPersonId.get(Number(personId)) : undefined
 
   useEffect(() => {
     ;(async () => {
@@ -291,15 +307,29 @@ export default function AddTransactionScreen() {
           setError('Pick or create a person.')
           return
         }
-        await peopleApi.action({
-          action: peopleAction,
-          wallet_id: Number(accountId),
-          person_id: Number(personId),
-          amount: pkrAmount,
-          date,
-          notes: notes.trim(),
-          ...fxApiFields,
-        })
+        const link = linkedByPersonId.get(Number(personId))
+        if (link) {
+          // Linked: post on your books + send Accept/Decline request to them
+          await peopleApi.propose({
+            link_id: link.id,
+            action: peopleAction,
+            wallet_id: Number(accountId),
+            amount: pkrAmount,
+            date,
+            notes: notes.trim(),
+            ...fxApiFields,
+          })
+        } else {
+          await peopleApi.action({
+            action: peopleAction,
+            wallet_id: Number(accountId),
+            person_id: Number(personId),
+            amount: pkrAmount,
+            date,
+            notes: notes.trim(),
+            ...fxApiFields,
+          })
+        }
         void hydrateNow()
         succeeded = true
         finishOk()
@@ -549,6 +579,7 @@ export default function AddTransactionScreen() {
                 {people.map((p) => {
                   const active = personId === String(p.id)
                   const bal = Number(p.current_balance) || 0
+                  const isLinkedPerson = linkedByPersonId.has(p.id)
                   return (
                     <Pressable key={p.id} style={styles.catItem} onPress={() => setPersonId(String(p.id))}>
                       <View
@@ -568,6 +599,9 @@ export default function AddTransactionScreen() {
                       >
                         {p.name}
                       </Text>
+                      {isLinkedPerson ? (
+                        <Text style={[styles.personBal, { color: colors.primary }]}>Linked</Text>
+                      ) : null}
                       {bal !== 0 ? (
                         <Text
                           style={[
@@ -612,7 +646,9 @@ export default function AddTransactionScreen() {
                 </Pressable>
               </View>
               <Text style={styles.hint}>
-                Local = name only. Invite = CashTrail user (email/username or code). Pay & Receive on History.
+                {selectedLink
+                  ? `Linked: posts on your books now and sends ${selectedLink.other_user?.name || 'them'} an Accept request to pick their wallet.`
+                  : 'Local = name only. Invite = CashTrail user (email/username or code). Pay & Receive on History.'}
               </Text>
             </>
           ) : (
@@ -755,9 +791,13 @@ export default function AddTransactionScreen() {
                   : kind === 'expense'
                     ? 'Add Expense'
                     : kind === 'people'
-                      ? peopleAction === 'lend'
-                        ? 'Record Lend'
-                        : 'Record Borrow'
+                      ? selectedLink
+                        ? peopleAction === 'lend'
+                          ? 'Send Lend request'
+                          : 'Send Borrow request'
+                        : peopleAction === 'lend'
+                          ? 'Record Lend'
+                          : 'Record Borrow'
                       : 'Record Transfer'}
               </Text>
             )}

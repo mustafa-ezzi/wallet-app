@@ -449,7 +449,10 @@ export default function PersonHistoryScreen() {
             {incomingProposals.length > 0 ? (
               <View style={styles.proposalBox}>
                 <Text style={styles.sectionTitle}>Waiting for you</Text>
-                <Text style={styles.fieldLabel}>Wallet to post into</Text>
+                <Text style={[styles.hintLine, { color: colors.textMuted }]}>
+                  Accept posts the matching entry on your books. Pick the wallet that received (or paid) the money.
+                </Text>
+                <Text style={styles.fieldLabel}>Your wallet</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletRow}>
                   {wallets.map((w) => {
                     const active = acceptWalletId === String(w.id)
@@ -477,8 +480,12 @@ export default function PersonHistoryScreen() {
                   return (
                     <View key={p.id} style={styles.proposalRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.txTitle}>{meta.label} · {fmtBalance(p.amount)}</Text>
-                        <Text style={styles.txSub}>{p.date}{p.notes ? ` · ${p.notes}` : ''}</Text>
+                        <Text style={styles.txTitle}>
+                          {p.proposer_name || 'Them'}: {meta.label} · {fmtBalance(p.amount)}
+                        </Text>
+                        <Text style={styles.txSub}>
+                          {p.date}{p.notes ? ` · ${p.notes}` : ''} · Accept to settle on your side
+                        </Text>
                       </View>
                       <Pressable
                         style={[styles.smallBtn, { borderColor: colors.border }]}

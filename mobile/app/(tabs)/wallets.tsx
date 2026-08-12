@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { accountsApi, apiErrorMessage, asList, peopleApi } from '@/src/api/client'
-import type { Account, PeopleInvitation, PeopleLink } from '@/src/api/types'
+import type { Account, PeopleInvitation, PeopleLink, PeopleProposal } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
 import { BouncyPressable, Reveal } from '@/src/components/motion'
 import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
@@ -24,10 +24,25 @@ import { InvitePersonSheet } from '@/src/people/InvitePersonSheet'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
-import { toMoney } from '@/src/utils/format'
+import { fmtBalance, toMoney } from '@/src/utils/format'
 
 function sumBalances(list: Account[]) {
   return list.reduce((s, a) => s + toMoney(a.current_balance), 0)
+}
+
+function proposalAcceptHint(action: string) {
+  switch (action) {
+    case 'lend':
+      return 'Pick wallet where you received the money'
+    case 'borrow':
+      return 'Pick wallet the money came from'
+    case 'pay':
+      return 'Pick wallet where you received repayment'
+    case 'receive':
+      return 'Pick wallet you paid from'
+    default:
+      return 'Pick wallet to post into'
+  }
 }
 
 export default function WalletsScreen() {
@@ -50,27 +65,39 @@ export default function WalletsScreen() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [incomingInvites, setIncomingInvites] = useState<PeopleInvitation[]>([])
   const [outgoingInvites, setOutgoingInvites] = useState<PeopleInvitation[]>([])
+  const [incomingProposals, setIncomingProposals] = useState<PeopleProposal[]>([])
   const [links, setLinks] = useState<PeopleLink[]>([])
   const [inviteBusyId, setInviteBusyId] = useState<number | null>(null)
+  const [proposalBusyId, setProposalBusyId] = useState<number | null>(null)
+  const [acceptWalletId, setAcceptWalletId] = useState('')
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
     setError('')
     try {
       const { data } = await accountsApi.list()
-      setAccounts(asList<Account>(data))
+      const list = asList<Account>(data)
+      setAccounts(list)
+      const walletsOnly = list.filter((a) => a.type === 'bank' || a.type === 'cash')
+      setAcceptWalletId((prev) => {
+        if (prev && walletsOnly.some((w) => String(w.id) === prev)) return prev
+        return walletsOnly[0] ? String(walletsOnly[0].id) : ''
+      })
       try {
-        const [invRes, linkRes] = await Promise.all([
+        const [invRes, linkRes, propRes] = await Promise.all([
           peopleApi.pendingInvites(),
           peopleApi.links(),
+          peopleApi.pendingProposals(),
         ])
         setIncomingInvites(invRes.data?.incoming || [])
         setOutgoingInvites(invRes.data?.outgoing || [])
         setLinks(asList<PeopleLink>(linkRes.data))
+        setIncomingProposals((propRes.data?.incoming || []) as PeopleProposal[])
       } catch {
         setIncomingInvites([])
         setOutgoingInvites([])
         setLinks([])
+        setIncomingProposals([])
       }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not load wallets.'))
@@ -103,6 +130,28 @@ export default function WalletsScreen() {
       setError(apiErrorMessage(err, 'Could not update invitation.'))
     } finally {
       setInviteBusyId(null)
+    }
+  }
+
+  const respondProposal = async (id: number, action: 'accept' | 'decline') => {
+    setProposalBusyId(id)
+    setError('')
+    try {
+      if (action === 'accept') {
+        if (!acceptWalletId) {
+          setError('Pick a wallet to accept into.')
+          return
+        }
+        await peopleApi.acceptProposal(id, { wallet_id: Number(acceptWalletId) })
+      } else {
+        await peopleApi.declineProposal(id)
+      }
+      bumpRefresh()
+      await load(true)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update money request.'))
+    } finally {
+      setProposalBusyId(null)
     }
   }
 
@@ -345,6 +394,68 @@ export default function WalletsScreen() {
               </View>
             ) : null}
 
+            {incomingProposals.length > 0 ? (
+              <View style={[styles.inviteBox, { marginTop: spacing.sm }]}>
+                <Text style={styles.inviteTitle}>Waiting for you</Text>
+                <Text style={[styles.cardType, { marginBottom: 8 }]}>
+                  Accept to post the matching entry — pick the wallet first.
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 10 }}>
+                  {walletAccounts.map((w) => {
+                    const active = acceptWalletId === String(w.id)
+                    return (
+                      <Pressable
+                        key={w.id}
+                        onPress={() => setAcceptWalletId(String(w.id))}
+                        style={[
+                          styles.walletPickChip,
+                          {
+                            backgroundColor: active ? colors.primary : colors.surfaceMuted,
+                            borderColor: active ? colors.primary : colors.border,
+                          },
+                        ]}
+                      >
+                        <Text style={{ color: active ? '#fff' : colors.text, fontWeight: '700', fontSize: 12 }}>
+                          {w.name}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                </ScrollView>
+                {incomingProposals.map((p) => (
+                  <View key={p.id} style={styles.inviteRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardName}>
+                        {p.proposer_name || 'Someone'} · {(p.action || '').replace(/^./, (c) => c.toUpperCase())}{' '}
+                        {money.fmtBalance(p.amount)}
+                      </Text>
+                      <Text style={styles.cardType}>{proposalAcceptHint(p.action)}</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <BouncyPressable
+                        style={[styles.inviteBtn, styles.inviteDecline]}
+                        onPress={() => void respondProposal(p.id, 'decline')}
+                        disabled={proposalBusyId === p.id}
+                      >
+                        <Text style={styles.inviteDeclineText}>Decline</Text>
+                      </BouncyPressable>
+                      <BouncyPressable
+                        style={[styles.inviteBtn, styles.inviteAccept]}
+                        onPress={() => void respondProposal(p.id, 'accept')}
+                        disabled={proposalBusyId === p.id}
+                      >
+                        {proposalBusyId === p.id ? (
+                          <ActivityIndicator color="#fff" size="small" />
+                        ) : (
+                          <Text style={styles.inviteAcceptText}>Accept</Text>
+                        )}
+                      </BouncyPressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
             {outgoingInvites.length > 0 ? (
               <View style={[styles.inviteBox, { marginTop: spacing.sm }]}>
                 <Text style={styles.inviteTitle}>Waiting for them</Text>
@@ -495,6 +606,12 @@ function makeStyles(colors: ColorTokens) {
     inviteAcceptText: { color: '#fff', fontWeight: '800', fontSize: 12 },
     inviteDecline: { borderWidth: 1, borderColor: colors.border },
     inviteDeclineText: { color: colors.textSecondary, fontWeight: '700', fontSize: 12 },
+    walletPickChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: radii.sm,
+      borderWidth: 1,
+    },
     card: {
       backgroundColor: colors.surface,
       borderRadius: radii.md,

@@ -81,6 +81,9 @@ export type PeopleProposal = {
   link: number
   proposer: number
   counterparty: number
+  proposer_name?: string
+  counterparty_person_id?: number | null
+  mirror_action?: PeopleActionKind
   action: PeopleActionKind
   amount: number | string
   date: string
