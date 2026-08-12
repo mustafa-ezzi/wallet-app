@@ -2116,4 +2116,126 @@ select option { background: var(--surface); color: var(--text-primary); }
   }
 }
 
+/* Travel + People (Phase E/I) */
+.travel-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: rgba(var(--primary-rgb), 0.12);
+  border: 1px solid var(--primary);
+  color: var(--primary-dark);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.travel-muted { color: var(--text-muted); font-weight: 600; }
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1rem;
+}
+.people-net-card {
+  background: linear-gradient(145deg, #0f3d32, #1a6b54);
+  color: #fff;
+  border-radius: var(--radius-md);
+  padding: 1.1rem 1.15rem;
+  margin-bottom: 1.1rem;
+}
+.people-net-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255,255,255,0.18);
+}
+.people-net-stats span {
+  display: block;
+  font-size: 0.7rem;
+  opacity: 0.75;
+  font-weight: 600;
+}
+.people-net-stats strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.88rem;
+}
+.people-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.people-action-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: flex-start;
+  text-align: left;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.85rem 0.9rem;
+  cursor: pointer;
+}
+.people-action-btn:hover { background: var(--surface-muted, #f6f7f6); }
+.people-invite-box {
+  padding: 0.85rem 0.95rem;
+  margin-bottom: 0.65rem;
+}
+.people-invite-box h4 {
+  margin: 0 0 0.65rem;
+  font-size: 0.85rem;
+}
+.people-invite-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--border-2);
+}
+.people-invite-row:first-of-type { border-top: none; padding-top: 0; }
+.people-linked-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--primary-dark);
+  background: rgba(var(--primary-rgb), 0.14);
+  border: 1px solid rgba(var(--primary-rgb), 0.28);
+  border-radius: 999px;
+  padding: 0.12rem 0.45rem;
+}
+.people-avatar {
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(var(--primary-rgb), 0.12);
+  color: var(--primary-dark);
+  flex-shrink: 0;
+}
+.people-code-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted, #f6f7f6);
+  padding: 0.9rem;
+  text-align: center;
+}
+.people-code-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  margin: 0.45rem 0 0.75rem;
+}
+.people-proposal-box {
+  padding: 0.9rem 1rem;
+}
+
+
 

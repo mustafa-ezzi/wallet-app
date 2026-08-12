@@ -1,6 +1,6 @@
 # Travel Mode + People — Development Phases
 
-**Status:** Phase A–D + **G–H** implemented (Linked People backend + mobile UI). Phase E–F (web Travel/People) and I–J (linked web / polish) not finished.  
+**Status:** Phase A–D + **G–I** implemented (Linked People backend + mobile + web UI). Phase E–F (full web Travel polish) and J (optional linked polish) not finished.  
 **Home currency:** PKR (from the user profile). All wallet balances, reports, and totals stay in PKR.  
 **Reference:** Hysab Kytab Travel Mode + person History screens.
 
@@ -401,7 +401,7 @@ Phase F can add: daily auto-refresh of the trip rate while the trip is active (s
 - Tests: `api.tests_linked_people` (9) + existing travel/people (12) — all OK.  
 - **Local people unchanged.**  
 - **Deploy:** `python manage.py migrate` on Railway (`0021`).  
-- **UI:** Phase H (mobile) ✅ / I (web).
+- **UI:** Phase H (mobile) ✅ / I (web) ✅.
 
 ### Phase H — Linked People mobile UI ✅
 
@@ -413,9 +413,11 @@ Phase F can add: daily auto-refresh of the trip rate while the trip is active (s
 - Notifications deep-link to the person History / proposal.  
 - **Exit:** full Mustafa ↔ Hussain cycle on device (invite → accept link → lend → notify → accept → pay → notify → accept → net 0).
 
-### Phase I — Linked People web parity
+### Phase I — Linked People web parity ✅
 
 - Same invite, pending, accept/decline flows on web.  
+- Wallets People section + Linked badge; Add Transaction People tab + Invite modal.  
+- Person History: propose when linked; Accept / Decline proposals + waiting copy.  
 - **Exit:** mobile and web behave the same for linked + local.
 
 ### Phase J — Linked People polish (optional)
@@ -494,4 +496,4 @@ Web (`E`) can start after `C` if needed. Linked web (`I`) waits on `H`.
 
 ---
 
-*Next step when ready: Phase I (Linked People web), or finish Phase E (web parity for local Travel/People).*
+*Next step when ready: Phase J (optional polish), or finish Phase E/F (web Travel hardening).*

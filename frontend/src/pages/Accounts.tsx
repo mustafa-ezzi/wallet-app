@@ -1,19 +1,23 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownRight,
   ArrowUpRight,
   FileText,
   Landmark,
   Trash2,
+  UserRound,
   Wallet,
   X,
 } from 'lucide-react'
-import { accountsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
+import { useNavigate } from 'react-router-dom'
+import { accountsApi, peopleApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
 import { fmt, fmtBalance, toMoney } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
 import { track } from '../lib/analytics'
 import { useOffline } from '../offline'
+import InvitePersonModal from '../people/InvitePersonModal'
+import type { PeopleInvitation, PeopleLink } from '../people/types'
 
 interface Account {
   id: number; name: string; type: string
@@ -35,10 +39,16 @@ const EMPTY_TX_FORM = {
 }
 
 export default function Accounts() {
+  const navigate = useNavigate()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const { getCachedAccounts, getCachedTransactions } = useOffline()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading]   = useState(true)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [incomingInvites, setIncomingInvites] = useState<PeopleInvitation[]>([])
+  const [outgoingInvites, setOutgoingInvites] = useState<PeopleInvitation[]>([])
+  const [links, setLinks] = useState<PeopleLink[]>([])
+  const [inviteBusyId, setInviteBusyId] = useState<number | null>(null)
 
   // account modal
   const [showAccModal, setShowAccModal] = useState(false)
@@ -60,11 +70,27 @@ export default function Accounts() {
 
   // ── loaders ──────────────────────────────────────────────────────────
 
-  const loadAccounts = () => {
+  const loadAccounts = useCallback(() => {
     setLoading(true)
     setAccError('')
     accountsApi.list()
-      .then(r => setAccounts(asList(r.data)))
+      .then(async (r) => {
+        setAccounts(asList<Account>(r.data))
+        try {
+          const [invRes, linkRes] = await Promise.all([
+            peopleApi.pendingInvites(),
+            peopleApi.links(),
+          ])
+          const inv = invRes.data as { incoming?: PeopleInvitation[]; outgoing?: PeopleInvitation[] }
+          setIncomingInvites(inv?.incoming || [])
+          setOutgoingInvites(inv?.outgoing || [])
+          setLinks(asList<PeopleLink>(linkRes.data))
+        } catch {
+          setIncomingInvites([])
+          setOutgoingInvites([])
+          setLinks([])
+        }
+      })
       .catch(async (err) => {
         const cached = await getCachedAccounts()
         if (cached.length) {
@@ -80,9 +106,12 @@ export default function Accounts() {
           setAccounts([])
           setAccError(apiErrorMessage(err, 'Could not load accounts.'))
         }
+        setIncomingInvites([])
+        setOutgoingInvites([])
+        setLinks([])
       })
       .finally(() => setLoading(false))
-  }
+  }, [getCachedAccounts])
 
   const reloadTxs = async (acc: Account) => {
     setTxLoading(true)
@@ -111,10 +140,29 @@ export default function Accounts() {
     }
   }
 
-  useEffect(loadAccounts, [getCachedAccounts])
+  useEffect(() => { loadAccounts() }, [loadAccounts])
 
-  // ── account CRUD ─────────────────────────────────────────────────────
+  const linkedPersonIds = useMemo(() => {
+    const ids = new Set<number>()
+    for (const link of links) {
+      if (link.my_person?.id) ids.add(link.my_person.id)
+    }
+    return ids
+  }, [links])
 
+  const respondInvite = async (id: number, action: 'accept' | 'decline') => {
+    setInviteBusyId(id)
+    setAccError('')
+    try {
+      if (action === 'accept') await peopleApi.acceptInvite(id)
+      else await peopleApi.declineInvite(id)
+      loadAccounts()
+    } catch (err) {
+      setAccError(apiErrorMessage(err, 'Could not update invitation.'))
+    } finally {
+      setInviteBusyId(null)
+    }
+  }
   const openAddAcc = () => {
     setEditingAcc(null); setAccForm({ ...EMPTY_ACCOUNT }); setAccError(''); setShowAccModal(true)
   }
@@ -218,10 +266,16 @@ export default function Accounts() {
 
   // ── derived ──────────────────────────────────────────────────────────
 
-  const totalBalance = accounts.reduce((s, a) => s + toMoney(a.current_balance), 0)
+  const wallets = accounts.filter(a => a.type === 'bank' || a.type === 'cash')
+  const totalBalance = wallets.reduce((s, a) => s + toMoney(a.current_balance), 0)
   const banks = accounts.filter(a => a.type === 'bank')
   const cash  = accounts.filter(a => a.type === 'cash')
-  const maxAbsBalance = Math.max(1, ...accounts.map(a => Math.abs(toMoney(a.current_balance))))
+  const people = accounts.filter(a => a.type === 'person')
+  const maxAbsBalance = Math.max(
+    1,
+    ...wallets.map(a => Math.abs(toMoney(a.current_balance))),
+    ...people.map(a => Math.abs(toMoney(a.current_balance))),
+  )
 
   const catOptions = txForm.type === 'income'
     ? INCOME_CATEGORIES.map(c => c.key)
@@ -234,7 +288,7 @@ export default function Accounts() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Wallets</h1>
-          <p className="page-subtitle">Manage your bank and cash wallets.</p>
+          <p className="page-subtitle">Manage bank, cash, and people balances.</p>
         </div>
         <button className="btn-primary" onClick={openAddAcc}>+ Create Wallet</button>
       </div>
@@ -289,8 +343,122 @@ export default function Accounts() {
               </div>
             </div>
           )}
+
+          <div style={{ marginTop: '1.1rem' }}>
+            <div className="wallet-section-head">
+              <UserRound size={15} strokeWidth={1.75} />
+              <h3>People</h3>
+              <button
+                type="button"
+                className="btn-glass"
+                style={{ marginLeft: 'auto', fontSize: '0.75rem', padding: '0.3rem 0.7rem' }}
+                onClick={() => setInviteOpen(true)}
+              >
+                + Add
+              </button>
+            </div>
+
+            {incomingInvites.length > 0 ? (
+              <div className="people-invite-box glass">
+                <h4>Link requests</h4>
+                {incomingInvites.map((inv) => (
+                  <div key={inv.id} className="people-invite-row">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800 }}>{inv.from_user_name || inv.from_user_email}</div>
+                      <div className="travel-muted" style={{ fontSize: '0.78rem' }}>Wants to link for lend/borrow</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn-glass"
+                        style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                        disabled={inviteBusyId === inv.id}
+                        onClick={() => void respondInvite(inv.id, 'decline')}
+                      >
+                        Decline
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }}
+                        disabled={inviteBusyId === inv.id}
+                        onClick={() => void respondInvite(inv.id, 'accept')}
+                      >
+                        {inviteBusyId === inv.id ? <span className="spinner" /> : 'Accept'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {outgoingInvites.length > 0 ? (
+              <div className="people-invite-box glass" style={{ marginTop: '0.65rem' }}>
+                <h4>Waiting for them</h4>
+                {outgoingInvites.map((inv) => (
+                  <div key={inv.id} className="people-invite-row">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800 }}>{inv.display_name || inv.to_user_name || inv.to_user_email}</div>
+                      <div className="travel-muted" style={{ fontSize: '0.78rem' }}>Link request pending</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {people.length === 0 && incomingInvites.length === 0 && outgoingInvites.length === 0 ? (
+              <div className="glass empty-state" style={{ padding: '1.1rem' }}>
+                <p style={{ margin: 0, fontWeight: 700 }}>No people yet</p>
+                <p className="page-subtitle" style={{ marginTop: 6 }}>
+                  Add a local person or invite a CashTrail user for lend/borrow.
+                </p>
+              </div>
+            ) : (
+              <div className="list" style={{ marginTop: people.length ? '0.65rem' : 0 }}>
+                {people.map((acc) => {
+                  const bal = toMoney(acc.current_balance)
+                  const status = Math.abs(bal) < 0.01 ? 'Settled' : bal > 0 ? 'They owe you' : 'You owe them'
+                  const isLinked = linkedPersonIds.has(acc.id)
+                  return (
+                    <div key={acc.id} className="glass" style={{ padding: '0.9rem 1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div className="people-avatar"><UserRound size={16} /></div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '0.95rem' }}>{acc.name}</strong>
+                            {isLinked ? <span className="people-linked-badge">Linked</span> : null}
+                          </div>
+                          <div className="travel-muted" style={{ fontSize: '0.75rem' }}>
+                            {isLinked ? 'CashTrail user' : 'Local'} · {status}
+                          </div>
+                        </div>
+                        <strong style={{ color: bal < 0 ? 'var(--danger)' : 'var(--primary)' }}>
+                          {fmtBalance(bal)}
+                        </strong>
+                      </div>
+                      <div className="wallet-card-actions" style={{ marginTop: 10 }}>
+                        <button
+                          type="button"
+                          className="btn-glass"
+                          onClick={() => navigate(`/people/${acc.id}`)}
+                        >
+                          History
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </>
       )}
+
+      <InvitePersonModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onDone={() => loadAccounts()}
+      />
 
       {/* ── Add / Edit Account modal ── */}
       {showAccModal && (

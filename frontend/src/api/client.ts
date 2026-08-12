@@ -279,5 +279,26 @@ export const peopleApi = {
   action: (data: object) => api.post('/people/actions/', data),
   history: (id: number, params?: { year?: number; month?: number }) =>
     api.get(`/people/${id}/history/`, { params }),
+  // Phase G/I — linked people
+  linkCode: () => api.get('/people/link-code/'),
+  regenerateLinkCode: () => api.post('/people/link-code/'),
+  invite: (data: { query: string; display_name?: string }) =>
+    api.post('/people/invitations/', data),
+  joinByCode: (data: { code: string; display_name?: string }) =>
+    api.post('/people/invitations/join/', data),
+  pendingInvites: () => api.get('/people/invitations/pending/'),
+  acceptInvite: (id: number) => api.post(`/people/invitations/${id}/accept/`),
+  declineInvite: (id: number) => api.post(`/people/invitations/${id}/decline/`),
+  cancelInvite: (id: number) => api.post(`/people/invitations/${id}/cancel/`),
+  links: () => api.get('/people/links/'),
+  unlink: (id: number) => api.post(`/people/links/${id}/unlink/`),
+  propose: (data: object) => api.post('/people/proposals/', data),
+  pendingProposals: () => api.get('/people/proposals/pending/'),
+  acceptProposal: (id: number, data: { wallet_id: number }) =>
+    api.post(`/people/proposals/${id}/accept/`, data),
+  declineProposal: (id: number) => api.post(`/people/proposals/${id}/decline/`),
+  notifications: () => api.get('/people/notifications/'),
+  markNotificationRead: (id: number) => api.post(`/people/notifications/${id}/mark_read/`),
+  markAllNotificationsRead: () => api.post('/people/notifications/mark_all_read/'),
 }
 

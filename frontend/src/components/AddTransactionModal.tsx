@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowDown,
   ArrowLeftRight,
@@ -7,22 +7,27 @@ import {
   ChevronUp,
   Landmark,
   Plus,
+  UserRound,
   Wallet,
   X,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { accountsApi, transactionsApi, householdsApi, asList } from '../api/client'
+import { accountsApi, transactionsApi, householdsApi, peopleApi, asList, apiErrorMessage } from '../api/client'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
 import { fmtBalance } from '../utils/format'
 import { track } from '../lib/analytics'
 import { useOffline } from '../offline'
+import InvitePersonModal from '../people/InvitePersonModal'
+import { formatRateLine, foreignToPkr } from '../travel/currencies'
+import { useTravelMode } from '../travel/TravelModeContext'
 
 interface Props {
   onClose: () => void
   onAdded: () => void
 }
 
-type TxType = 'income' | 'expense' | 'transfer'
+type TxType = 'income' | 'expense' | 'transfer' | 'people'
+type PeopleAction = 'lend' | 'borrow'
 
 interface OpenLedger {
   id: number
@@ -42,6 +47,13 @@ interface WalletAccount {
 export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const navigate = useNavigate()
   const { queueTransaction, online, getCachedAccounts } = useOffline()
+  const {
+    isActive: travelOn,
+    currency: travelCurrency,
+    rate: travelRate,
+    rateLine,
+    toPkr,
+  } = useTravelMode()
   const [type, setType] = useState<TxType>('expense')
 
   const [amount, setAmount] = useState('')
@@ -51,6 +63,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const [error, setError] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [calcOpen, setCalcOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   const [accountId, setAccountId] = useState('')
   const [category, setCategory] = useState('')
@@ -61,33 +74,47 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
   const [accounts, setAccounts] = useState<WalletAccount[]>([])
   const [openLedgers, setOpenLedgers] = useState<OpenLedger[]>([])
+  const [personId, setPersonId] = useState('')
+  const [peopleAction, setPeopleAction] = useState<PeopleAction>('lend')
+
+  const wallets = useMemo(
+    () => accounts.filter((a) => a.type === 'bank' || a.type === 'cash'),
+    [accounts],
+  )
+  const people = useMemo(
+    () => accounts.filter((a) => a.type === 'person'),
+    [accounts],
+  )
+
+  const applyAccountDefaults = (list: WalletAccount[]) => {
+    setAccounts(list)
+    const walletList = list.filter((a) => a.type === 'bank' || a.type === 'cash')
+    const peopleList = list.filter((a) => a.type === 'person')
+    if (walletList[0]) {
+      setAccountId((prev) => (prev && walletList.some((w) => String(w.id) === prev) ? prev : String(walletList[0].id)))
+      setFromAccountId((prev) => (prev && walletList.some((w) => String(w.id) === prev) ? prev : String(walletList[0].id)))
+      setToAccountId((prev) => {
+        if (prev && walletList.some((w) => String(w.id) === prev)) return prev
+        return String(walletList[1]?.id ?? walletList[0].id)
+      })
+    }
+    if (peopleList[0]) {
+      setPersonId((prev) => (prev && peopleList.some((p) => String(p.id) === prev) ? prev : String(peopleList[0].id)))
+    }
+  }
 
   useEffect(() => {
     accountsApi.list()
-      .then(r => {
-        const list = asList<WalletAccount>(r.data)
-        setAccounts(list)
-        if (list[0]) {
-          setAccountId(String(list[0].id))
-          setFromAccountId(String(list[0].id))
-          setToAccountId(String(list[1]?.id ?? list[0].id))
-        }
-      })
+      .then(r => applyAccountDefaults(asList<WalletAccount>(r.data)))
       .catch(async () => {
         const cached = await getCachedAccounts()
-        const list: WalletAccount[] = cached.map(a => ({
+        applyAccountDefaults(cached.map(a => ({
           id: a.serverId,
           name: a.name,
           type: a.type,
           opening_balance: a.openingBalance,
           current_balance: a.currentBalance,
-        }))
-        setAccounts(list)
-        if (list[0]) {
-          setAccountId(String(list[0].id))
-          setFromAccountId(String(list[0].id))
-          setToAccountId(String(list[1]?.id ?? list[0].id))
-        }
+        })))
       })
     if (online) {
       householdsApi.openLedgers()
@@ -120,6 +147,43 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
     setError('')
 
     if (!amount || parseFloat(amount) <= 0) { setError('Please enter a valid amount.'); return }
+
+    if (type === 'people') {
+      if (!accountId) { setError('Pick a wallet.'); return }
+      if (!personId) { setError('Pick a person.'); return }
+      const value = parseFloat(amount)
+      const pkrAmount = travelOn ? toPkr(value) : value
+      if (travelOn && (!(travelRate > 0) || !(pkrAmount > 0))) {
+        setError('Travel rate missing. Open Travel Mode and set a rate.')
+        return
+      }
+      setLoading(true)
+      try {
+        await peopleApi.action({
+          action: peopleAction,
+          wallet_id: Number(accountId),
+          person_id: Number(personId),
+          amount: pkrAmount,
+          date,
+          notes: notes.trim(),
+          ...(travelOn
+            ? {
+                original_amount: value,
+                original_currency: travelCurrency,
+                fx_rate: travelRate,
+                fx_source: 'manual',
+              }
+            : {}),
+        })
+        track('people_action_created', { action: peopleAction })
+        onAdded()
+      } catch (err) {
+        setError(apiErrorMessage(err, 'Could not save people entry.'))
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
 
     if (type === 'transfer') {
       if (!fromAccountId || !toAccountId) { setError('Please select both accounts.'); return }
@@ -217,6 +281,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
   }
 
   return (
+    <>
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet add-tx-sheet">
         <div className="add-tx-header">
@@ -233,6 +298,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
               { key: 'expense' as const, label: 'Expense' },
               { key: 'income' as const, label: 'Income' },
               { key: 'transfer' as const, label: 'Transfer' },
+              { key: 'people' as const, label: 'People' },
             ]).map((t) => (
               <button
                 key={t.key}
@@ -245,8 +311,14 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
             ))}
           </div>
 
+          {travelOn && (type === 'people' || type === 'expense' || type === 'income') ? (
+            <div className="travel-banner" style={{ margin: '0.65rem 0 0' }}>
+              Travel Mode · {rateLine || formatRateLine(travelCurrency, travelRate)}
+            </div>
+          ) : null}
+
           <div className="add-tx-amount">
-            <span className="add-tx-currency">PKR</span>
+            <span className="add-tx-currency">{travelOn && type !== 'transfer' ? travelCurrency : 'PKR'}</span>
             <input
               type="text"
               inputMode="decimal"
@@ -264,6 +336,11 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
               <Calculator size={18} strokeWidth={2} />
             </button>
           </div>
+          {travelOn && type !== 'transfer' && amount && Number(amount) > 0 ? (
+            <p className="page-subtitle" style={{ margin: '0.35rem 0 0', textAlign: 'center' }}>
+              ≈ {fmtBalance(foreignToPkr(Number(amount), travelRate))}
+            </p>
+          ) : null}
 
           {calcOpen && (
             <SimpleCalc
@@ -288,7 +365,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 <label>From wallet</label>
                 <select value={fromAccountId} onChange={e => setFromAccountId(e.target.value)} required>
                   <option value="">Select source…</option>
-                  {accounts.map((a: any) => (
+                  {wallets.map((a) => (
                     <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
                   ))}
                 </select>
@@ -298,13 +375,95 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 <label>To wallet</label>
                 <select value={toAccountId} onChange={e => setToAccountId(e.target.value)} required>
                   <option value="">Select destination…</option>
-                  {accounts.filter(a => String(a.id) !== fromAccountId).map((a: any) => (
+                  {wallets.filter(a => String(a.id) !== fromAccountId).map((a) => (
                     <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
                   ))}
                 </select>
               </div>
               <p className="add-tx-hint">
                 Moves money between your wallets. Transfers don’t count as income or expense.
+              </p>
+            </div>
+          ) : type === 'people' ? (
+            <div className="add-tx-block">
+              <h3 className="add-tx-section">Action</h3>
+              <div className="add-tx-chip-row">
+                {([
+                  { key: 'lend' as const, label: 'Lend', color: '#8b5cf6' },
+                  { key: 'borrow' as const, label: 'Borrow', color: '#f59e0b' },
+                ]).map((a) => {
+                  const active = peopleAction === a.key
+                  return (
+                    <button
+                      key={a.key}
+                      type="button"
+                      className={`add-tx-chip ${active ? 'active' : ''}`}
+                      onClick={() => setPeopleAction(a.key)}
+                    >
+                      <span
+                        className="add-tx-chip-icon"
+                        style={{
+                          background: active ? a.color : `${a.color}1f`,
+                          color: active ? '#fff' : a.color,
+                          borderColor: active ? a.color : 'transparent',
+                        }}
+                      >
+                        <UserRound size={18} strokeWidth={2} />
+                      </span>
+                      <span className="add-tx-chip-label">{a.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <h3 className="add-tx-section">{peopleAction === 'lend' ? 'From wallet' : 'Into wallet'}</h3>
+              <div className="add-tx-chip-row">
+                {wallets.map((a) => {
+                  const active = accountId === String(a.id)
+                  const isCash = a.type === 'cash'
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      className={`add-tx-chip ${active ? 'active' : ''}`}
+                      onClick={() => setAccountId(String(a.id))}
+                    >
+                      <span className={`add-tx-acct-icon ${active ? 'on' : ''}`}>
+                        {isCash
+                          ? <Wallet size={18} strokeWidth={2} />
+                          : <Landmark size={18} strokeWidth={2} />}
+                      </span>
+                      <span className="add-tx-chip-label">{a.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <h3 className="add-tx-section">Person</h3>
+              <div className="add-tx-chip-row">
+                {people.map((p) => {
+                  const active = personId === String(p.id)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`add-tx-chip ${active ? 'active' : ''}`}
+                      onClick={() => setPersonId(String(p.id))}
+                    >
+                      <span className={`add-tx-acct-icon ${active ? 'on' : ''}`}>
+                        <UserRound size={18} strokeWidth={2} />
+                      </span>
+                      <span className="add-tx-chip-label">{p.name}</span>
+                    </button>
+                  )
+                })}
+                <button type="button" className="add-tx-chip" onClick={() => setInviteOpen(true)}>
+                  <span className="add-tx-acct-icon muted"><Plus size={18} strokeWidth={2} /></span>
+                  <span className="add-tx-chip-label">Invite</span>
+                </button>
+              </div>
+              <p className="add-tx-hint">
+                Local = name only. Invite = CashTrail user (email/username or code). Pay &amp; Receive on History.
               </p>
             </div>
           ) : (
@@ -339,7 +498,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
               <h3 className="add-tx-section">Select Account</h3>
               <div className="add-tx-chip-row">
-                {accounts.map((a: any) => {
+                {wallets.map((a) => {
                   const active = accountId === String(a.id)
                   const isCash = a.type === 'cash'
                   return (
@@ -421,11 +580,29 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
               ? <span className="spinner" />
               : type === 'transfer'
                 ? <><ArrowLeftRight size={15} strokeWidth={2} /> Record Transfer</>
-                : `Add ${type === 'income' ? 'Income' : 'Expense'}`}
+                : type === 'people'
+                  ? `${peopleAction === 'lend' ? 'Lend' : 'Borrow'}`
+                  : `Add ${type === 'income' ? 'Income' : 'Expense'}`}
           </button>
         </form>
       </div>
     </div>
+
+    <InvitePersonModal
+      open={inviteOpen}
+      onClose={() => setInviteOpen(false)}
+      onDone={(result) => {
+        if (result.kind === 'local') setPersonId(String(result.personId))
+        accountsApi.list()
+          .then(r => {
+            const list = asList<WalletAccount>(r.data)
+            setAccounts(list)
+            if (result.kind === 'local') setPersonId(String(result.personId))
+          })
+          .catch(() => undefined)
+      }}
+    />
+    </>
   )
 }
 

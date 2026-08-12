@@ -13,6 +13,7 @@ import { accountsApi, apiErrorMessage, asList, peopleApi } from '../api/client'
 import { fmtBalance, toMoney } from '../utils/format'
 import { formatForeignSubtitle, foreignToPkr, formatRateLine, todayISO } from '../travel/currencies'
 import { useTravelMode } from '../travel/TravelModeContext'
+import type { PeopleLink, PeopleProposal } from '../people/types'
 
 type PeopleAction = 'lend' | 'borrow' | 'pay' | 'receive'
 
@@ -76,16 +77,23 @@ export default function PersonHistoryPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [history, setHistory] = useState<HistoryPayload | null>(null)
   const [wallets, setWallets] = useState<Array<{ id: number; name: string; type: string }>>([])
+  const [link, setLink] = useState<PeopleLink | null>(null)
+  const [incomingProposals, setIncomingProposals] = useState<PeopleProposal[]>([])
+  const [outgoingProposals, setOutgoingProposals] = useState<PeopleProposal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [proposalBusyId, setProposalBusyId] = useState<number | null>(null)
 
   const [sheetAction, setSheetAction] = useState<PeopleAction | null>(null)
   const [walletId, setWalletId] = useState('')
+  const [acceptWalletId, setAcceptWalletId] = useState('')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(todayISO())
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  const isLinked = Boolean(link)
 
   const load = useCallback(async () => {
     if (!Number.isFinite(personId) || personId <= 0) {
@@ -107,6 +115,30 @@ export default function PersonHistoryPage() {
         if (prev && list.some((w) => String(w.id) === prev)) return prev
         return list[0] ? String(list[0].id) : ''
       })
+      setAcceptWalletId((prev) => {
+        if (prev && list.some((w) => String(w.id) === prev)) return prev
+        return list[0] ? String(list[0].id) : ''
+      })
+
+      try {
+        const [linkRes, propRes] = await Promise.all([
+          peopleApi.links(),
+          peopleApi.pendingProposals(),
+        ])
+        const allLinks = asList<PeopleLink>(linkRes.data)
+        const mine = allLinks.find((l) => l.my_person?.id === personId) || null
+        setLink(mine)
+        const linkId = mine?.id
+        const pending = propRes.data as { incoming?: PeopleProposal[]; outgoing?: PeopleProposal[] }
+        const incoming = pending?.incoming || []
+        const outgoing = pending?.outgoing || []
+        setIncomingProposals(linkId ? incoming.filter((p) => p.link === linkId) : [])
+        setOutgoingProposals(linkId ? outgoing.filter((p) => p.link === linkId) : [])
+      } catch {
+        setLink(null)
+        setIncomingProposals([])
+        setOutgoingProposals([])
+      }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not load person history.'))
       setHistory(null)
@@ -155,28 +187,63 @@ export default function PersonHistoryPage() {
     }
     setSaving(true)
     try {
-      await peopleApi.action({
-        action: sheetAction,
-        wallet_id: Number(walletId),
-        person_id: personId,
-        amount: pkrAmount,
-        date,
-        notes: notes.trim(),
-        ...(travelOn
-          ? {
-              original_amount: value,
-              original_currency: travelCurrency,
-              fx_rate: travelRate,
-              fx_source: 'manual',
-            }
-          : {}),
-      })
+      const fx = travelOn
+        ? {
+            original_amount: value,
+            original_currency: travelCurrency,
+            fx_rate: travelRate,
+            fx_source: 'manual',
+          }
+        : {}
+
+      if (link) {
+        await peopleApi.propose({
+          link_id: link.id,
+          action: sheetAction,
+          wallet_id: Number(walletId),
+          amount: pkrAmount,
+          date,
+          notes: notes.trim(),
+          ...fx,
+        })
+      } else {
+        await peopleApi.action({
+          action: sheetAction,
+          wallet_id: Number(walletId),
+          person_id: personId,
+          amount: pkrAmount,
+          date,
+          notes: notes.trim(),
+          ...fx,
+        })
+      }
       setSheetAction(null)
       await load()
     } catch (err) {
       setFormError(apiErrorMessage(err, 'Could not save.'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const respondProposal = async (proposalId: number, action: 'accept' | 'decline') => {
+    setProposalBusyId(proposalId)
+    setError('')
+    try {
+      if (action === 'accept') {
+        if (!acceptWalletId) {
+          setError('Pick a wallet to accept into.')
+          return
+        }
+        await peopleApi.acceptProposal(proposalId, { wallet_id: Number(acceptWalletId) })
+      } else {
+        await peopleApi.declineProposal(proposalId)
+      }
+      await load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update proposal.'))
+    } finally {
+      setProposalBusyId(null)
     }
   }
 
@@ -224,7 +291,9 @@ export default function PersonHistoryPage() {
           </button>
           <div>
             <h1 style={{ margin: 0 }}>{personName}</h1>
-            <p className="page-subtitle" style={{ margin: 0 }}>History</p>
+            <p className="page-subtitle" style={{ margin: 0 }}>
+              {isLinked ? 'Linked · History' : 'History'}
+            </p>
           </div>
         </div>
         <button type="button" className="btn-glass" onClick={exportCsv} disabled={!history?.transactions.length}>
@@ -257,7 +326,78 @@ export default function PersonHistoryPage() {
             </div>
           </div>
 
+          {incomingProposals.length > 0 ? (
+            <div className="people-proposal-box glass" style={{ marginBottom: '1rem' }}>
+              <h3 style={{ margin: '0 0 0.65rem' }}>Waiting for you</h3>
+              <div className="form-group">
+                <label>Wallet to post into</label>
+                <select value={acceptWalletId} onChange={(e) => setAcceptWalletId(e.target.value)}>
+                  {wallets.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              {incomingProposals.map((p) => {
+                const meta = actionMeta(p.action)
+                return (
+                  <div key={p.id} className="people-invite-row">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800 }}>{meta.label} · {fmtBalance(p.amount)}</div>
+                      <div className="travel-muted" style={{ fontSize: '0.78rem' }}>
+                        {p.date}{p.notes ? ` · ${p.notes}` : ''}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn-glass"
+                        style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                        disabled={proposalBusyId === p.id}
+                        onClick={() => void respondProposal(p.id, 'decline')}
+                      >
+                        Decline
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ fontSize: '0.72rem', padding: '0.3rem 0.7rem' }}
+                        disabled={proposalBusyId === p.id}
+                        onClick={() => void respondProposal(p.id, 'accept')}
+                      >
+                        {proposalBusyId === p.id ? <span className="spinner" /> : 'Accept'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : null}
+
+          {outgoingProposals.length > 0 ? (
+            <div className="people-proposal-box glass" style={{ marginBottom: '1rem' }}>
+              <h3 style={{ margin: '0 0 0.65rem' }}>
+                Waiting for {link?.other_user?.name || personName}
+              </h3>
+              {outgoingProposals.map((p) => {
+                const meta = actionMeta(p.action)
+                return (
+                  <div key={p.id} className="people-invite-row">
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 800 }}>{meta.label} · {fmtBalance(p.amount)}</div>
+                      <div className="travel-muted" style={{ fontSize: '0.78rem' }}>
+                        Posted on your side · awaiting their accept
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : null}
+
           <h3 style={{ margin: '0 0 0.75rem' }}>Actions</h3>
+          {isLinked ? (
+            <p className="page-subtitle" style={{ marginTop: 0 }}>
+              Linked: they’ll get a notification to accept before their books update.
+            </p>
+          ) : null}
           <div className="people-action-grid">
             {ACTIONS.map((a) => (
               <button
@@ -359,11 +499,16 @@ export default function PersonHistoryPage() {
                 <label>Notes (optional)</label>
                 <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
+              {isLinked ? (
+                <p className="page-subtitle" style={{ margin: 0 }}>
+                  Posts on your books now. {link?.other_user?.name || personName} gets a request to accept.
+                </p>
+              ) : null}
               <button type="submit" className="btn-primary" style={{ width: '100%' }} disabled={saving}>
                 {saving ? <span className="spinner" /> : (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     {sheetAction === 'pay' ? <Send size={16} /> : sheetAction === 'receive' ? <Download size={16} /> : <UserRound size={16} />}
-                    Record {sheetMeta.label}
+                    {isLinked ? `Send ${sheetMeta.label} request` : `Record ${sheetMeta.label}`}
                   </span>
                 )}
               </button>
