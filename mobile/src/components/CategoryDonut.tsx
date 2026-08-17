@@ -90,7 +90,15 @@ function PetalArc({
   )
 }
 
-export function CategoryDonut({ data }: { data: DonutDatum[] }) {
+export function CategoryDonut({
+  data,
+  title = 'This month you spent',
+  emptyText = 'No spending recorded this month yet.',
+}: {
+  data: DonutDatum[]
+  title?: string
+  emptyText?: string
+}) {
   const colors = useColors()
   const money = useMaskedMoney()
   const progress = useSharedValue(0)
@@ -151,7 +159,7 @@ export function CategoryDonut({ data }: { data: DonutDatum[] }) {
           <FontAwesome name="pie-chart" size={22} color={colors.textMuted} />
         </View>
         <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-          No spending recorded this month yet.
+          {emptyText}
         </Text>
       </View>
     )
@@ -160,7 +168,7 @@ export function CategoryDonut({ data }: { data: DonutDatum[] }) {
   return (
     <View style={styles.wrap}>
       <View style={styles.totalBanner}>
-        <Text style={[styles.totalLabel, { color: colors.textMuted }]}>This month you spent</Text>
+        <Text style={[styles.totalLabel, { color: colors.textMuted }]}>{title}</Text>
         <Text style={[styles.totalValue, money.amountStyle, { color: colors.primaryDark }]}>
           {money.fmt(total)}
         </Text>

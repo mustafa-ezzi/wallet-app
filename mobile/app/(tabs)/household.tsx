@@ -30,13 +30,16 @@ import type {
   SettlementRow,
 } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
+import { CategoryDonut } from '@/src/components/CategoryDonut'
+import { MemberSpendBars } from '@/src/components/MemberSpendBars'
 import { BouncyPressable, Reveal } from '@/src/components/motion'
 import { DateField, SelectField } from '@/src/components/SelectFields'
 import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
+import { getCategoryMeta } from '@/src/constants/categories'
 import { useOffline } from '@/src/offline'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
-import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
+import { iosShadow, radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { todayISO, toMoney } from '@/src/utils/format'
 import { buildHouseholdInviteMessage } from '@/src/utils/shareInvite'
 import { useAuth } from '@/src/context/AuthContext'
@@ -309,6 +312,21 @@ export default function HouseholdScreen() {
   const isAdmin = selected?.my_role === 'owner' || selected?.my_role === 'admin'
   const potBalance = toMoney(activeLedger?.pot_balance)
 
+  const categoryChartData = useMemo(
+    () =>
+      (summary?.by_category ?? []).map((r) => ({
+        category: r.name || 'Other',
+        amount: toMoney(r.amount),
+      })),
+    [summary],
+  )
+
+  const spentLabel =
+    period === 'month' && activeLedger?.kind === 'ongoing' && activeLedger?.status === 'open'
+      ? 'This month'
+      : 'Total spent'
+  const spentValue = periodSpent || toMoney(summary?.total_spent) || toMoney(activeLedger?.total_spent)
+
   const openInviteModal = async () => {
     if (!requireOnline() || !selected) return
     setInviteOpen(true)
@@ -533,25 +551,25 @@ export default function HouseholdScreen() {
         <View style={styles.head}>
           <View style={{ flex: 1 }}>
             {view !== 'list' ? (
-              <Pressable onPress={back} style={styles.back}>
+              <Pressable onPress={back} style={styles.back} hitSlop={8}>
                 <FontAwesome name="chevron-left" size={12} color={colors.primary} />
                 <Text style={styles.backText}>Back</Text>
               </Pressable>
             ) : null}
             <Text style={styles.title}>
               {view === 'list'
-                ? 'Household'
+                ? 'Family'
                 : view === 'detail'
                   ? selected?.name
                   : activeLedger?.name}
             </Text>
             <Text style={styles.sub}>
               {view === 'list'
-                ? 'Shared spending with family'
+                ? 'Shared ledgers, pot, and splits'
                 : view === 'detail'
-                  ? `${selected?.member_count ?? 0} members · ${ledgers.length} ledgers`
+                  ? `${selected?.member_count ?? members.length} members · ${ledgers.length} ledger${ledgers.length === 1 ? '' : 's'}`
                   : activeLedger?.status === 'open'
-                    ? 'Open ledger'
+                    ? `${activeLedger.kind === 'event' ? 'Event' : 'Ongoing'} · open`
                     : 'Closed ledger'}
             </Text>
           </View>
@@ -571,46 +589,73 @@ export default function HouseholdScreen() {
 
         {view === 'list' ? (
           <>
-            <View style={styles.actions}>
-              <Pressable style={styles.primaryChip} onPress={() => setCreateOpen(true)}>
-                <Text style={styles.primaryChipText}>+ Create</Text>
-              </Pressable>
-              <Pressable style={styles.secondaryChip} onPress={() => setJoinOpen(true)}>
-                <Text style={styles.secondaryChipText}>Join with code</Text>
-              </Pressable>
+            <View style={styles.heroActions}>
+              <BouncyPressable style={styles.heroPrimary} onPress={() => setCreateOpen(true)}>
+                <FontAwesome name="plus" size={13} color="#fff" />
+                <Text style={styles.heroPrimaryText}>Create household</Text>
+              </BouncyPressable>
+              <BouncyPressable style={styles.heroSecondary} onPress={() => setJoinOpen(true)}>
+                <FontAwesome name="ticket" size={13} color={colors.primaryDark} />
+                <Text style={styles.heroSecondaryText}>Join with code</Text>
+              </BouncyPressable>
             </View>
 
             {loading && households.length === 0 ? (
               <ActivityIndicator color={colors.primary} />
             ) : households.length === 0 ? (
               <View style={styles.emptyCard}>
+                <View style={styles.emptyIcon}>
+                  <FontAwesome name="users" size={22} color={colors.primary} />
+                </View>
                 <Text style={styles.emptyTitle}>No households yet</Text>
-                <Text style={styles.emptyBody}>Create one or join with an invite code.</Text>
+                <Text style={styles.emptyBody}>
+                  Create a shared space for family spending, or join with an invite code.
+                </Text>
               </View>
             ) : (
-              households.map((hh, i) => (
-                <Reveal index={i} key={hh.id}>
-                <BouncyPressable style={styles.card} onPress={() => void openHousehold(hh)}>
-                  <View style={styles.hhIcon}>
-                    <FontAwesome name="home" size={16} color={colors.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{hh.name}</Text>
-                    <Text style={styles.cardMeta}>
-                      {hh.member_count} members · {hh.ledger_count} ledgers
-                      {hh.my_role ? ` · ${hh.my_role}` : ''}
-                    </Text>
-                  </View>
-                  <FontAwesome name="chevron-right" size={12} color={colors.textMuted} />
-                </BouncyPressable>
-                </Reveal>
-              ))
+              households.map((hh, i) => {
+                const initial = (hh.name.trim()[0] || 'F').toUpperCase()
+                return (
+                  <Reveal index={i} key={hh.id}>
+                    <BouncyPressable style={styles.hhCard} onPress={() => void openHousehold(hh)}>
+                      <View style={styles.hhAvatar}>
+                        <Text style={styles.hhAvatarText}>{initial}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cardTitle}>{hh.name}</Text>
+                        <Text style={styles.cardMeta}>
+                          {hh.member_count} members · {hh.ledger_count} ledgers
+                          {hh.my_role ? ` · ${hh.my_role}` : ''}
+                        </Text>
+                      </View>
+                      <FontAwesome name="chevron-right" size={12} color={colors.textMuted} />
+                    </BouncyPressable>
+                  </Reveal>
+                )
+              })
             )}
           </>
         ) : null}
 
         {view === 'detail' && selected ? (
           <>
+            <View style={styles.detailHero}>
+              <View style={styles.detailStat}>
+                <Text style={styles.detailLab}>Members</Text>
+                <Text style={styles.detailVal}>{selected.member_count ?? members.length}</Text>
+              </View>
+              <View style={styles.detailDivider} />
+              <View style={styles.detailStat}>
+                <Text style={styles.detailLab}>Ledgers</Text>
+                <Text style={styles.detailVal}>{ledgers.length}</Text>
+              </View>
+              <View style={styles.detailDivider} />
+              <View style={styles.detailStat}>
+                <Text style={styles.detailLab}>Your role</Text>
+                <Text style={styles.detailVal}>{selected.my_role || 'member'}</Text>
+              </View>
+            </View>
+
             <View style={styles.hhActionRow}>
               {isAdmin ? (
                 <>
@@ -654,33 +699,61 @@ export default function HouseholdScreen() {
             <View style={styles.sectionHead}>
               <Text style={styles.section}>Ledgers</Text>
               {isAdmin ? (
-                <Pressable onPress={() => setLedgerOpen(true)}>
-                  <Text style={styles.link}>+ New</Text>
+                <Pressable onPress={() => setLedgerOpen(true)} hitSlop={8}>
+                  <Text style={styles.link}>+ New ledger</Text>
                 </Pressable>
               ) : null}
             </View>
             {ledgers.length === 0 ? (
-              <Text style={styles.emptyBody}>No ledgers yet.</Text>
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>No ledgers yet</Text>
+                <Text style={styles.emptyBody}>
+                  Start an ongoing monthly ledger or an event ledger for a trip or wedding.
+                </Text>
+              </View>
             ) : (
-              ledgers.map((led, i) => (
-                <Reveal index={i} key={led.id}>
-                <BouncyPressable style={styles.card} onPress={() => void openLedger(led)}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{led.name}</Text>
-                    <Text style={styles.cardMeta}>
-                      {led.kind} · {led.status}
-                    </Text>
-                    <Text style={[styles.cardAmt, money.amountStyle]}>
-                      {led.kind === 'ongoing' && led.status === 'open'
-                        ? `This month ${money.fmt(led.month_spent ?? 0)}`
-                        : `Spent ${money.fmt(led.total_spent)}`}
-                      {led.pot_balance != null ? ` · pot ${money.fmt(led.pot_balance)}` : ''}
-                    </Text>
-                  </View>
-                  <FontAwesome name="chevron-right" size={12} color={colors.textMuted} />
-                </BouncyPressable>
-                </Reveal>
-              ))
+              ledgers.map((led, i) => {
+                const open = led.status === 'open'
+                return (
+                  <Reveal index={i} key={led.id}>
+                    <BouncyPressable style={styles.ledgerCard} onPress={() => void openLedger(led)}>
+                      <View style={styles.ledgerTop}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.cardTitle}>{led.name}</Text>
+                          <Text style={styles.cardMeta}>
+                            {led.kind === 'event' ? 'Event' : 'Ongoing'}
+                          </Text>
+                        </View>
+                        <View style={[styles.statusPill, open ? styles.statusOpen : styles.statusClosed]}>
+                          <Text style={[styles.statusText, open ? styles.statusTextOpen : styles.statusTextClosed]}>
+                            {open ? 'Open' : 'Closed'}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.ledgerBottom}>
+                        <View>
+                          <Text style={styles.detailLab}>
+                            {led.kind === 'ongoing' && open ? 'This month' : 'Spent'}
+                          </Text>
+                          <Text style={[styles.ledgerAmt, money.amountStyle]}>
+                            {money.fmt(
+                              led.kind === 'ongoing' && open
+                                ? led.month_spent ?? 0
+                                : led.total_spent,
+                            )}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={styles.detailLab}>Pot</Text>
+                          <Text style={[styles.ledgerAmt, money.amountStyle]}>
+                            {money.fmt(led.pot_balance ?? 0)}
+                          </Text>
+                        </View>
+                      </View>
+                    </BouncyPressable>
+                  </Reveal>
+                )
+              })
             )}
           </>
         ) : null}
@@ -708,20 +781,18 @@ export default function HouseholdScreen() {
               </View>
             ) : null}
 
-            <View style={styles.potRow}>
-              <View style={styles.potCard}>
-                <Text style={styles.actualLab}>
-                  {period === 'month' && activeLedger.kind === 'ongoing' && activeLedger.status === 'open'
-                    ? 'This month'
-                    : 'Total spent'}
-                </Text>
-                <Text style={[styles.actualVal, money.amountStyle]}>
-                  {money.fmt(periodSpent || summary?.total_spent || activeLedger.total_spent)}
+            <View style={styles.statHero}>
+              <View style={styles.statHeroMain}>
+                <Text style={styles.statHeroLab}>{spentLabel}</Text>
+                <Text style={[styles.statHeroAmt, money.amountStyle]}>{money.fmt(spentValue)}</Text>
+                <Text style={styles.statHeroMeta}>
+                  {(summary?.expense_count ?? expenses.length) || 0} expense
+                  {(summary?.expense_count ?? expenses.length) === 1 ? '' : 's'}
                 </Text>
               </View>
-              <View style={styles.potCard}>
-                <Text style={styles.actualLab}>Pot balance</Text>
-                <Text style={[styles.actualVal, money.amountStyle]}>
+              <View style={styles.statHeroSide}>
+                <Text style={styles.actualLab}>Shared pot</Text>
+                <Text style={[styles.statSideAmt, money.amountStyle]}>
                   {money.fmt(activeLedger.pot_balance ?? 0)}
                 </Text>
               </View>
@@ -738,7 +809,7 @@ export default function HouseholdScreen() {
                   }}
                 >
                   <Text style={[styles.tabText, ledgerTab === t && styles.tabTextOn]}>
-                    {t === 'feed' ? 'Feed' : t === 'report' ? 'Report' : 'Split equal'}
+                    {t === 'feed' ? 'Feed' : t === 'report' ? 'Report' : 'Split'}
                   </Text>
                 </Pressable>
               ))}
@@ -747,77 +818,138 @@ export default function HouseholdScreen() {
             <View style={styles.actions}>
               {activeLedger.status === 'open' ? (
                 <>
-                  <Pressable style={styles.primaryChip} onPress={() => setExpenseOpen(true)}>
+                  <BouncyPressable style={styles.primaryChip} onPress={() => setExpenseOpen(true)}>
                     <Text style={styles.primaryChipText}>+ Expense</Text>
-                  </Pressable>
-                  <Pressable style={styles.secondaryChip} onPress={() => setContribOpen(true)}>
+                  </BouncyPressable>
+                  <BouncyPressable style={styles.secondaryChip} onPress={() => setContribOpen(true)}>
                     <Text style={styles.secondaryChipText}>Pot contribute</Text>
-                  </Pressable>
+                  </BouncyPressable>
                 </>
               ) : null}
-              <Pressable style={styles.secondaryChip} onPress={() => void toggleClose()}>
+              <BouncyPressable style={styles.secondaryChip} onPress={() => void toggleClose()}>
                 <Text style={styles.secondaryChipText}>
                   {activeLedger.status === 'open' ? 'Close' : 'Reopen'}
                 </Text>
-              </Pressable>
+              </BouncyPressable>
             </View>
 
             {ledgerTab === 'feed' ? (
               expenses.length === 0 ? (
-                <Text style={styles.emptyBody}>
-                  {period === 'month' ? 'No expenses this month yet.' : 'No expenses yet.'}
-                </Text>
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyTitle}>
+                    {period === 'month' ? 'No expenses this month' : 'No expenses yet'}
+                  </Text>
+                  <Text style={styles.emptyBody}>
+                    Add a shared expense — pay from the pot, a wallet, or both.
+                  </Text>
+                </View>
               ) : (
-                expenses.map((ex) => (
-                  <View key={ex.id} style={styles.card}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle}>{ex.category || 'Expense'}</Text>
-                      <Text style={styles.cardMeta}>
-                        {ex.paid_by_name} · {ex.date}
-                        {ex.notes ? ` · ${ex.notes}` : ''}
-                      </Text>
-                      {toMoney(ex.pot_amount) > 0 ? (
-                        <Text style={styles.cardMeta}>
-                          Pot {money.fmt(ex.pot_amount)}
+                expenses.map((ex, i) => {
+                  const meta = getCategoryMeta(ex.category)
+                  const potAmt = toMoney(ex.pot_amount)
+                  const personal = toMoney(ex.personal_amount ?? Math.max(0, toMoney(ex.amount) - potAmt))
+                  return (
+                    <Reveal index={i} key={ex.id}>
+                      <View style={styles.expenseCard}>
+                        <View style={[styles.expenseIcon, { backgroundColor: `${meta.color}1f` }]}>
+                          <FontAwesome name={meta.icon} size={15} color={meta.color} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.expenseTitle} numberOfLines={1}>
+                            {ex.category || 'Expense'}
+                          </Text>
+                          <Text style={styles.expenseMeta} numberOfLines={1}>
+                            {ex.paid_by_name || 'Member'} · {ex.date}
+                          </Text>
+                          {ex.notes ? (
+                            <Text style={styles.expenseNotes} numberOfLines={2}>
+                              {ex.notes}
+                            </Text>
+                          ) : null}
+                          {potAmt > 0 || personal > 0 ? (
+                            <View style={styles.expenseTags}>
+                              {potAmt > 0 ? (
+                                <View style={styles.tagPot}>
+                                  <Text style={styles.tagPotText}>Pot {money.fmt(potAmt)}</Text>
+                                </View>
+                              ) : null}
+                              {personal > 0 ? (
+                                <View style={styles.tagWallet}>
+                                  <Text style={styles.tagWalletText}>
+                                    Wallet {money.fmt(personal)}
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                          ) : null}
+                        </View>
+                        <Text style={[styles.expenseAmt, money.amountStyle]}>
+                          {money.fmt(ex.amount)}
                         </Text>
-                      ) : null}
-                    </View>
-                    <Text style={[styles.cardAmt, money.amountStyle]}>{money.fmt(ex.amount)}</Text>
-                  </View>
-                ))
+                      </View>
+                    </Reveal>
+                  )
+                })
               )
             ) : null}
 
-            {ledgerTab === 'report' && summary ? (
-              <>
-                <Text style={styles.section}>By member</Text>
-                {(summary.by_member ?? []).map((row, i) => (
-                  <View key={`m-${i}`} style={styles.lineRow}>
-                    <Text style={[styles.cardTitle, { flex: 1 }]}>{row.name}</Text>
-                    <Text style={[styles.cardAmt, money.amountStyle]}>{money.fmt(row.amount)}</Text>
+            {ledgerTab === 'report' ? (
+              summary ? (
+                <>
+                  <View style={styles.reportCard}>
+                    <CategoryDonut
+                      data={categoryChartData}
+                      title={period === 'month' ? 'Household spent this month' : 'Household spent'}
+                      emptyText="No category spending in this period."
+                    />
                   </View>
-                ))}
-                <Text style={styles.section}>By category</Text>
-                {(summary.by_category ?? []).map((row, i) => (
-                  <View key={`c-${i}`} style={styles.lineRow}>
-                    <Text style={[styles.cardTitle, { flex: 1 }]}>{row.name}</Text>
-                    <Text style={[styles.cardAmt, money.amountStyle]}>{money.fmt(row.amount)}</Text>
-                  </View>
-                ))}
-              </>
+                  <MemberSpendBars data={summary.by_member ?? []} title="Who paid" />
+                </>
+              ) : (
+                <View style={styles.emptyCard}>
+                  <Text style={styles.emptyTitle}>Report unavailable</Text>
+                  <Text style={styles.emptyBody}>Pull to refresh, or switch period and try again.</Text>
+                </View>
+              )
             ) : null}
 
             {ledgerTab === 'split' ? (
               settlement.length === 0 ? (
-                <Text style={styles.emptyBody}>No transfers needed — already even.</Text>
+                <View style={styles.emptyCard}>
+                  <View style={styles.emptyIcon}>
+                    <FontAwesome name="check" size={18} color={colors.success} />
+                  </View>
+                  <Text style={styles.emptyTitle}>Already even</Text>
+                  <Text style={styles.emptyBody}>No transfers needed for an equal split.</Text>
+                </View>
               ) : (
                 settlement.map((row, i) => (
-                  <View key={`s-${i}`} style={styles.lineRow}>
-                    <Text style={[styles.cardTitle, { flex: 1 }]}>
-                      {(row.from_name || 'Member')} → {(row.to_name || 'Member')}
-                    </Text>
-                    <Text style={[styles.cardAmt, money.amountStyle]}>{money.fmt(row.amount)}</Text>
-                  </View>
+                  <Reveal index={i} key={`s-${i}`}>
+                    <View style={styles.splitCard}>
+                      <View style={styles.splitAvatars}>
+                        <View style={[styles.splitAvatar, { backgroundColor: '#ecfdf5' }]}>
+                          <Text style={[styles.splitAvatarText, { color: colors.success }]}>
+                            {((row.from_name || 'M')[0] || 'M').toUpperCase()}
+                          </Text>
+                        </View>
+                        <FontAwesome name="long-arrow-right" size={12} color={colors.textMuted} />
+                        <View style={[styles.splitAvatar, { backgroundColor: colors.infoBg }]}>
+                          <Text style={[styles.splitAvatarText, { color: colors.infoText }]}>
+                            {((row.to_name || 'M')[0] || 'M').toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.cardTitle}>
+                          {(row.from_name || 'Member')} → {(row.to_name || 'Member')}
+                        </Text>
+                        <Text style={styles.cardMeta}>Equal-split settlement</Text>
+                      </View>
+                      <Text style={[styles.expenseAmt, money.amountStyle]}>
+                        {money.fmt(row.amount)}
+                      </Text>
+                    </View>
+                  </Reveal>
                 ))
               )
             ) : null}
@@ -1059,220 +1191,406 @@ export default function HouseholdScreen() {
 
 function makeStyles(colors: ColorTokens) {
   return StyleSheet.create({
-  head: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md },
-  back: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  backText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
-  title: { fontSize: typography.title, fontWeight: '800', color: colors.text },
-  sub: { color: colors.textMuted, marginTop: 2, fontSize: typography.caption },
-  offline: {
-    backgroundColor: colors.warningBg,
-    borderColor: colors.warningBorder,
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  offlineText: { color: colors.warning, fontWeight: '600', fontSize: typography.caption, lineHeight: 18 },
-  error: { color: colors.danger, marginBottom: spacing.md, fontWeight: '600' },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  primaryChip: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: radii.sm,
-  },
-  primaryChipText: { color: colors.white, fontWeight: '800', fontSize: 13 },
-  secondaryChip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: radii.sm,
-  },
-  secondaryChipText: { color: colors.primaryDark, fontWeight: '800', fontSize: 13 },
-  hhActionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: spacing.lg,
-  },
-  hhActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: radii.sm,
-  },
-  hhActionPrimary: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  hhActionDanger: {
-    borderColor: 'rgba(220,38,38,0.3)',
-  },
-  hhActionText: {
-    fontWeight: '800',
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  sheetHint: {
-    color: colors.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    marginBottom: spacing.md,
-    marginTop: -4,
-  },
-  potActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: spacing.md,
-    marginTop: -4,
-  },
-  emptyCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
-  emptyTitle: { fontWeight: '800', color: colors.text, marginBottom: 4 },
-  emptyBody: { color: colors.textMuted, fontSize: typography.caption, lineHeight: 18, marginBottom: spacing.md },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  hhIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardTitle: { fontWeight: '800', color: colors.text },
-  cardMeta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  cardAmt: { fontWeight: '800', color: colors.primaryDark, fontSize: typography.caption },
-  inviteCard: {
-    backgroundColor: colors.infoBg,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  inviteLab: { color: colors.infoText, fontWeight: '700', fontSize: 12 },
-  inviteCode: { fontSize: 22, fontWeight: '800', color: colors.primaryDark, marginVertical: 6, letterSpacing: 1 },
-  section: {
-    fontSize: typography.subtitle,
-    fontWeight: '800',
-    color: colors.primaryDark,
-    marginBottom: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  link: { color: colors.primary, fontWeight: '800' },
-  memberRow: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  potRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  potCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
-  periodRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
-  periodChip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.full,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    backgroundColor: colors.surface,
-  },
-  periodChipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  periodText: { fontWeight: '700', color: colors.textSecondary, fontSize: 12 },
-  periodTextOn: { color: colors.white },
-  actualLab: { fontSize: 11, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' },
-  actualVal: { marginTop: 4, fontWeight: '800', fontSize: typography.caption, color: colors.primaryDark },
-  tabRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
-  tab: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingVertical: 8,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  tabOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { fontWeight: '800', fontSize: 12, color: colors.textSecondary },
-  tabTextOn: { color: colors.white },
-  lineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  modalRoot: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.4)' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    maxHeight: '88%',
-    zIndex: 2,
-  },
-  sheetTitle: { fontSize: typography.subtitle, fontWeight: '800', color: colors.primaryDark, marginBottom: spacing.md },
-  preview: { color: colors.primaryDark, fontWeight: '700', marginBottom: spacing.md },
-  label: { fontSize: 12, fontWeight: '700', color: colors.textMuted, marginBottom: 6, marginTop: 4 },
-  seg: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
-  segBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.sm,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  segBtnOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  segText: { fontWeight: '700', color: colors.textSecondary },
-  segTextOn: { color: colors.white },
-  filters: { gap: 8, marginBottom: spacing.md },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radii.full,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: colors.background,
-  },
-  chipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chipText: { fontWeight: '700', color: colors.textSecondary, fontSize: 12 },
-  chipTextOn: { color: colors.white },
+    head: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md },
+    back: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+    backText: { color: colors.primary, fontWeight: '800', fontSize: 13 },
+    title: { fontSize: typography.title, fontWeight: '800', color: colors.text },
+    sub: { color: colors.textMuted, marginTop: 2, fontSize: typography.caption },
+    offline: {
+      backgroundColor: colors.warningBg,
+      borderColor: colors.warningBorder,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+    },
+    offlineText: { color: colors.warning, fontWeight: '600', fontSize: typography.caption, lineHeight: 18 },
+    error: { color: colors.danger, marginBottom: spacing.md, fontWeight: '600' },
+    heroActions: { gap: spacing.sm, marginBottom: spacing.lg },
+    heroPrimary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.primary,
+      paddingVertical: 14,
+      borderRadius: radii.md,
+      ...iosShadow,
+    },
+    heroPrimaryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+    heroSecondary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 12,
+      borderRadius: radii.md,
+    },
+    heroSecondaryText: { color: colors.primaryDark, fontWeight: '800', fontSize: 13 },
+    actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+    primaryChip: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: radii.sm,
+    },
+    primaryChipText: { color: colors.white, fontWeight: '800', fontSize: 13 },
+    secondaryChip: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: radii.sm,
+    },
+    secondaryChipText: { color: colors.primaryDark, fontWeight: '800', fontSize: 13 },
+    hhCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      ...iosShadow,
+    },
+    hhAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: colors.surfaceMuted,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    hhAvatarText: { fontWeight: '800', fontSize: 18, color: colors.primary },
+    detailHero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      marginBottom: spacing.md,
+      ...iosShadow,
+    },
+    detailStat: { flex: 1, alignItems: 'center', gap: 2 },
+    detailDivider: { width: 1, height: 28, backgroundColor: colors.border },
+    detailLab: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    detailVal: { fontWeight: '800', fontSize: 15, color: colors.primaryDark, textTransform: 'capitalize' },
+    hhActionRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: spacing.lg,
+    },
+    hhActionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: radii.sm,
+    },
+    hhActionPrimary: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    hhActionDanger: {
+      borderColor: 'rgba(220,38,38,0.3)',
+    },
+    hhActionText: {
+      fontWeight: '800',
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    sheetHint: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 17,
+      marginBottom: spacing.md,
+      marginTop: -4,
+    },
+    potActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: spacing.md,
+      marginTop: -4,
+    },
+    emptyCard: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.xl,
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    emptyIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 16,
+      backgroundColor: colors.surfaceMuted,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.md,
+    },
+    emptyTitle: { fontWeight: '800', color: colors.text, marginBottom: 4, textAlign: 'center' },
+    emptyBody: {
+      color: colors.textMuted,
+      fontSize: typography.caption,
+      lineHeight: 18,
+      textAlign: 'center',
+    },
+    cardTitle: { fontWeight: '800', color: colors.text, fontSize: 15 },
+    cardMeta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+    ledgerCard: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      gap: spacing.md,
+      ...iosShadow,
+    },
+    ledgerTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+    ledgerBottom: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: spacing.sm,
+    },
+    ledgerAmt: { marginTop: 2, fontWeight: '800', fontSize: 15, color: colors.primaryDark },
+    statusPill: {
+      borderRadius: radii.full,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    statusOpen: { backgroundColor: '#ecfdf5' },
+    statusClosed: { backgroundColor: colors.surfaceMuted },
+    statusText: { fontSize: 11, fontWeight: '800' },
+    statusTextOpen: { color: colors.success },
+    statusTextClosed: { color: colors.textMuted },
+    inviteCard: {
+      backgroundColor: colors.infoBg,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: '#bfdbfe',
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    inviteLab: { color: colors.infoText, fontWeight: '700', fontSize: 12 },
+    inviteCode: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: colors.primaryDark,
+      marginVertical: 6,
+      letterSpacing: 1,
+    },
+    section: {
+      fontSize: typography.subtitle,
+      fontWeight: '800',
+      color: colors.primaryDark,
+      marginBottom: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    sectionHead: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    link: { color: colors.primary, fontWeight: '800' },
+    memberRow: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    periodRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
+    periodChip: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.full,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      backgroundColor: colors.surface,
+    },
+    periodChipOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+    periodText: { fontWeight: '700', color: colors.textSecondary, fontSize: 12 },
+    periodTextOn: { color: colors.white },
+    actualLab: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    statHeroLab: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: 'rgba(255,255,255,0.78)',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    statHero: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    statHeroMain: {
+      flex: 1.4,
+      backgroundColor: colors.primary,
+      borderRadius: radii.lg,
+      padding: spacing.md,
+      ...iosShadow,
+    },
+    statHeroSide: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      justifyContent: 'center',
+    },
+    statHeroAmt: { marginTop: 4, fontWeight: '800', fontSize: 22, color: '#fff' },
+    statHeroMeta: { marginTop: 4, color: 'rgba(255,255,255,0.78)', fontSize: 12, fontWeight: '600' },
+    statSideAmt: { marginTop: 6, fontWeight: '800', fontSize: 16, color: colors.primaryDark },
+    tabRow: {
+      flexDirection: 'row',
+      gap: 6,
+      marginBottom: spacing.md,
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: radii.md,
+      padding: 4,
+    },
+    tab: {
+      flex: 1,
+      borderRadius: radii.sm,
+      paddingVertical: 9,
+      alignItems: 'center',
+    },
+    tabOn: { backgroundColor: colors.surface, ...iosShadow },
+    tabText: { fontWeight: '800', fontSize: 12, color: colors.textMuted },
+    tabTextOn: { color: colors.primaryDark },
+    expenseCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      ...iosShadow,
+    },
+    expenseIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    expenseTitle: { fontWeight: '800', color: colors.text, fontSize: 15 },
+    expenseMeta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
+    expenseNotes: { color: colors.textSecondary, fontSize: 12, marginTop: 4, lineHeight: 16 },
+    expenseTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
+    tagPot: {
+      backgroundColor: '#ecfdf5',
+      borderRadius: radii.full,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    tagPotText: { color: colors.success, fontSize: 11, fontWeight: '800' },
+    tagWallet: {
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: radii.full,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    tagWalletText: { color: colors.textSecondary, fontSize: 11, fontWeight: '800' },
+    expenseAmt: { fontWeight: '800', color: colors.primaryDark, fontSize: 15 },
+    reportCard: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      ...iosShadow,
+    },
+    splitCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      ...iosShadow,
+    },
+    splitAvatars: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    splitAvatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    splitAvatarText: { fontWeight: '800', fontSize: 12 },
+    modalRoot: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.4)' },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: spacing.lg,
+      maxHeight: '88%',
+      zIndex: 2,
+    },
+    sheetTitle: {
+      fontSize: typography.subtitle,
+      fontWeight: '800',
+      color: colors.primaryDark,
+      marginBottom: spacing.md,
+    },
+    preview: { color: colors.primaryDark, fontWeight: '700', marginBottom: spacing.md },
+    label: { fontSize: 12, fontWeight: '700', color: colors.textMuted, marginBottom: 6, marginTop: 4 },
+    seg: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
+    segBtn: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radii.sm,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    segBtnOn: { backgroundColor: colors.primary, borderColor: colors.primary },
+    segText: { fontWeight: '700', color: colors.textSecondary },
+    segTextOn: { color: colors.white },
   })
 }
+

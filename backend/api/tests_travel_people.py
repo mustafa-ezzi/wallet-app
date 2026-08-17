@@ -84,7 +84,7 @@ class PeopleDoubleEntryTests(TravelPeopleBase):
         self.assertEqual(Decimal(str(self.cash.current_balance)), Decimal('2000'))
         self.assertEqual(Decimal(str(person.current_balance)), Decimal('0'))
 
-    def test_cannot_delete_person_with_balance(self):
+    def test_can_delete_person_with_balance_and_unwinds_wallet(self):
         person = Account.objects.create(user=self.user, name='Debt', type='person', opening_balance=0)
         self.client.post('/api/people/actions/', {
             'action': 'lend',
@@ -92,8 +92,43 @@ class PeopleDoubleEntryTests(TravelPeopleBase):
             'person_id': person.id,
             'amount': '100',
         }, format='json')
+        self.bank.refresh_from_db()
+        self.assertEqual(Decimal(str(self.bank.current_balance)), Decimal('9900'))
         res = self.client.delete(f'/api/people/{person.id}/')
-        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.status_code, 204)
+        self.bank.refresh_from_db()
+        self.assertEqual(Decimal(str(self.bank.current_balance)), Decimal('10000'))
+        self.assertFalse(Account.objects.filter(id=person.id).exists())
+        self.assertEqual(Transaction.objects.filter(user=self.user, people_action='lend').count(), 0)
+
+    def test_can_edit_and_delete_people_pair(self):
+        person = Account.objects.create(user=self.user, name='EditMe', type='person', opening_balance=0)
+        res = self.client.post('/api/people/actions/', {
+            'action': 'lend',
+            'wallet_id': self.bank.id,
+            'person_id': person.id,
+            'amount': '200',
+            'notes': 'old',
+        }, format='json')
+        pair_id = res.data['people_pair_id']
+        patched = self.client.patch(f'/api/people/pairs/{pair_id}/', {
+            'amount': '50',
+            'wallet_id': self.cash.id,
+            'notes': 'new',
+        }, format='json')
+        self.assertEqual(patched.status_code, 200)
+        person.refresh_from_db()
+        self.bank.refresh_from_db()
+        self.cash.refresh_from_db()
+        self.assertEqual(Decimal(str(person.current_balance)), Decimal('50'))
+        self.assertEqual(Decimal(str(self.bank.current_balance)), Decimal('10000'))
+        self.assertEqual(Decimal(str(self.cash.current_balance)), Decimal('1950'))
+        deleted = self.client.delete(f'/api/people/pairs/{pair_id}/')
+        self.assertEqual(deleted.status_code, 204)
+        person.refresh_from_db()
+        self.cash.refresh_from_db()
+        self.assertEqual(Decimal(str(person.current_balance)), Decimal('0'))
+        self.assertEqual(Decimal(str(self.cash.current_balance)), Decimal('2000'))
 
     def test_dashboard_excludes_people_from_total(self):
         person = Account.objects.create(user=self.user, name='Hussain', type='person', opening_balance=0)

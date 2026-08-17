@@ -26,6 +26,8 @@ export type Transaction = {
   fx_source?: string | null
   people_pair_id?: string | null
   people_action?: string | null
+  wallet_id?: number | null
+  wallet_name?: string | null
 }
 
 export type PeopleHistory = {

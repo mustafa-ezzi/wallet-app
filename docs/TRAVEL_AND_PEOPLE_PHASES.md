@@ -286,7 +286,7 @@ Phase F can add: daily auto-refresh of the trip rate while the trip is active (s
 3. Notes distinguish Lend vs Pay (both look like wallet− / person+).  
 4. People **do not** count in “What you have” / combined wallet total. Combined = bank + cash only.  
 5. Person net is **not** income/expense of the month. Reports: filter “People” or exclude from spending chart.  
-6. Cannot delete a person with a non-zero balance (settle first).  
+6. You can delete a person even with a non-zero balance (app warns first). Deleting also removes that person’s matching wallet legs so your bank/cash totals stay consistent.  
 7. Travel Mode can apply to People amounts the same way (type AED, store PKR).  
 8. Local people stay forever as option 2 — no CashTrail account required.
 

@@ -247,13 +247,14 @@ export default function WalletsScreen() {
 
   const deletePerson = (a: Account) => {
     const bal = toMoney(a.current_balance)
-    if (Math.abs(bal) >= 0.01) {
-      setError('Settle this person to zero before deleting.')
-      return
-    }
+    const unsettled = Math.abs(bal) >= 0.01
+    const status =
+      bal > 0 ? `They still owe you ${money.fmt(bal)}` : `You still owe them ${money.fmt(Math.abs(bal))}`
     Alert.alert(
-      'Delete person?',
-      `Remove “${a.name}” from People? This cannot be undone.`,
+      unsettled ? 'Not settled — delete anyway?' : 'Delete person?',
+      unsettled
+        ? `${status}. Deleting “${a.name}” also removes their lend/borrow entries from your wallets. This cannot be undone.`
+        : `Remove “${a.name}” from People? This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -266,7 +267,7 @@ export default function WalletsScreen() {
                 bumpRefresh()
                 await load(true)
               } catch (err) {
-                setError(apiErrorMessage(err, 'Could not delete person. Settle to zero first.'))
+                setError(apiErrorMessage(err, 'Could not delete person.'))
               }
             })()
           },
@@ -280,7 +281,6 @@ export default function WalletsScreen() {
     const status =
       Math.abs(bal) < 0.01 ? 'Settled' : bal > 0 ? 'They owe you' : 'You owe them'
     const isLinked = linkedPersonIds.has(a.id)
-    const settled = Math.abs(bal) < 0.01
     return (
       <Reveal index={index} key={a.id}>
         <View style={styles.card}>
@@ -327,14 +327,12 @@ export default function WalletsScreen() {
             >
               <Text style={styles.actionText}>History</Text>
             </BouncyPressable>
-            {settled ? (
-              <BouncyPressable
-                style={[styles.actionBtn, styles.actionBtnDanger]}
-                onPress={() => deletePerson(a)}
-              >
-                <Text style={styles.actionTextDanger}>Delete</Text>
-              </BouncyPressable>
-            ) : null}
+            <BouncyPressable
+              style={[styles.actionBtn, styles.actionBtnDanger]}
+              onPress={() => deletePerson(a)}
+            >
+              <Text style={styles.actionTextDanger}>Delete</Text>
+            </BouncyPressable>
           </View>
         </View>
       </Reveal>

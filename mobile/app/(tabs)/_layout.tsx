@@ -54,10 +54,7 @@ function TabsShell() {
         <Tabs.Screen name="wallets" options={{ title: 'Wallets' }} />
         <Tabs.Screen name="income" options={{ title: 'Income' }} />
         <Tabs.Screen name="bills" options={{ title: 'Bills' }} />
-        <Tabs.Screen
-          name="household"
-          options={{ title: 'Family', href: null, headerShown: true }}
-        />
+        <Tabs.Screen name="household" options={{ title: 'Family' }} />
         <Tabs.Screen
           name="reports"
           options={{ title: 'Reports', href: null, headerShown: true }}

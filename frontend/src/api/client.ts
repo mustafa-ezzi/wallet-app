@@ -277,6 +277,10 @@ export const peopleApi = {
   update: (id: number, data: object) => api.patch(`/people/${id}/`, data),
   remove: (id: number) => api.delete(`/people/${id}/`),
   action: (data: object) => api.post('/people/actions/', data),
+  updatePair: (pairId: string, data: object) =>
+    api.patch(`/people/pairs/${encodeURIComponent(pairId)}/`, data),
+  removePair: (pairId: string) =>
+    api.delete(`/people/pairs/${encodeURIComponent(pairId)}/`),
   history: (id: number, params?: { year?: number; month?: number }) =>
     api.get(`/people/${id}/history/`, { params }),
   // Phase G/I — linked people

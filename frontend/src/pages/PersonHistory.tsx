@@ -6,7 +6,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Pencil,
   Send,
+  Trash2,
   UserRound,
 } from 'lucide-react'
 import { accountsApi, apiErrorMessage, asList, peopleApi } from '../api/client'
@@ -15,6 +17,7 @@ import { formatForeignSubtitle, foreignToPkr, formatRateLine, todayISO } from '.
 import { useTravelMode } from '../travel/TravelModeContext'
 import InvitePersonModal from '../people/InvitePersonModal'
 import type { PeopleLink, PeopleProposal } from '../people/types'
+import { useConfirm } from '../hooks/useConfirm'
 
 type PeopleAction = 'lend' | 'borrow' | 'pay' | 'receive'
 
@@ -34,6 +37,9 @@ type HistoryPayload = {
     date: string
     notes: string
     people_action?: string | null
+    people_pair_id?: string | null
+    wallet_id?: number | null
+    wallet_name?: string | null
     original_amount?: number | string | null
     original_currency?: string | null
     fx_rate?: number | string | null
@@ -61,10 +67,16 @@ function actionMeta(action?: string | null) {
   }
 }
 
+function userNotesFromPeople(notes: string): string {
+  const idx = (notes || '').indexOf(' · ')
+  return idx >= 0 ? notes.slice(idx + 3) : ''
+}
+
 export default function PersonHistoryPage() {
   const { id } = useParams()
   const personId = Number(id)
   const navigate = useNavigate()
+  const { confirm, dialog: confirmDialog } = useConfirm()
   const {
     isActive: travelOn,
     currency: travelCurrency,
@@ -93,6 +105,7 @@ export default function PersonHistoryPage() {
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [editingPairId, setEditingPairId] = useState<string | null>(null)
   const [convertOpen, setConvertOpen] = useState(false)
   const [unlinkBusy, setUnlinkBusy] = useState(false)
 
@@ -169,11 +182,26 @@ export default function PersonHistoryPage() {
   }
 
   const openAction = (action: PeopleAction) => {
+    setEditingPairId(null)
     setSheetAction(action)
     setAmount('')
     setDate(todayISO())
     setNotes('')
     setFormError('')
+  }
+
+  const openEdit = (tx: HistoryPayload['transactions'][number]) => {
+    const action = (tx.people_action as PeopleAction) || 'lend'
+    setEditingPairId(tx.people_pair_id || null)
+    setSheetAction(action)
+    const raw = tx.original_amount != null && toMoney(tx.original_amount) > 0
+      ? toMoney(tx.original_amount)
+      : toMoney(tx.amount)
+    setAmount(String(raw))
+    setDate(tx.date)
+    setNotes(userNotesFromPeople(tx.notes || ''))
+    setFormError('')
+    if (tx.wallet_id) setWalletId(String(tx.wallet_id))
   }
 
   const submitAction = async (e: React.FormEvent) => {
@@ -199,7 +227,16 @@ export default function PersonHistoryPage() {
           }
         : {}
 
-      if (link) {
+      if (editingPairId) {
+        await peopleApi.updatePair(editingPairId, {
+          action: sheetAction,
+          wallet_id: Number(walletId),
+          amount: pkrAmount,
+          date,
+          notes: notes.trim(),
+          ...fx,
+        })
+      } else if (link) {
         await peopleApi.propose({
           link_id: link.id,
           action: sheetAction,
@@ -221,6 +258,7 @@ export default function PersonHistoryPage() {
         })
       }
       setSheetAction(null)
+      setEditingPairId(null)
       await load()
     } catch (err) {
       setFormError(apiErrorMessage(err, 'Could not save.'))
@@ -247,6 +285,23 @@ export default function PersonHistoryPage() {
       setError(apiErrorMessage(err, 'Could not update proposal.'))
     } finally {
       setProposalBusyId(null)
+    }
+  }
+
+  const deleteEntry = async (tx: HistoryPayload['transactions'][number]) => {
+    if (!tx.people_pair_id) return
+    const ok = await confirm({
+      title: 'Delete entry?',
+      message: `Remove this ${actionMeta(tx.people_action).label.toLowerCase()} of ${fmtBalance(tx.amount)}? Wallet and person balances will both update.${isLinked ? ' This only changes your books.' : ''} This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await peopleApi.removePair(tx.people_pair_id)
+      await load()
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not delete entry.'))
     }
   }
 
@@ -301,6 +356,7 @@ export default function PersonHistoryPage() {
 
   return (
     <div className="page">
+      {confirmDialog}
       <div className="page-header">
         <div className="page-header-left" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button type="button" className="btn-glass" onClick={() => navigate('/accounts')} aria-label="Back">
@@ -482,6 +538,22 @@ export default function PersonHistoryPage() {
                     <strong style={{ color: isIn ? 'var(--success)' : 'var(--danger)' }}>
                       {isIn ? '+' : '−'}{fmtBalance(tx.amount).replace(/^Deficit\s+/, '')}
                     </strong>
+                    {tx.people_pair_id ? (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" className="btn-glass" onClick={() => openEdit(tx)} aria-label="Edit">
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-glass"
+                          style={{ color: 'var(--danger)' }}
+                          onClick={() => void deleteEntry(tx)}
+                          aria-label="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 )
               })}
@@ -491,11 +563,11 @@ export default function PersonHistoryPage() {
       ) : null}
 
       {sheetAction && sheetMeta ? (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSheetAction(null)}>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setSheetAction(null), setEditingPairId(null))}>
           <div className="modal-sheet">
             <div className="modal-header">
-              <h2>{sheetMeta.label} · {personName}</h2>
-              <button type="button" className="modal-close" onClick={() => setSheetAction(null)}>×</button>
+              <h2>{editingPairId ? 'Edit' : ''}{editingPairId ? ' · ' : ''}{sheetMeta.label} · {personName}</h2>
+              <button type="button" className="modal-close" onClick={() => { setSheetAction(null); setEditingPairId(null) }}>×</button>
             </div>
             {formError ? <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{formError}</div> : null}
             {travelOn ? (
@@ -534,16 +606,21 @@ export default function PersonHistoryPage() {
                 <label>Notes (optional)</label>
                 <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
-              {isLinked ? (
+              {isLinked && !editingPairId ? (
                 <p className="page-subtitle" style={{ margin: 0 }}>
                   Posts on your books now. {link?.other_user?.name || personName} gets a request to accept.
+                </p>
+              ) : null}
+              {editingPairId && isLinked ? (
+                <p className="page-subtitle" style={{ margin: 0 }}>
+                  Saves on your books only. Their side is not changed.
                 </p>
               ) : null}
               <button type="submit" className="btn-primary" style={{ width: '100%' }} disabled={saving}>
                 {saving ? <span className="spinner" /> : (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     {sheetAction === 'pay' ? <Send size={16} /> : sheetAction === 'receive' ? <Download size={16} /> : <UserRound size={16} />}
-                    {isLinked ? `Send ${sheetMeta.label} request` : `Record ${sheetMeta.label}`}
+                    {editingPairId ? `Save ${sheetMeta.label}` : isLinked ? `Send ${sheetMeta.label} request` : `Record ${sheetMeta.label}`}
                   </span>
                 )}
               </button>

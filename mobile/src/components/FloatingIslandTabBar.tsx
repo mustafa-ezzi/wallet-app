@@ -94,7 +94,7 @@ export function FloatingIslandTabBar({ state, descriptors, navigation }: TabBarP
   const colors = useColors()
   const [rowWidth, setRowWidth] = useState(0)
 
-  const HIDDEN_TABS = new Set(['reports', 'settings', 'household'])
+  const HIDDEN_TABS = new Set(['reports', 'settings'])
 
   const visibleRoutes = state.routes.filter((route) => {
     if (HIDDEN_TABS.has(route.name)) return false

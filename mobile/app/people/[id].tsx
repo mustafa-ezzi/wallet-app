@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -77,6 +78,11 @@ function counterpartFromNotes(notes: string, personName: string): string {
   return 'Wallet'
 }
 
+function userNotesFromPeople(notes: string): string {
+  const idx = (notes || '').indexOf(' · ')
+  return idx >= 0 ? notes.slice(idx + 3) : ''
+}
+
 function directionLabel(action: string | null | undefined, walletName: string, personName: string) {
   switch (action) {
     case 'lend':
@@ -130,6 +136,7 @@ export default function PersonHistoryScreen() {
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const [formError, setFormError] = useState('')
+  const [editingPairId, setEditingPairId] = useState<string | null>(null)
   const [convertOpen, setConvertOpen] = useState(false)
   const [unlinkBusy, setUnlinkBusy] = useState(false)
 
@@ -218,6 +225,7 @@ export default function PersonHistoryScreen() {
   }
 
   const openAction = (action: PeopleActionKind) => {
+    setEditingPairId(null)
     setSheetAction(action)
     setAmount('')
     setDate(todayISO())
@@ -225,9 +233,29 @@ export default function PersonHistoryScreen() {
     setFormError('')
   }
 
+  const openEdit = (tx: Transaction) => {
+    const action = (tx.people_action as PeopleActionKind) || 'lend'
+    setEditingPairId(tx.people_pair_id || null)
+    setSheetAction(action)
+    const raw = tx.original_amount != null && toMoney(tx.original_amount) > 0
+      ? toMoney(tx.original_amount)
+      : toMoney(tx.amount)
+    setAmount(String(raw))
+    setDate(tx.date)
+    setNotes(userNotesFromPeople(tx.notes || ''))
+    setFormError('')
+    if (tx.wallet_id) setWalletId(String(tx.wallet_id))
+    else {
+      const name = counterpartFromNotes(tx.notes || '', personName)
+      const match = wallets.find((w) => w.name === name)
+      if (match) setWalletId(String(match.id))
+    }
+  }
+
   const closeSheet = () => {
     if (saving) return
     setSheetAction(null)
+    setEditingPairId(null)
     setFormError('')
   }
 
@@ -264,7 +292,16 @@ export default function PersonHistoryScreen() {
           }
         : {}
 
-      if (link) {
+      if (editingPairId) {
+        await peopleApi.updatePair(editingPairId, {
+          action: sheetAction,
+          wallet_id: Number(walletId),
+          amount: pkrAmount,
+          date,
+          notes: notes.trim(),
+          ...fx,
+        })
+      } else if (link) {
         await peopleApi.propose({
           link_id: link.id,
           action: sheetAction,
@@ -286,6 +323,7 @@ export default function PersonHistoryScreen() {
         })
       }
       setSheetAction(null)
+      setEditingPairId(null)
       bumpRefresh()
       await load(true)
     } catch (err) {
@@ -331,6 +369,33 @@ export default function PersonHistoryScreen() {
     } finally {
       setUnlinkBusy(false)
     }
+  }
+
+  const deleteEntry = (tx: Transaction) => {
+    const pairId = tx.people_pair_id
+    if (!pairId) return
+    Alert.alert(
+      'Delete entry?',
+      `Remove this ${actionMeta(tx.people_action).label.toLowerCase()} of ${money.fmt(tx.amount)}? Wallet and person balances will both update.${isLinked ? ' This only changes your books.' : ''} This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await peopleApi.removePair(pairId)
+                bumpRefresh()
+                await load(true)
+              } catch (err) {
+                Alert.alert('Delete failed', apiErrorMessage(err, 'Could not delete entry.'))
+              }
+            })()
+          },
+        },
+      ],
+    )
   }
 
   const netStatus = settled
@@ -577,6 +642,8 @@ export default function PersonHistoryScreen() {
                   styles={styles}
                   colors={colors}
                   money={money}
+                  onEdit={() => openEdit(tx)}
+                  onDelete={() => deleteEntry(tx)}
                 />
               ))
             )}
@@ -593,7 +660,7 @@ export default function PersonHistoryScreen() {
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
             <View style={styles.sheetHead}>
               <Text style={styles.sheetTitle}>
-                {sheetMeta?.label} · {personName}
+                {editingPairId ? 'Edit' : ''}{editingPairId ? ' · ' : ''}{sheetMeta?.label} · {personName}
               </Text>
               <Pressable onPress={closeSheet} hitSlop={10}>
                 <FontAwesome name="close" size={18} color={colors.textMuted} />
@@ -662,18 +729,25 @@ export default function PersonHistoryScreen() {
               autoCapitalize="sentences"
             />
 
-            {isLinked ? (
+            {isLinked && !editingPairId ? (
               <Text style={[styles.hintLine, { color: colors.textMuted, marginBottom: spacing.md }]}>
                 Posts on your books now. {link?.other_user?.name || personName} gets a request to accept.
+              </Text>
+            ) : null}
+            {editingPairId && isLinked ? (
+              <Text style={[styles.hintLine, { color: colors.textMuted, marginBottom: spacing.md }]}>
+                Saves on your books only. Their side is not changed.
               </Text>
             ) : null}
 
             <PrimaryButton
               title={
                 sheetMeta
-                  ? isLinked
-                    ? `Send ${sheetMeta.label} request`
-                    : `Record ${sheetMeta.label}`
+                  ? editingPairId
+                    ? `Save ${sheetMeta.label}`
+                    : isLinked
+                      ? `Send ${sheetMeta.label} request`
+                      : `Record ${sheetMeta.label}`
                   : 'Save'
               }
               onPress={() => void submitAction()}
@@ -704,19 +778,24 @@ function HistoryRow({
   styles,
   colors,
   money,
+  onEdit,
+  onDelete,
 }: {
   tx: Transaction
   personName: string
   styles: ReturnType<typeof makeStyles>
   colors: ColorTokens
   money: ReturnType<typeof useMaskedMoney>
+  onEdit: () => void
+  onDelete: () => void
 }) {
   const meta = actionMeta(tx.people_action)
-  const walletName = counterpartFromNotes(tx.notes || '', personName)
+  const walletName = tx.wallet_name || counterpartFromNotes(tx.notes || '', personName)
   const line = directionLabel(tx.people_action, walletName, personName)
   const foreign = formatForeignSubtitle(tx.original_amount, tx.original_currency, tx.fx_rate)
   const amt = toMoney(tx.amount)
   const isIn = tx.type === 'income'
+  const canMutate = Boolean(tx.people_pair_id)
 
   return (
     <View style={styles.txRow}>
@@ -730,6 +809,18 @@ function HistoryRow({
         </Text>
         <Text style={styles.txDate}>{tx.date}</Text>
         {foreign ? <Text style={styles.txForeign}>{foreign}</Text> : null}
+        {canMutate ? (
+          <View style={styles.txActions}>
+            <Pressable onPress={onEdit} hitSlop={8} style={styles.txActionBtn} accessibilityLabel="Edit entry">
+              <FontAwesome name="pencil" size={13} color={colors.primaryDark} />
+              <Text style={[styles.txActionText, { color: colors.primaryDark }]}>Edit</Text>
+            </Pressable>
+            <Pressable onPress={onDelete} hitSlop={8} style={styles.txActionBtn} accessibilityLabel="Delete entry">
+              <FontAwesome name="trash-o" size={13} color={colors.danger} />
+              <Text style={[styles.txActionText, { color: colors.danger }]}>Delete</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
           <Text
             style={[
@@ -874,7 +965,7 @@ function makeStyles(colors: ColorTokens) {
     emptyBody: { color: colors.textMuted, marginTop: 4, fontSize: typography.caption, fontWeight: '600', lineHeight: 18 },
     txRow: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       gap: spacing.md,
       backgroundColor: colors.surface,
       borderRadius: radii.md,
@@ -895,6 +986,9 @@ function makeStyles(colors: ColorTokens) {
     txDate: { color: colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 2 },
     txForeign: { color: colors.primary, fontSize: 11, fontWeight: '700', marginTop: 2 },
     txAmt: { fontWeight: '800', fontSize: typography.body },
+    txActions: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 8 },
+    txActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    txActionText: { fontWeight: '800', fontSize: 12 },
     modalRoot: { flex: 1, justifyContent: 'flex-end' },
     backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.45)' },
     sheet: {

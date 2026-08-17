@@ -133,16 +133,9 @@ class AccountViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         acc = self.get_object()
         if acc.type == 'person':
-            from decimal import Decimal
-            bal = Decimal(str(acc.current_balance))
-            if abs(bal) > Decimal('0.01'):
-                return Response(
-                    {
-                        'detail': 'Settle this person to zero before deleting.',
-                        'balance': float(bal),
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            from .travel_people_api import delete_person_account
+            delete_person_account(request.user, acc)
+            return Response(status=status.HTTP_204_NO_CONTENT)
         return super().destroy(request, *args, **kwargs)
 
 
@@ -219,6 +212,11 @@ class TransactionViewSet(viewsets.ModelViewSet):
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError('Cannot delete — linked household ledger is closed.')
             he.delete()
+        pair_id = (instance.people_pair_id or '').strip()
+        if pair_id:
+            from .travel_people_api import delete_people_pair
+            delete_people_pair(instance.user, pair_id)
+            return
         instance.delete()
 
 

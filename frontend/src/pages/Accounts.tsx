@@ -234,6 +234,28 @@ export default function Accounts() {
     } finally { setAccSaving(false) }
   }
 
+  const deletePerson = async (acc: Account) => {
+    const bal = toMoney(acc.current_balance)
+    const unsettled = Math.abs(bal) >= 0.01
+    const status =
+      bal > 0 ? `They still owe you ${fmtBalance(bal)}` : `You still owe them ${fmtBalance(Math.abs(bal))}`
+    const ok = await confirm({
+      title: unsettled ? 'Not settled — delete anyway?' : 'Delete person?',
+      message: unsettled
+        ? `${status}. Deleting “${acc.name}” also removes their lend/borrow entries from your wallets. This cannot be undone.`
+        : `Remove “${acc.name}” from People? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await peopleApi.remove(acc.id)
+      await loadAccounts()
+    } catch (err) {
+      setAccError(apiErrorMessage(err, 'Could not delete person.'))
+    }
+  }
+
   const deleteAcc = async (id: number) => {
     const ok = await confirm({
       title: 'Delete wallet?',
@@ -529,6 +551,14 @@ export default function Accounts() {
                           onClick={() => navigate(`/people/${acc.id}`)}
                         >
                           History
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-glass"
+                          style={{ color: 'var(--red-600)', borderColor: '#f5c4c0' }}
+                          onClick={() => void deletePerson(acc)}
+                        >
+                          Delete
                         </button>
                       </div>
                     </div>
