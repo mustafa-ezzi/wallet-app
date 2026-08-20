@@ -5,62 +5,75 @@ interface Props {
   /** Gradient colors of the incoming theme */
   colorFrom: string
   colorTo: string
-  /** Screen coordinates the reveal expands from (tapped swatch) */
+  /** Kept for API parity with ThemeProvider (pixel wipe is full-screen). */
   x: number
   y: number
 }
 
+const COLS = 12
+const ROWS = 8
+
 /**
- * Professional theme transition: a circle of the new theme color expands
- * from the tapped swatch, covers the screen, then fades to reveal the
- * re-themed UI. No bouncing, no cartoon waves.
+ * Theme switch: pixel dissolve inspired by React Bits Pixel Transition,
+ * implemented with animejs (already in the app — no GSAP).
  */
-export default function ThemeRevealOverlay({ colorFrom, colorTo, x, y }: Props) {
-  const ref = useRef<HTMLDivElement>(null)
+export default function ThemeRevealOverlay({ colorFrom, colorTo }: Props) {
+  const gridRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
+    const grid = gridRef.current
+    if (!grid) return
 
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    const radius = Math.ceil(Math.hypot(Math.max(x, vw - x), Math.max(y, vh - y))) + 24
+    grid.innerHTML = ''
+    const pixels: HTMLDivElement[] = []
+    for (let row = 0; row < ROWS; row += 1) {
+      for (let col = 0; col < COLS; col += 1) {
+        const pixel = document.createElement('div')
+        pixel.className = 'theme-pixel'
+        pixel.style.background = `linear-gradient(135deg, ${colorFrom}, ${colorTo})`
+        pixel.style.gridColumn = String(col + 1)
+        pixel.style.gridRow = String(row + 1)
+        grid.appendChild(pixel)
+        pixels.push(pixel)
+      }
+    }
 
-    anime.set(el, {
-      clipPath: `circle(0px at ${x}px ${y}px)`,
-      opacity: 1,
-    })
+    anime.set(pixels, { opacity: 0, scale: 0.4 })
 
     const tl = anime.timeline({ autoplay: true })
-
     tl.add({
-      targets: el,
-      clipPath: [
-        `circle(0px at ${x}px ${y}px)`,
-        `circle(${radius}px at ${x}px ${y}px)`,
-      ],
-      duration: 480,
-      easing: 'easeInOutQuart',
-    })
-      .add({
-        targets: el,
-        opacity: 0,
-        duration: 340,
-        easing: 'easeOutQuad',
-      }, '+=90')
+      targets: pixels,
+      opacity: [0, 1],
+      scale: [0.4, 1],
+      duration: 220,
+      delay: anime.stagger(4, { from: 'center', grid: [COLS, ROWS] }),
+      easing: 'easeOutQuad',
+    }).add({
+      targets: pixels,
+      opacity: 0,
+      scale: 0.9,
+      duration: 200,
+      delay: anime.stagger(3.5, { from: 'center', grid: [COLS, ROWS] }),
+      easing: 'easeInQuad',
+    }, '+=90')
 
     return () => {
       tl.pause()
-      anime.remove(el)
+      anime.remove(pixels)
+      grid.innerHTML = ''
     }
-  }, [colorFrom, colorTo, x, y])
+  }, [colorFrom, colorTo])
 
   return (
-    <div
-      ref={ref}
-      className="theme-reveal"
-      aria-hidden
-      style={{ background: `linear-gradient(135deg, ${colorFrom} 0%, ${colorTo} 100%)` }}
-    />
+    <div className="theme-reveal theme-reveal-pixel" aria-hidden>
+      <div
+        ref={gridRef}
+        className="theme-pixel-grid"
+        style={{
+          gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+          gridTemplateRows: `repeat(${ROWS}, 1fr)`,
+        }}
+      />
+    </div>
   )
 }

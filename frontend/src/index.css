@@ -1,14 +1,50 @@
-/* ── Theme reveal transition (circular wipe) ─────────────────────── */
+/* ── Theme reveal (pixel dissolve) ───────────────────────────────── */
 .theme-reveal {
   position: fixed;
   inset: 0;
   z-index: 9999;
   pointer-events: none;
-  will-change: clip-path, opacity;
+}
+.theme-reveal-pixel {
+  background: transparent;
+}
+.theme-pixel-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 2px;
+  padding: 2px;
+}
+.theme-pixel {
+  border-radius: 3px;
+  transform-origin: center;
+  will-change: opacity, transform;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .theme-reveal { display: none !important; }
+}
+
+/* ── Motion helpers (list reveal) ────────────────────────────────── */
+.ct-reveal {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.ct-reveal-on {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ct-reveal,
+  .ct-reveal-on {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 /* ── Theme swatches (Settings) ───────────────────────────────────── */
@@ -418,7 +454,7 @@ select option { background: var(--surface); color: var(--text-primary); }
 
 /* ── Animations ─────────────────────────────────────────────────── */
 @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
-@keyframes slideUp { from { transform: translateY(32px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 /* ── App shell ───────────────────────────────────────────────────── */
 #app, #root { min-height: 100vh; }
@@ -792,7 +828,7 @@ select option { background: var(--surface); color: var(--text-primary); }
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  animation: fadeIn 0.15s ease;
+  animation: fadeIn 0.2s ease;
 }
 @media (min-width: 640px) { .modal-overlay { align-items: center; } }
 
@@ -803,13 +839,17 @@ select option { background: var(--surface); color: var(--text-primary); }
   width: 100%;
   max-width: 520px;
   padding: 1.4rem 1.25rem 1.75rem;
-  animation: slideUp 0.22s ease;
+  animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: var(--shadow-lg);
   max-height: 90vh;
   overflow-y: auto;
 }
 @media (min-width: 640px) {
   .modal-sheet { border-radius: var(--radius-xl); padding: 1.5rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay,
+  .modal-sheet { animation: none; }
 }
 
 .modal-header {
@@ -1020,6 +1060,14 @@ select option { background: var(--surface); color: var(--text-primary); }
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.55rem;
+}
+.wallet-grid > .ct-reveal {
+  display: flex;
+  min-width: 0;
+}
+.wallet-grid > .ct-reveal > .wallet-tile {
+  flex: 1;
+  width: 100%;
 }
 .wallet-tile {
   text-align: left;

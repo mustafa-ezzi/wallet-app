@@ -11,10 +11,12 @@ import {
 } from 'lucide-react'
 import { dashboardApi, householdsApi, transactionsApi } from '../api/client'
 import { CategoryDonut, type DonutDatum } from '../components/CategoryDonut'
+import { CountUp } from '../components/motion/CountUp'
+import { Reveal } from '../components/motion/Reveal'
 import { getCategoryMeta } from '../constants/categories'
 import { useAuth } from '../context/AuthContext'
 import { useOffline } from '../offline'
-import { fmt, fmtBalance } from '../utils/format'
+import { fmt } from '../utils/format'
 
 interface DashboardData {
   total_balance: number
@@ -164,89 +166,104 @@ export default function Dashboard() {
       )}
 
       {/* What you have — balance + wallets in one card (mobile parity) */}
-      <section className="home-card">
-        <div className="home-card-head">
-          <h3>What you have</h3>
-          <button type="button" className="section-link" onClick={() => navigate('/accounts')}>
-            All wallets →
-          </button>
-        </div>
-        <div className={`home-balance ${balanceNeg ? 'neg' : ''}`}>
-          {fmtBalance(data?.total_balance ?? 0)}
-        </div>
-        <p className="home-balance-hint">
-          Across {walletCount} wallet{walletCount === 1 ? '' : 's'} · {monthName} in {fmt(data?.month_income ?? 0)} · out {fmt(data?.month_expense ?? 0)}
-        </p>
+      <Reveal index={0}>
+        <section className="home-card">
+          <div className="home-card-head">
+            <h3>What you have</h3>
+            <button type="button" className="section-link" onClick={() => navigate('/accounts')}>
+              All wallets →
+            </button>
+          </div>
+          <div className={`home-balance ${balanceNeg ? 'neg' : ''}`}>
+            <CountUp value={data?.total_balance ?? 0} />
+          </div>
+          <p className="home-balance-hint">
+            Across {walletCount} wallet{walletCount === 1 ? '' : 's'} · {monthName} in {fmt(data?.month_income ?? 0)} · out {fmt(data?.month_expense ?? 0)}
+          </p>
 
-        <div className="wallet-grid">
-          {accounts.slice(0, 6).map((acc) => {
-            const neg = acc.balance < 0
-            return (
-              <button
-                key={acc.id}
-                type="button"
-                className="wallet-tile"
-                onClick={() => navigate('/accounts')}
-              >
-                <div className="wallet-tile-top">
-                  <span className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : 'account-icon-bank'}`}>
-                    {acc.type === 'cash'
-                      ? <Wallet size={14} strokeWidth={1.75} />
-                      : <Landmark size={14} strokeWidth={1.75} />}
-                  </span>
-                  <span className="wallet-tile-name">{acc.name}</span>
-                </div>
-                <div className={`wallet-tile-bal ${neg ? 'neg' : ''}`}>{fmtBalance(acc.balance)}</div>
+          <div className="wallet-grid">
+            {accounts.slice(0, 6).map((acc, i) => {
+              const neg = acc.balance < 0
+              return (
+                <Reveal key={acc.id} index={i} stepMs={40}>
+                  <button
+                    type="button"
+                    className="wallet-tile"
+                    onClick={() => navigate('/accounts')}
+                  >
+                    <div className="wallet-tile-top">
+                      <span className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : 'account-icon-bank'}`}>
+                        {acc.type === 'cash'
+                          ? <Wallet size={14} strokeWidth={1.75} />
+                          : <Landmark size={14} strokeWidth={1.75} />}
+                      </span>
+                      <span className="wallet-tile-name">{acc.name}</span>
+                    </div>
+                    <div className={`wallet-tile-bal ${neg ? 'neg' : ''}`}>
+                      <CountUp value={acc.balance} durationMs={520} />
+                    </div>
+                  </button>
+                </Reveal>
+              )
+            })}
+            <Reveal index={Math.min(accounts.length, 6)} stepMs={40}>
+              <button type="button" className="wallet-tile wallet-tile-add" onClick={() => navigate('/accounts')}>
+                <Plus size={16} strokeWidth={2.25} />
+                <span>Add wallet</span>
               </button>
-            )
-          })}
-          <button type="button" className="wallet-tile wallet-tile-add" onClick={() => navigate('/accounts')}>
-            <Plus size={16} strokeWidth={2.25} />
-            <span>Add wallet</span>
-          </button>
-        </div>
-      </section>
+            </Reveal>
+          </div>
+        </section>
+      </Reveal>
 
       {/* Monthly spending bloom chart */}
-      <section className="home-card">
-        <div className="home-card-head">
-          <h3>{monthName} spending</h3>
-          <button type="button" className="section-link" onClick={() => navigate('/reports')}>
-            Reports →
-          </button>
-        </div>
-        <CategoryDonut data={breakdown} />
-      </section>
+      <Reveal index={1}>
+        <section className="home-card">
+          <div className="home-card-head">
+            <h3>{monthName} spending</h3>
+            <button type="button" className="section-link" onClick={() => navigate('/reports')}>
+              Reports →
+            </button>
+          </div>
+          <CategoryDonut data={breakdown} />
+        </section>
+      </Reveal>
 
       {/* Household shortcut */}
-      <button type="button" className="home-card home-hh-btn" onClick={() => navigate('/household')}>
-        <div className="home-hh-left">
-          <span className="account-icon account-icon-bank"><Users size={16} strokeWidth={1.75} /></span>
-          <div>
-            <div className="home-hh-title">
-              Household
-              {hhUnread > 0 && <span className="badge badge-red">{hhUnread} new</span>}
-            </div>
-            <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-              {hhUnread > 0 ? 'Someone posted a shared expense' : 'Shared expenses with family'}
+      <Reveal index={2}>
+        <button type="button" className="home-card home-hh-btn" onClick={() => navigate('/household')}>
+          <div className="home-hh-left">
+            <span className="account-icon account-icon-bank"><Users size={16} strokeWidth={1.75} /></span>
+            <div>
+              <div className="home-hh-title">
+                Household
+                {hhUnread > 0 && <span className="badge badge-red">{hhUnread} new</span>}
+              </div>
+              <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                {hhUnread > 0 ? 'Someone posted a shared expense' : 'Shared expenses with family'}
+              </div>
             </div>
           </div>
-        </div>
-        <span className="section-link">Open →</span>
-      </button>
+          <span className="section-link">Open →</span>
+        </button>
+      </Reveal>
 
       {/* Recent */}
-      <div className="section-row">
-        <h3>Recent</h3>
-        <button type="button" className="section-link" onClick={() => navigate('/reports')}>
-          View all →
-        </button>
-      </div>
-      {!recent.length ? (
-        <div className="home-card empty-state">
-          <div className="empty-icon"><FileText size={36} strokeWidth={1.5} /></div>
-          <p>No transactions yet. Tap + to add your first one.</p>
+      <Reveal index={3}>
+        <div className="section-row">
+          <h3>Recent</h3>
+          <button type="button" className="section-link" onClick={() => navigate('/reports')}>
+            View all →
+          </button>
         </div>
+      </Reveal>
+      {!recent.length ? (
+        <Reveal index={4}>
+          <div className="home-card empty-state">
+            <div className="empty-icon"><FileText size={36} strokeWidth={1.5} /></div>
+            <p>No transactions yet. Tap + to add your first one.</p>
+          </div>
+        </Reveal>
       ) : (
         <div className="home-tx-list">
           {recent.map((tx, i) => {
@@ -256,28 +273,31 @@ export default function Dashboard() {
             const Icon = income ? ArrowUpRight : meta.icon
             const note = (tx.notes || '').trim()
             return (
-              <div
+              <Reveal
                 key={tx.id && !Number.isNaN(tx.id) ? tx.id : `tx-${tx.date}-${i}`}
-                className="home-tx-row"
+                index={i}
+                stepMs={40}
               >
-                <div
-                  className="home-tx-icon"
-                  style={{
-                    background: income ? '#ecfdf5' : `${meta.color}1f`,
-                    color: income ? 'var(--success)' : meta.color,
-                  }}
-                >
-                  <Icon size={14} strokeWidth={2.25} />
+                <div className="home-tx-row">
+                  <div
+                    className="home-tx-icon"
+                    style={{
+                      background: income ? '#ecfdf5' : `${meta.color}1f`,
+                      color: income ? 'var(--success)' : meta.color,
+                    }}
+                  >
+                    <Icon size={14} strokeWidth={2.25} />
+                  </div>
+                  <div className="home-tx-body">
+                    <div className="home-tx-title">{title}</div>
+                    {note ? <div className="home-tx-notes">{note}</div> : null}
+                    <div className="home-tx-meta">{tx.account_name} · {tx.date}</div>
+                  </div>
+                  <div className={`home-tx-amt ${income ? 'in' : 'out'}`}>
+                    {income ? '+' : '−'} {fmt(Math.abs(tx.amount))}
+                  </div>
                 </div>
-                <div className="home-tx-body">
-                  <div className="home-tx-title">{title}</div>
-                  {note ? <div className="home-tx-notes">{note}</div> : null}
-                  <div className="home-tx-meta">{tx.account_name} · {tx.date}</div>
-                </div>
-                <div className={`home-tx-amt ${income ? 'in' : 'out'}`}>
-                  {income ? '+' : '−'} {fmt(Math.abs(tx.amount))}
-                </div>
-              </div>
+              </Reveal>
             )
           })}
         </div>

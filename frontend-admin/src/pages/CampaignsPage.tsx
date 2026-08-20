@@ -154,8 +154,12 @@ export function CampaignsPage() {
   }
 
   async function onSend(id: number) {
+    const row = rows.find((c) => c.id === id)
+    const retry = row?.status === 'failed'
     const ok = window.confirm(
-      'Send this push to all matching opted-in users now? This cannot be undone.',
+      retry
+        ? 'Retry this failed push now? This cannot be undone.'
+        : 'Send this push to all matching opted-in users now? This cannot be undone.',
     )
     if (!ok) return
     setBusy(true)
@@ -165,7 +169,7 @@ export function CampaignsPage() {
       const result = await sendCampaign(id, { confirm: true })
       setMessage(
         result.ok
-          ? `Sent #${id}: ${result.sent_ok} ok, ${result.sent_failed} failed.`
+          ? `${retry ? 'Retried' : 'Sent'} #${id}: ${result.sent_ok} ok, ${result.sent_failed} failed.`
           : `Send failed: ${result.detail || 'unknown error'}`,
       )
       await load()
@@ -317,20 +321,50 @@ export function CampaignsPage() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {(c.status === 'draft' || c.status === 'scheduled') && (
+                      <Link className="btn" to={`/campaigns/${c.id}`}>
+                        View
+                      </Link>
+                      <button
+                        className="btn"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setTitle(c.title)
+                          setBody(c.body)
+                          setAudience(c.audience)
+                          setRoute(String((c.data as { route?: string })?.route || ''))
+                          setMessage(`Copied #${c.id} into the compose form — edit if needed, then Save draft.`)
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }}
+                      >
+                        Duplicate
+                      </button>
+                      {(c.status === 'draft' || c.status === 'scheduled' || c.status === 'failed') && (
                         <>
                           <button className="btn" type="button" disabled={busy} onClick={() => void onDryRun(c.id)}>
                             Dry run
                           </button>
-                          <button className="btn primary" type="button" disabled={busy} onClick={() => void onSend(c.id)}>
-                            Send
-                          </button>
-                          <button className="btn danger" type="button" disabled={busy} onClick={() => void onCancel(c.id)}>
-                            Cancel
+                          <button
+                            className="btn primary"
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void onSend(c.id)}
+                          >
+                            {c.status === 'failed' ? 'Retry' : 'Send'}
                           </button>
                         </>
                       )}
+                      {(c.status === 'draft' || c.status === 'scheduled') && (
+                        <button className="btn danger" type="button" disabled={busy} onClick={() => void onCancel(c.id)}>
+                          Cancel
+                        </button>
+                      )}
                     </div>
+                    {c.status === 'failed' && c.last_error ? (
+                      <div className="muted" style={{ fontSize: '0.75rem', marginTop: 6, maxWidth: 260, whiteSpace: 'normal' }}>
+                        {c.last_error}
+                      </div>
+                    ) : null}
                   </td>
                 </tr>
               ))

@@ -60,17 +60,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       key: (prev?.key ?? 0) + 1,
     }))
 
-    // Swap the theme once the circle has fully covered the screen
+    // Swap once the pixel grid has mostly covered the screen
     window.setTimeout(() => {
       setThemeId(id)
       applyTheme(id)
-    }, 500)
+    }, 380)
 
-    // Remove overlay after the fade completes
+    // Remove overlay after dissolve-out finishes
     window.setTimeout(() => {
       setReveal(null)
       busyRef.current = false
-    }, 950)
+    }, 900)
   }, [])
 
   const setTheme = useCallback((id: ThemeId, origin?: ThemeOrigin) => {

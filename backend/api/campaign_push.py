@@ -103,6 +103,7 @@ def send_campaign(campaign: PushCampaign, *, dry_run: bool = False) -> dict:
             'sent_ok': campaign.sent_ok,
             'sent_failed': campaign.sent_failed,
         }
+    # STATUS_FAILED and STATUS_DRAFT / STATUS_SCHEDULED can be (re)sent.
 
     if not dry_run and campaigns_sent_today() >= MAX_CAMPAIGNS_PER_DAY:
         return {

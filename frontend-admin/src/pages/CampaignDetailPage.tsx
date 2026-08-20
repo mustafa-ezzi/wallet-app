@@ -1,28 +1,56 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { fetchCampaign, type OpsCampaign } from '../api'
+import { fetchCampaign, sendCampaign, type OpsCampaign } from '../api'
 
 export function CampaignDetailPage() {
   const { id } = useParams()
   const campaignId = Number(id)
   const [campaign, setCampaign] = useState<OpsCampaign | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function load() {
+    if (!Number.isFinite(campaignId)) return
+    try {
+      const data = await fetchCampaign(campaignId)
+      setCampaign(data)
+      setError(null)
+    } catch {
+      setError('Campaign not found.')
+    }
+  }
 
   useEffect(() => {
-    if (!Number.isFinite(campaignId)) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const data = await fetchCampaign(campaignId)
-        if (!cancelled) setCampaign(data)
-      } catch {
-        if (!cancelled) setError('Campaign not found.')
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
+    void load()
   }, [campaignId])
+
+  async function onRetry() {
+    if (!campaign) return
+    const ok = window.confirm('Retry sending this push now?')
+    if (!ok) return
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      const result = await sendCampaign(campaign.id, { confirm: true })
+      setMessage(
+        result.ok
+          ? `Sent: ${result.sent_ok} ok, ${result.sent_failed} failed.`
+          : `Send failed: ${result.detail || 'unknown error'}`,
+      )
+      await load()
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Send failed.')
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const canRetry =
+    campaign && (campaign.status === 'failed' || campaign.status === 'draft' || campaign.status === 'scheduled')
 
   return (
     <div>
@@ -34,8 +62,14 @@ export function CampaignDetailPage() {
           <h1>{campaign ? campaign.title : `Campaign #${id}`}</h1>
           <p>Delivery summary — no user finance data.</p>
         </div>
+        {canRetry ? (
+          <button className="btn primary" type="button" disabled={busy} onClick={() => void onRetry()}>
+            {campaign?.status === 'failed' ? 'Retry send' : 'Send now'}
+          </button>
+        ) : null}
       </div>
       {error ? <p className="error">{error}</p> : null}
+      {message ? <p className="note">{message}</p> : null}
       {!campaign ? (
         <p className="muted">Loading…</p>
       ) : (

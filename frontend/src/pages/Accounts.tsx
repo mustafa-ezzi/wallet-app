@@ -12,6 +12,8 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { accountsApi, peopleApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
+import { CountUp } from '../components/motion/CountUp'
+import { Reveal } from '../components/motion/Reveal'
 import { fmt, fmtBalance, toMoney } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
 import { track } from '../lib/analytics'
@@ -352,12 +354,14 @@ export default function Accounts() {
       </div>
 
       {/* Combined balance strip */}
-      <div className="glass wallet-combined">
-        <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Combined Balance</span>
-        <span style={{ fontWeight: 800, fontSize: '1.2rem', color: totalBalance < 0 ? 'var(--danger)' : 'var(--primary)' }}>
-          {fmtBalance(totalBalance)}
-        </span>
-      </div>
+      <Reveal index={0}>
+        <div className="glass wallet-combined">
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Combined Balance</span>
+          <span style={{ fontWeight: 800, fontSize: '1.2rem', color: totalBalance < 0 ? 'var(--danger)' : 'var(--primary)' }}>
+            <CountUp value={totalBalance} />
+          </span>
+        </div>
+      </Reveal>
 
       {!showAccModal && accError && (
         <div className="auth-error" style={{ marginBottom: '1rem' }}>{accError}</div>
@@ -381,9 +385,11 @@ export default function Accounts() {
                 <Landmark size={15} strokeWidth={1.75} /><h3>Bank Wallets</h3>
               </div>
               <div className="list">
-                {banks.map(acc => (
-                  <AccountCard key={acc.id} acc={acc} maxAbs={maxAbsBalance}
-                    onEdit={openEditAcc} onDelete={deleteAcc} onView={viewTxs} />
+                {banks.map((acc, i) => (
+                  <Reveal key={acc.id} index={i} stepMs={40}>
+                    <AccountCard acc={acc} maxAbs={maxAbsBalance}
+                      onEdit={openEditAcc} onDelete={deleteAcc} onView={viewTxs} />
+                  </Reveal>
                 ))}
               </div>
             </div>
@@ -394,9 +400,11 @@ export default function Accounts() {
                 <Wallet size={15} strokeWidth={1.75} /><h3>Cash &amp; Wallets</h3>
               </div>
               <div className="list">
-                {cash.map(acc => (
-                  <AccountCard key={acc.id} acc={acc} maxAbs={maxAbsBalance}
-                    onEdit={openEditAcc} onDelete={deleteAcc} onView={viewTxs} />
+                {cash.map((acc, i) => (
+                  <Reveal key={acc.id} index={banks.length + i} stepMs={40}>
+                    <AccountCard acc={acc} maxAbs={maxAbsBalance}
+                      onEdit={openEditAcc} onDelete={deleteAcc} onView={viewTxs} />
+                  </Reveal>
                 ))}
               </div>
             </div>
@@ -523,45 +531,47 @@ export default function Accounts() {
               </div>
             ) : (
               <div className="list" style={{ marginTop: people.length ? '0.65rem' : 0 }}>
-                {people.map((acc) => {
+                {people.map((acc, i) => {
                   const bal = toMoney(acc.current_balance)
                   const status = Math.abs(bal) < 0.01 ? 'Settled' : bal > 0 ? 'They owe you' : 'You owe them'
                   const isLinked = linkedPersonIds.has(acc.id)
                   return (
-                    <div key={acc.id} className="glass" style={{ padding: '0.9rem 1rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div className="people-avatar"><UserRound size={16} /></div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                            <strong style={{ fontSize: '0.95rem' }}>{acc.name}</strong>
-                            {isLinked ? <span className="people-linked-badge">Linked</span> : null}
+                    <Reveal key={acc.id} index={i} stepMs={40}>
+                      <div className="glass" style={{ padding: '0.9rem 1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <div className="people-avatar"><UserRound size={16} /></div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <strong style={{ fontSize: '0.95rem' }}>{acc.name}</strong>
+                              {isLinked ? <span className="people-linked-badge">Linked</span> : null}
+                            </div>
+                            <div className="travel-muted" style={{ fontSize: '0.75rem' }}>
+                              {isLinked ? 'CashTrail user' : 'Local'} · {status}
+                            </div>
                           </div>
-                          <div className="travel-muted" style={{ fontSize: '0.75rem' }}>
-                            {isLinked ? 'CashTrail user' : 'Local'} · {status}
-                          </div>
+                          <strong style={{ color: bal < 0 ? 'var(--danger)' : 'var(--primary)' }}>
+                            {fmtBalance(bal)}
+                          </strong>
                         </div>
-                        <strong style={{ color: bal < 0 ? 'var(--danger)' : 'var(--primary)' }}>
-                          {fmtBalance(bal)}
-                        </strong>
+                        <div className="wallet-card-actions" style={{ marginTop: 10 }}>
+                          <button
+                            type="button"
+                            className="btn-glass"
+                            onClick={() => navigate(`/people/${acc.id}`)}
+                          >
+                            History
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-glass"
+                            style={{ color: 'var(--red-600)', borderColor: '#f5c4c0' }}
+                            onClick={() => void deletePerson(acc)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <div className="wallet-card-actions" style={{ marginTop: 10 }}>
-                        <button
-                          type="button"
-                          className="btn-glass"
-                          onClick={() => navigate(`/people/${acc.id}`)}
-                        >
-                          History
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-glass"
-                          style={{ color: 'var(--red-600)', borderColor: '#f5c4c0' }}
-                          onClick={() => void deletePerson(acc)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+                    </Reveal>
                   )
                 })}
               </div>
