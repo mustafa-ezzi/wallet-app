@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   cancelCampaign,
   createCampaign,
+  deleteCampaign,
   estimateCampaignAudience,
   fetchCampaigns,
   sendCampaign,
@@ -194,6 +195,26 @@ export function CampaignsPage() {
     }
   }
 
+  async function onDelete(id: number) {
+    const ok = window.confirm(
+      `Delete campaign #${id}? This removes it and its delivery records permanently.`,
+    )
+    if (!ok) return
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      await deleteCampaign(id)
+      setMessage(`Deleted campaign #${id}.`)
+      await load()
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Delete failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div>
       <div className="page-head">
@@ -357,6 +378,16 @@ export function CampaignsPage() {
                       {(c.status === 'draft' || c.status === 'scheduled') && (
                         <button className="btn danger" type="button" disabled={busy} onClick={() => void onCancel(c.id)}>
                           Cancel
+                        </button>
+                      )}
+                      {c.status !== 'sending' && (
+                        <button
+                          className="btn danger"
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void onDelete(c.id)}
+                        >
+                          Delete
                         </button>
                       )}
                     </div>

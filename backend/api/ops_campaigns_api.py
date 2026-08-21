@@ -141,6 +141,33 @@ class OpsCampaignDetailView(APIView):
         }
         return Response(data)
 
+    def delete(self, request, campaign_id: int):
+        try:
+            campaign = PushCampaign.objects.get(pk=campaign_id)
+        except PushCampaign.DoesNotExist:
+            return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if campaign.status == PushCampaign.STATUS_SENDING:
+            return Response(
+                {'detail': 'Cannot delete a campaign while it is sending.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        cid = campaign.id
+        meta = {
+            'title': campaign.title,
+            'status': campaign.status,
+            'audience': campaign.audience,
+        }
+        campaign.delete()
+        log_ops_action(
+            actor=request.user,
+            action='campaign.delete',
+            target_type='push_campaign',
+            target_id=cid,
+            meta=meta,
+            request=request,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class OpsCampaignEstimateView(APIView):
     permission_classes = [IsOpsStaff]

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { fetchCampaign, sendCampaign, type OpsCampaign } from '../api'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { deleteCampaign, fetchCampaign, sendCampaign, type OpsCampaign } from '../api'
 
 export function CampaignDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const campaignId = Number(id)
   const [campaign, setCampaign] = useState<OpsCampaign | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -49,8 +50,28 @@ export function CampaignDetailPage() {
     }
   }
 
+  async function onDelete() {
+    if (!campaign) return
+    const ok = window.confirm(
+      `Delete campaign #${campaign.id}? This removes it and its delivery records permanently.`,
+    )
+    if (!ok) return
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    try {
+      await deleteCampaign(campaign.id)
+      navigate('/campaigns')
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Delete failed.')
+      setBusy(false)
+    }
+  }
+
   const canRetry =
     campaign && (campaign.status === 'failed' || campaign.status === 'draft' || campaign.status === 'scheduled')
+  const canDelete = campaign && campaign.status !== 'sending'
 
   return (
     <div>
@@ -62,11 +83,18 @@ export function CampaignDetailPage() {
           <h1>{campaign ? campaign.title : `Campaign #${id}`}</h1>
           <p>Delivery summary — no user finance data.</p>
         </div>
-        {canRetry ? (
-          <button className="btn primary" type="button" disabled={busy} onClick={() => void onRetry()}>
-            {campaign?.status === 'failed' ? 'Retry send' : 'Send now'}
-          </button>
-        ) : null}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {canRetry ? (
+            <button className="btn primary" type="button" disabled={busy} onClick={() => void onRetry()}>
+              {campaign?.status === 'failed' ? 'Retry send' : 'Send now'}
+            </button>
+          ) : null}
+          {canDelete ? (
+            <button className="btn danger" type="button" disabled={busy} onClick={() => void onDelete()}>
+              Delete
+            </button>
+          ) : null}
+        </div>
       </div>
       {error ? <p className="error">{error}</p> : null}
       {message ? <p className="note">{message}</p> : null}

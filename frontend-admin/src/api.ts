@@ -253,6 +253,10 @@ export async function cancelCampaign(id: number) {
   return data
 }
 
+export async function deleteCampaign(id: number) {
+  await opsApi.delete(`/ops/campaigns/${id}/`)
+}
+
 export type SupportMessage = {
   id: number
   sender: 'user' | 'staff'
