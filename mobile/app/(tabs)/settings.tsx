@@ -136,6 +136,22 @@ export default function SettingsScreen() {
           </View>
         </Pressable>
 
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Bank SMS</Text>
+        <Pressable
+          onPress={() => router.push('/bank-sms')}
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <View style={styles.rowBetween}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Bank SMS assist</Text>
+              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                Paste a bank alert to draft expense, ATM cash-out, or money received
+              </Text>
+            </View>
+            <Text style={{ color: colors.primary, fontWeight: '800' }}>Paste →</Text>
+          </View>
+        </Pressable>
+
         <Text style={[styles.section, { color: colors.primaryDark }]}>Theme</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.swatchRow}>

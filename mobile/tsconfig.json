@@ -3,7 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@cashtrail/bank-sms-parser": ["../packages/bank-sms-parser/src/index.ts"]
     }
   },
   "include": [

@@ -1,8 +1,14 @@
+import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@cashtrail/bank-sms-parser': path.resolve(__dirname, '../packages/bank-sms-parser/src/index.ts'),
+    },
+  },
   plugins: [
     react(),
     VitePWA({

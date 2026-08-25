@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, LogOut, Palette, UserRound, X } from 'lucide-react'
+import { KeyRound, LogOut, MessageSquareText, Palette, UserRound, X } from 'lucide-react'
+import { BANK_SMS_UX } from '@cashtrail/bank-sms-parser'
 import { authApi, apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useConfirm } from '../hooks/useConfirm'
@@ -182,6 +183,38 @@ export default function Settings() {
           ))}
         </div>
       </div>
+
+      <button
+        type="button"
+        className="glass glass-hover"
+        style={{
+          display: 'block',
+          width: '100%',
+          textAlign: 'left',
+          padding: '1.1rem 1.15rem',
+          marginBottom: '1rem',
+          borderRadius: 'var(--radius-md)',
+          cursor: 'pointer',
+          border: '1px solid var(--border-2)',
+          background: 'var(--surface)',
+        }}
+        onClick={() => navigate('/bank-sms')}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem' }}>
+            <MessageSquareText size={16} strokeWidth={1.75} color="var(--primary)" style={{ marginTop: 2 }} />
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem' }}>{BANK_SMS_UX.settingsTitle}</h3>
+              <p className="text-muted" style={{ fontSize: '0.78rem', margin: '0.25rem 0 0' }}>
+                {BANK_SMS_UX.settingsHint}
+              </p>
+            </div>
+          </div>
+          <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+            {BANK_SMS_UX.settingsOpen}
+          </span>
+        </div>
+      </button>
 
       <div className="glass" style={{ padding: '1.1rem 1.15rem', borderRadius: 'var(--radius-md)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.75rem' }}>

@@ -17,6 +17,7 @@ import Accounts from './pages/Accounts'
 import Expenses from './pages/Expenses'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import BankSmsImportPage from './pages/BankSmsImport'
 import HouseholdPage from './pages/Household'
 import TravelModePage from './pages/TravelMode'
 import PersonHistoryPage from './pages/PersonHistory'
@@ -85,6 +86,7 @@ function AppRoutes() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/household" element={<HouseholdPage />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/bank-sms" element={<BankSmsImportPage />} />
           <Route path="/travel-mode" element={<TravelModePage />} />
           <Route path="/people/:id" element={<PersonHistoryPage />} />
         </Route>

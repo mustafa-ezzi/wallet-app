@@ -33,6 +33,7 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="add-transaction" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="travel-mode" options={{ headerShown: false, presentation: 'card' }} />
+        <Stack.Screen name="bank-sms" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen name="people/[id]" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: 'card' }} />
       </Stack>

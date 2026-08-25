@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@cashtrail/bank-sms-parser": "file:../packages/bank-sms-parser",
     "animejs": "^3.2.2",
     "axios": "^1.7.7",
     "jspdf": "^4.2.1",
