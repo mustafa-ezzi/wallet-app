@@ -30,7 +30,7 @@ export function applyKindOverrides(
   const rawLower = (parsed.raw || '').toLowerCase()
 
   for (const o of overrides) {
-    if (!o?.kind || o.kind === 'unknown') continue
+    if (!o?.kind) continue
     let matched = false
     if (o.mask && maskKey && normalizeMask(o.mask) === maskKey) matched = true
     if (o.hint && hintKey && normHint(o.hint) === hintKey) matched = true
