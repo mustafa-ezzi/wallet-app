@@ -13,6 +13,12 @@ CashTrail’s **Bank SMS assist** helps turn bank transaction alerts into draft 
 - No SMS inbox permission is requested.
 - We do not upload full SMS bodies for analytics.
 
+## Phase 2 (current sync)
+
+- Paste still runs the parser in the app.
+- Structured draft fields (+ short snippet) sync to your CashTrail account so you can **review pending imports on web and mobile**.
+- Approve/reject happens via the API; books only change after Approve.
+
 ## Later (Android auto-detect — Phase 3)
 
 - Optional permission to read **financial** SMS / bank notifications, only after you opt in (onboarding for new users; one-time prompt for existing users).

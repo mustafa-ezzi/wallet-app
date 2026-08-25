@@ -306,3 +306,47 @@ export const peopleApi = {
   markAllNotificationsRead: () => api.post('/people/notifications/mark_all_read/'),
 }
 
+export type BankSmsImportRow = {
+  id: number
+  status: 'pending' | 'approved' | 'rejected' | 'expired'
+  kind: 'expense' | 'atm' | 'income' | 'reversal' | 'unknown'
+  amount: string | number | null
+  occurred_at: string | null
+  tx_date: string | null
+  suggested_account: number | null
+  suggested_account_name: string | null
+  resolved_account: number | null
+  resolved_account_name: string | null
+  cash_account: number | null
+  cash_account_name: string | null
+  category: string
+  notes: string
+  fingerprint: string
+  tid: string
+  counterparty: string
+  bank_hint: string
+  account_mask: string
+  raw_snippet: string
+  source: string
+  created_transaction_ids: number[]
+  parser_version: string
+  confidence: string | number | null
+  parse_reason: string
+  record_atm_as_expense: boolean
+  responded_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export const bankSmsApi = {
+  list: (params?: { status?: string }) =>
+    api.get<BankSmsImportRow[]>('/bank-sms-imports/', { params }),
+  create: (data: object) => api.post<BankSmsImportRow>('/bank-sms-imports/', data),
+  update: (id: number, data: object) => api.patch<BankSmsImportRow>(`/bank-sms-imports/${id}/`, data),
+  approve: (id: number, data?: object) =>
+    api.post<BankSmsImportRow>(`/bank-sms-imports/${id}/approve/`, data ?? {}),
+  reject: (id: number) => api.post<BankSmsImportRow>(`/bank-sms-imports/${id}/reject/`),
+  settings: () => api.get('/bank-sms-import-settings/'),
+  updateSettings: (data: object) => api.patch('/bank-sms-import-settings/', data),
+}
+

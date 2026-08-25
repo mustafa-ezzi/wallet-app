@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KeyRound, LogOut, MessageSquareText, Palette, UserRound, X } from 'lucide-react'
-import { BANK_SMS_UX } from '@cashtrail/bank-sms-parser'
+import { BANK_SMS_UX } from '../lib/bank-sms-parser'
 import { authApi, apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useConfirm } from '../hooks/useConfirm'

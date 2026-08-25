@@ -14,6 +14,7 @@ from . import health
 
 from . import travel_people_api
 from . import people_linked_api
+from . import bank_sms_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -23,6 +24,7 @@ router.register('expenses', views.RecurringExpenseViewSet, basename='expense')
 router.register('receivables', views.ReceivableViewSet, basename='receivable')
 router.register('payables', views.PayableViewSet, basename='payable')
 router.register('people', travel_people_api.PeopleViewSet, basename='people')
+router.register('bank-sms-imports', bank_sms_api.BankSmsImportViewSet, basename='bank-sms-import')
 router.register('households', household_api.HouseholdViewSet, basename='household')
 router.register('household-ledgers', household_api.HouseholdLedgerViewSet, basename='household-ledger')
 router.register('household-expenses', household_api.HouseholdExpenseViewSet, basename='household-expense')
@@ -41,6 +43,11 @@ urlpatterns = [
     path('forecast/<int:year>/<int:month>/', views.ForecastView.as_view(), name='forecast'),
     path('fx/', travel_people_api.FxQuoteView.as_view(), name='fx-quote'),
     path('travel-mode/', travel_people_api.TravelModeView.as_view(), name='travel-mode'),
+    path(
+        'bank-sms-import-settings/',
+        bank_sms_api.BankSmsImportSettingsView.as_view(),
+        name='bank-sms-import-settings',
+    ),
     # Linked People (Phase G)
     path('people/link-code/', people_linked_api.PeopleLinkCodeView.as_view(), name='people-link-code'),
     path('people/invitations/', people_linked_api.PeopleInvitationCreateView.as_view(), name='people-invitations-create'),

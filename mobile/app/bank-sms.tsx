@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   BANK_SMS_UX,
   buildApproveDraft,
-  buildApprovePlan,
   parseBankSms,
   type ApproveDraft,
   type BankSmsKind,
@@ -23,11 +22,18 @@ import {
 } from '@cashtrail/bank-sms-parser'
 import { DateField, SelectField } from '@/src/components/SelectFields'
 import { ErrorBanner, PrimaryButton } from '@/src/components/ui'
-import { accountsApi, apiErrorMessage, asList } from '@/src/api/client'
+import {
+  accountsApi,
+  apiErrorMessage,
+  asList,
+  bankSmsApi,
+  type BankSmsImportRow,
+} from '@/src/api/client'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/src/constants/categories'
 import { useOffline } from '@/src/offline'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
+import { fmt } from '@/src/utils/format'
 
 type Acc = { id: number; name: string; type: string }
 
@@ -38,16 +44,39 @@ const KIND_OPTIONS: { value: BankSmsKind; label: string }[] = [
   { value: 'reversal', label: 'Reversed' },
 ]
 
+function toMoney(n: number | string | null | undefined): number {
+  if (n == null || n === '') return 0
+  const num = typeof n === 'number' ? n : parseFloat(String(n).replace(/,/g, ''))
+  return Number.isFinite(num) ? num : 0
+}
+
+function draftFromRow(row: BankSmsImportRow): ApproveDraft {
+  const kind = (row.kind === 'unknown' ? 'expense' : row.kind) as BankSmsKind
+  return {
+    kind,
+    amount: toMoney(row.amount),
+    date: row.tx_date || new Date().toISOString().slice(0, 10),
+    bankAccountId: row.resolved_account ?? row.suggested_account,
+    cashAccountId: row.cash_account,
+    category: row.category || (kind === 'atm' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous'),
+    notes: row.notes || '',
+    createCashNamed: row.cash_account ? null : 'Cash',
+    recordAtmAsExpense: row.record_atm_as_expense,
+  }
+}
+
 export default function BankSmsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
-  const { queueTransaction, syncNow, getCachedAccounts } = useOffline()
+  const { syncNow, getCachedAccounts } = useOffline()
 
   const [paste, setPaste] = useState('')
   const [parsed, setParsed] = useState<ParsedBankSms | null>(null)
   const [draft, setDraft] = useState<ApproveDraft | null>(null)
+  const [pendingId, setPendingId] = useState<number | null>(null)
+  const [pending, setPending] = useState<BankSmsImportRow[]>([])
   const [wallets, setWallets] = useState<WalletLike[]>([])
   const [error, setError] = useState('')
   const [okMsg, setOkMsg] = useState('')
@@ -68,29 +97,98 @@ export default function BankSmsScreen() {
     }
   }, [getCachedAccounts])
 
+  const loadPending = useCallback(async () => {
+    try {
+      const res = await bankSmsApi.list({ status: 'pending' })
+      setPending(Array.isArray(res.data) ? res.data : [])
+    } catch {
+      /* offline */
+    }
+  }, [])
+
   useEffect(() => {
     void loadWallets()
-  }, [loadWallets])
+    void loadPending()
+  }, [loadWallets, loadPending])
 
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
   const cashWallets = useMemo(() => wallets.filter((w) => w.type === 'cash'), [wallets])
 
-  const onDetect = () => {
+  const onDetect = async () => {
     setError('')
     setOkMsg('')
     const p = parseBankSms(paste)
     setParsed(p)
     if (p.ignore) {
       setDraft(null)
+      setPendingId(null)
       setError('This does not look like a bank money alert (OTP, failed, or marketing).')
       return
     }
     if (!p.amount) {
       setDraft(null)
+      setPendingId(null)
       setError('Could not read an amount. Check the message and try again.')
       return
     }
-    setDraft(buildApproveDraft(p, wallets))
+    const localDraft = buildApproveDraft(p, wallets)
+    setDraft(localDraft)
+    setBusy(true)
+    try {
+      const res = await bankSmsApi.create({
+        kind: localDraft.kind,
+        amount: localDraft.amount,
+        tx_date: localDraft.date,
+        fingerprint: p.fingerprint,
+        tid: p.tid || '',
+        counterparty: p.counterparty || '',
+        bank_hint: p.bankHint || '',
+        account_mask: p.accountMask || '',
+        raw_snippet: p.raw.slice(0, 280),
+        source: 'paste',
+        category: localDraft.category,
+        notes: localDraft.notes,
+        confidence: p.confidence,
+        parse_reason: p.reason,
+        parser_version: '1',
+        suggested_account_id: localDraft.bankAccountId,
+        resolved_account_id: localDraft.bankAccountId,
+        cash_account_id: localDraft.cashAccountId,
+        record_atm_as_expense: localDraft.recordAtmAsExpense,
+      })
+      setPendingId(res.data.id)
+      setDraft(draftFromRow(res.data))
+      await loadPending()
+      setOkMsg(`Saved to pending (#${res.data.id}). Approve here or on web.`)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not sync pending draft.'))
+      setPendingId(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const openPending = (row: BankSmsImportRow) => {
+    setError('')
+    setOkMsg('')
+    setPendingId(row.id)
+    setDraft(draftFromRow(row))
+    setParsed({
+      ok: true,
+      kind: row.kind,
+      amount: toMoney(row.amount),
+      occurredAt: row.occurred_at,
+      date: row.tx_date,
+      tid: row.tid || null,
+      counterparty: row.counterparty || null,
+      accountMask: row.account_mask || null,
+      bankHint: row.bank_hint || null,
+      confidence: Number(row.confidence) || 0.5,
+      reason: row.parse_reason || 'queued',
+      fingerprint: row.fingerprint,
+      raw: row.raw_snippet || '',
+      ignore: false,
+    })
   }
 
   const patchDraft = (patch: Partial<ApproveDraft>) => {
@@ -105,7 +203,10 @@ export default function BankSmsScreen() {
   }, [draft])
 
   const onApprove = async () => {
-    if (!draft) return
+    if (!draft || !pendingId) {
+      setError('Detect a message first, or open one from the pending inbox.')
+      return
+    }
     if (!draft.bankAccountId) {
       setError('Pick a bank wallet.')
       return
@@ -114,40 +215,50 @@ export default function BankSmsScreen() {
     setError('')
     setOkMsg('')
     try {
-      let cashId = draft.cashAccountId
-      const plan = buildApprovePlan({ ...draft, cashAccountId: cashId })
-
-      if (plan.createCashNamed) {
-        const created = await accountsApi.create({
-          name: plan.createCashNamed,
-          type: 'cash',
-          opening_balance: 0,
-        })
-        cashId = Number(created.data.id)
-        await syncNow()
-        await loadWallets()
-      }
-
-      const finalPlan = buildApprovePlan({ ...draft, cashAccountId: cashId })
-      for (const step of finalPlan.steps) {
-        const accountId = step.accountRole === 'cash' ? cashId : step.accountId
-        if (!accountId) throw new Error('Missing wallet for one of the legs.')
-        await queueTransaction({
-          type: step.type,
-          amount: step.amount,
-          date: step.date,
-          accountServerId: accountId,
-          category: step.category,
-          notes: step.notes,
-        })
-      }
-
-      setOkMsg(`Posted: ${finalPlan.summary}`)
+      const res = await bankSmsApi.approve(pendingId, {
+        kind: draft.kind,
+        amount: draft.amount,
+        tx_date: draft.date,
+        category: draft.category,
+        notes: draft.notes,
+        resolved_account_id: draft.bankAccountId,
+        cash_account_id: draft.cashAccountId,
+        record_atm_as_expense: draft.recordAtmAsExpense,
+        create_cash: draft.kind === 'atm' && !draft.recordAtmAsExpense && !draft.cashAccountId,
+        create_cash_name: draft.createCashNamed || 'Cash',
+      })
+      await syncNow()
+      await loadWallets()
+      await loadPending()
+      setOkMsg(`Approved #${res.data.id}`)
       setPaste('')
       setParsed(null)
       setDraft(null)
+      setPendingId(null)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not approve this draft.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onReject = async () => {
+    if (!pendingId) {
+      setDraft(null)
+      setParsed(null)
+      return
+    }
+    setBusy(true)
+    try {
+      await bankSmsApi.reject(pendingId)
+      await loadPending()
+      setOkMsg(`Rejected #${pendingId}.`)
+      setDraft(null)
+      setParsed(null)
+      setPendingId(null)
+      setPaste('')
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Reject failed.'))
     } finally {
       setBusy(false)
     }
@@ -165,12 +276,35 @@ export default function BankSmsScreen() {
 
       <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
         <Text style={[styles.hint, { color: colors.textMuted }]}>{BANK_SMS_UX.pasteHint}</Text>
-        <Text style={[styles.privacy, { color: colors.textSecondary }]}>{BANK_SMS_UX.privacyBlurb}</Text>
+        <Text style={[styles.privacy, { color: colors.textSecondary }]}>
+          {BANK_SMS_UX.privacyBlurb} Drafts sync to your pending inbox across devices.
+        </Text>
 
         {error ? <ErrorBanner message={error} /> : null}
         {okMsg ? (
           <View style={[styles.okBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={{ color: colors.primary, fontWeight: '700' }}>{okMsg}</Text>
+          </View>
+        ) : null}
+
+        {pending.length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Pending ({pending.length})</Text>
+            {pending.map((row) => (
+              <Pressable
+                key={row.id}
+                onPress={() => openPending(row)}
+                style={[styles.pendingRow, { borderColor: colors.border }]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.text, fontWeight: '800' }}>#{row.id} · {row.kind}</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }} numberOfLines={2}>
+                    {row.raw_snippet || row.notes || 'Bank SMS'}
+                  </Text>
+                </View>
+                <Text style={{ color: colors.primary, fontWeight: '800' }}>{fmt(row.amount)}</Text>
+              </Pressable>
+            ))}
           </View>
         ) : null}
 
@@ -185,13 +319,16 @@ export default function BankSmsScreen() {
         />
         <PrimaryButton
           title={BANK_SMS_UX.parseButton}
-          onPress={onDetect}
+          onPress={() => void onDetect()}
           disabled={!paste.trim() || busy}
+          loading={busy && !draft}
         />
 
         {draft && parsed ? (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{BANK_SMS_UX.reviewTitle}</Text>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>
+              {BANK_SMS_UX.reviewTitle}{pendingId ? ` · #${pendingId}` : ''}
+            </Text>
             <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 12 }}>
               Detected as {parsed.kind} · {Math.round(parsed.confidence * 100)}% · {parsed.reason}
             </Text>
@@ -222,11 +359,7 @@ export default function BankSmsScreen() {
               style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
             />
 
-            <DateField
-              label="Date"
-              value={draft.date}
-              onChange={(date) => patchDraft({ date })}
-            />
+            <DateField label="Date" value={draft.date} onChange={(date) => patchDraft({ date })} />
 
             <SelectField
               label="Bank wallet"
@@ -282,11 +415,13 @@ export default function BankSmsScreen() {
             />
 
             {busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} /> : null}
-            <PrimaryButton title={BANK_SMS_UX.approve} onPress={() => void onApprove()} disabled={busy} loading={busy} />
-            <Pressable
-              onPress={() => { setDraft(null); setParsed(null) }}
-              style={{ marginTop: 12, alignItems: 'center' }}
-            >
+            <PrimaryButton
+              title={BANK_SMS_UX.approve}
+              onPress={() => void onApprove()}
+              disabled={busy || !pendingId}
+              loading={busy}
+            />
+            <Pressable onPress={() => void onReject()} style={{ marginTop: 12, alignItems: 'center' }}>
               <Text style={{ color: colors.textMuted, fontWeight: '700' }}>{BANK_SMS_UX.reject}</Text>
             </Pressable>
           </View>
@@ -329,7 +464,8 @@ function makeStyles(_colors: ColorTokens) {
       fontSize: 15,
     },
     card: {
-      marginTop: 16,
+      marginTop: 8,
+      marginBottom: 8,
       borderWidth: 1,
       borderRadius: radii.lg,
       padding: spacing.md,
@@ -352,6 +488,13 @@ function makeStyles(_colors: ColorTokens) {
       borderRadius: radii.md,
       padding: 12,
       marginBottom: 8,
+    },
+    pendingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
     },
   })
 }

@@ -1,9 +1,9 @@
 # Bank SMS / Transaction Auto-Detect — Feature Spec & Phases
 
-**Status:** Phase 0 complete · Phase 1 (paste MVP) implemented on web + mobile  
-**Surfaces:** Mobile (paste) + Web (paste) — Android auto-SMS is Phase 3  
+**Status:** Phase 0–2 complete · Phase 3 (Android auto-SMS) next  
+**Surfaces:** Mobile (paste + pending inbox) + Web (paste + pending inbox)  
 **Home currency:** PKR  
-**Code:** `packages/bank-sms-parser` · Web `/bank-sms` · Mobile Settings → Bank SMS assist  
+**Code:** `packages/bank-sms-parser` · `backend/api/bank_sms_api.py` · Web `/bank-sms` · Mobile Settings → Bank SMS assist  
 
 ---
 
@@ -325,13 +325,14 @@ Confidence score example:
 
 ---
 
-### Phase 2 — Pending queue + sync API
+### Phase 2 — Pending queue + sync API ✅
 
-- Backend models: `BankSmsImport`, prefs, aliases  
-- CRUD: list pending, approve, reject  
-- Mobile + web **Review inbox**  
-- Dedup fingerprints  
-- Link created transaction ids  
+- Backend models: `BankSmsImport`, `BankSmsImportSettings` (migration `0023`)  
+- API: `GET/POST /api/bank-sms-imports/`, `PATCH`, `POST …/approve/`, `POST …/reject/`  
+- Prefs: `GET/PATCH /api/bank-sms-import-settings/`  
+- Dedup pending by `fingerprint`  
+- Approve creates Transaction rows server-side; stores `created_transaction_ids`  
+- Mobile + web pending inbox on Bank SMS screen; paste syncs then approve from either side  
 
 **Exit:** Paste on phone → appear on web pending list; approve from either side  
 

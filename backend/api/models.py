@@ -1383,3 +1383,111 @@ class PeopleNotification(models.Model):
 
     def __str__(self):
         return f'PeopleNotification({self.kind} → {self.user_id})'
+
+
+# ── Bank SMS import (Phase 2) ─────────────────────────────────────────────────
+
+class BankSmsImportSettings(models.Model):
+    """Per-user prefs for bank SMS assist (paste now; Android SMS later)."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='bank_sms_import_settings')
+    sms_import_enabled = models.BooleanField(default=True)
+    sms_permission_prompted_at = models.DateTimeField(null=True, blank=True)
+    default_cash_wallet = models.ForeignKey(
+        Account, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    wallet_aliases = models.JSONField(default=list, blank=True)
+    auto_create_cash_on_atm = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Bank SMS import settings'
+        verbose_name_plural = 'Bank SMS import settings'
+
+    def __str__(self):
+        return f'BankSmsImportSettings({self.user_id}, enabled={self.sms_import_enabled})'
+
+
+class BankSmsImport(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_EXPIRED = 'expired'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+        (STATUS_EXPIRED, 'Expired'),
+    ]
+
+    KIND_EXPENSE = 'expense'
+    KIND_ATM = 'atm'
+    KIND_INCOME = 'income'
+    KIND_REVERSAL = 'reversal'
+    KIND_UNKNOWN = 'unknown'
+    KIND_CHOICES = [
+        (KIND_EXPENSE, 'Expense'),
+        (KIND_ATM, 'ATM'),
+        (KIND_INCOME, 'Income'),
+        (KIND_REVERSAL, 'Reversal'),
+        (KIND_UNKNOWN, 'Unknown'),
+    ]
+
+    SOURCE_PASTE = 'paste'
+    SOURCE_ANDROID_SMS = 'android_sms'
+    SOURCE_SHARE = 'share'
+    SOURCE_CHOICES = [
+        (SOURCE_PASTE, 'Paste'),
+        (SOURCE_ANDROID_SMS, 'Android SMS'),
+        (SOURCE_SHARE, 'Share'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bank_sms_imports')
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    kind = models.CharField(max_length=16, choices=KIND_CHOICES, default=KIND_UNKNOWN)
+    amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    occurred_at = models.DateTimeField(null=True, blank=True)
+    tx_date = models.DateField(null=True, blank=True)
+    suggested_account = models.ForeignKey(
+        Account, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    resolved_account = models.ForeignKey(
+        Account, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    cash_account = models.ForeignKey(
+        Account, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+    )
+    category = models.CharField(max_length=100, blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    fingerprint = models.CharField(max_length=64, db_index=True)
+    tid = models.CharField(max_length=64, blank=True, default='')
+    counterparty = models.CharField(max_length=120, blank=True, default='')
+    bank_hint = models.CharField(max_length=64, blank=True, default='')
+    account_mask = models.CharField(max_length=32, blank=True, default='')
+    raw_snippet = models.CharField(max_length=280, blank=True, default='')
+    source = models.CharField(max_length=16, choices=SOURCE_CHOICES, default=SOURCE_PASTE)
+    created_transaction_ids = models.JSONField(default=list, blank=True)
+    parser_version = models.CharField(max_length=32, blank=True, default='1')
+    confidence = models.DecimalField(max_digits=4, decimal_places=3, null=True, blank=True)
+    parse_reason = models.CharField(max_length=64, blank=True, default='')
+    record_atm_as_expense = models.BooleanField(default=False)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'status', '-created_at'], name='bank_sms_user_status_idx'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'fingerprint'],
+                condition=models.Q(status='pending'),
+                name='uniq_pending_bank_sms_fingerprint',
+            ),
+        ]
+
+    def __str__(self):
+        return f'BankSmsImport({self.id} {self.kind} {self.status})'
