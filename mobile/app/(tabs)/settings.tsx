@@ -22,7 +22,7 @@ import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import type { PrivacyTimeout } from '@/src/privacy/storage'
 import { useTheme } from '@/src/theme/ThemeContext'
 import { useRemoteConfig } from '@/src/config/RemoteConfigContext'
-import { radii, spacing, typography } from '@/src/theme/colors'
+import { iosShadow, radii, spacing, typography } from '@/src/theme/colors'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 
 const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
@@ -140,7 +140,7 @@ export default function SettingsScreen() {
         </Pressable>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Bank SMS</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
           <View style={styles.rowBetween}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={[styles.rowTitle, { color: colors.text }]}>Auto-detect bank SMS</Text>
@@ -179,6 +179,11 @@ export default function SettingsScreen() {
                     : 'Paste a bank alert or review synced drafts'}
                 </Text>
               </View>
+              {bankSms.pendingCount > 0 ? (
+                <View style={{ backgroundColor: colors.primary, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, marginRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{bankSms.pendingCount}</Text>
+                </View>
+              ) : null}
               <Text style={{ color: colors.primary, fontWeight: '800' }}>Open →</Text>
             </View>
           </Pressable>

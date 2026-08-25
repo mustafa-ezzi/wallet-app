@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageSquareText, X } from 'lucide-react'
+import {
+  Check,
+  Inbox,
+  Link2,
+  MessageSquareText,
+  ShieldCheck,
+  Wallet,
+  X,
+} from 'lucide-react'
 import {
   BANK_SMS_UX,
   buildApproveDraft,
@@ -34,6 +42,18 @@ const KINDS: { value: BankSmsKind; label: string }[] = [
   { value: 'income', label: 'Received' },
   { value: 'reversal', label: 'Reversed' },
 ]
+
+function kindBadgeClass(kind: string): string {
+  if (kind === 'income') return 'badge badge-green'
+  if (kind === 'atm') return 'badge badge-blue'
+  if (kind === 'reversal') return 'badge badge-yellow'
+  if (kind === 'expense') return 'badge badge-red'
+  return 'badge badge-gray'
+}
+
+function kindLabel(kind: string): string {
+  return KINDS.find((k) => k.value === kind)?.label || kind
+}
 
 function draftFromRow(row: BankSmsImportRow): ApproveDraft {
   const kind = (row.kind === 'unknown' ? 'expense' : row.kind) as BankSmsKind
@@ -427,303 +447,359 @@ export default function BankSmsImportPage() {
   return (
     <div className="page">
       <div className="page-header">
-        <div className="page-header-left">
-          <h1>{BANK_SMS_UX.pasteTitle}</h1>
-          <p className="page-subtitle">{BANK_SMS_UX.pasteHint}</p>
+        <div className="page-header-left bsms-hero">
+          <div className="bsms-hero-icon" aria-hidden>
+            <MessageSquareText size={20} strokeWidth={1.75} />
+          </div>
+          <div>
+            <h1 style={{ margin: 0 }}>{BANK_SMS_UX.settingsTitle}</h1>
+            <p className="page-subtitle" style={{ marginTop: '0.35rem' }}>
+              Paste a bank alert, review the draft, then Approve — nothing posts without you.
+            </p>
+          </div>
         </div>
         <button className="btn-glass" type="button" onClick={() => navigate('/settings')}>
           <X size={14} strokeWidth={2} /> Close
         </button>
       </div>
 
-      {pending.length > 0 ? (
-        <div className="glass" style={{ padding: '1.1rem 1.15rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: '0.65rem' }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', flex: 1 }}>
-              Pending inbox ({pending.length})
-            </h3>
-            <button type="button" className="btn-glass" style={{ fontSize: '0.75rem' }} disabled={busy || !selectedIds.length} onClick={() => void onBatchApprove()}>
-              Approve selected ({selectedIds.length})
-            </button>
-            <button type="button" className="btn-glass" style={{ fontSize: '0.75rem' }} disabled={busy || !selectedIds.length} onClick={() => void onBatchReject()}>
-              Reject selected
-            </button>
-          </div>
-          <div className="list">
-            {pending.map((row) => (
-              <div key={row.id} className="list-item" style={{ gap: 10 }}>
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(row.id)}
-                  onChange={() => toggleSelected(row.id)}
-                  aria-label={`Select #${row.id}`}
-                />
+      <div className="bsms-layout">
+        {error ? <div className="auth-error">{error}</div> : null}
+        {okMsg ? <div className="auth-success">{okMsg}</div> : null}
+
+        <section className="glass bsms-panel">
+          <div className="bsms-panel-head">
+            <div>
+              <h2 className="bsms-panel-title">
+                <Inbox size={16} strokeWidth={2} color="var(--primary)" />
+                Pending inbox
+                {pending.length > 0 ? <span className="bsms-count">{pending.length}</span> : null}
+              </h2>
+              <p className="bsms-panel-sub">Synced from mobile & web. Select several to batch approve.</p>
+            </div>
+            {pending.length > 0 ? (
+              <div className="bsms-batch">
                 <button
                   type="button"
-                  className="list-item"
-                  style={{ flex: 1, width: 'auto', textAlign: 'left', cursor: 'pointer', border: 'none', background: 'transparent', padding: 0 }}
-                  onClick={() => openPending(row)}
+                  className="btn-glass"
+                  style={{ fontSize: '0.78rem' }}
+                  disabled={busy || selectedIds.length === pending.length}
+                  onClick={() => setSelectedIds(pending.map((p) => p.id))}
                 >
-                  <div>
-                    <strong>#{row.id} · {row.kind}</strong>
-                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                      {row.raw_snippet || row.notes || 'Bank SMS'} · {row.source}
-                    </div>
-                  </div>
-                  <strong>{fmt(row.amount)}</strong>
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ fontSize: '0.78rem' }}
+                  disabled={busy || !selectedIds.length}
+                  onClick={() => void onBatchApprove()}
+                >
+                  Approve ({selectedIds.length})
+                </button>
+                <button
+                  type="button"
+                  className="btn-glass"
+                  style={{ fontSize: '0.78rem' }}
+                  disabled={busy || !selectedIds.length}
+                  onClick={() => void onBatchReject()}
+                >
+                  Reject
                 </button>
               </div>
-            ))}
+            ) : null}
           </div>
-        </div>
-      ) : null}
 
-      <div className="glass" style={{ padding: '1.1rem 1.15rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.65rem' }}>
-          <MessageSquareText size={16} strokeWidth={1.75} color="var(--primary)" />
-          <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Paste new</h3>
-        </div>
-        <p className="text-muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>
-          {BANK_SMS_UX.privacyBlurb} Detected drafts sync to your pending inbox (web + mobile).
-        </p>
-        <textarea
-          value={paste}
-          onChange={(e) => setPaste(e.target.value)}
-          placeholder={BANK_SMS_UX.pastePlaceholder}
-          rows={5}
-          style={{ width: '100%', resize: 'vertical', marginBottom: '0.75rem' }}
-        />
-        <button type="button" className="btn-primary" disabled={!paste.trim() || busy} onClick={() => void onDetect()}>
-          {BANK_SMS_UX.parseButton}
-        </button>
-      </div>
+          {pending.length === 0 ? (
+            <div className="bsms-empty">No pending drafts. Paste a bank SMS below to get started.</div>
+          ) : (
+            <div className="list">
+              {pending.map((row) => (
+                <div
+                  key={row.id}
+                  className={`bsms-pending-row${pendingId === row.id ? ' is-active' : ''}`}
+                >
+                  <input
+                    className="bsms-check"
+                    type="checkbox"
+                    checked={selectedIds.includes(row.id)}
+                    onChange={() => toggleSelected(row.id)}
+                    aria-label={`Select #${row.id}`}
+                  />
+                  <button type="button" className="bsms-pending-main" onClick={() => openPending(row)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span className={kindBadgeClass(row.kind)}>{kindLabel(row.kind)}</span>
+                      <span className="text-muted" style={{ fontSize: '0.75rem' }}>#{row.id} · {row.source}</span>
+                    </div>
+                    <div className="text-muted" style={{ fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {row.raw_snippet || row.notes || 'Bank SMS'}
+                    </div>
+                  </button>
+                  <div className="bsms-pending-amt">{fmt(row.amount)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
-      {error ? <div className="auth-error" style={{ marginBottom: '1rem' }}>{error}</div> : null}
-      {okMsg ? <div className="auth-success" style={{ marginBottom: '1rem' }}>{okMsg}</div> : null}
+        <section className="glass bsms-panel">
+          <div className="bsms-panel-head">
+            <div>
+              <h2 className="bsms-panel-title">
+                <MessageSquareText size={16} strokeWidth={2} color="var(--primary)" />
+                Paste bank SMS
+              </h2>
+              <p className="bsms-panel-sub">{BANK_SMS_UX.privacyBlurb}</p>
+            </div>
+          </div>
+          <textarea
+            className="bsms-textarea"
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            placeholder={BANK_SMS_UX.pastePlaceholder}
+            rows={5}
+          />
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={!paste.trim() || busy}
+            onClick={() => void onDetect()}
+          >
+            {busy && !draft ? <span className="spinner" /> : BANK_SMS_UX.parseButton}
+          </button>
+        </section>
 
-      {draft && parsed ? (
-        <div className="glass" style={{ padding: '1.1rem 1.15rem', borderRadius: 'var(--radius-md)' }}>
-          <h3 style={{ marginTop: 0 }}>
-            {BANK_SMS_UX.reviewTitle}
-            {pendingId ? <span className="text-muted" style={{ fontWeight: 600 }}> · #{pendingId}</span> : null}
-          </h3>
-          <p className="text-muted" style={{ fontSize: '0.78rem' }}>
-            Detected as <strong>{parsed.kind}</strong> · confidence {Math.round(parsed.confidence * 100)}% · {parsed.reason}
-          </p>
-          {mustPickType ? (
-            <div className="auth-error" style={{ marginBottom: '0.75rem' }}>
-              Type is unclear (unknown or low confidence). Pick the correct type below, then continue.
-              <button
-                type="button"
-                className="btn-glass"
-                style={{ marginLeft: 8, fontSize: '0.75rem' }}
-                onClick={() => setTypeConfirmed(true)}
+        {draft && parsed ? (
+          <section className="glass bsms-panel">
+            <div className="bsms-panel-head">
+              <div>
+                <h2 className="bsms-panel-title">
+                  <Check size={16} strokeWidth={2} color="var(--primary)" />
+                  {BANK_SMS_UX.reviewTitle}
+                  {pendingId ? <span className="text-muted" style={{ fontWeight: 600 }}>#{pendingId}</span> : null}
+                </h2>
+              </div>
+            </div>
+
+            <div className="bsms-meta-row">
+              <span className={kindBadgeClass(parsed.kind)}>{kindLabel(parsed.kind)}</span>
+              <span className={`bsms-conf${mustPickType || parsed.confidence < 0.5 ? ' is-low' : ''}`}>
+                {Math.round(parsed.confidence * 100)}% confidence
+              </span>
+              <span className="text-muted" style={{ fontSize: '0.75rem' }}>{parsed.reason}</span>
+            </div>
+
+            {mustPickType ? (
+              <div className="bsms-alert warn">
+                <span>Type is unclear. Pick the correct type below, then confirm.</span>
+                <button type="button" className="btn-glass" style={{ fontSize: '0.75rem', flexShrink: 0 }} onClick={() => setTypeConfirmed(true)}>
+                  Confirmed
+                </button>
+              </div>
+            ) : null}
+            {peopleHint ? (
+              <div className="bsms-alert info">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Link2 size={14} /> {peopleHint}
+                </span>
+              </div>
+            ) : null}
+
+            <div className="form-group">
+              <label>Type</label>
+              <select
+                value={draft.kind}
+                onChange={(e) => {
+                  const kind = e.target.value as BankSmsKind
+                  patchDraft({
+                    kind,
+                    category: kind === 'atm' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous',
+                    recordAtmAsExpense: kind === 'atm' ? draft.recordAtmAsExpense : false,
+                  })
+                }}
               >
-                I’ve confirmed the type
+                {KINDS.map((k) => (
+                  <option key={k.value} value={k.value}>{k.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid-2">
+              <div className="form-group">
+                <label>Amount (PKR)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={draft.amount}
+                  onChange={(e) => patchDraft({ amount: Number(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="form-group">
+                <label>Date</label>
+                <input type="date" value={draft.date} onChange={(e) => patchDraft({ date: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label>Bank wallet</label>
+              <select
+                value={draft.bankAccountId ?? ''}
+                onChange={(e) => patchDraft({ bankAccountId: e.target.value ? Number(e.target.value) : null })}
+              >
+                <option value="">Select wallet…</option>
+                {banks.map((w) => (
+                  <option key={w.id} value={w.id}>{w.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {draft.kind === 'atm' ? (
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label className="bsms-toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.recordAtmAsExpense}
+                    onChange={(e) => patchDraft({ recordAtmAsExpense: e.target.checked })}
+                  />
+                  <span>{BANK_SMS_UX.atmAsExpense}</span>
+                </label>
+                {!draft.recordAtmAsExpense ? (
+                  cashWallets.length ? (
+                    <div className="form-group">
+                      <label>Cash wallet (destination)</label>
+                      <select
+                        value={draft.cashAccountId ?? ''}
+                        onChange={(e) => patchDraft({
+                          cashAccountId: e.target.value ? Number(e.target.value) : null,
+                          createCashNamed: null,
+                        })}
+                      >
+                        {cashWallets.map((w) => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="bsms-alert warn" style={{ display: 'block' }}>
+                      <strong>{BANK_SMS_UX.atmNoCashTitle}</strong>
+                      <p style={{ margin: '0.35rem 0 0' }}>{BANK_SMS_UX.atmNoCashBody}</p>
+                    </div>
+                  )
+                ) : null}
+              </div>
+            ) : null}
+
+            {categoryOptions.length > 0 ? (
+              <div className="form-group">
+                <label>Category</label>
+                <select value={draft.category} onChange={(e) => patchDraft({ category: e.target.value })}>
+                  {categoryOptions.map((c) => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
+            <div className="form-group">
+              <label>Notes</label>
+              <input value={draft.notes} onChange={(e) => patchDraft({ notes: e.target.value })} />
+            </div>
+
+            <label className="bsms-toggle">
+              <input type="checkbox" checked={rememberWallet} onChange={(e) => setRememberWallet(e.target.checked)} />
+              <span>Always use this bank wallet for matching mask / bank hint</span>
+            </label>
+            <label className="bsms-toggle">
+              <input type="checkbox" checked={rememberKind} onChange={(e) => setRememberKind(e.target.checked)} />
+              <span>Always treat similar SMS (same mask / bank) as this type</span>
+            </label>
+
+            <div className="bsms-actions">
+              <button type="button" className="btn-primary" disabled={busy || !pendingId || mustPickType} onClick={() => void onApprove()}>
+                {busy ? <span className="spinner" /> : BANK_SMS_UX.approve}
+              </button>
+              <button type="button" className="btn-glass" disabled={busy} onClick={() => void onReject()}>
+                {BANK_SMS_UX.reject}
               </button>
             </div>
-          ) : null}
-          {peopleHint ? (
-            <p className="text-muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>{peopleHint}</p>
-          ) : null}
+          </section>
+        ) : null}
 
-          <div className="form-group" style={{ marginTop: '0.85rem' }}>
-            <label>Type</label>
-            <select
-              value={draft.kind}
-              onChange={(e) => {
-                const kind = e.target.value as BankSmsKind
-                patchDraft({
-                  kind,
-                  category: kind === 'atm' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous',
-                  recordAtmAsExpense: kind === 'atm' ? draft.recordAtmAsExpense : false,
-                })
-              }}
-            >
-              {KINDS.map((k) => (
-                <option key={k.value} value={k.value}>{k.label}</option>
+        <section className="glass bsms-panel">
+          <div className="bsms-panel-head">
+            <div>
+              <h2 className="bsms-panel-title">
+                <Wallet size={16} strokeWidth={2} color="var(--primary)" />
+                Wallet intelligence
+              </h2>
+              <p className="bsms-panel-sub">
+                Map account last-4 or bank name → wallet so future alerts auto-select the right account.
+              </p>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label>Default Cash wallet (ATM destination)</label>
+            <select value={defaultCashId ?? ''} onChange={(e) => void saveDefaultCash(e.target.value)}>
+              <option value="">First Cash wallet</option>
+              {cashWallets.map((w) => (
+                <option key={w.id} value={w.id}>{w.name}</option>
               ))}
             </select>
           </div>
 
           <div className="grid-2">
             <div className="form-group">
-              <label>Amount (PKR)</label>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                value={draft.amount}
-                onChange={(e) => patchDraft({ amount: Number(e.target.value) || 0 })}
-              />
+              <label>Last-4 / mask</label>
+              <input value={aliasMask} onChange={(e) => setAliasMask(e.target.value)} placeholder="2554" />
             </div>
             <div className="form-group">
-              <label>Date</label>
-              <input
-                type="date"
-                value={draft.date}
-                onChange={(e) => patchDraft({ date: e.target.value })}
-              />
+              <label>Bank hint</label>
+              <input value={aliasHint} onChange={(e) => setAliasHint(e.target.value)} placeholder="meezan" />
             </div>
           </div>
-
           <div className="form-group">
-            <label>Bank wallet</label>
-            <select
-              value={draft.bankAccountId ?? ''}
-              onChange={(e) => patchDraft({ bankAccountId: e.target.value ? Number(e.target.value) : null })}
-            >
-              <option value="">Select wallet…</option>
+            <label>Wallet</label>
+            <select value={aliasWalletId} onChange={(e) => setAliasWalletId(e.target.value)}>
+              <option value="">Select…</option>
               {banks.map((w) => (
                 <option key={w.id} value={w.id}>{w.name}</option>
               ))}
             </select>
           </div>
+          <button type="button" className="btn-primary" disabled={busy} onClick={() => void saveAlias()}>
+            Save mapping
+          </button>
 
-          {draft.kind === 'atm' ? (
-            <div style={{ marginBottom: '0.85rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={draft.recordAtmAsExpense}
-                  onChange={(e) => patchDraft({ recordAtmAsExpense: e.target.checked })}
-                />
-                {BANK_SMS_UX.atmAsExpense}
-              </label>
-              {!draft.recordAtmAsExpense ? (
-                cashWallets.length ? (
-                  <div className="form-group">
-                    <label>Cash wallet (destination)</label>
-                    <select
-                      value={draft.cashAccountId ?? ''}
-                      onChange={(e) => patchDraft({
-                        cashAccountId: e.target.value ? Number(e.target.value) : null,
-                        createCashNamed: null,
-                      })}
-                    >
-                      {cashWallets.map((w) => (
-                        <option key={w.id} value={w.id}>{w.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="auth-error" style={{ marginBottom: 0 }}>
-                    <strong>{BANK_SMS_UX.atmNoCashTitle}</strong>
-                    <p style={{ margin: '0.35rem 0 0' }}>{BANK_SMS_UX.atmNoCashBody}</p>
+          {aliases.length > 0 ? (
+            <div className="list" style={{ marginTop: '0.95rem' }}>
+              {aliases.map((a, i) => {
+                const w = wallets.find((x) => x.id === a.account_id)
+                return (
+                  <div key={`${a.account_id}-${a.mask}-${a.hint}-${i}`} className="list-item">
+                    <div>
+                      <strong>{w?.name || `Wallet #${a.account_id}`}</strong>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                        {a.mask ? <span className="bsms-alias-chip">…{a.mask}</span> : null}
+                        {a.hint ? <span className="bsms-alias-chip">{a.hint}</span> : null}
+                      </div>
+                    </div>
+                    <button type="button" className="btn-glass" style={{ fontSize: '0.75rem' }} onClick={() => void removeAlias(i)}>
+                      Remove
+                    </button>
                   </div>
                 )
-              ) : null}
+              })}
             </div>
-          ) : null}
+          ) : (
+            <p className="bsms-empty" style={{ paddingBottom: 0 }}>No aliases yet — save one after you approve a draft.</p>
+          )}
 
-          {categoryOptions.length > 0 ? (
-            <div className="form-group">
-              <label>Category</label>
-              <select value={draft.category} onChange={(e) => patchDraft({ category: e.target.value })}>
-                {categoryOptions.map((c) => (
-                  <option key={c.key} value={c.key}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-
-          <div className="form-group">
-            <label>Notes</label>
-            <input value={draft.notes} onChange={(e) => patchDraft({ notes: e.target.value })} />
-          </div>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}>
-            <input
-              type="checkbox"
-              checked={rememberWallet}
-              onChange={(e) => setRememberWallet(e.target.checked)}
-            />
-            Always use this bank wallet for matching mask / bank hint next time
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.85rem' }}>
-            <input
-              type="checkbox"
-              checked={rememberKind}
-              onChange={(e) => setRememberKind(e.target.checked)}
-            />
-            Always treat similar SMS (same mask / bank) as this type
-          </label>
-
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: '0.5rem' }}>
-            <button type="button" className="btn-primary" disabled={busy || !pendingId || mustPickType} onClick={() => void onApprove()}>
-              {busy ? <span className="spinner" /> : BANK_SMS_UX.approve}
-            </button>
-            <button type="button" className="btn-glass" disabled={busy} onClick={() => void onReject()}>
-              {BANK_SMS_UX.reject}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      <div className="glass" style={{ padding: '1.1rem 1.15rem', marginTop: '1rem', borderRadius: 'var(--radius-md)' }}>
-        <h3 style={{ marginTop: 0, fontSize: '0.95rem' }}>Wallet intelligence</h3>
-        <p className="text-muted" style={{ fontSize: '0.78rem' }}>
-          Map account last-4 / bank name → wallet so future SMS auto-selects the right account.
-        </p>
-
-        <div className="form-group">
-          <label>Default Cash wallet (ATM destination)</label>
-          <select
-            value={defaultCashId ?? ''}
-            onChange={(e) => void saveDefaultCash(e.target.value)}
-          >
-            <option value="">First Cash wallet</option>
-            {cashWallets.map((w) => (
-              <option key={w.id} value={w.id}>{w.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid-2">
-          <div className="form-group">
-            <label>Last-4 / mask</label>
-            <input value={aliasMask} onChange={(e) => setAliasMask(e.target.value)} placeholder="2554" />
-          </div>
-          <div className="form-group">
-            <label>Bank hint</label>
-            <input value={aliasHint} onChange={(e) => setAliasHint(e.target.value)} placeholder="meezan" />
-          </div>
-        </div>
-        <div className="form-group">
-          <label>Wallet</label>
-          <select value={aliasWalletId} onChange={(e) => setAliasWalletId(e.target.value)}>
-            <option value="">Select…</option>
-            {banks.map((w) => (
-              <option key={w.id} value={w.id}>{w.name}</option>
-            ))}
-          </select>
-        </div>
-        <button type="button" className="btn-primary" disabled={busy} onClick={() => void saveAlias()}>
-          Save mapping
-        </button>
-
-        {aliases.length > 0 ? (
-          <div className="list" style={{ marginTop: '0.85rem' }}>
-            {aliases.map((a, i) => {
-              const w = wallets.find((x) => x.id === a.account_id)
-              return (
-                <div key={`${a.account_id}-${a.mask}-${a.hint}-${i}`} className="list-item">
-                  <div>
-                    <strong>{w?.name || `Wallet #${a.account_id}`}</strong>
-                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                      {a.mask ? `mask …${a.mask}` : ''}{a.mask && a.hint ? ' · ' : ''}{a.hint ? `hint ${a.hint}` : ''}
-                    </div>
-                  </div>
-                  <button type="button" className="btn-glass" style={{ fontSize: '0.75rem' }} onClick={() => void removeAlias(i)}>
-                    Remove
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <p className="text-muted" style={{ fontSize: '0.78rem', marginTop: '0.75rem' }}>No aliases yet.</p>
-        )}
+          <p className="text-muted" style={{ fontSize: '0.75rem', margin: '1rem 0 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ShieldCheck size={14} /> OTP and marketing messages are filtered automatically.
+          </p>
+        </section>
       </div>
     </div>
   )

@@ -191,7 +191,7 @@ export default function Settings() {
           display: 'block',
           width: '100%',
           textAlign: 'left',
-          padding: '1.1rem 1.15rem',
+          padding: '1.15rem 1.2rem',
           marginBottom: '1rem',
           borderRadius: 'var(--radius-md)',
           cursor: 'pointer',
@@ -201,17 +201,29 @@ export default function Settings() {
         onClick={() => navigate('/bank-sms')}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.55rem' }}>
-            <MessageSquareText size={16} strokeWidth={1.75} color="var(--primary)" style={{ marginTop: 2 }} />
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem' }}>
+            <div
+              style={{
+                width: '2.35rem',
+                height: '2.35rem',
+                borderRadius: '0.7rem',
+                display: 'grid',
+                placeItems: 'center',
+                background: 'rgba(var(--primary-rgb, 5, 150, 105), 0.12)',
+                flexShrink: 0,
+              }}
+            >
+              <MessageSquareText size={17} strokeWidth={1.75} color="var(--primary)" />
+            </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '0.95rem' }}>{BANK_SMS_UX.settingsTitle}</h3>
-              <p className="text-muted" style={{ fontSize: '0.78rem', margin: '0.25rem 0 0' }}>
+              <p className="text-muted" style={{ fontSize: '0.78rem', margin: '0.3rem 0 0', lineHeight: 1.4 }}>
                 {BANK_SMS_UX.settingsHint}
               </p>
             </div>
           </div>
           <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-            {BANK_SMS_UX.settingsOpen}
+            Open →
           </span>
         </div>
       </button>

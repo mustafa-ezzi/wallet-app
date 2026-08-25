@@ -35,6 +35,7 @@ Production: leave `VITE_API_URL` empty when using the Vite proxy locally. For a 
 | GET | `/api/ops/users/:id/` | Safe summary |
 | POST | `/api/ops/users/:id/suspend/` | Sets `is_active=False` + audit |
 | POST | `/api/ops/users/:id/unsuspend/` | Restores access + audit |
+| POST | `/api/ops/users/:id/delete/` | Hard-delete user + linked data (`confirm_username` required) |
 | POST | `/api/ops/users/refresh-inactivity/` | Recompute inactivity flags |
 | GET/POST | `/api/ops/campaigns/` | List / create draft |
 | GET | `/api/ops/campaigns/estimate/?audience=` | Audience size |

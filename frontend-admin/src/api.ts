@@ -168,6 +168,24 @@ export async function unsuspendOpsUser(id: number) {
   return data
 }
 
+export async function deleteOpsUser(id: number, confirmUsername: string) {
+  const { data } = await opsApi.post<{
+    ok: boolean
+    deleted: {
+      user_id: number
+      username: string
+      accounts: number
+      people_proposals: number
+      household_expenses: number
+      household_contributions: number
+      household_settlements: number
+      households_removed: number
+      memberships_removed: number
+    }
+  }>(`/ops/users/${id}/delete/`, { confirm_username: confirmUsername })
+  return data
+}
+
 export async function refreshInactivityFlags() {
   const { data } = await opsApi.post<{ updated: number }>('/ops/users/refresh-inactivity/')
   return data

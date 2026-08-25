@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
+  deleteOpsUser,
   fetchOpsUser,
   suspendOpsUser,
   unsuspendOpsUser,
@@ -9,10 +10,13 @@ import {
 
 export function UserDetailPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const userId = Number(id)
   const [user, setUser] = useState<OpsUser | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [confirmName, setConfirmName] = useState('')
+  const [showDelete, setShowDelete] = useState(false)
 
   async function load() {
     setError(null)
@@ -50,6 +54,31 @@ export function UserDetailPage() {
     }
   }
 
+  async function onDelete() {
+    if (!user) return
+    if (confirmName.trim() !== user.username) {
+      setError(`Type “${user.username}” exactly to confirm delete.`)
+      return
+    }
+    const ok = window.confirm(
+      `Permanently delete @${user.username} and ALL linked data?\n\n`
+      + 'Wallets, transactions, bank SMS drafts, support threads, devices, entitlements, '
+      + 'and their household contributions will be removed. This cannot be undone.',
+    )
+    if (!ok) return
+    setBusy(true)
+    setError(null)
+    try {
+      await deleteOpsUser(user.id, confirmName.trim())
+      navigate('/users', { replace: true })
+    } catch (err: unknown) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(typeof detail === 'string' ? detail : 'Delete failed.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!Number.isFinite(userId)) {
     return <p className="error">Invalid user id.</p>
   }
@@ -65,14 +94,28 @@ export function UserDetailPage() {
           <p>Hosted profile summary — no ledger access.</p>
         </div>
         {user ? (
-          <button
-            className={`btn ${user.suspended ? 'primary' : 'danger'}`}
-            type="button"
-            disabled={busy || user.is_superuser}
-            onClick={() => void toggleSuspend()}
-          >
-            {user.suspended ? 'Unsuspend' : 'Suspend'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className={`btn ${user.suspended ? 'primary' : 'danger'}`}
+              type="button"
+              disabled={busy || user.is_superuser}
+              onClick={() => void toggleSuspend()}
+            >
+              {user.suspended ? 'Unsuspend' : 'Suspend'}
+            </button>
+            <button
+              className="btn danger"
+              type="button"
+              disabled={busy || user.is_superuser}
+              onClick={() => {
+                setShowDelete((v) => !v)
+                setConfirmName('')
+                setError(null)
+              }}
+            >
+              Delete user
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -164,6 +207,56 @@ export function UserDetailPage() {
               Premium, ads config, and push campaigns are available in the Ops sidebar.
             </p>
           )}
+
+          {showDelete ? (
+            <div
+              className="note"
+              style={{
+                marginTop: '1.25rem',
+                borderColor: '#f5c4c0',
+                background: '#fff5f5',
+              }}
+            >
+              <strong style={{ color: '#b91c1c' }}>Permanent delete</strong>
+              <p style={{ margin: '0.5rem 0 0.85rem', lineHeight: 1.45 }}>
+                This removes @{user.username} and all linked personal data (wallets, transactions,
+                bank SMS, devices, support, entitlements, people links, and their household rows).
+                Empty households they alone belonged to are removed. Superusers cannot be deleted.
+              </p>
+              <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: 6 }}>
+                Type <code>{user.username}</code> to confirm
+              </label>
+              <input
+                value={confirmName}
+                onChange={(e) => setConfirmName(e.target.value)}
+                placeholder={user.username}
+                autoComplete="off"
+                style={{ maxWidth: 320, width: '100%', marginBottom: 10 }}
+                disabled={busy}
+              />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button
+                  className="btn danger"
+                  type="button"
+                  disabled={busy || confirmName.trim() !== user.username}
+                  onClick={() => void onDelete()}
+                >
+                  {busy ? 'Deleting…' : 'Delete forever'}
+                </button>
+                <button
+                  className="btn"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setShowDelete(false)
+                    setConfirmName('')
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
     </div>

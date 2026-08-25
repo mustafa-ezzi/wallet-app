@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  ActivityIndicator,
   Platform,
   Pressable,
   ScrollView,
@@ -39,7 +38,7 @@ import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/src/constants/categorie
 import { useOffline } from '@/src/offline'
 import { useBankSms } from '@/src/bankSms'
 import { useColors } from '@/src/theme/ThemeContext'
-import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
+import { iosShadow, radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { fmt } from '@/src/utils/format'
 
 type Acc = { id: number; name: string; type: string }
@@ -50,6 +49,19 @@ const KIND_OPTIONS: { value: BankSmsKind; label: string }[] = [
   { value: 'income', label: 'Received' },
   { value: 'reversal', label: 'Reversed' },
 ]
+
+function kindTone(kind: string, colors: ColorTokens): { bg: string; fg: string } {
+  if (kind === 'income') return { bg: colors.primarySoft + '22', fg: colors.primaryDark }
+  if (kind === 'atm') return { bg: colors.infoBg, fg: colors.infoText }
+  if (kind === 'reversal') return { bg: colors.warningBg, fg: colors.warning }
+  if (kind === 'expense') return { bg: '#fef2f2', fg: colors.danger }
+  return { bg: colors.surfaceMuted, fg: colors.textMuted }
+}
+
+function kindLabel(kind: string): string {
+  return KIND_OPTIONS.find((k) => k.value === kind)?.label || kind
+}
+
 
 function toMoney(n: number | string | null | undefined): number {
   if (n == null || n === '') return 0
@@ -439,24 +451,31 @@ export default function BankSmsScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8, backgroundColor: colors.background }]}>
       <View style={styles.topBar}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Text style={{ color: colors.primary, fontWeight: '800' }}>← Back</Text>
         </Pressable>
-        <Text style={[styles.title, { color: colors.text }]}>{BANK_SMS_UX.pasteTitle}</Text>
-        <View style={{ width: 48 }} />
+        <View style={{ alignItems: 'center', flex: 1 }}>
+          <Text style={[styles.title, { color: colors.text }]}>{BANK_SMS_UX.settingsTitle}</Text>
+          {pending.length > 0 ? (
+            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 2 }}>
+              {pending.length} pending
+            </Text>
+          ) : null}
+        </View>
+        <View style={{ width: 56 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.hint, { color: colors.textMuted }]}>{BANK_SMS_UX.pasteHint}</Text>
-        <Text style={[styles.privacy, { color: colors.textSecondary }]}>
-          {BANK_SMS_UX.privacyBlurb} Drafts sync to your pending inbox across devices.
+      <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Text style={[styles.heroSub, { color: colors.textSecondary }]}>
+          Paste a bank alert, review the draft, then Approve — nothing posts without you.
         </Text>
+
         {Platform.OS === 'android' ? (
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
             <View style={styles.switchRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: '800' }}>Auto-detect SMS</Text>
-                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>Auto-detect SMS</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4, lineHeight: 17 }}>
                   {bankSms.enabled && bankSms.permissionGranted
                     ? 'Listening — Approve pending items below'
                     : 'Off or missing permission'}
@@ -472,81 +491,160 @@ export default function BankSmsScreen() {
 
         {error ? <ErrorBanner message={error} /> : null}
         {okMsg ? (
-          <View style={[styles.okBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={{ color: colors.primary, fontWeight: '700' }}>{okMsg}</Text>
+          <View style={[styles.okBox, { backgroundColor: colors.primarySoft + '18', borderColor: colors.primarySoft + '55' }]}>
+            <Text style={{ color: colors.primaryDark, fontWeight: '700', fontSize: 13, lineHeight: 18 }}>{okMsg}</Text>
           </View>
         ) : null}
 
-        {pending.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Pending ({pending.length})</Text>
-            {selectedIds.length > 0 ? (
-              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 8 }}>
-                <Pressable onPress={() => void onBatchApprove()}>
-                  <Text style={{ color: colors.primary, fontWeight: '800' }}>Approve ({selectedIds.length})</Text>
-                </Pressable>
-                <Pressable onPress={() => void onBatchReject()}>
-                  <Text style={{ color: colors.textMuted, fontWeight: '700' }}>Reject selected</Text>
-                </Pressable>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
+          <View style={styles.sectionHead}>
+            <Text style={[styles.cardTitle, { color: colors.text }]}>Pending inbox</Text>
+            {pending.length > 0 ? (
+              <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
+                <Text style={styles.countPillText}>{pending.length}</Text>
               </View>
             ) : null}
-            {pending.map((row) => (
-              <View key={row.id} style={[styles.pendingRow, { borderColor: colors.border }]}>
-                <Switch
-                  value={selectedIds.includes(row.id)}
-                  onValueChange={(on) => {
-                    setSelectedIds((prev) => (on ? [...prev, row.id] : prev.filter((x) => x !== row.id)))
-                  }}
-                />
-                <Pressable onPress={() => openPending(row)} style={{ flex: 1 }}>
-                  <Text style={{ color: colors.text, fontWeight: '800' }}>#{row.id} · {row.kind}</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12 }} numberOfLines={2}>
-                    {row.raw_snippet || row.notes || 'Bank SMS'}
-                  </Text>
-                </Pressable>
-                <Text style={{ color: colors.primary, fontWeight: '800' }}>{fmt(row.amount)}</Text>
-              </View>
-            ))}
           </View>
-        ) : null}
 
-        <Text style={[styles.label, { color: colors.textMuted }]}>Message</Text>
-        <TextInput
-          value={paste}
-          onChangeText={setPaste}
-          placeholder={BANK_SMS_UX.pastePlaceholder}
-          placeholderTextColor={colors.textMuted}
-          multiline
-          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-        />
-        <PrimaryButton
-          title={BANK_SMS_UX.parseButton}
-          onPress={() => void onDetect()}
-          disabled={!paste.trim() || busy}
-          loading={busy && !draft}
-        />
+          {pending.length === 0 ? (
+            <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
+              No drafts yet. Paste a bank SMS below.
+            </Text>
+          ) : (
+            <>
+              <View style={styles.batchRow}>
+                <Pressable onPress={() => setSelectedIds(pending.map((r) => r.id))} hitSlop={8}>
+                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Select all</Text>
+                </Pressable>
+                {selectedIds.length > 0 ? (
+                  <>
+                    <Pressable onPress={() => void onBatchApprove()} hitSlop={8}>
+                      <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>
+                        Approve ({selectedIds.length})
+                      </Text>
+                    </Pressable>
+                    <Pressable onPress={() => void onBatchReject()} hitSlop={8}>
+                      <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 13 }}>Reject</Text>
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
+              {pending.map((row, idx) => {
+                const tone = kindTone(row.kind, colors)
+                const selected = selectedIds.includes(row.id)
+                const active = pendingId === row.id
+                return (
+                  <View
+                    key={row.id}
+                    style={[
+                      styles.pendingCard,
+                      {
+                        borderColor: active ? colors.primary : colors.border,
+                        backgroundColor: active ? colors.primarySoft + '14' : colors.background,
+                        marginBottom: idx === pending.length - 1 ? 0 : 8,
+                      },
+                    ]}
+                  >
+                    <Pressable
+                      onPress={() => {
+                        setSelectedIds((prev) =>
+                          selected ? prev.filter((x) => x !== row.id) : [...prev, row.id],
+                        )
+                      }}
+                      style={[
+                        styles.checkBox,
+                        {
+                          borderColor: selected ? colors.primary : colors.borderStrong,
+                          backgroundColor: selected ? colors.primary : 'transparent',
+                        },
+                      ]}
+                      hitSlop={6}
+                    >
+                      {selected ? <Text style={styles.checkMark}>✓</Text> : null}
+                    </Pressable>
+                    <Pressable onPress={() => openPending(row)} style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                        <View style={[styles.kindPill, { backgroundColor: tone.bg }]}>
+                          <Text style={[styles.kindPillText, { color: tone.fg }]}>{kindLabel(row.kind)}</Text>
+                        </View>
+                        <Text style={{ color: colors.textMuted, fontSize: 11 }}>#{row.id}</Text>
+                      </View>
+                      <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 16 }} numberOfLines={2}>
+                        {row.raw_snippet || row.notes || 'Bank SMS'}
+                      </Text>
+                    </Pressable>
+                    <Text style={{ color: colors.text, fontWeight: '800' }}>
+                      {fmt(row.amount)}
+                    </Text>
+                  </View>
+                )
+              })}
+            </>
+          )}
+        </View>
+
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Paste bank SMS</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 10 }}>
+            {BANK_SMS_UX.privacyBlurb}
+          </Text>
+          <TextInput
+            value={paste}
+            onChangeText={setPaste}
+            placeholder={BANK_SMS_UX.pastePlaceholder}
+            placeholderTextColor={colors.textMuted}
+            multiline
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+          <PrimaryButton
+            title={BANK_SMS_UX.parseButton}
+            onPress={() => void onDetect()}
+            disabled={!paste.trim() || busy}
+            loading={busy && !draft}
+          />
+        </View>
 
         {draft && parsed ? (
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>
               {BANK_SMS_UX.reviewTitle}{pendingId ? ` · #${pendingId}` : ''}
             </Text>
-            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 12 }}>
-              Detected as {parsed.kind} · {Math.round(parsed.confidence * 100)}% · {parsed.reason}
-            </Text>
+            <View style={styles.metaRow}>
+              <View style={[styles.kindPill, { backgroundColor: kindTone(parsed.kind, colors).bg }]}>
+                <Text style={[styles.kindPillText, { color: kindTone(parsed.kind, colors).fg }]}>
+                  {kindLabel(parsed.kind)}
+                </Text>
+              </View>
+              <View style={[
+                styles.confPill,
+                {
+                  backgroundColor: mustPickType || parsed.confidence < 0.5 ? colors.warningBg : colors.surfaceMuted,
+                  borderColor: mustPickType || parsed.confidence < 0.5 ? colors.warningBorder : colors.border,
+                },
+              ]}>
+                <Text style={{
+                  color: mustPickType || parsed.confidence < 0.5 ? colors.warning : colors.textMuted,
+                  fontSize: 11,
+                  fontWeight: '700',
+                }}>
+                  {Math.round(parsed.confidence * 100)}%
+                </Text>
+              </View>
+            </View>
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 10 }}>{parsed.reason}</Text>
 
             {mustPickType ? (
-              <View style={[styles.warn, { borderColor: colors.border, marginBottom: 12 }]}>
-                <Text style={{ color: colors.text, fontWeight: '800' }}>
-                  Type unclear — confirm before approving
-                </Text>
+              <View style={[styles.warn, { backgroundColor: colors.warningBg, borderColor: colors.warningBorder, marginBottom: 12 }]}>
+                <Text style={{ color: colors.warning, fontWeight: '800' }}>Type unclear — confirm before approving</Text>
                 <Pressable onPress={() => setTypeConfirmed(true)} style={{ marginTop: 8 }}>
                   <Text style={{ color: colors.primary, fontWeight: '800' }}>I’ve confirmed the type</Text>
                 </Pressable>
               </View>
             ) : null}
             {peopleHint ? (
-              <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 10 }}>{peopleHint}</Text>
+              <View style={[styles.infoBox, { backgroundColor: colors.infoBg, marginBottom: 10 }]}>
+                <Text style={{ color: colors.infoText, fontSize: 12, fontWeight: '600' }}>{peopleHint}</Text>
+              </View>
             ) : null}
 
             <SelectField
@@ -587,8 +685,8 @@ export default function BankSmsScreen() {
 
             {draft.kind === 'atm' ? (
               <View style={{ marginBottom: 12 }}>
-                <View style={styles.switchRow}>
-                  <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }}>
+                <View style={[styles.toggleCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                  <Text style={{ flex: 1, color: colors.text, fontWeight: '600', fontSize: 13 }}>
                     {BANK_SMS_UX.atmAsExpense}
                   </Text>
                   <Switch
@@ -605,9 +703,9 @@ export default function BankSmsScreen() {
                       onChange={(v) => patchDraft({ cashAccountId: Number(v), createCashNamed: null })}
                     />
                   ) : (
-                    <View style={[styles.warn, { borderColor: colors.border }]}>
+                    <View style={[styles.warn, { backgroundColor: colors.warningBg, borderColor: colors.warningBorder }]}>
                       <Text style={{ color: colors.text, fontWeight: '800' }}>{BANK_SMS_UX.atmNoCashTitle}</Text>
-                      <Text style={{ color: colors.textMuted, marginTop: 6 }}>{BANK_SMS_UX.atmNoCashBody}</Text>
+                      <Text style={{ color: colors.textMuted, marginTop: 6, fontSize: 13 }}>{BANK_SMS_UX.atmNoCashBody}</Text>
                     </View>
                   )
                 ) : null}
@@ -630,35 +728,34 @@ export default function BankSmsScreen() {
               style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
             />
 
-            <View style={styles.switchRow}>
-              <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }}>
+            <View style={[styles.toggleCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+              <Text style={{ flex: 1, color: colors.text, fontWeight: '600', fontSize: 13 }}>
                 Always use this wallet for matching mask / bank hint
               </Text>
               <Switch value={rememberWallet} onValueChange={setRememberWallet} />
             </View>
-            <View style={styles.switchRow}>
-              <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }}>
+            <View style={[styles.toggleCard, { borderColor: colors.border, backgroundColor: colors.background, marginBottom: 12 }]}>
+              <Text style={{ flex: 1, color: colors.text, fontWeight: '600', fontSize: 13 }}>
                 Always treat similar SMS as this type
               </Text>
               <Switch value={rememberKind} onValueChange={setRememberKind} />
             </View>
 
-            {busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} /> : null}
             <PrimaryButton
               title={BANK_SMS_UX.approve}
               onPress={() => void onApprove()}
               disabled={busy || !pendingId || mustPickType}
               loading={busy}
             />
-            <Pressable onPress={() => void onReject()} style={{ marginTop: 12, alignItems: 'center' }}>
-              <Text style={{ color: colors.textMuted, fontWeight: '700' }}>{BANK_SMS_UX.reject}</Text>
+            <Pressable onPress={() => void onReject()} style={{ marginTop: 14, alignItems: 'center', paddingVertical: 6 }}>
+              <Text style={{ color: colors.danger, fontWeight: '700' }}>{BANK_SMS_UX.reject}</Text>
             </Pressable>
           </View>
         ) : null}
 
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Wallet intelligence</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 10 }}>
+          <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 10, lineHeight: 17 }}>
             Map last-4 / bank name → wallet so future SMS auto-selects the right account.
           </Text>
 
@@ -702,21 +799,32 @@ export default function BankSmsScreen() {
             aliases.map((a, i) => {
               const w = wallets.find((x) => x.id === a.account_id)
               return (
-                <View key={`${a.account_id}-${a.mask}-${a.hint}-${i}`} style={[styles.pendingRow, { borderColor: colors.border }]}>
+                <View key={`${a.account_id}-${a.mask}-${a.hint}-${i}`} style={[styles.aliasRow, { borderColor: colors.border }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: colors.text, fontWeight: '800' }}>{w?.name || `Wallet #${a.account_id}`}</Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                      {a.mask ? `mask …${a.mask}` : ''}{a.mask && a.hint ? ' · ' : ''}{a.hint ? `hint ${a.hint}` : ''}
-                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      {a.mask ? (
+                        <View style={[styles.aliasChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                          <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>…{a.mask}</Text>
+                        </View>
+                      ) : null}
+                      {a.hint ? (
+                        <View style={[styles.aliasChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                          <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>{a.hint}</Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                  <Pressable onPress={() => void removeAlias(i)}>
-                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>Remove</Text>
+                  <Pressable onPress={() => void removeAlias(i)} hitSlop={8}>
+                    <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 12 }}>Remove</Text>
                   </Pressable>
                 </View>
               )
             })
           ) : (
-            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 8 }}>No aliases yet.</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 10 }}>
+              No aliases yet — save one after you approve a draft.
+            </Text>
           )}
         </View>
       </ScrollView>
@@ -732,43 +840,108 @@ function makeStyles(_colors: ColorTokens) {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: spacing.md,
-      paddingBottom: 8,
+      paddingBottom: 10,
     },
+    backBtn: { width: 56 },
     title: { ...typography.title, fontSize: 17 },
-    pad: { padding: spacing.md, paddingBottom: 48, gap: 8 },
-    hint: { fontSize: 14, lineHeight: 20, marginBottom: 4 },
-    privacy: { fontSize: 12, lineHeight: 18, marginBottom: 12 },
+    pad: { padding: spacing.md, paddingBottom: 56, gap: 12 },
+    heroSub: { fontSize: 14, lineHeight: 20, marginBottom: 4 },
     label: { fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 8 },
     input: {
-      minHeight: 110,
+      minHeight: 118,
       borderWidth: 1,
       borderRadius: radii.md,
       padding: 12,
       textAlignVertical: 'top',
       marginBottom: 12,
       fontSize: 14,
+      lineHeight: 20,
     },
     inputSingle: {
       borderWidth: 1,
       borderRadius: radii.md,
       paddingHorizontal: 12,
-      paddingVertical: 10,
+      paddingVertical: 11,
       marginBottom: 10,
       fontSize: 15,
     },
     card: {
-      marginTop: 8,
-      marginBottom: 8,
       borderWidth: 1,
       borderRadius: radii.lg,
       padding: spacing.md,
     },
-    cardTitle: { fontSize: 16, fontWeight: '800', marginBottom: 4 },
+    cardTitle: { fontSize: 16, fontWeight: '800', marginBottom: 8 },
+    sectionHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+    },
+    countPill: {
+      minWidth: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 6,
+    },
+    countPillText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+    batchRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 14,
+      marginBottom: 10,
+    },
+    pendingCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 12,
+      borderWidth: 1,
+      borderRadius: radii.md,
+    },
+    checkBox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 1.5,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkMark: { color: '#fff', fontSize: 13, fontWeight: '800', lineHeight: 14 },
+    kindPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+    },
+    kindPillText: { fontSize: 11, fontWeight: '800' },
+    confPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 6,
+      flexWrap: 'wrap',
+    },
     switchRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      marginBottom: 10,
+    },
+    toggleCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderWidth: 1,
+      borderRadius: radii.md,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginBottom: 8,
     },
     warn: {
       borderWidth: 1,
@@ -776,18 +949,27 @@ function makeStyles(_colors: ColorTokens) {
       padding: 12,
       marginTop: 4,
     },
+    infoBox: {
+      borderRadius: radii.md,
+      padding: 10,
+    },
     okBox: {
       borderWidth: 1,
       borderRadius: radii.md,
       padding: 12,
-      marginBottom: 8,
     },
-    pendingRow: {
+    aliasRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      paddingVertical: 10,
+      paddingVertical: 12,
       borderBottomWidth: StyleSheet.hairlineWidth,
+    },
+    aliasChip: {
+      borderWidth: 1,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
     },
   })
 }

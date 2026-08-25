@@ -8,14 +8,29 @@ Never include Transaction rows, balances, installment amounts, or household ledg
 from datetime import timedelta
 
 from django.contrib.auth.models import User
-from django.db.models import Count, Max, Q
+from django.db import transaction
+from django.db.models import Count, Max, Q, ProtectedError
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Account, DeviceToken, Transaction, UserOpsMeta, SupportThread, Entitlement
+from .models import (
+    Account,
+    DeviceToken,
+    Entitlement,
+    Household,
+    HouseholdContribution,
+    HouseholdExpense,
+    HouseholdInvite,
+    HouseholdMembership,
+    HouseholdSettlementMark,
+    PeopleProposal,
+    SupportThread,
+    Transaction,
+    UserOpsMeta,
+)
 from .ops_audit import log_ops_action
 from .ops_permissions import IsOpsStaff
 from .entitlements import premium_summary
@@ -449,6 +464,142 @@ class OpsUserUnsuspendView(APIView):
             request=request,
         )
         return Response(_serialize_user(user))
+
+
+def purge_user_completely(user: User) -> dict:
+    """
+    Permanently delete a user and their personal data.
+    Pre-clears PROTECT FKs and shared-household rows so CASCADE cannot fail
+    or leave broken shared books.
+    """
+    summary = {
+        'user_id': user.id,
+        'username': user.username,
+        'accounts': 0,
+        'people_proposals': 0,
+        'household_expenses': 0,
+        'household_contributions': 0,
+        'household_settlements': 0,
+        'households_removed': 0,
+        'memberships_removed': 0,
+    }
+
+    with transaction.atomic():
+        account_ids = list(Account.objects.filter(user=user).values_list('id', flat=True))
+        summary['accounts'] = len(account_ids)
+
+        # PeopleProposal.proposer_wallet is PROTECT — must go before Account CASCADE
+        prop_qs = PeopleProposal.objects.filter(
+            Q(proposer_wallet_id__in=account_ids) | Q(counterparty_wallet_id__in=account_ids)
+        )
+        summary['people_proposals'] = prop_qs.count()
+        prop_qs.delete()
+
+        # Shared household rows that CASCADE from this user (would erase other members' history)
+        exp_qs = HouseholdExpense.objects.filter(Q(paid_by=user) | Q(created_by=user))
+        summary['household_expenses'] = exp_qs.count()
+        exp_qs.delete()
+
+        cont_qs = HouseholdContribution.objects.filter(Q(contributed_by=user) | Q(created_by=user))
+        summary['household_contributions'] = cont_qs.count()
+        cont_qs.delete()
+
+        mark_qs = HouseholdSettlementMark.objects.filter(
+            Q(from_user=user) | Q(to_user=user) | Q(marked_by=user)
+        )
+        summary['household_settlements'] = mark_qs.count()
+        mark_qs.delete()
+
+        # Invites this user created (CASCADE would fail mid-delete if household kept)
+        HouseholdInvite.objects.filter(created_by=user).delete()
+
+        memberships = list(
+            HouseholdMembership.objects.filter(user=user).select_related('household')
+        )
+        for membership in memberships:
+            hh = membership.household
+            others = (
+                HouseholdMembership.objects.filter(household=hh, user__isnull=False)
+                .exclude(user=user)
+                .count()
+            )
+            membership.delete()
+            summary['memberships_removed'] += 1
+            if others == 0:
+                hh.delete()
+                summary['households_removed'] += 1
+
+        # Auth tokens / sessions for this user (Django defaults)
+        try:
+            from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+            OutstandingToken.objects.filter(user=user).delete()
+        except Exception:
+            pass
+
+        user.delete()
+
+    return summary
+
+
+class OpsUserDeleteView(APIView):
+    """Hard-delete a hosted user and all linked personal data."""
+
+    permission_classes = [IsOpsStaff]
+
+    def post(self, request, user_id: int):
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.is_superuser:
+            return Response(
+                {'detail': 'Cannot delete a superuser.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if user.id == request.user.id:
+            return Response(
+                {'detail': 'Cannot delete yourself.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if user.is_staff and not request.user.is_superuser:
+            return Response(
+                {'detail': 'Only a superuser can delete another staff account.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        confirm = str(request.data.get('confirm_username') or '').strip()
+        if confirm != user.username:
+            return Response(
+                {
+                    'detail': 'Type the exact username in confirm_username to delete.',
+                    'username': user.username,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        meta = {
+            'username': user.username,
+            'email': user.email or '',
+            'is_staff': user.is_staff,
+        }
+        try:
+            summary = purge_user_completely(user)
+        except ProtectedError as exc:
+            return Response(
+                {'detail': f'Could not delete user due to protected related rows: {exc}'},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        log_ops_action(
+            actor=request.user,
+            action='user.delete',
+            target_type='user',
+            target_id=user_id,
+            meta={**meta, **summary},
+            request=request,
+        )
+        return Response({'ok': True, 'deleted': summary})
 
 
 class OpsRefreshInactivityView(APIView):
