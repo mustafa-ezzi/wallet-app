@@ -333,6 +333,7 @@ export type BankSmsImportRow = {
   confidence: string | number | null
   parse_reason: string
   record_atm_as_expense: boolean
+  linked_import: number | null
   responded_at: string | null
   created_at: string | null
   updated_at: string | null
@@ -346,6 +347,13 @@ export const bankSmsApi = {
   approve: (id: number, data?: object) =>
     api.post<BankSmsImportRow>(`/bank-sms-imports/${id}/approve/`, data ?? {}),
   reject: (id: number) => api.post<BankSmsImportRow>(`/bank-sms-imports/${id}/reject/`),
+  batchApprove: (data: { ids: number[]; resolved_account_id?: number; cash_account_id?: number; remember_wallet?: boolean }) =>
+    api.post<{ approved: BankSmsImportRow[]; errors: { id: number; detail: string }[] }>(
+      '/bank-sms-imports/batch-approve/',
+      data,
+    ),
+  batchReject: (data: { ids: number[] }) =>
+    api.post<{ rejected_count: number }>('/bank-sms-imports/batch-reject/', data),
   settings: () => api.get<BankSmsImportSettings>('/bank-sms-import-settings/'),
   updateSettings: (data: object) => api.patch<BankSmsImportSettings>('/bank-sms-import-settings/', data),
 }
@@ -355,6 +363,7 @@ export type BankSmsImportSettings = {
   sms_permission_prompted_at: string | null
   default_cash_wallet_id: number | null
   wallet_aliases: { account_id: number; hint?: string; mask?: string }[]
+  kind_overrides: { kind: string; hint?: string; mask?: string; phrase?: string }[]
   auto_create_cash_on_atm: boolean
   updated_at: string | null
 }

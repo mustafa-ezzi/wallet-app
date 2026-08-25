@@ -366,16 +366,17 @@ Confidence score example:
 
 ---
 
-### Phase 5 — Accuracy & polish
+### Phase 5 — Accuracy & polish ✅
 
-- Per-bank templates  
-- Correction learning (“always treat as…”)  
-- Reversal ↔ original linking  
-- OTP/marketing hard filters  
-- Batch review UI  
-- Optional People suggest for RAAST counterparties  
+- Per-bank templates (`BANK_TEMPLATES` in parser)  
+- Correction learning: `kind_overrides` + Approve “Always treat similar as this type” (`remember_kind`)  
+- Reversal ↔ original linking by TID / amount+mask (`linked_import`)  
+- Harder OTP / verification / promo / declined filters + fixtures  
+- Batch review: `POST …/batch-approve/` + `batch-reject/` (web + mobile)  
+- Optional People name hint for RAAST counterparties  
+- Play Policy answers documented in `docs/BANK_SMS_PRIVACY.md`  
 
-**Exit:** Low false-positive rate; documented Play Policy answers  
+**Exit:** Low false-positive rate on ignore fixtures; batch + corrections ship; policy Q&A documented  
 
 ---
 

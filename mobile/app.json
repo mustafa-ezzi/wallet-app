@@ -127,8 +127,9 @@
       "router": {},
       "apiUrl": "https://tranquil-radiance-production.up.railway.app",
       "eas": {
-        "projectId": "bf847a85-3034-464b-8ac3-b7018dc543ab"
+        "projectId": "c7895bac-9652-44e9-a80a-a779737f7f69"
       }
-    }
+    },
+    "owner": "mustafaezzi"
   }
 }

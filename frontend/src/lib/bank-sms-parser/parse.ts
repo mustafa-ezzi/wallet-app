@@ -1,4 +1,6 @@
 import type { BankSmsKind, BankSmsUiBucket, ParsedBankSms } from './types'
+import { applyBankTemplate } from './templates'
+import { applyKindOverrides, type KindOverride } from './corrections'
 
 const MONTHS: Record<string, number> = {
   jan: 1, january: 1,
@@ -43,14 +45,28 @@ const BANK_HINTS: { re: RegExp; hint: string }[] = [
 const IGNORE_RES = [
   /\botp\b/i,
   /\bone[-\s]?time\s+password\b/i,
+  /\bverification\s+code\b/i,
+  /\bauth(?:entication)?\s+code\b/i,
   /\bdo not share\b/i,
+  /\bdon'?t share\b/i,
   /\bunsuccessful\b/i,
   /\bfailed\b/i,
   /\bdeclined\b/i,
+  /\brejected\b/i,
+  /\bcould not be processed\b/i,
   /\bcashback\b/i,
   /\bT&Cs?\b/i,
+  /\bterms\s+(?:and|&)\s+conditions\b/i,
   /\bavail\b.*\b%/i,
   /\bpromo(?:tion)?\b/i,
+  /\boffer\b.*\b%|\b%\s*off\b/i,
+  /\bclick\s+here\b/i,
+  /\bdownload\s+(?:our\s+)?app\b/i,
+  /\bunsubscribe\b/i,
+  /\bmarketing\b/i,
+  /\blucky\s+draw\b/i,
+  /\bpin\s+(?:is|code)\b/i,
+  /\byour\s+code\s+is\b/i,
 ]
 
 function normalize(text: string): string {
@@ -175,8 +191,12 @@ function classify(text: string, tid: string | null): { kind: BankSmsKind; reason
 /**
  * Parse a bank SMS / alert body into a structured draft.
  * Phase 1: on-device / paste only — no network.
+ * Phase 5: optional kindOverrides from user corrections.
  */
-export function parseBankSms(rawInput: string): ParsedBankSms {
+export function parseBankSms(
+  rawInput: string,
+  opts?: { kindOverrides?: KindOverride[] },
+): ParsedBankSms {
   const raw = normalize(rawInput)
   const empty: ParsedBankSms = {
     ok: false,
@@ -218,10 +238,11 @@ export function parseBankSms(rawInput: string): ParsedBankSms {
   const counterparty = parseCounterparty(raw)
   const bankHint = parseBankHint(raw)
   const { isoDate, occurredAt } = parseOccurred(raw)
-  const { kind, reason, confidence } = classify(raw, tid)
+  const base = classify(raw, tid)
+  const { kind, reason, confidence } = applyBankTemplate(raw, bankHint, base)
 
   const ok = amount != null && kind !== 'unknown'
-  return {
+  const parsed: ParsedBankSms = {
     ok,
     kind,
     amount,
@@ -239,6 +260,7 @@ export function parseBankSms(rawInput: string): ParsedBankSms {
     raw,
     ignore: false,
   }
+  return applyKindOverrides(parsed, opts?.kindOverrides ?? [])
 }
 
 export function kindToUiBucket(kind: BankSmsKind): BankSmsUiBucket {

@@ -179,3 +179,71 @@ class BankSmsImportTests(TestCase):
         self.assertEqual(aliases[0]['account_id'], self.bank.id)
         self.assertEqual(aliases[0]['mask'], '9910')
         self.assertEqual(aliases[0]['hint'], 'hbl')
+
+    def test_approve_remember_kind_override(self):
+        created = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'expense',
+            'amount': '50',
+            'fingerprint': 'fp_kind',
+            'suggested_account_id': self.bank.id,
+            'account_mask': '2554',
+            'bank_hint': 'meezan',
+        }, format='json')
+        pk = created.data['id']
+        res = self.client.post(f'/api/bank-sms-imports/{pk}/approve/', {
+            'kind': 'atm',
+            'resolved_account_id': self.bank.id,
+            'cash_account_id': self.cash.id,
+            'remember_kind': True,
+        }, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        settings = self.client.get('/api/bank-sms-import-settings/')
+        overrides = settings.data['kind_overrides']
+        self.assertTrue(any(o.get('kind') == 'atm' and o.get('mask') == '2554' for o in overrides))
+
+    def test_reversal_links_original_by_tid(self):
+        orig = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'expense',
+            'amount': '3147',
+            'fingerprint': 'fp_orig',
+            'suggested_account_id': self.bank.id,
+            'tid': '265023',
+            'account_mask': 'xxx2554',
+        }, format='json')
+        self.client.post(f'/api/bank-sms-imports/{orig.data["id"]}/approve/', {}, format='json')
+
+        rev = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'reversal',
+            'amount': '3147',
+            'fingerprint': 'fp_rev',
+            'suggested_account_id': self.bank.id,
+            'tid': '265023',
+            'account_mask': 'xxx2554',
+        }, format='json')
+        res = self.client.post(f'/api/bank-sms-imports/{rev.data["id"]}/approve/', {}, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(res.data['linked_import'], orig.data['id'])
+
+    def test_batch_approve_and_reject(self):
+        a = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'expense', 'amount': '10', 'fingerprint': 'fp_b1',
+            'suggested_account_id': self.bank.id,
+        }, format='json')
+        b = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'income', 'amount': '20', 'fingerprint': 'fp_b2',
+            'suggested_account_id': self.bank.id,
+        }, format='json')
+        c = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'expense', 'amount': '30', 'fingerprint': 'fp_b3',
+            'suggested_account_id': self.bank.id,
+        }, format='json')
+        appr = self.client.post('/api/bank-sms-imports/batch-approve/', {
+            'ids': [a.data['id'], b.data['id']],
+        }, format='json')
+        self.assertEqual(appr.status_code, 200, appr.data)
+        self.assertEqual(len(appr.data['approved']), 2)
+        rej = self.client.post('/api/bank-sms-imports/batch-reject/', {
+            'ids': [c.data['id']],
+        }, format='json')
+        self.assertEqual(rej.status_code, 200)
+        self.assertEqual(rej.data['rejected_count'], 1)

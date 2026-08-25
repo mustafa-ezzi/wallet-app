@@ -1,37 +1,47 @@
-# Bank SMS assist — Privacy (draft)
+# Bank SMS assist — Privacy
 
-**Status:** Phase 0 draft (not legal advice). Expand before Play Store SMS permission (Phase 3).
+**Status:** Living doc for Play Console / in-app disclosure. Not legal advice.
 
 ## Summary
 
-CashTrail’s **Bank SMS assist** helps turn bank transaction alerts into draft bookkeeping entries that you **Approve** or **Reject**. Nothing is posted to your wallets without confirmation.
+CashTrail’s **Bank SMS assist** turns bank transaction alerts into **draft** bookkeeping entries. You **Approve** or **Reject** every draft. Nothing is posted to your wallets without confirmation.
 
-## Phase 1 (current)
+## Capture modes
 
-- You **paste** a message yourself (mobile or web).
-- Parsing runs **in the app**.
-- No SMS inbox permission is requested.
-- We do not upload full SMS bodies for analytics.
+| Mode | Platforms | Permission |
+|------|-----------|------------|
+| Paste | Android, iOS, web | None |
+| Auto-detect | Android only (opt-in) | `RECEIVE_SMS` / `READ_SMS` |
 
-## Phase 2 (current sync)
+## What we process
 
-- Paste still runs the parser in the app.
-- Structured draft fields (+ short snippet) sync to your CashTrail account so you can **review pending imports on web and mobile**.
-- Approve/reject happens via the API; books only change after Approve.
+- Money alerts that look like expense, ATM cash-out, money received, or reversal  
+- Structured fields: amount, date, type, TID, counterparty, account mask, short snippet  
 
-## Phase 3 (Android auto-detect)
+## What we filter out (hard ignore)
 
-- Optional **READ_SMS / RECEIVE_SMS** on Android after you opt in (onboarding or Home prompt).
-- Detected alerts become **pending drafts** only — Approve still required.
-- iOS and web continue to use paste / review.
-- Play Store: declare financial SMS use case before shipping SMS permissions publicly.
+- OTP / one-time password / verification / auth codes  
+- “Do not share” / PIN messages  
+- Failed, declined, unsuccessful transactions  
+- Marketing, promo, cashback, % offers, unsubscribe / download-app blasts  
 
 ## What we do not do
 
 - Post expenses, income, or ATM transfers without Approve  
-- Use OTP or marketing messages for bookkeeping  
-- Sell message content  
+- Sell message content or use SMS for ads  
+- Read the full SMS inbox on iOS or web  
+- Auto-approve drafts (including background Android capture)
 
-## What may sync (Phase 2+)
+## What may sync to your CashTrail account
 
-Structured fields (amount, date, type, wallet ids, short snippet) so you can review the same queue on web. See `docs/BANK_SMS_IMPORT_PHASES.md`.
+Structured draft fields (+ short snippet), wallet aliases, and type corrections so you can review the same pending queue on web and mobile. See `docs/BANK_SMS_IMPORT_PHASES.md`.
+
+## Play Console — SMS permission answers (draft)
+
+Use when declaring financial SMS use case:
+
+1. **Why SMS?** Optional Android feature to detect bank debit/credit alerts and draft bookkeeping entries the user must approve.  
+2. **Core feature?** Assistive only — paste works without SMS permission on all platforms.  
+3. **User control?** Opt-in onboarding / Home prompt; Settings toggle off; Approve/Reject required.  
+4. **Data minimization?** Parser ignores OTP/marketing; only short structured snippets sync for cross-device review.  
+5. **No silent posting?** Confirmed — books change only after explicit Approve.

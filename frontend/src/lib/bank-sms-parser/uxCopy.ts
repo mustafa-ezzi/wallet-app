@@ -30,24 +30,24 @@ export const BANK_SMS_UX = {
   settingsOpen: 'Paste SMS →',
 
   privacyBlurb:
-    'Phase 1 parses messages on your device after you paste them. Full SMS inbox access is not required yet. '
-    + 'We do not upload raw SMS for analytics.',
+    'Bank SMS assist drafts bookkeeping entries from alerts you paste or (on Android) opt in to detect. '
+    + 'Nothing posts until you Approve. OTP and marketing messages are filtered out.',
 } as const
 
 export const BANK_SMS_PRIVACY_DRAFT = `
-## Bank SMS assist (draft — Phase 0)
+## Bank SMS assist
 
 CashTrail may help you turn bank transaction alerts into draft bookkeeping entries.
 
 ### What we ask
-- **Phase 1 (paste):** You paste a message yourself. Parsing runs in the app.
-- **Later (Android auto-detect):** Optional permission to read financial SMS / bank notifications, only if you opt in.
+- **Paste:** You paste a message yourself. Parsing runs in the app.
+- **Android auto-detect:** Optional READ_SMS / RECEIVE_SMS only if you opt in (onboarding or Settings).
 
 ### What we do not do
 - We do not post expenses or transfers without your Approve.
 - We do not sell SMS content.
-- We do not use OTP or marketing SMS for bookkeeping.
+- We do not use OTP, PIN, verification, failed, or marketing SMS for bookkeeping.
 
-### What may sync (Phase 2+)
-Structured fields only (amount, date, type, wallet id, short snippet) so you can review on web. Full inbox is never required on iOS or web.
+### What may sync
+Structured fields only (amount, date, type, wallet id, short snippet, aliases/corrections) so you can review on web.
 `.trim()

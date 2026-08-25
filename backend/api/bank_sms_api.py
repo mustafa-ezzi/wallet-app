@@ -66,6 +66,7 @@ class BankSmsImportSerializer(serializers.ModelSerializer):
             'bank_hint', 'account_mask', 'raw_snippet', 'source',
             'created_transaction_ids', 'parser_version', 'confidence',
             'parse_reason', 'record_atm_as_expense',
+            'linked_import',
             'responded_at', 'created_at', 'updated_at',
         )
         read_only_fields = (
@@ -125,6 +126,20 @@ class BankSmsImportApproveSerializer(serializers.Serializer):
     create_cash = serializers.BooleanField(required=False, default=False)
     create_cash_name = serializers.CharField(max_length=100, required=False, allow_blank=True, default='Cash')
     # Remember this wallet for mask/hint (Phase 4)
+    remember_wallet = serializers.BooleanField(required=False, default=False)
+    # Remember kind correction (Phase 5)
+    remember_kind = serializers.BooleanField(required=False, default=False)
+
+
+class BankSmsBatchSerializer(serializers.Serializer):
+    ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+        max_length=50,
+    )
+    # Optional defaults applied when an item has no resolved wallet
+    resolved_account_id = serializers.IntegerField(required=False, allow_null=True)
+    cash_account_id = serializers.IntegerField(required=False, allow_null=True)
     remember_wallet = serializers.BooleanField(required=False, default=False)
 
 
@@ -199,6 +214,82 @@ def _sanitize_aliases(raw) -> list:
         if 'hint' in entry or 'mask' in entry:
             out.append(entry)
     return out
+
+
+def _sanitize_kind_overrides(raw) -> list:
+    allowed = {'expense', 'atm', 'income', 'reversal'}
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        kind = str(row.get('kind') or '').strip().lower()
+        if kind not in allowed:
+            continue
+        entry = {'kind': kind}
+        hint = str(row.get('hint') or '').strip()
+        mask = str(row.get('mask') or '').strip()
+        phrase = str(row.get('phrase') or '').strip().lower()[:80]
+        if hint:
+            entry['hint'] = ''.join(ch for ch in hint.lower() if ch.isalnum())
+        if mask:
+            entry['mask'] = _normalize_mask(mask)
+        if phrase:
+            entry['phrase'] = phrase
+        if 'hint' in entry or 'mask' in entry or 'phrase' in entry:
+            out.append(entry)
+    return out[:40]
+
+
+def _upsert_kind_override(overrides: list, *, kind: str, hint: str = '', mask: str = '', phrase: str = '') -> list:
+    next_list = _sanitize_kind_overrides(overrides)
+    entry = {'kind': kind}
+    hint_n = ''.join(ch for ch in hint.lower() if ch.isalnum()) if hint else ''
+    mask_n = _normalize_mask(mask) if mask else ''
+    phrase_n = (phrase or '').strip().lower()[:80]
+    if mask_n:
+        next_list = [o for o in next_list if o.get('mask') != mask_n]
+        entry['mask'] = mask_n
+    if hint_n:
+        next_list = [
+            o for o in next_list
+            if not (o.get('hint') == hint_n and not o.get('mask') and not o.get('phrase'))
+        ]
+        entry['hint'] = hint_n
+    if phrase_n and not mask_n and not hint_n:
+        next_list = [o for o in next_list if o.get('phrase') != phrase_n]
+        entry['phrase'] = phrase_n
+    if 'hint' in entry or 'mask' in entry or 'phrase' in entry:
+        next_list.append(entry)
+    return next_list[:40]
+
+
+def _find_reversal_original(user, item: BankSmsImport) -> Optional[BankSmsImport]:
+    """Best-effort: prior approved debit/ATM with same TID, or same amount+mask recently."""
+    qs = BankSmsImport.objects.filter(
+        user=user,
+        status=BankSmsImport.STATUS_APPROVED,
+    ).exclude(kind=BankSmsImport.KIND_REVERSAL).exclude(pk=item.pk)
+
+    tid = (item.tid or '').strip()
+    if tid:
+        hit = qs.filter(tid__iexact=tid).order_by('-tx_date', '-id').first()
+        if hit:
+            return hit
+
+    if item.amount is None:
+        return None
+    mask = _normalize_mask(item.account_mask)
+    candidates = qs.filter(amount=item.amount).order_by('-tx_date', '-id')[:20]
+    for c in candidates:
+        if mask and _normalize_mask(c.account_mask) == mask:
+            return c
+        if not mask and not c.account_mask:
+            # same amount alone is weak — only if within ~45 days and notes share counterparty
+            if item.tx_date and c.tx_date and abs((item.tx_date - c.tx_date).days) <= 45:
+                return c
+    return None
 
 
 def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankSmsImport:
@@ -327,17 +418,40 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
     item.created_transaction_ids = created_ids
     item.status = BankSmsImport.STATUS_APPROVED
     item.responded_at = timezone.now()
+
+    if kind == BankSmsImport.KIND_REVERSAL and not item.linked_import_id:
+        original = _find_reversal_original(user, item)
+        if original:
+            item.linked_import = original
+            # Annotate notes for audit trail
+            if original.id and f'linked#{original.id}' not in item.notes:
+                item.notes = f'{item.notes} · linked#{original.id}'.strip()
+
     item.save()
 
+    settings_obj, _ = BankSmsImportSettings.objects.get_or_create(user=user)
+    dirty = False
     if overrides.get('remember_wallet') and bank and bank.type == 'bank':
-        settings_obj, _ = BankSmsImportSettings.objects.get_or_create(user=user)
         settings_obj.wallet_aliases = _upsert_wallet_alias(
             list(settings_obj.wallet_aliases or []),
             account_id=bank.id,
             hint=item.bank_hint or '',
             mask=item.account_mask or '',
         )
-        settings_obj.save(update_fields=['wallet_aliases', 'updated_at'])
+        dirty = True
+    if overrides.get('remember_kind') and kind in (
+        BankSmsImport.KIND_EXPENSE, BankSmsImport.KIND_ATM,
+        BankSmsImport.KIND_INCOME, BankSmsImport.KIND_REVERSAL,
+    ):
+        settings_obj.kind_overrides = _upsert_kind_override(
+            list(settings_obj.kind_overrides or []),
+            kind=kind,
+            hint=item.bank_hint or '',
+            mask=item.account_mask or '',
+        )
+        dirty = True
+    if dirty:
+        settings_obj.save()
 
     return item
 
@@ -479,6 +593,53 @@ class BankSmsImportViewSet(viewsets.ModelViewSet):
         item.save(update_fields=['status', 'responded_at', 'updated_at'])
         return Response(BankSmsImportSerializer(item).data)
 
+    @action(detail=False, methods=['post'], url_path='batch-approve')
+    def batch_approve(self, request):
+        ser = BankSmsBatchSerializer(data=request.data or {})
+        ser.is_valid(raise_exception=True)
+        ids = ser.validated_data['ids']
+        defaults = {
+            'resolved_account_id': ser.validated_data.get('resolved_account_id'),
+            'cash_account_id': ser.validated_data.get('cash_account_id'),
+            'remember_wallet': ser.validated_data.get('remember_wallet', False),
+        }
+        approved = []
+        errors = []
+        for pk in ids:
+            try:
+                with transaction.atomic():
+                    item = BankSmsImport.objects.select_for_update().filter(
+                        pk=pk, user=request.user, status=BankSmsImport.STATUS_PENDING,
+                    ).first()
+                    if not item:
+                        errors.append({'id': pk, 'detail': 'Not found or not pending.'})
+                        continue
+                    overrides = {k: v for k, v in defaults.items() if v is not None}
+                    # Only pass resolved_account_id when provided
+                    ov = {}
+                    if defaults.get('resolved_account_id'):
+                        ov['resolved_account_id'] = defaults['resolved_account_id']
+                    if defaults.get('cash_account_id'):
+                        ov['cash_account_id'] = defaults['cash_account_id']
+                    if defaults.get('remember_wallet'):
+                        ov['remember_wallet'] = True
+                    item = approve_bank_sms_import(request.user, item, ov)
+                    approved.append(BankSmsImportSerializer(item).data)
+            except ValueError as exc:
+                errors.append({'id': pk, 'detail': str(exc)})
+        return Response({'approved': approved, 'errors': errors})
+
+    @action(detail=False, methods=['post'], url_path='batch-reject')
+    def batch_reject(self, request):
+        ser = BankSmsBatchSerializer(data={'ids': (request.data or {}).get('ids') or []})
+        ser.is_valid(raise_exception=True)
+        ids = ser.validated_data['ids']
+        now = timezone.now()
+        updated = BankSmsImport.objects.filter(
+            user=request.user, id__in=ids, status=BankSmsImport.STATUS_PENDING,
+        ).update(status=BankSmsImport.STATUS_REJECTED, responded_at=now)
+        return Response({'rejected_count': updated})
+
 
 class BankSmsImportSettingsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -494,6 +655,7 @@ class BankSmsImportSettingsView(APIView):
             'sms_permission_prompted_at': obj.sms_permission_prompted_at.isoformat() if obj.sms_permission_prompted_at else None,
             'default_cash_wallet_id': obj.default_cash_wallet_id,
             'wallet_aliases': obj.wallet_aliases or [],
+            'kind_overrides': obj.kind_overrides or [],
             'auto_create_cash_on_atm': obj.auto_create_cash_on_atm,
             'updated_at': obj.updated_at.isoformat() if obj.updated_at else None,
         })
@@ -520,6 +682,8 @@ class BankSmsImportSettingsView(APIView):
             obj.wallet_aliases = [
                 a for a in obj.wallet_aliases if int(a.get('account_id') or 0) in owned
             ]
+        if 'kind_overrides' in request.data and isinstance(request.data.get('kind_overrides'), list):
+            obj.kind_overrides = _sanitize_kind_overrides(request.data.get('kind_overrides'))
         if 'default_cash_wallet_id' in request.data:
             wid = request.data.get('default_cash_wallet_id')
             obj.default_cash_wallet = _user_wallet(request.user, wid) if wid else None

@@ -6,8 +6,10 @@ import {
   buildApproveDraft,
   needsManualTypePick,
   parseBankSms,
+  suggestPeopleMatch,
   type ApproveDraft,
   type BankSmsKind,
+  type KindOverride,
   type ParsedBankSms,
   type WalletAlias,
   type WalletLike,
@@ -17,6 +19,7 @@ import {
   asList,
   apiErrorMessage,
   bankSmsApi,
+  peopleApi,
   type BankSmsImportRow,
 } from '../api/client'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
@@ -58,9 +61,13 @@ export default function BankSmsImportPage() {
   const [pending, setPending] = useState<BankSmsImportRow[]>([])
   const [wallets, setWallets] = useState<WalletLike[]>([])
   const [aliases, setAliases] = useState<WalletAlias[]>([])
+  const [kindOverrides, setKindOverrides] = useState<KindOverride[]>([])
   const [defaultCashId, setDefaultCashId] = useState<number | null>(null)
   const [rememberWallet, setRememberWallet] = useState(true)
+  const [rememberKind, setRememberKind] = useState(false)
   const [typeConfirmed, setTypeConfirmed] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [peopleHint, setPeopleHint] = useState<string | null>(null)
   const [aliasMask, setAliasMask] = useState('')
   const [aliasHint, setAliasHint] = useState('')
   const [aliasWalletId, setAliasWalletId] = useState('')
@@ -87,9 +94,25 @@ export default function BankSmsImportPage() {
     try {
       const res = await bankSmsApi.settings()
       setAliases((res.data.wallet_aliases || []) as WalletAlias[])
+      setKindOverrides((res.data.kind_overrides || []) as KindOverride[])
       setDefaultCashId(res.data.default_cash_wallet_id ?? null)
     } catch {
       /* offline */
+    }
+  }, [])
+
+  const loadPeopleHint = useCallback(async (counterparty: string | null | undefined) => {
+    if (!counterparty) {
+      setPeopleHint(null)
+      return
+    }
+    try {
+      const res = await peopleApi.list()
+      const people = asList<{ id: number; name: string }>(res.data)
+      const hit = suggestPeopleMatch(counterparty, people)
+      setPeopleHint(hit ? `Matches People: ${hit.name}` : null)
+    } catch {
+      setPeopleHint(null)
     }
   }, [])
 
@@ -116,7 +139,7 @@ export default function BankSmsImportPage() {
     setError('')
     setOkMsg('')
     setTypeConfirmed(false)
-    const p = parseBankSms(paste)
+    const p = parseBankSms(paste, { kindOverrides })
     setParsed(p)
     if (p.ignore) {
       setDraft(null)
@@ -132,6 +155,7 @@ export default function BankSmsImportPage() {
     }
     const localDraft = buildApproveDraft(p, wallets, undefined, { aliases, defaultCashId })
     setDraft(localDraft)
+    void loadPeopleHint(p.counterparty)
     if (p.accountMask) setAliasMask(p.accountMask.replace(/\D/g, '').slice(-4) || p.accountMask)
     if (p.bankHint) setAliasHint(p.bankHint)
     if (localDraft.bankAccountId) setAliasWalletId(String(localDraft.bankAccountId))
@@ -199,6 +223,7 @@ export default function BankSmsImportPage() {
     if (row.bank_hint) setAliasHint(row.bank_hint)
     const acct = row.resolved_account ?? row.suggested_account
     if (acct) setAliasWalletId(String(acct))
+    void loadPeopleHint(row.counterparty)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -242,6 +267,7 @@ export default function BankSmsImportPage() {
         create_cash: draft.kind === 'atm' && !draft.recordAtmAsExpense && !draft.cashAccountId,
         create_cash_name: draft.createCashNamed || 'Cash',
         remember_wallet: rememberWallet,
+        remember_kind: rememberKind,
       })
       await hydrateNow()
       await loadWallets()
@@ -252,13 +278,17 @@ export default function BankSmsImportPage() {
         + (res.data.created_transaction_ids?.length
           ? ` · txs ${res.data.created_transaction_ids.join(', ')}`
           : '')
-        + (rememberWallet ? ' · wallet remembered for next SMS' : ''),
+        + (res.data.linked_import ? ` · linked original #${res.data.linked_import}` : '')
+        + (rememberWallet ? ' · wallet remembered' : '')
+        + (rememberKind ? ' · type correction saved' : ''),
       )
       setPaste('')
       setParsed(null)
       setDraft(null)
       setPendingId(null)
       setTypeConfirmed(false)
+      setRememberKind(false)
+      setPeopleHint(null)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not approve this draft.'))
     } finally {
@@ -332,6 +362,45 @@ export default function BankSmsImportPage() {
     }
   }
 
+  const toggleSelected = (id: number) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const onBatchApprove = async () => {
+    if (!selectedIds.length) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await bankSmsApi.batchApprove({ ids: selectedIds })
+      await hydrateNow()
+      await loadPending()
+      setSelectedIds([])
+      const errN = res.data.errors?.length || 0
+      setOkMsg(`Batch approved ${res.data.approved.length}${errN ? ` · ${errN} failed` : ''}.`)
+      if (errN) setError(res.data.errors.map((e) => `#${e.id}: ${e.detail}`).join(' · '))
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Batch approve failed.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onBatchReject = async () => {
+    if (!selectedIds.length) return
+    setBusy(true)
+    setError('')
+    try {
+      const res = await bankSmsApi.batchReject({ ids: selectedIds })
+      await loadPending()
+      setSelectedIds([])
+      setOkMsg(`Rejected ${res.data.rejected_count} item(s).`)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Batch reject failed.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onReject = async () => {
     if (!pendingId) {
       setDraft(null)
@@ -369,26 +438,41 @@ export default function BankSmsImportPage() {
 
       {pending.length > 0 ? (
         <div className="glass" style={{ padding: '1.1rem 1.15rem', marginBottom: '1rem', borderRadius: 'var(--radius-md)' }}>
-          <h3 style={{ margin: '0 0 0.65rem', fontSize: '0.95rem' }}>
-            Pending inbox ({pending.length})
-          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: '0.65rem' }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', flex: 1 }}>
+              Pending inbox ({pending.length})
+            </h3>
+            <button type="button" className="btn-glass" style={{ fontSize: '0.75rem' }} disabled={busy || !selectedIds.length} onClick={() => void onBatchApprove()}>
+              Approve selected ({selectedIds.length})
+            </button>
+            <button type="button" className="btn-glass" style={{ fontSize: '0.75rem' }} disabled={busy || !selectedIds.length} onClick={() => void onBatchReject()}>
+              Reject selected
+            </button>
+          </div>
           <div className="list">
             {pending.map((row) => (
-              <button
-                key={row.id}
-                type="button"
-                className="list-item"
-                style={{ width: '100%', textAlign: 'left', cursor: 'pointer' }}
-                onClick={() => openPending(row)}
-              >
-                <div>
-                  <strong>#{row.id} · {row.kind}</strong>
-                  <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                    {row.raw_snippet || row.notes || 'Bank SMS'} · {row.source}
+              <div key={row.id} className="list-item" style={{ gap: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(row.id)}
+                  onChange={() => toggleSelected(row.id)}
+                  aria-label={`Select #${row.id}`}
+                />
+                <button
+                  type="button"
+                  className="list-item"
+                  style={{ flex: 1, width: 'auto', textAlign: 'left', cursor: 'pointer', border: 'none', background: 'transparent', padding: 0 }}
+                  onClick={() => openPending(row)}
+                >
+                  <div>
+                    <strong>#{row.id} · {row.kind}</strong>
+                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                      {row.raw_snippet || row.notes || 'Bank SMS'} · {row.source}
+                    </div>
                   </div>
-                </div>
-                <strong>{fmt(row.amount)}</strong>
-              </button>
+                  <strong>{fmt(row.amount)}</strong>
+                </button>
+              </div>
             ))}
           </div>
         </div>
@@ -438,6 +522,9 @@ export default function BankSmsImportPage() {
                 I’ve confirmed the type
               </button>
             </div>
+          ) : null}
+          {peopleHint ? (
+            <p className="text-muted" style={{ fontSize: '0.78rem', marginBottom: '0.75rem' }}>{peopleHint}</p>
           ) : null}
 
           <div className="form-group" style={{ marginTop: '0.85rem' }}>
@@ -545,13 +632,21 @@ export default function BankSmsImportPage() {
             <input value={draft.notes} onChange={(e) => patchDraft({ notes: e.target.value })} />
           </div>
 
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.85rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}>
             <input
               type="checkbox"
               checked={rememberWallet}
               onChange={(e) => setRememberWallet(e.target.checked)}
             />
             Always use this bank wallet for matching mask / bank hint next time
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.85rem' }}>
+            <input
+              type="checkbox"
+              checked={rememberKind}
+              onChange={(e) => setRememberKind(e.target.checked)}
+            />
+            Always treat similar SMS (same mask / bank) as this type
           </label>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: '0.5rem' }}>

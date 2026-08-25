@@ -3,6 +3,7 @@ import {
   parseBankSms,
   suggestBankWallet,
   preferCashWallet,
+  type KindOverride,
   type WalletAlias,
   type WalletLike,
 } from '@cashtrail/bank-sms-parser'
@@ -21,15 +22,20 @@ async function loadWallets(): Promise<WalletLike[]> {
   }
 }
 
-async function loadAliases(): Promise<{ aliases: WalletAlias[]; defaultCashId: number | null }> {
+async function loadSettings(): Promise<{
+  aliases: WalletAlias[]
+  defaultCashId: number | null
+  kindOverrides: KindOverride[]
+}> {
   try {
     const res = await bankSmsApi.settings()
     return {
       aliases: (res.data.wallet_aliases || []) as WalletAlias[],
       defaultCashId: res.data.default_cash_wallet_id ?? null,
+      kindOverrides: (res.data.kind_overrides || []) as KindOverride[],
     }
   } catch {
-    return { aliases: [], defaultCashId: null }
+    return { aliases: [], defaultCashId: null, kindOverrides: [] }
   }
 }
 
@@ -48,12 +54,12 @@ export async function ingestBankSmsBody(
   const text = (body || '').trim()
   if (!text) return { ok: false, reason: 'empty' }
 
-  const parsed = parseBankSms(text)
+  const { aliases, defaultCashId, kindOverrides } = await loadSettings()
+  const parsed = parseBankSms(text, { kindOverrides })
   if (parsed.ignore) return { ok: false, reason: parsed.ignoreReason || 'ignored' }
   if (!parsed.amount) return { ok: false, reason: 'no-amount' }
 
   const wallets = await loadWallets()
-  const { aliases, defaultCashId } = await loadAliases()
   const draft = buildApproveDraft(parsed, wallets, undefined, { aliases, defaultCashId })
   const bank = suggestBankWallet(wallets, parsed, aliases)
   const cash = preferCashWallet(wallets, defaultCashId)

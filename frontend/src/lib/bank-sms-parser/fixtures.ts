@@ -74,6 +74,24 @@ export const FIXTURE_SMS: FixtureSms[] = [
     expectedKind: 'ignore',
     text: 'Meezan Bank: Avail 10% cashback on groceries this weekend. T&Cs apply.',
   },
+  {
+    id: 'ignore-verification-code',
+    label: 'Verification code',
+    expectedKind: 'ignore',
+    text: 'Your verification code is 391028. Do not share with anyone.',
+  },
+  {
+    id: 'ignore-declined',
+    label: 'Declined card',
+    expectedKind: 'ignore',
+    text: 'PKR 4,200.00 transaction declined at POS. If this was not you, call 111.',
+  },
+  {
+    id: 'ignore-promo-offer',
+    label: 'Percent-off promo',
+    expectedKind: 'ignore',
+    text: 'Limited offer! Get 20% off on transfer fees. Download our app now.',
+  },
 
   // ── ATM keyword variants ─────────────────────────────────────────────────
   {

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { buildApproveDraft, buildApprovePlan } from './approvePlan'
+import { applyKindOverrides } from './corrections'
 import { FIXTURE_SMS } from './fixtures'
 import { needsManualTypePick, preferCashWallet, suggestBankWallet } from './matchWallet'
 import { parseBankSms } from './parse'
+import { suggestPeopleMatch } from './suggestPeople'
 
 describe('parseBankSms — product samples', () => {
   it('classifies ATM with TID as atm', () => {
@@ -131,5 +133,38 @@ describe('wallet suggest + approve plan', () => {
     const plan = buildApprovePlan(draft)
     expect(plan.steps).toHaveLength(1)
     expect(plan.steps[0].type).toBe('expense')
+  })
+})
+
+describe('phase 5 — corrections, templates, people', () => {
+  it('applies kind override by mask', () => {
+    const p = parseBankSms(FIXTURE_SMS.find((x) => x.id === 'hint-account-mask')!.text)
+    expect(p.kind).toBe('expense')
+    const forced = applyKindOverrides(p, [{ kind: 'atm', mask: '2554' }])
+    expect(forced.kind).toBe('atm')
+    expect(forced.reason).toMatch(/override/)
+  })
+
+  it('parseBankSms accepts kindOverrides option', () => {
+    const p = parseBankSms(
+      FIXTURE_SMS.find((x) => x.id === 'hint-meezan-debit')!.text,
+      { kindOverrides: [{ kind: 'income', hint: 'meezan' }] },
+    )
+    expect(p.kind).toBe('income')
+  })
+
+  it('suggestPeopleMatch finds unique person', () => {
+    const hit = suggestPeopleMatch('M.SHAKIR', [
+      { id: 1, name: 'M Shakir' },
+      { id: 2, name: 'Ali' },
+    ])
+    expect(hit?.id).toBe(1)
+  })
+
+  it('hard-filters verification / promo SMS', () => {
+    for (const id of ['ignore-verification-code', 'ignore-declined', 'ignore-promo-offer']) {
+      const f = FIXTURE_SMS.find((x) => x.id === id)!
+      expect(parseBankSms(f.text).ignore).toBe(true)
+    }
   })
 })
