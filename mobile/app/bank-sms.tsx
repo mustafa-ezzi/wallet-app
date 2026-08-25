@@ -23,7 +23,7 @@ import {
   type ParsedBankSms,
   type WalletAlias,
   type WalletLike,
-} from '@cashtrail/bank-sms-parser'
+} from '@/src/lib/bank-sms-parser'
 import { DateField, SelectField } from '@/src/components/SelectFields'
 import { ErrorBanner, PrimaryButton } from '@/src/components/ui'
 import {

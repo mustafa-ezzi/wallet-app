@@ -31,7 +31,7 @@ import { AdBanner } from '@/src/ads/AdBanner'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { formatForeignSubtitle } from '@/src/travel/currencies'
 import { useBankSms } from '@/src/bankSms'
-import { BANK_SMS_UX } from '@cashtrail/bank-sms-parser'
+import { BANK_SMS_UX } from '@/src/lib/bank-sms-parser'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',

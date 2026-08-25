@@ -6,7 +6,7 @@ import {
   type KindOverride,
   type WalletAlias,
   type WalletLike,
-} from '@cashtrail/bank-sms-parser'
+} from '@/src/lib/bank-sms-parser'
 import { accountsApi, asList, bankSmsApi } from '@/src/api/client'
 
 type Acc = { id: number; name: string; type: string }
