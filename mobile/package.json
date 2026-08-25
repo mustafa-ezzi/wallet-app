@@ -3,11 +3,13 @@
   "main": "index.js",
   "version": "1.0.0",
   "dependencies": {
+    "@cashtrail/bank-sms-parser": "file:../packages/bank-sms-parser",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-community/datetimepicker": "9.1.0",
     "@react-native-community/netinfo": "12.0.1",
     "axios": "^1.19.0",
     "expo": "~57.0.8",
+    "expo-android-notification-listener-service": "^1.1.0",
     "expo-blur": "^57.0.2",
     "expo-constants": "~57.0.7",
     "expo-font": "~57.0.1",

@@ -486,6 +486,29 @@ export default function BankSmsScreen() {
                 onValueChange={(v) => void bankSms.setEnabled(v)}
               />
             </View>
+            {bankSms.notifNativeAvailable ? (
+              <View style={[styles.switchRow, { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>NayaPay / SadaPay</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4, lineHeight: 17 }}>
+                    {bankSms.notifEnabled && bankSms.notifPermissionGranted
+                      ? 'Notification listener on — Approve still required'
+                      : bankSms.notifEnabled
+                        ? 'Enable CashTrail in Notification access'
+                        : 'App notifications (not SMS)'}
+                  </Text>
+                  {bankSms.notifEnabled && !bankSms.notifPermissionGranted ? (
+                    <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 8 }}>
+                      <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>Open Notification access →</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <Switch
+                  value={bankSms.notifEnabled}
+                  onValueChange={(v) => void bankSms.setNotifEnabled(v)}
+                />
+              </View>
+            ) : null}
           </View>
         ) : null}
 

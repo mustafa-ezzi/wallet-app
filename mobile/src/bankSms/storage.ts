@@ -3,6 +3,8 @@ import * as SecureStore from 'expo-secure-store'
 
 const ENABLED = 'cashtrail_bank_sms_enabled'
 const PROMPTED = 'cashtrail_bank_sms_prompted'
+/** NayaPay / SadaPay via Android Notification Listener */
+const NOTIF_ENABLED = 'cashtrail_bank_notif_enabled'
 
 async function getItem(key: string): Promise<string | null> {
   try {
@@ -38,4 +40,12 @@ export async function getBankSmsPromptSeen(): Promise<boolean> {
 
 export async function setBankSmsPromptSeen(): Promise<void> {
   await setItem(PROMPTED, '1')
+}
+
+export async function getBankNotifEnabled(): Promise<boolean> {
+  return (await getItem(NOTIF_ENABLED)) === '1'
+}
+
+export async function setBankNotifEnabled(on: boolean): Promise<void> {
+  await setItem(NOTIF_ENABLED, on ? '1' : '0')
 }

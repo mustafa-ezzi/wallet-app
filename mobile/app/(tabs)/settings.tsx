@@ -163,9 +163,36 @@ export default function SettingsScreen() {
           </View>
           {Platform.OS === 'android' && bankSms.enabled && !bankSms.permissionGranted ? (
             <Pressable onPress={() => void bankSms.openSettings()} style={{ marginTop: 10 }}>
-              <Text style={{ color: colors.primary, fontWeight: '800' }}>Open settings →</Text>
+              <Text style={{ color: colors.primary, fontWeight: '800' }}>Open SMS settings →</Text>
             </Pressable>
           ) : null}
+
+          {Platform.OS === 'android' && bankSms.notifNativeAvailable ? (
+            <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+              <View style={styles.rowBetween}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>NayaPay / SadaPay alerts</Text>
+                  <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                    {bankSms.notifEnabled
+                      ? (bankSms.notifPermissionGranted
+                        ? 'Reading wallet app notifications — Approve still required'
+                        : 'On — enable CashTrail under Notification access')
+                      : 'Uses Notification access (these apps don’t send SMS)'}
+                  </Text>
+                </View>
+                <Switch
+                  value={bankSms.notifEnabled}
+                  onValueChange={(v) => void bankSms.setNotifEnabled(v)}
+                />
+              </View>
+              {bankSms.notifEnabled && !bankSms.notifPermissionGranted ? (
+                <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 10 }}>
+                  <Text style={{ color: colors.primary, fontWeight: '800' }}>Open Notification access →</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+
           <Pressable
             onPress={() => router.push('/bank-sms')}
             style={{ marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}

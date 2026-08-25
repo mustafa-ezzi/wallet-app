@@ -21,25 +21,40 @@ import {
   subscribeIncomingSms,
 } from './nativeSms'
 import {
+  applyWalletNotificationAllowlist,
+  getNotificationListenerGranted,
+  isBankNotificationNativeAvailable,
+  openNotificationListenerSettings,
+  subscribeWalletNotifications,
+} from './nativeNotification'
+import {
+  getBankNotifEnabled,
   getBankSmsEnabled,
   getBankSmsPromptSeen,
+  setBankNotifEnabled,
   setBankSmsEnabled,
   setBankSmsPromptSeen,
 } from './storage'
 
 type BankSmsContextValue = {
-  /** Feature enabled by user (Android). */
+  /** SMS auto-detect enabled by user (Android). */
   enabled: boolean
   prompted: boolean
   permissionGranted: boolean
   nativeAvailable: boolean
+  /** NayaPay / SadaPay notification listener. */
+  notifEnabled: boolean
+  notifPermissionGranted: boolean
+  notifNativeAvailable: boolean
   pendingCount: number
   showPromptBanner: boolean
   refreshing: boolean
   setEnabled: (on: boolean) => Promise<void>
+  setNotifEnabled: (on: boolean) => Promise<void>
   markPromptSeen: () => Promise<void>
   requestPermissionAndEnable: () => Promise<boolean>
   openSettings: () => Promise<void>
+  openNotifSettings: () => void
   refreshPending: () => Promise<void>
   ingestBody: (body: string) => Promise<void>
 }
@@ -51,9 +66,12 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabledState] = useState(false)
   const [prompted, setPrompted] = useState(true)
   const [permissionGranted, setPermissionGranted] = useState(false)
+  const [notifEnabled, setNotifEnabledState] = useState(false)
+  const [notifPermissionGranted, setNotifPermissionGranted] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const nativeAvailable = Platform.OS === 'android' && isBankSmsNativeAvailable()
+  const notifNativeAvailable = Platform.OS === 'android' && isBankNotificationNativeAvailable()
 
   const refreshPending = useCallback(async () => {
     if (!user) {
@@ -73,19 +91,28 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const reloadLocal = useCallback(async () => {
-    const [en, seen, granted] = await Promise.all([
+    const [en, seen, granted, notifOn, notifGranted] = await Promise.all([
       getBankSmsEnabled(),
       getBankSmsPromptSeen(),
       getSmsPermissionGranted(),
+      getBankNotifEnabled(),
+      Promise.resolve(getNotificationListenerGranted()),
     ])
     setEnabledState(en)
     setPrompted(seen)
     setPermissionGranted(granted)
+    setNotifEnabledState(notifOn)
+    setNotifPermissionGranted(notifGranted)
   }, [])
 
   useEffect(() => {
     void reloadLocal()
   }, [reloadLocal, user?.id])
+
+  // Always pin allowlist as soon as native module can load (never leave empty = all apps).
+  useEffect(() => {
+    if (Platform.OS === 'android') applyWalletNotificationAllowlist()
+  }, [])
 
   useEffect(() => {
     if (user) void refreshPending()
@@ -93,7 +120,11 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
-      if (s === 'active' && user) void refreshPending()
+      if (s === 'active') {
+        setNotifPermissionGranted(getNotificationListenerGranted())
+        if (user) void refreshPending()
+        void getSmsPermissionGranted().then(setPermissionGranted)
+      }
     })
     return () => sub.remove()
   }, [user, refreshPending])
@@ -114,6 +145,28 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     }
   }, [user, enabled, permissionGranted, refreshPending])
 
+  // NayaPay / SadaPay notifications → pending only
+  useEffect(() => {
+    if (
+      Platform.OS !== 'android'
+      || !user
+      || !notifEnabled
+      || !notifPermissionGranted
+      || !notifNativeAvailable
+    ) {
+      return undefined
+    }
+    applyWalletNotificationAllowlist()
+    const unsub = subscribeWalletNotifications((body) => {
+      void ingestBankSmsBody(body, 'notification').then((r) => {
+        if (r.ok) void refreshPending()
+      })
+    })
+    return () => {
+      unsub()
+    }
+  }, [user, notifEnabled, notifPermissionGranted, notifNativeAvailable, refreshPending])
+
   const setEnabled = useCallback(async (on: boolean) => {
     if (on && Platform.OS === 'android') {
       let granted = await getSmsPermissionGranted()
@@ -132,6 +185,26 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     await setBankSmsEnabled(false)
     setEnabledState(false)
     await stopSmsBackgroundService()
+  }, [])
+
+  const setNotifEnabled = useCallback(async (on: boolean) => {
+    if (on && Platform.OS === 'android') {
+      applyWalletNotificationAllowlist()
+      const granted = getNotificationListenerGranted()
+      setNotifPermissionGranted(granted)
+      if (!granted) {
+        // Persist intent; user must grant Notification Access in system settings.
+        await setBankNotifEnabled(true)
+        setNotifEnabledState(true)
+        openNotificationListenerSettings()
+        return
+      }
+      await setBankNotifEnabled(true)
+      setNotifEnabledState(true)
+      return
+    }
+    await setBankNotifEnabled(false)
+    setNotifEnabledState(false)
   }, [])
 
   const markPromptSeen = useCallback(async () => {
@@ -168,13 +241,18 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       prompted,
       permissionGranted,
       nativeAvailable,
+      notifEnabled,
+      notifPermissionGranted,
+      notifNativeAvailable,
       pendingCount,
       showPromptBanner,
       refreshing,
       setEnabled,
+      setNotifEnabled,
       markPromptSeen,
       requestPermissionAndEnable,
       openSettings: openAppPermissionSettings,
+      openNotifSettings: openNotificationListenerSettings,
       refreshPending,
       ingestBody,
     }),
@@ -183,10 +261,14 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       prompted,
       permissionGranted,
       nativeAvailable,
+      notifEnabled,
+      notifPermissionGranted,
+      notifNativeAvailable,
       pendingCount,
       showPromptBanner,
       refreshing,
       setEnabled,
+      setNotifEnabled,
       markPromptSeen,
       requestPermissionAndEnable,
       refreshPending,

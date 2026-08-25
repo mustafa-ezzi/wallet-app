@@ -44,7 +44,7 @@ export default function BankSmsPermissionScreen() {
         </Text>
         <Text style={[styles.note, { color: colors.textMuted }]}>
           {nativeAvailable
-            ? 'Android can detect bank SMS in the background. Nothing is posted until you Approve.'
+            ? 'Android can detect bank SMS in the background. For NayaPay / SadaPay (app notifications), turn on Notification access later in Settings. Nothing posts until you Approve.'
             : 'This device build does not include SMS reading yet. You can still paste alerts anytime in Settings.'}
         </Text>
       </View>

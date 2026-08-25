@@ -49,7 +49,7 @@ export type IngestResult =
  */
 export async function ingestBankSmsBody(
   body: string,
-  source: 'android_sms' | 'paste' | 'share' = 'android_sms',
+  source: 'android_sms' | 'notification' | 'paste' | 'share' = 'android_sms',
 ): Promise<IngestResult> {
   const text = (body || '').trim()
   if (!text) return { ok: false, reason: 'empty' }

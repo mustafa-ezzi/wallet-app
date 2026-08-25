@@ -352,6 +352,20 @@ Confidence score example:
 
 ---
 
+### Phase 3b — NayaPay / SadaPay Notification Listener ✅
+
+- These wallets alert via **app notifications**, not SMS  
+- Capture: `expo-android-notification-listener-service` + system **Notification access**  
+- Package allowlist only: `com.nayapay.app`, `com.sadapay.app`  
+- Source on imports: `notification`  
+- Settings + Bank SMS screen: separate “NayaPay / SadaPay” toggle  
+- Events require JS runtime (open / recent session); Approve still required  
+- Requires **EAS rebuild** after adding the native module  
+
+**Exit:** Wallet app transaction notifications enqueue as pending drafts  
+
+---
+
 ### Phase 4 — Wallet intelligence ✅
 
 - Alias settings + last-4 / mask mapping (`wallet_aliases` on `BankSmsImportSettings`)  
@@ -415,9 +429,9 @@ Do **not** start with SMS permission alone — Play review + false positives are
 
 ---
 
-## 14. Open decisions (confirm before Phase 3)
+## 14. Open decisions (historical)
 
-1. **SMS API vs Notification Listener** on Android (policy + OEM reliability)  
+1. ~~**SMS API vs Notification Listener**~~ → **Both:** SMS for bank alerts; Notification Listener for NayaPay / SadaPay (Phase 3b)  
 2. Store **raw snippet** on server for web review, or web-only after mobile approve? (Recommend: structured fields always; snippet optional + short TTL)  
 3. ATM default Cash wallet: always “Cash” name vs last-used cash  
 4. RAAST “sent to” → plain expense vs People flow when name matches  

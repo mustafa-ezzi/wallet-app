@@ -5,4 +5,7 @@ export {
   setBankSmsEnabled,
   getBankSmsPromptSeen,
   setBankSmsPromptSeen,
+  getBankNotifEnabled,
+  setBankNotifEnabled,
 } from './storage'
+export { WALLET_NOTIFICATION_PACKAGES } from './walletApps'

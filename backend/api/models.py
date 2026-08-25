@@ -1439,10 +1439,12 @@ class BankSmsImport(models.Model):
     SOURCE_PASTE = 'paste'
     SOURCE_ANDROID_SMS = 'android_sms'
     SOURCE_SHARE = 'share'
+    SOURCE_NOTIFICATION = 'notification'
     SOURCE_CHOICES = [
         (SOURCE_PASTE, 'Paste'),
         (SOURCE_ANDROID_SMS, 'Android SMS'),
         (SOURCE_SHARE, 'Share'),
+        (SOURCE_NOTIFICATION, 'App notification'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bank_sms_imports')
