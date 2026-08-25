@@ -1,4 +1,4 @@
-import { Platform } from 'react-native'
+import { Platform, AppRegistry } from 'react-native'
 
 if (Platform.OS === 'android') {
   // Native Android only — Expo Go won't show widgets; needs an EAS APK.
@@ -7,6 +7,15 @@ if (Platform.OS === 'android') {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { widgetTaskHandler } = require('./src/widgets/widgetTaskHandler')
   registerWidgetTaskHandler(widgetTaskHandler)
+
+  // Bank SMS headless ingest (expo-sms-listener) — EAS / dev client only
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { handleSmsHeadlessTask } = require('./src/bankSms/headlessTask')
+    AppRegistry.registerHeadlessTask('ExpoSmsListenerBackground', () => handleSmsHeadlessTask)
+  } catch {
+    /* module missing in Expo Go */
+  }
 }
 
 import 'expo-router/entry'

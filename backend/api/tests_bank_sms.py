@@ -144,3 +144,38 @@ class BankSmsImportTests(TestCase):
         self.assertEqual(patched.status_code, 200)
         self.assertFalse(patched.data['sms_import_enabled'])
         self.assertFalse(patched.data['auto_create_cash_on_atm'])
+
+    def test_approve_remember_wallet_alias(self):
+        created = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'expense',
+            'amount': '99',
+            'fingerprint': 'fp_alias',
+            'suggested_account_id': self.bank.id,
+            'account_mask': 'xxx2554',
+            'bank_hint': 'meezan',
+        }, format='json')
+        pk = created.data['id']
+        res = self.client.post(f'/api/bank-sms-imports/{pk}/approve/', {
+            'resolved_account_id': self.bank.id,
+            'remember_wallet': True,
+        }, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        settings = self.client.get('/api/bank-sms-import-settings/')
+        aliases = settings.data['wallet_aliases']
+        self.assertTrue(any(a.get('mask') == '2554' and a.get('account_id') == self.bank.id for a in aliases))
+        self.assertTrue(any(a.get('hint') == 'meezan' and a.get('account_id') == self.bank.id for a in aliases))
+
+    def test_settings_sanitize_aliases(self):
+        res = self.client.patch('/api/bank-sms-import-settings/', {
+            'wallet_aliases': [
+                {'account_id': self.bank.id, 'mask': 'xx9910', 'hint': 'HBL'},
+                {'account_id': 99999, 'mask': '1111'},
+                {'junk': True},
+            ],
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        aliases = res.data['wallet_aliases']
+        self.assertEqual(len(aliases), 1)
+        self.assertEqual(aliases[0]['account_id'], self.bank.id)
+        self.assertEqual(aliases[0]['mask'], '9910')
+        self.assertEqual(aliases[0]['hint'], 'hbl')

@@ -1,9 +1,9 @@
 # Bank SMS / Transaction Auto-Detect — Feature Spec & Phases
 
-**Status:** Phase 0–2 complete · Phase 3 (Android auto-SMS) next  
-**Surfaces:** Mobile (paste + pending inbox) + Web (paste + pending inbox)  
+**Status:** Phase 0–3 complete · Phase 4 (wallet intelligence) next  
+**Surfaces:** Mobile (Android auto-SMS + paste + inbox) + Web (paste + inbox)  
 **Home currency:** PKR  
-**Code:** `packages/bank-sms-parser` · `backend/api/bank_sms_api.py` · Web `/bank-sms` · Mobile Settings → Bank SMS assist  
+**Code:** `packages/bank-sms-parser` · `backend/api/bank_sms_api.py` · `mobile/src/bankSms/` · Web `/bank-sms`  
 
 ---
 
@@ -338,26 +338,31 @@ Confidence score example:
 
 ---
 
-### Phase 3 — Android SMS permission & auto-detect
+### Phase 3 — Android SMS permission & auto-detect ✅
 
-- Onboarding + existing-user prompt  
-- Android SMS receive / read **or** notification listener (spike both; pick one for Play compliance)  
-- Background → pending only (no silent approve)  
-- Home badge + review sheet on open  
-- Settings toggle + OS permission deep-link  
+- Onboarding: Android step `bank-sms-permission` after user-type  
+- Existing users: one-time Home banner (SecureStore `cashtrail_bank_sms_prompted`)  
+- Capture: `expo-sms-listener` (RECEIVE_SMS / READ_SMS) → parse → `bankSmsApi.create` (**pending only**)  
+- Headless task `ExpoSmsListenerBackground` in `mobile/index.js`  
+- Home badge for pending count → `/bank-sms`  
+- Settings: Auto-detect toggle + Open settings + paste inbox  
+- Requires **EAS / dev client** rebuild (not Expo Go)  
 
-**Exit:** Real Meezan/HBL SMS appear as pending within seconds; approve posts books  
+**Exit:** Real bank SMS appear as pending; approve posts books  
 
 ---
 
-### Phase 4 — Wallet intelligence
+### Phase 4 — Wallet intelligence ✅
 
-- Alias settings + last-4 / mask mapping  
-- Bank dictionary expansion  
-- “Always use this wallet for xxx2554”  
-- Confidence + unknown type UX  
+- Alias settings + last-4 / mask mapping (`wallet_aliases` on `BankSmsImportSettings`)  
+- Expanded bank dictionary in parser (`BANK_HINTS`)  
+- “Always use this wallet” on approve (`remember_wallet` → upsert alias)  
+- Confidence + unknown type UX (`needsManualTypePick` blocks approve until confirmed)  
+- Default Cash wallet for ATM destination  
+- Suggest priority: alias mask → alias hint → name mask → name hint → sole bank  
+- Web + mobile: Wallet intelligence panel + remember toggle; ingest uses aliases  
 
-**Exit:** ≥80% correct wallet suggestion on fixture banks without manual pick  
+**Exit:** Alias / mask binding drives wallet suggestion; low-confidence drafts require type confirm  
 
 ---
 

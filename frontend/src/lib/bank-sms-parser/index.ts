@@ -1,11 +1,14 @@
-/**
- * Vendored copy of packages/bank-sms-parser for Railway frontend deploys
- * (service root is frontend/, so file:../packages is unavailable).
- * Keep in sync with packages/bank-sms-parser/src when changing the parser.
- */
 export type { BankSmsKind, BankSmsUiBucket, ParsedBankSms, WalletLike, ApproveDraft } from './types'
 export { parseBankSms, kindToUiBucket, defaultCategoryForKind, todayIsoDate } from './parse'
-export { suggestBankWallet, preferCashWallet } from './matchWallet'
+export {
+  suggestBankWallet,
+  suggestBankWalletDetailed,
+  preferCashWallet,
+  upsertWalletAlias,
+  normalizeMask,
+  needsManualTypePick,
+} from './matchWallet'
+export type { WalletAlias, WalletSuggestResult } from './matchWallet'
 export { buildApproveDraft, buildApprovePlan } from './approvePlan'
 export type { ApprovePlan, ApprovePlanStep } from './approvePlan'
 export { FIXTURE_SMS } from './fixtures'

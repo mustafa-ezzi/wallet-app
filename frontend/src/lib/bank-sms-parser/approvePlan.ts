@@ -1,5 +1,6 @@
 import { defaultCategoryForKind, todayIsoDate } from './parse'
 import { preferCashWallet, suggestBankWallet } from './matchWallet'
+import type { WalletAlias } from './matchWallet'
 import type { ApproveDraft, BankSmsKind, ParsedBankSms, WalletLike } from './types'
 
 export type ApprovePlanStep = {
@@ -19,14 +20,15 @@ export type ApprovePlan = {
   summary: string
 }
 
-/** Build editable draft defaults from a parse + wallets. */
+/** Build editable draft defaults from a parse + wallets (+ optional aliases). */
 export function buildApproveDraft(
   parsed: ParsedBankSms,
   wallets: WalletLike[],
   overrides?: Partial<ApproveDraft>,
+  opts?: { aliases?: WalletAlias[]; defaultCashId?: number | null },
 ): ApproveDraft {
-  const bank = suggestBankWallet(wallets, parsed)
-  const cash = preferCashWallet(wallets)
+  const bank = suggestBankWallet(wallets, parsed, opts?.aliases ?? [])
+  const cash = preferCashWallet(wallets, opts?.defaultCashId)
   const kind = (overrides?.kind ?? parsed.kind) as BankSmsKind
   const amount = overrides?.amount ?? parsed.amount ?? 0
   const date = overrides?.date ?? parsed.date ?? todayIsoDate()

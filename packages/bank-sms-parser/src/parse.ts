@@ -17,8 +17,8 @@ const MONTHS: Record<string, number> = {
 
 const BANK_HINTS: { re: RegExp; hint: string }[] = [
   { re: /\bmeezan\b/i, hint: 'meezan' },
-  { re: /\bhbl\b/i, hint: 'hbl' },
-  { re: /\bubl\b/i, hint: 'ubl' },
+  { re: /\bhbl\b|\bhabib\s*bank\s*limited\b/i, hint: 'hbl' },
+  { re: /\bubl\b|\bunited\s*bank\b/i, hint: 'ubl' },
   { re: /\bmcb\b/i, hint: 'mcb' },
   { re: /\ballied\b/i, hint: 'allied' },
   { re: /\bjazz\s*cash\b|\bjazzcash\b/i, hint: 'jazzcash' },
@@ -26,7 +26,18 @@ const BANK_HINTS: { re: RegExp; hint: string }[] = [
   { re: /\bnayapay\b/i, hint: 'nayapay' },
   { re: /\bsada\s*pay\b|\bsadapay\b/i, hint: 'sadapay' },
   { re: /\bbank\s*alfalah\b|\balfalah\b/i, hint: 'alfalah' },
-  { re: /\bhabib\b/i, hint: 'habib' },
+  { re: /\bhabib\s*metro\b|\bhmb\b/i, hint: 'habibmetro' },
+  { re: /\baskari\b/i, hint: 'askari' },
+  { re: /\bfaysal\b/i, hint: 'faysal' },
+  { re: /\bstandard\s*chartered\b|\bstan\s*chart\b|\bscb\b/i, hint: 'scb' },
+  { re: /\bcitibank\b|\bciti\b/i, hint: 'citi' },
+  { re: /\bbsbl\b|\bbankislami\b|\bbank\s*islami\b/i, hint: 'bankislami' },
+  { re: /\bdubai\s*islamic\b|\bdib\b/i, hint: 'dib' },
+  { re: /\bsilk\s*bank\b/i, hint: 'silk' },
+  { re: /\bsoneri\b/i, hint: 'soneri' },
+  { re: /\bsnmbl\b|\bsindh\s*bank\b/i, hint: 'sindh' },
+  { re: /\bnbp\b|\bnational\s*bank\b/i, hint: 'nbp' },
+  { re: /\bkeenu?\b|\braast\b/i, hint: '' }, // skip — not a bank wallet brand
 ]
 
 const IGNORE_RES = [
@@ -74,6 +85,7 @@ function parseCounterparty(text: string): string | null {
 
 function parseBankHint(text: string): string | null {
   for (const { re, hint } of BANK_HINTS) {
+    if (!hint) continue
     if (re.test(text)) return hint
   }
   return null

@@ -124,6 +124,8 @@ class BankSmsImportApproveSerializer(serializers.Serializer):
     record_atm_as_expense = serializers.BooleanField(required=False)
     create_cash = serializers.BooleanField(required=False, default=False)
     create_cash_name = serializers.CharField(max_length=100, required=False, allow_blank=True, default='Cash')
+    # Remember this wallet for mask/hint (Phase 4)
+    remember_wallet = serializers.BooleanField(required=False, default=False)
 
 
 class BankSmsImportSettingsSerializer(serializers.ModelSerializer):
@@ -138,6 +140,65 @@ class BankSmsImportSettingsSerializer(serializers.ModelSerializer):
             'updated_at',
         )
         read_only_fields = ('sms_permission_prompted_at', 'updated_at')
+
+
+def _normalize_mask(mask: str) -> str:
+    digits = ''.join(ch for ch in str(mask or '') if ch.isdigit())
+    if not digits:
+        return ''.join(ch for ch in str(mask or '').lower() if ch.isalnum())
+    return digits[-4:] if len(digits) > 4 else digits
+
+
+def _upsert_wallet_alias(aliases: list, *, account_id: int, hint: str = '', mask: str = '') -> list:
+    next_list = [a for a in (aliases or []) if isinstance(a, dict)]
+    hint_n = ''.join(ch for ch in hint.lower() if ch.isalnum()) if hint else ''
+    mask_n = _normalize_mask(mask) if mask else ''
+    if mask_n:
+        next_list = [
+            a for a in next_list
+            if _normalize_mask(str(a.get('mask') or '')) != mask_n
+        ]
+        next_list.append({'account_id': account_id, 'mask': mask_n})
+    if hint_n:
+        next_list = [
+            a for a in next_list
+            if not (
+                ''.join(ch for ch in str(a.get('hint') or '').lower() if ch.isalnum()) == hint_n
+                and not a.get('mask')
+            )
+        ]
+        if not any(
+            ''.join(ch for ch in str(a.get('hint') or '').lower() if ch.isalnum()) == hint_n
+            and int(a.get('account_id') or 0) == account_id
+            for a in next_list
+        ):
+            next_list.append({'account_id': account_id, 'hint': hint_n})
+    return next_list
+
+
+def _sanitize_aliases(raw) -> list:
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        try:
+            aid = int(row.get('account_id'))
+        except (TypeError, ValueError):
+            continue
+        if aid <= 0:
+            continue
+        entry = {'account_id': aid}
+        hint = str(row.get('hint') or '').strip()
+        mask = str(row.get('mask') or '').strip()
+        if hint:
+            entry['hint'] = ''.join(ch for ch in hint.lower() if ch.isalnum())
+        if mask:
+            entry['mask'] = _normalize_mask(mask)
+        if 'hint' in entry or 'mask' in entry:
+            out.append(entry)
+    return out
 
 
 def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankSmsImport:
@@ -267,6 +328,17 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
     item.status = BankSmsImport.STATUS_APPROVED
     item.responded_at = timezone.now()
     item.save()
+
+    if overrides.get('remember_wallet') and bank and bank.type == 'bank':
+        settings_obj, _ = BankSmsImportSettings.objects.get_or_create(user=user)
+        settings_obj.wallet_aliases = _upsert_wallet_alias(
+            list(settings_obj.wallet_aliases or []),
+            account_id=bank.id,
+            hint=item.bank_hint or '',
+            mask=item.account_mask or '',
+        )
+        settings_obj.save(update_fields=['wallet_aliases', 'updated_at'])
+
     return item
 
 
@@ -439,7 +511,15 @@ class BankSmsImportSettingsView(APIView):
         if 'auto_create_cash_on_atm' in request.data:
             obj.auto_create_cash_on_atm = bool(request.data.get('auto_create_cash_on_atm'))
         if 'wallet_aliases' in request.data and isinstance(request.data.get('wallet_aliases'), list):
-            obj.wallet_aliases = request.data.get('wallet_aliases')
+            obj.wallet_aliases = _sanitize_aliases(request.data.get('wallet_aliases'))
+            # Drop aliases pointing at wallets the user no longer owns
+            owned = set(
+                Account.objects.filter(user=request.user, type__in=['bank', 'cash'])
+                .values_list('id', flat=True)
+            )
+            obj.wallet_aliases = [
+                a for a in obj.wallet_aliases if int(a.get('account_id') or 0) in owned
+            ]
         if 'default_cash_wallet_id' in request.data:
             wid = request.data.get('default_cash_wallet_id')
             obj.default_cash_wallet = _user_wallet(request.user, wid) if wid else None

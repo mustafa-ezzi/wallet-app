@@ -7,6 +7,7 @@ export default function OnboardingLayout() {
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="about-you" />
       <Stack.Screen name="user-type" />
+      <Stack.Screen name="bank-sms-permission" />
     </Stack>
   )
 }

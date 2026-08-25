@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildApproveDraft, buildApprovePlan } from './approvePlan'
 import { FIXTURE_SMS } from './fixtures'
-import { preferCashWallet, suggestBankWallet } from './matchWallet'
+import { needsManualTypePick, preferCashWallet, suggestBankWallet } from './matchWallet'
 import { parseBankSms } from './parse'
 
 describe('parseBankSms — product samples', () => {
@@ -74,8 +74,34 @@ describe('wallet suggest + approve plan', () => {
     expect(suggestBankWallet(wallets, p)?.id).toBe(1)
   })
 
+  it('prefers alias mask over name fuzzy', () => {
+    const p = parseBankSms(FIXTURE_SMS.find((x) => x.id === 'hint-account-mask')!.text)
+    const aliases = [{ account_id: 3, mask: '2554' }]
+    expect(suggestBankWallet(wallets, p, aliases)?.id).toBe(3)
+  })
+
+  it('prefers alias hint', () => {
+    const p = parseBankSms(FIXTURE_SMS.find((x) => x.id === 'hint-meezan-debit')!.text)
+    const aliases = [{ account_id: 3, hint: 'meezan' }]
+    expect(suggestBankWallet(wallets, p, aliases)?.id).toBe(3)
+  })
+
   it('prefers named Cash wallet', () => {
     expect(preferCashWallet(wallets)?.id).toBe(2)
+  })
+
+  it('prefers default Cash wallet id when set', () => {
+    const multiCash = [
+      ...wallets,
+      { id: 9, name: 'Petty Cash', type: 'cash' },
+    ]
+    expect(preferCashWallet(multiCash, 9)?.id).toBe(9)
+  })
+
+  it('needsManualTypePick for unknown / low confidence', () => {
+    expect(needsManualTypePick({ kind: 'unknown', confidence: 0.9 })).toBe(true)
+    expect(needsManualTypePick({ kind: 'expense', confidence: 0.4 })).toBe(true)
+    expect(needsManualTypePick({ kind: 'expense', confidence: 0.8 })).toBe(false)
   })
 
   it('ATM plan creates bank→cash transfer steps', () => {

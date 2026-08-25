@@ -1,6 +1,14 @@
 export type { BankSmsKind, BankSmsUiBucket, ParsedBankSms, WalletLike, ApproveDraft } from './types'
 export { parseBankSms, kindToUiBucket, defaultCategoryForKind, todayIsoDate } from './parse'
-export { suggestBankWallet, preferCashWallet } from './matchWallet'
+export {
+  suggestBankWallet,
+  suggestBankWalletDetailed,
+  preferCashWallet,
+  upsertWalletAlias,
+  normalizeMask,
+  needsManualTypePick,
+} from './matchWallet'
+export type { WalletAlias, WalletSuggestResult } from './matchWallet'
 export { buildApproveDraft, buildApprovePlan } from './approvePlan'
 export type { ApprovePlan, ApprovePlanStep } from './approvePlan'
 export { FIXTURE_SMS } from './fixtures'

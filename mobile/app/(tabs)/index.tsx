@@ -30,6 +30,8 @@ import { toMoney } from '@/src/utils/format'
 import { AdBanner } from '@/src/ads/AdBanner'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { formatForeignSubtitle } from '@/src/travel/currencies'
+import { useBankSms } from '@/src/bankSms'
+import { BANK_SMS_UX } from '@cashtrail/bank-sms-parser'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -60,6 +62,13 @@ export default function HomeScreen() {
   const { user } = useAuth()
   const { premium } = useRemoteConfig()
   const { isActive: travelOn, currency: travelCurrency } = useTravelMode()
+  const {
+    showPromptBanner,
+    pendingCount,
+    requestPermissionAndEnable,
+    markPromptSeen,
+    refreshPending,
+  } = useBankSms()
   const router = useRouter()
   const { refreshKey, bumpRefresh } = useMoneyUi()
   const { online, syncNow, hydrateNow, getCachedAccounts, getCachedTransactions } = useOffline()
@@ -147,7 +156,8 @@ export default function HomeScreen() {
 
   useEffect(() => {
     void load()
-  }, [load, refreshKey])
+    void refreshPending()
+  }, [load, refreshKey, refreshPending])
 
   const txs: Transaction[] = data?.recent_transactions ?? asList(data?.recent_transactions)
   const balanceNeg = toMoney(data?.total_balance) < 0
@@ -236,6 +246,48 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         </View>
+
+        {showPromptBanner ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: spacing.md }]}>
+            <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>{BANK_SMS_UX.permissionTitle}</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: 6 }}>
+              {BANK_SMS_UX.permissionBody}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+              <Pressable
+                onPress={() => void requestPermissionAndEnable()}
+                style={{ backgroundColor: colors.primary, paddingVertical: 10, paddingHorizontal: 14, borderRadius: radii.md }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '800' }}>{BANK_SMS_UX.permissionAllow}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void markPromptSeen()}
+                style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+              >
+                <Text style={{ color: colors.textMuted, fontWeight: '700' }}>{BANK_SMS_UX.permissionNotNow}</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {pendingCount > 0 ? (
+          <Pressable
+            onPress={() => router.push('/bank-sms')}
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: spacing.md }]}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>
+                  {pendingCount} bank alert{pendingCount === 1 ? '' : 's'} to review
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
+                  Detected SMS drafts — Approve or Reject before books change
+                </Text>
+              </View>
+              <Text style={{ color: colors.primary, fontWeight: '800' }}>Review →</Text>
+            </View>
+          </Pressable>
+        ) : null}
 
         {loading && !data ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />

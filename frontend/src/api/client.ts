@@ -346,7 +346,16 @@ export const bankSmsApi = {
   approve: (id: number, data?: object) =>
     api.post<BankSmsImportRow>(`/bank-sms-imports/${id}/approve/`, data ?? {}),
   reject: (id: number) => api.post<BankSmsImportRow>(`/bank-sms-imports/${id}/reject/`),
-  settings: () => api.get('/bank-sms-import-settings/'),
-  updateSettings: (data: object) => api.patch('/bank-sms-import-settings/', data),
+  settings: () => api.get<BankSmsImportSettings>('/bank-sms-import-settings/'),
+  updateSettings: (data: object) => api.patch<BankSmsImportSettings>('/bank-sms-import-settings/', data),
+}
+
+export type BankSmsImportSettings = {
+  sms_import_enabled: boolean
+  sms_permission_prompted_at: string | null
+  default_cash_wallet_id: number | null
+  wallet_aliases: { account_id: number; hint?: string; mask?: string }[]
+  auto_create_cash_on_atm: boolean
+  updated_at: string | null
 }
 

@@ -4,10 +4,12 @@ import { MessageSquareText, X } from 'lucide-react'
 import {
   BANK_SMS_UX,
   buildApproveDraft,
+  needsManualTypePick,
   parseBankSms,
   type ApproveDraft,
   type BankSmsKind,
   type ParsedBankSms,
+  type WalletAlias,
   type WalletLike,
 } from '../lib/bank-sms-parser'
 import {
@@ -55,6 +57,13 @@ export default function BankSmsImportPage() {
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [pending, setPending] = useState<BankSmsImportRow[]>([])
   const [wallets, setWallets] = useState<WalletLike[]>([])
+  const [aliases, setAliases] = useState<WalletAlias[]>([])
+  const [defaultCashId, setDefaultCashId] = useState<number | null>(null)
+  const [rememberWallet, setRememberWallet] = useState(true)
+  const [typeConfirmed, setTypeConfirmed] = useState(false)
+  const [aliasMask, setAliasMask] = useState('')
+  const [aliasHint, setAliasHint] = useState('')
+  const [aliasWalletId, setAliasWalletId] = useState('')
   const [error, setError] = useState('')
   const [okMsg, setOkMsg] = useState('')
   const [busy, setBusy] = useState(false)
@@ -74,6 +83,16 @@ export default function BankSmsImportPage() {
     }
   }, [getCachedAccounts])
 
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await bankSmsApi.settings()
+      setAliases((res.data.wallet_aliases || []) as WalletAlias[])
+      setDefaultCashId(res.data.default_cash_wallet_id ?? null)
+    } catch {
+      /* offline */
+    }
+  }, [])
+
   const loadPending = useCallback(async () => {
     try {
       const res = await bankSmsApi.list({ status: 'pending' })
@@ -86,14 +105,17 @@ export default function BankSmsImportPage() {
   useEffect(() => {
     void loadWallets()
     void loadPending()
-  }, [loadWallets, loadPending])
+    void loadSettings()
+  }, [loadWallets, loadPending, loadSettings])
 
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
   const cashWallets = useMemo(() => wallets.filter((w) => w.type === 'cash'), [wallets])
+  const mustPickType = parsed ? needsManualTypePick(parsed) && !typeConfirmed : false
 
   const onDetect = async () => {
     setError('')
     setOkMsg('')
+    setTypeConfirmed(false)
     const p = parseBankSms(paste)
     setParsed(p)
     if (p.ignore) {
@@ -108,8 +130,11 @@ export default function BankSmsImportPage() {
       setError('Could not read an amount. Check the message and try again.')
       return
     }
-    const localDraft = buildApproveDraft(p, wallets)
+    const localDraft = buildApproveDraft(p, wallets, undefined, { aliases, defaultCashId })
     setDraft(localDraft)
+    if (p.accountMask) setAliasMask(p.accountMask.replace(/\D/g, '').slice(-4) || p.accountMask)
+    if (p.bankHint) setAliasHint(p.bankHint)
+    if (localDraft.bankAccountId) setAliasWalletId(String(localDraft.bankAccountId))
     setBusy(true)
     try {
       const res = await bankSmsApi.create({
@@ -137,6 +162,9 @@ export default function BankSmsImportPage() {
       setDraft(draftFromRow(res.data))
       await loadPending()
       setOkMsg(`Saved to pending queue (#${res.data.id}). Approve here or on another device.`)
+      if (needsManualTypePick(p)) {
+        setOkMsg((m) => `${m} Low confidence — confirm the type before approving.`)
+      }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not sync pending draft. Check your connection.'))
       setPendingId(null)
@@ -148,6 +176,7 @@ export default function BankSmsImportPage() {
   const openPending = (row: BankSmsImportRow) => {
     setError('')
     setOkMsg('')
+    setTypeConfirmed(false)
     setPendingId(row.id)
     setDraft(draftFromRow(row))
     setParsed({
@@ -166,6 +195,10 @@ export default function BankSmsImportPage() {
       raw: row.raw_snippet || '',
       ignore: false,
     })
+    if (row.account_mask) setAliasMask(String(row.account_mask).replace(/\D/g, '').slice(-4))
+    if (row.bank_hint) setAliasHint(row.bank_hint)
+    const acct = row.resolved_account ?? row.suggested_account
+    if (acct) setAliasWalletId(String(acct))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -189,6 +222,10 @@ export default function BankSmsImportPage() {
       setError('Pick a bank wallet.')
       return
     }
+    if (mustPickType) {
+      setError('Confirm the transaction type — detection confidence is low.')
+      return
+    }
     setBusy(true)
     setError('')
     setOkMsg('')
@@ -204,22 +241,92 @@ export default function BankSmsImportPage() {
         record_atm_as_expense: draft.recordAtmAsExpense,
         create_cash: draft.kind === 'atm' && !draft.recordAtmAsExpense && !draft.cashAccountId,
         create_cash_name: draft.createCashNamed || 'Cash',
+        remember_wallet: rememberWallet,
       })
       await hydrateNow()
       await loadWallets()
       await loadPending()
+      await loadSettings()
       setOkMsg(
         `Approved #${res.data.id}`
         + (res.data.created_transaction_ids?.length
           ? ` · txs ${res.data.created_transaction_ids.join(', ')}`
-          : ''),
+          : '')
+        + (rememberWallet ? ' · wallet remembered for next SMS' : ''),
       )
       setPaste('')
       setParsed(null)
       setDraft(null)
       setPendingId(null)
+      setTypeConfirmed(false)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not approve this draft.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveAlias = async () => {
+    if (!aliasWalletId) {
+      setError('Pick a wallet for the alias.')
+      return
+    }
+    if (!aliasMask.trim() && !aliasHint.trim()) {
+      setError('Enter a last-4 / mask or a bank hint.')
+      return
+    }
+    const next: WalletAlias[] = [
+      ...aliases.filter((a) => {
+        if (aliasMask && a.mask === aliasMask.replace(/\D/g, '').slice(-4)) return false
+        if (aliasHint && a.hint === aliasHint.toLowerCase().replace(/[^a-z0-9]/g, '') && !a.mask) return false
+        return true
+      }),
+    ]
+    if (aliasMask.trim()) {
+      next.push({ account_id: Number(aliasWalletId), mask: aliasMask.replace(/\D/g, '').slice(-4) })
+    }
+    if (aliasHint.trim()) {
+      next.push({
+        account_id: Number(aliasWalletId),
+        hint: aliasHint.toLowerCase().replace(/[^a-z0-9]/g, ''),
+      })
+    }
+    setBusy(true)
+    try {
+      const res = await bankSmsApi.updateSettings({ wallet_aliases: next })
+      setAliases((res.data.wallet_aliases || []) as WalletAlias[])
+      setOkMsg('Wallet alias saved.')
+      setAliasMask('')
+      setAliasHint('')
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not save alias.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeAlias = async (idx: number) => {
+    const next = aliases.filter((_, i) => i !== idx)
+    setBusy(true)
+    try {
+      const res = await bankSmsApi.updateSettings({ wallet_aliases: next })
+      setAliases((res.data.wallet_aliases || []) as WalletAlias[])
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not remove alias.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveDefaultCash = async (id: string) => {
+    const cashId = id ? Number(id) : null
+    setBusy(true)
+    try {
+      const res = await bankSmsApi.updateSettings({ default_cash_wallet_id: cashId })
+      setDefaultCashId(res.data.default_cash_wallet_id ?? null)
+      setOkMsg('Default Cash wallet updated.')
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update default Cash.'))
     } finally {
       setBusy(false)
     }
@@ -319,6 +426,19 @@ export default function BankSmsImportPage() {
           <p className="text-muted" style={{ fontSize: '0.78rem' }}>
             Detected as <strong>{parsed.kind}</strong> · confidence {Math.round(parsed.confidence * 100)}% · {parsed.reason}
           </p>
+          {mustPickType ? (
+            <div className="auth-error" style={{ marginBottom: '0.75rem' }}>
+              Type is unclear (unknown or low confidence). Pick the correct type below, then continue.
+              <button
+                type="button"
+                className="btn-glass"
+                style={{ marginLeft: 8, fontSize: '0.75rem' }}
+                onClick={() => setTypeConfirmed(true)}
+              >
+                I’ve confirmed the type
+              </button>
+            </div>
+          ) : null}
 
           <div className="form-group" style={{ marginTop: '0.85rem' }}>
             <label>Type</label>
@@ -425,8 +545,17 @@ export default function BankSmsImportPage() {
             <input value={draft.notes} onChange={(e) => patchDraft({ notes: e.target.value })} />
           </div>
 
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.85rem' }}>
+            <input
+              type="checkbox"
+              checked={rememberWallet}
+              onChange={(e) => setRememberWallet(e.target.checked)}
+            />
+            Always use this bank wallet for matching mask / bank hint next time
+          </label>
+
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: '0.5rem' }}>
-            <button type="button" className="btn-primary" disabled={busy || !pendingId} onClick={() => void onApprove()}>
+            <button type="button" className="btn-primary" disabled={busy || !pendingId || mustPickType} onClick={() => void onApprove()}>
               {busy ? <span className="spinner" /> : BANK_SMS_UX.approve}
             </button>
             <button type="button" className="btn-glass" disabled={busy} onClick={() => void onReject()}>
@@ -435,6 +564,72 @@ export default function BankSmsImportPage() {
           </div>
         </div>
       ) : null}
+
+      <div className="glass" style={{ padding: '1.1rem 1.15rem', marginTop: '1rem', borderRadius: 'var(--radius-md)' }}>
+        <h3 style={{ marginTop: 0, fontSize: '0.95rem' }}>Wallet intelligence</h3>
+        <p className="text-muted" style={{ fontSize: '0.78rem' }}>
+          Map account last-4 / bank name → wallet so future SMS auto-selects the right account.
+        </p>
+
+        <div className="form-group">
+          <label>Default Cash wallet (ATM destination)</label>
+          <select
+            value={defaultCashId ?? ''}
+            onChange={(e) => void saveDefaultCash(e.target.value)}
+          >
+            <option value="">First Cash wallet</option>
+            {cashWallets.map((w) => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid-2">
+          <div className="form-group">
+            <label>Last-4 / mask</label>
+            <input value={aliasMask} onChange={(e) => setAliasMask(e.target.value)} placeholder="2554" />
+          </div>
+          <div className="form-group">
+            <label>Bank hint</label>
+            <input value={aliasHint} onChange={(e) => setAliasHint(e.target.value)} placeholder="meezan" />
+          </div>
+        </div>
+        <div className="form-group">
+          <label>Wallet</label>
+          <select value={aliasWalletId} onChange={(e) => setAliasWalletId(e.target.value)}>
+            <option value="">Select…</option>
+            {banks.map((w) => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+          </select>
+        </div>
+        <button type="button" className="btn-primary" disabled={busy} onClick={() => void saveAlias()}>
+          Save mapping
+        </button>
+
+        {aliases.length > 0 ? (
+          <div className="list" style={{ marginTop: '0.85rem' }}>
+            {aliases.map((a, i) => {
+              const w = wallets.find((x) => x.id === a.account_id)
+              return (
+                <div key={`${a.account_id}-${a.mask}-${a.hint}-${i}`} className="list-item">
+                  <div>
+                    <strong>{w?.name || `Wallet #${a.account_id}`}</strong>
+                    <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+                      {a.mask ? `mask …${a.mask}` : ''}{a.mask && a.hint ? ' · ' : ''}{a.hint ? `hint ${a.hint}` : ''}
+                    </div>
+                  </div>
+                  <button type="button" className="btn-glass" style={{ fontSize: '0.75rem' }} onClick={() => void removeAlias(i)}>
+                    Remove
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-muted" style={{ fontSize: '0.78rem', marginTop: '0.75rem' }}>No aliases yet.</p>
+        )}
+      </div>
     </div>
   )
 }

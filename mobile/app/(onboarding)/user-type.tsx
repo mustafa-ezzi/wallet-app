@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
+import { Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { authApi, apiErrorMessage, wakeServer } from '@/src/api/client'
@@ -128,7 +129,11 @@ export default function UserTypeScreen() {
         /* profile saved — continue even if refresh flakes */
       }
       clearOnboardingDraft()
-      router.replace('/(tabs)')
+      if (Platform.OS === 'android') {
+        router.replace('/(onboarding)/bank-sms-permission')
+      } else {
+        router.replace('/(tabs)')
+      }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not finish setup. Wait a few seconds and try again.'))
     } finally {

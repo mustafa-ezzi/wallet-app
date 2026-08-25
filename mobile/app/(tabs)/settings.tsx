@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
 import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
+import { useBankSms } from '@/src/bankSms'
 import { registerDeviceTokenDetailed } from '@/src/notifications/pushRegistration'
 import { requestReminderPermission } from '@/src/notifications/schedule'
 import api, { apiErrorMessage, API_ROOT, probeApiConnection } from '@/src/api/client'
@@ -38,6 +40,7 @@ export default function SettingsScreen() {
   const { themeId, themes, setThemeAnimated, colors } = useTheme()
   const { premium, config, refresh: refreshConfig, shouldShowAds } = useRemoteConfig()
   const { isActive: travelOn, currency: travelCurrency, rateLine } = useTravelMode()
+  const bankSms = useBankSms()
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email
 
   const [pin, setPin] = useState('')
@@ -137,20 +140,49 @@ export default function SettingsScreen() {
         </Pressable>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Bank SMS</Text>
-        <Pressable
-          onPress={() => router.push('/bank-sms')}
-          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.rowBetween}>
             <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>Bank SMS assist</Text>
+              <Text style={[styles.rowTitle, { color: colors.text }]}>Auto-detect bank SMS</Text>
               <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                Paste a bank alert to draft expense, ATM cash-out, or money received
+                {Platform.OS === 'android'
+                  ? (bankSms.enabled
+                    ? (bankSms.permissionGranted
+                      ? 'Listening for bank alerts — nothing posts until you Approve'
+                      : 'On, but SMS permission is off — tap Open settings')
+                    : 'Off — turn on to draft expenses / ATM / received from SMS')
+                  : 'Auto-detect is Android-only. Paste alerts anytime below.'}
               </Text>
             </View>
-            <Text style={{ color: colors.primary, fontWeight: '800' }}>Paste →</Text>
+            {Platform.OS === 'android' ? (
+              <Switch
+                value={bankSms.enabled && bankSms.permissionGranted}
+                onValueChange={(v) => void bankSms.setEnabled(v)}
+              />
+            ) : null}
           </View>
-        </Pressable>
+          {Platform.OS === 'android' && bankSms.enabled && !bankSms.permissionGranted ? (
+            <Pressable onPress={() => void bankSms.openSettings()} style={{ marginTop: 10 }}>
+              <Text style={{ color: colors.primary, fontWeight: '800' }}>Open settings →</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={() => router.push('/bank-sms')}
+            style={{ marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
+          >
+            <View style={styles.rowBetween}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Paste & review inbox</Text>
+                <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                  {bankSms.pendingCount > 0
+                    ? `${bankSms.pendingCount} pending — approve or reject`
+                    : 'Paste a bank alert or review synced drafts'}
+                </Text>
+              </View>
+              <Text style={{ color: colors.primary, fontWeight: '800' }}>Open →</Text>
+            </View>
+          </Pressable>
+        </View>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Theme</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>

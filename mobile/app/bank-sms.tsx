@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,10 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   BANK_SMS_UX,
   buildApproveDraft,
+  needsManualTypePick,
   parseBankSms,
   type ApproveDraft,
   type BankSmsKind,
   type ParsedBankSms,
+  type WalletAlias,
   type WalletLike,
 } from '@cashtrail/bank-sms-parser'
 import { DateField, SelectField } from '@/src/components/SelectFields'
@@ -31,6 +34,7 @@ import {
 } from '@/src/api/client'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/src/constants/categories'
 import { useOffline } from '@/src/offline'
+import { useBankSms } from '@/src/bankSms'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { fmt } from '@/src/utils/format'
@@ -71,6 +75,7 @@ export default function BankSmsScreen() {
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const { syncNow, getCachedAccounts } = useOffline()
+  const bankSms = useBankSms()
 
   const [paste, setPaste] = useState('')
   const [parsed, setParsed] = useState<ParsedBankSms | null>(null)
@@ -78,6 +83,13 @@ export default function BankSmsScreen() {
   const [pendingId, setPendingId] = useState<number | null>(null)
   const [pending, setPending] = useState<BankSmsImportRow[]>([])
   const [wallets, setWallets] = useState<WalletLike[]>([])
+  const [aliases, setAliases] = useState<WalletAlias[]>([])
+  const [defaultCashId, setDefaultCashId] = useState<number | null>(null)
+  const [rememberWallet, setRememberWallet] = useState(true)
+  const [typeConfirmed, setTypeConfirmed] = useState(false)
+  const [aliasMask, setAliasMask] = useState('')
+  const [aliasHint, setAliasHint] = useState('')
+  const [aliasWalletId, setAliasWalletId] = useState('')
   const [error, setError] = useState('')
   const [okMsg, setOkMsg] = useState('')
   const [busy, setBusy] = useState(false)
@@ -97,6 +109,16 @@ export default function BankSmsScreen() {
     }
   }, [getCachedAccounts])
 
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await bankSmsApi.settings()
+      setAliases((res.data.wallet_aliases || []) as WalletAlias[])
+      setDefaultCashId(res.data.default_cash_wallet_id ?? null)
+    } catch {
+      /* offline */
+    }
+  }, [])
+
   const loadPending = useCallback(async () => {
     try {
       const res = await bankSmsApi.list({ status: 'pending' })
@@ -109,14 +131,17 @@ export default function BankSmsScreen() {
   useEffect(() => {
     void loadWallets()
     void loadPending()
-  }, [loadWallets, loadPending])
+    void loadSettings()
+  }, [loadWallets, loadPending, loadSettings])
 
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
   const cashWallets = useMemo(() => wallets.filter((w) => w.type === 'cash'), [wallets])
+  const mustPickType = parsed ? needsManualTypePick(parsed) && !typeConfirmed : false
 
   const onDetect = async () => {
     setError('')
     setOkMsg('')
+    setTypeConfirmed(false)
     const p = parseBankSms(paste)
     setParsed(p)
     if (p.ignore) {
@@ -131,8 +156,11 @@ export default function BankSmsScreen() {
       setError('Could not read an amount. Check the message and try again.')
       return
     }
-    const localDraft = buildApproveDraft(p, wallets)
+    const localDraft = buildApproveDraft(p, wallets, undefined, { aliases, defaultCashId })
     setDraft(localDraft)
+    if (p.accountMask) setAliasMask(p.accountMask.replace(/\D/g, '').slice(-4) || p.accountMask)
+    if (p.bankHint) setAliasHint(p.bankHint)
+    if (localDraft.bankAccountId) setAliasWalletId(String(localDraft.bankAccountId))
     setBusy(true)
     try {
       const res = await bankSmsApi.create({
@@ -159,7 +187,9 @@ export default function BankSmsScreen() {
       setPendingId(res.data.id)
       setDraft(draftFromRow(res.data))
       await loadPending()
-      setOkMsg(`Saved to pending (#${res.data.id}). Approve here or on web.`)
+      let msg = `Saved to pending (#${res.data.id}). Approve here or on web.`
+      if (needsManualTypePick(p)) msg += ' Low confidence — confirm the type before approving.'
+      setOkMsg(msg)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not sync pending draft.'))
       setPendingId(null)
@@ -171,6 +201,7 @@ export default function BankSmsScreen() {
   const openPending = (row: BankSmsImportRow) => {
     setError('')
     setOkMsg('')
+    setTypeConfirmed(false)
     setPendingId(row.id)
     setDraft(draftFromRow(row))
     setParsed({
@@ -189,6 +220,10 @@ export default function BankSmsScreen() {
       raw: row.raw_snippet || '',
       ignore: false,
     })
+    if (row.account_mask) setAliasMask(String(row.account_mask).replace(/\D/g, '').slice(-4))
+    if (row.bank_hint) setAliasHint(row.bank_hint)
+    const acct = row.resolved_account ?? row.suggested_account
+    if (acct) setAliasWalletId(String(acct))
   }
 
   const patchDraft = (patch: Partial<ApproveDraft>) => {
@@ -211,6 +246,10 @@ export default function BankSmsScreen() {
       setError('Pick a bank wallet.')
       return
     }
+    if (mustPickType) {
+      setError('Confirm the transaction type — detection confidence is low.')
+      return
+    }
     setBusy(true)
     setError('')
     setOkMsg('')
@@ -226,15 +265,21 @@ export default function BankSmsScreen() {
         record_atm_as_expense: draft.recordAtmAsExpense,
         create_cash: draft.kind === 'atm' && !draft.recordAtmAsExpense && !draft.cashAccountId,
         create_cash_name: draft.createCashNamed || 'Cash',
+        remember_wallet: rememberWallet,
       })
       await syncNow()
       await loadWallets()
       await loadPending()
-      setOkMsg(`Approved #${res.data.id}`)
+      await loadSettings()
+      setOkMsg(
+        `Approved #${res.data.id}`
+        + (rememberWallet ? ' · wallet remembered for next SMS' : ''),
+      )
       setPaste('')
       setParsed(null)
       setDraft(null)
       setPendingId(null)
+      setTypeConfirmed(false)
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not approve this draft.'))
     } finally {
@@ -257,8 +302,71 @@ export default function BankSmsScreen() {
       setParsed(null)
       setPendingId(null)
       setPaste('')
+      setTypeConfirmed(false)
     } catch (err) {
       setError(apiErrorMessage(err, 'Reject failed.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveAlias = async () => {
+    if (!aliasWalletId) {
+      setError('Pick a wallet for the alias.')
+      return
+    }
+    if (!aliasMask.trim() && !aliasHint.trim()) {
+      setError('Enter a last-4 / mask or a bank hint.')
+      return
+    }
+    const maskDigits = aliasMask.replace(/\D/g, '').slice(-4)
+    const hintNorm = aliasHint.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const next: WalletAlias[] = [
+      ...aliases.filter((a) => {
+        if (maskDigits && a.mask === maskDigits) return false
+        if (hintNorm && a.hint === hintNorm && !a.mask) return false
+        return true
+      }),
+    ]
+    if (maskDigits) next.push({ account_id: Number(aliasWalletId), mask: maskDigits })
+    if (hintNorm) next.push({ account_id: Number(aliasWalletId), hint: hintNorm })
+    setBusy(true)
+    try {
+      const res = await bankSmsApi.updateSettings({ wallet_aliases: next })
+      setAliases((res.data.wallet_aliases || []) as WalletAlias[])
+      setOkMsg('Wallet alias saved.')
+      setAliasMask('')
+      setAliasHint('')
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not save alias.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const removeAlias = async (idx: number) => {
+    const next = aliases.filter((_, i) => i !== idx)
+    setBusy(true)
+    try {
+      const res = await bankSmsApi.updateSettings({ wallet_aliases: next })
+      setAliases((res.data.wallet_aliases || []) as WalletAlias[])
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not remove alias.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveDefaultCash = async (id: string) => {
+    setBusy(true)
+    try {
+      const res = await bankSmsApi.updateSettings({
+        default_cash_wallet_id: id ? Number(id) : null,
+      })
+      setDefaultCashId(res.data.default_cash_wallet_id ?? null)
+      setOkMsg('Default Cash wallet updated.')
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update default Cash.'))
     } finally {
       setBusy(false)
     }
@@ -279,6 +387,24 @@ export default function BankSmsScreen() {
         <Text style={[styles.privacy, { color: colors.textSecondary }]}>
           {BANK_SMS_UX.privacyBlurb} Drafts sync to your pending inbox across devices.
         </Text>
+        {Platform.OS === 'android' ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: '800' }}>Auto-detect SMS</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                  {bankSms.enabled && bankSms.permissionGranted
+                    ? 'Listening — Approve pending items below'
+                    : 'Off or missing permission'}
+                </Text>
+              </View>
+              <Switch
+                value={bankSms.enabled && bankSms.permissionGranted}
+                onValueChange={(v) => void bankSms.setEnabled(v)}
+              />
+            </View>
+          </View>
+        ) : null}
 
         {error ? <ErrorBanner message={error} /> : null}
         {okMsg ? (
@@ -332,6 +458,17 @@ export default function BankSmsScreen() {
             <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 12 }}>
               Detected as {parsed.kind} · {Math.round(parsed.confidence * 100)}% · {parsed.reason}
             </Text>
+
+            {mustPickType ? (
+              <View style={[styles.warn, { borderColor: colors.border, marginBottom: 12 }]}>
+                <Text style={{ color: colors.text, fontWeight: '800' }}>
+                  Type unclear — confirm before approving
+                </Text>
+                <Pressable onPress={() => setTypeConfirmed(true)} style={{ marginTop: 8 }}>
+                  <Text style={{ color: colors.primary, fontWeight: '800' }}>I’ve confirmed the type</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <SelectField
               label="Type"
@@ -414,11 +551,18 @@ export default function BankSmsScreen() {
               style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
             />
 
+            <View style={styles.switchRow}>
+              <Text style={{ flex: 1, color: colors.text, fontWeight: '600' }}>
+                Always use this wallet for matching mask / bank hint
+              </Text>
+              <Switch value={rememberWallet} onValueChange={setRememberWallet} />
+            </View>
+
             {busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 12 }} /> : null}
             <PrimaryButton
               title={BANK_SMS_UX.approve}
               onPress={() => void onApprove()}
-              disabled={busy || !pendingId}
+              disabled={busy || !pendingId || mustPickType}
               loading={busy}
             />
             <Pressable onPress={() => void onReject()} style={{ marginTop: 12, alignItems: 'center' }}>
@@ -426,6 +570,70 @@ export default function BankSmsScreen() {
             </Pressable>
           </View>
         ) : null}
+
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Wallet intelligence</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 10 }}>
+            Map last-4 / bank name → wallet so future SMS auto-selects the right account.
+          </Text>
+
+          <SelectField
+            label="Default Cash wallet (ATM)"
+            value={defaultCashId != null ? String(defaultCashId) : ''}
+            options={[
+              { value: '', label: 'First Cash wallet' },
+              ...cashWallets.map((w) => ({ value: String(w.id), label: w.name })),
+            ]}
+            onChange={(v) => void saveDefaultCash(v)}
+          />
+
+          <Text style={[styles.label, { color: colors.textMuted }]}>Last-4 / mask</Text>
+          <TextInput
+            value={aliasMask}
+            onChangeText={setAliasMask}
+            placeholder="2554"
+            placeholderTextColor={colors.textMuted}
+            style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+          <Text style={[styles.label, { color: colors.textMuted }]}>Bank hint</Text>
+          <TextInput
+            value={aliasHint}
+            onChangeText={setAliasHint}
+            placeholder="meezan"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="none"
+            style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+          <SelectField
+            label="Wallet"
+            value={aliasWalletId}
+            options={banks.map((w) => ({ value: String(w.id), label: w.name }))}
+            onChange={setAliasWalletId}
+            placeholder="Select…"
+          />
+          <PrimaryButton title="Save mapping" onPress={() => void saveAlias()} disabled={busy} />
+
+          {aliases.length > 0 ? (
+            aliases.map((a, i) => {
+              const w = wallets.find((x) => x.id === a.account_id)
+              return (
+                <View key={`${a.account_id}-${a.mask}-${a.hint}-${i}`} style={[styles.pendingRow, { borderColor: colors.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.text, fontWeight: '800' }}>{w?.name || `Wallet #${a.account_id}`}</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                      {a.mask ? `mask …${a.mask}` : ''}{a.mask && a.hint ? ' · ' : ''}{a.hint ? `hint ${a.hint}` : ''}
+                    </Text>
+                  </View>
+                  <Pressable onPress={() => void removeAlias(i)}>
+                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>Remove</Text>
+                  </Pressable>
+                </View>
+              )
+            })
+          ) : (
+            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 8 }}>No aliases yet.</Text>
+          )}
+        </View>
       </ScrollView>
     </View>
   )

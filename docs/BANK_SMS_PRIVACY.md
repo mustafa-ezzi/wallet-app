@@ -19,11 +19,12 @@ CashTrail’s **Bank SMS assist** helps turn bank transaction alerts into draft 
 - Structured draft fields (+ short snippet) sync to your CashTrail account so you can **review pending imports on web and mobile**.
 - Approve/reject happens via the API; books only change after Approve.
 
-## Later (Android auto-detect — Phase 3)
+## Phase 3 (Android auto-detect)
 
-- Optional permission to read **financial** SMS / bank notifications, only after you opt in (onboarding for new users; one-time prompt for existing users).
-- Detected alerts become **pending drafts** only.
-- iOS and web will continue to use paste / share / review — they cannot read the SMS inbox.
+- Optional **READ_SMS / RECEIVE_SMS** on Android after you opt in (onboarding or Home prompt).
+- Detected alerts become **pending drafts** only — Approve still required.
+- iOS and web continue to use paste / review.
+- Play Store: declare financial SMS use case before shipping SMS permissions publicly.
 
 ## What we do not do
 

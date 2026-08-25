@@ -8,6 +8,7 @@ import { AuthProvider } from '@/src/context/AuthContext'
 import { MoneyUiProvider } from '@/src/context/MoneyUiContext'
 import { OfflineProvider } from '@/src/offline'
 import { RemindersProvider } from '@/src/notifications'
+import { BankSmsProvider } from '@/src/bankSms'
 import { PrivacyLockProvider } from '@/src/privacy/PrivacyLockContext'
 import { RemoteConfigProvider } from '@/src/config/RemoteConfigContext'
 import { ForceUpdateGate, MaintenanceBanner } from '@/src/config/ForceUpdateGate'
@@ -56,6 +57,7 @@ export default function RootLayout() {
         <AuthProvider>
           <OfflineProvider>
             <RemindersProvider>
+              <BankSmsProvider>
               <PrivacyLockProvider>
                 <RemoteConfigProvider>
                   <MoneyUiProvider>
@@ -65,6 +67,7 @@ export default function RootLayout() {
                   </MoneyUiProvider>
                 </RemoteConfigProvider>
               </PrivacyLockProvider>
+              </BankSmsProvider>
             </RemindersProvider>
           </OfflineProvider>
         </AuthProvider>
