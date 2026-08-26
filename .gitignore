@@ -1,6 +1,27 @@
 # Research notes / docs (local only)
 researches/
 
+# Dependencies & caches
+node_modules/
+**/node_modules/
+.npm-cache/
+**/.npm-cache/
+.expo/
+**/.expo/
+dist/
+web-build/
+coverage/
+*.log
+npm-debug.*
+yarn-error.*
+
+# IDE / OS
+.vscode/
+.idea/
+.cursor/
+.DS_Store
+Thumbs.db
+
 # Android signing / Firebase secrets (never commit)
 *.jks
 *.keystore
@@ -8,4 +29,13 @@ researches/
 **/google-services.json
 **/firebase-service-account*.json
 **/*-firebase-adminsdk-*.json
+.env
+.env*.local
 
+# Local / generated
+mobile/eas-archive-check/
+mobile/ios/
+mobile/android/
+**/*.apk
+**/*.aab
+**/tmp-*.apk

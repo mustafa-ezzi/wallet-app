@@ -1,24 +1,30 @@
-# Prefer repo-root .easignore. This file helps when EAS_PROJECT_ROOT=mobile.
+# Used when EAS_PROJECT_ROOT=mobile. Prefer repo-root .easignore for monorepo uploads.
 .expo/
 .expo-shared/
 dist/
 web-build/
 node_modules/
+.npm-cache/
 npm-debug.*
 yarn-error.*
 *.log
 .git/
+.cursor/
+.vscode/
+.idea/
 ios/
 android/
 coverage/
-.vscode/
-.idea/
+eas-archive-check/
 .env
 .env*.local
 *.jks
 *.keystore
 *.p12
 *.pem
+*.apk
+*.aab
+*.pdf
 
 # Upload FCM config even though gitignored
 !google-services.json

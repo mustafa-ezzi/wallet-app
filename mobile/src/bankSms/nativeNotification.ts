@@ -2,13 +2,13 @@
  * Thin wrapper around expo-android-notification-listener-service.
  * Safe stubs on iOS / web / Expo Go when the native module is missing.
  *
- * Used for bank / wallet apps that alert via notifications
- * (NayaPay, SadaPay, Meezan, …) when SMS is missing or delayed.
+ * Native allowlist is left empty so OEM package-ID variants still reach JS;
+ * we filter to bank-like alerts in JS (see walletApps.isBankishNotification).
  */
 import { Platform } from 'react-native'
 import {
-  WALLET_NOTIFICATION_PACKAGES,
-  bankLabelForPackage,
+  isBankishNotification,
+  resolveBankLabel,
 } from './walletApps'
 
 export type NotificationPayload = {
@@ -48,12 +48,15 @@ export function isBankNotificationNativeAvailable(): boolean {
   return loadNative() != null
 }
 
-/** Always restrict to wallet allowlist (empty allowlist = all apps — never leave that). */
+/**
+ * Empty native allowlist = deliver all packages to JS (module treats empty as allow-all).
+ * We must filter in subscribeWalletNotifications — never leave this "open" without JS filter.
+ */
 export function applyWalletNotificationAllowlist(): void {
   const mod = loadNative()
   if (!mod?.setAllowedPackages) return
   try {
-    mod.setAllowedPackages([...WALLET_NOTIFICATION_PACKAGES])
+    mod.setAllowedPackages([])
   } catch {
     /* ignore */
   }
@@ -81,19 +84,18 @@ export function openNotificationListenerSettings(): void {
 
 /**
  * Build a parseable body from a notification. Prefers bigText over text.
- * Injects wallet name when missing so bank_hint matching still works.
+ * Injects wallet/bank name when missing so bank_hint matching still works.
  */
 export function bodyFromWalletNotification(n: NotificationPayload): string {
   const parts = [n.title, n.bigText || n.text, n.subText, n.summaryText]
     .map((s) => (s || '').trim())
     .filter(Boolean)
-  // Dedup consecutive identical lines (title often repeats in text)
   const unique: string[] = []
   for (const p of parts) {
     if (unique[unique.length - 1] !== p) unique.push(p)
   }
   let body = unique.join('\n')
-  const label = bankLabelForPackage(n.packageName || '')
+  const label = resolveBankLabel(n)
   if (label && !new RegExp(label.replace(/\s+/g, '\\s*'), 'i').test(body)) {
     body = `${label}\n${body}`
   }
@@ -109,8 +111,7 @@ export function subscribeWalletNotifications(
   applyWalletNotificationAllowlist()
   try {
     const sub = mod.addListener('onNotificationReceived', (event) => {
-      const pkg = event?.packageName || ''
-      if (!(WALLET_NOTIFICATION_PACKAGES as readonly string[]).includes(pkg)) return
+      if (!isBankishNotification(event)) return
       const body = bodyFromWalletNotification(event)
       if (body) onNotification(body, event)
     })

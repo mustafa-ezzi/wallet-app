@@ -47,6 +47,8 @@ const IGNORE_RES = [
   /\bone[-\s]?time\s+password\b/i,
   /\bverification\s+code\b/i,
   /\bauth(?:entication)?\s+code\b/i,
+  /\blogin\s+successful\b/i,
+  /\byou have successfully\s+log/i,
   /\bdo not share\b/i,
   /\bdon'?t share\b/i,
   /\bunsuccessful\b/i,

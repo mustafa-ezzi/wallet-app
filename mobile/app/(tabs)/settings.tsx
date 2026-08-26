@@ -167,11 +167,9 @@ export default function SettingsScreen() {
                     <View style={{ flex: 1, paddingRight: 12 }}>
                       <Text style={[styles.rowTitle, { color: colors.text }]}>Bank apps</Text>
                       <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                        {bankSms.notifEnabled && bankSms.notifPermissionGranted
-                          ? 'On'
-                          : bankSms.notifEnabled
-                            ? 'Needs Notification access'
-                            : 'App alerts (Meezan, HBL, …)'}
+                        {bankSms.notifPermissionGranted
+                          ? (bankSms.notifEnabled ? 'Listening (Meezan, HBL, …)' : 'Off')
+                          : 'Required for Meezan app alerts'}
                       </Text>
                     </View>
                     <Switch
@@ -179,9 +177,11 @@ export default function SettingsScreen() {
                       onValueChange={(v) => void bankSms.setNotifEnabled(v)}
                     />
                   </View>
-                  {bankSms.notifEnabled && !bankSms.notifPermissionGranted ? (
+                  {!bankSms.notifPermissionGranted ? (
                     <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 8 }}>
-                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Allow Notification access</Text>
+                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+                        Turn on Notification access for CashTrail
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>

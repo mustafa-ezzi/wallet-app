@@ -7,6 +7,7 @@ import { BouncingFab } from '@/src/components/BouncingFab'
 import { FloatingIslandTabBar } from '@/src/components/FloatingIslandTabBar'
 import { OfflineBanner } from '@/src/offline'
 import { AmountUnlockSheet } from '@/src/privacy/AmountUnlockSheet'
+import { RatingPrompt } from '@/src/rating'
 import { useColors } from '@/src/theme/ThemeContext'
 
 function TabsShell() {
@@ -74,6 +75,7 @@ function TabsShell() {
       ) : null}
 
       <AmountUnlockSheet />
+      {user ? <RatingPrompt /> : null}
     </View>
   )
 }

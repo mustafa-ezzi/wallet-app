@@ -473,9 +473,16 @@ export default function BankSmsScreen() {
               <View style={[styles.switchRow, { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
                 <View style={{ flex: 1, paddingRight: 8 }}>
                   <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>Bank apps</Text>
-                  {bankSms.notifEnabled && !bankSms.notifPermissionGranted ? (
-                    <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 4 }}>
-                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>Allow access</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                    {bankSms.notifPermissionGranted
+                      ? (bankSms.notifEnabled ? 'Listening' : 'Off')
+                      : 'Needed for Meezan push alerts'}
+                  </Text>
+                  {!bankSms.notifPermissionGranted ? (
+                    <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 6 }}>
+                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>
+                        Open Notification access
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>

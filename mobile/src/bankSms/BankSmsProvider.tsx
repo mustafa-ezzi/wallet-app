@@ -145,12 +145,14 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     }
   }, [user, enabled, permissionGranted, refreshPending])
 
-  // Bank app notifications (Meezan / NayaPay / SadaPay) → pending only
+  // Bank app notifications → pending only.
+  // Also listen when SMS auto-detect is on (same user intent), once Notification access is granted.
   useEffect(() => {
+    const wantNotifs = notifEnabled || enabled
     if (
       Platform.OS !== 'android'
       || !user
-      || !notifEnabled
+      || !wantNotifs
       || !notifPermissionGranted
       || !notifNativeAvailable
     ) {
@@ -165,7 +167,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     return () => {
       unsub()
     }
-  }, [user, notifEnabled, notifPermissionGranted, notifNativeAvailable, refreshPending])
+  }, [user, notifEnabled, enabled, notifPermissionGranted, notifNativeAvailable, refreshPending])
 
   const setEnabled = useCallback(async (on: boolean) => {
     if (on && Platform.OS === 'android') {
@@ -180,6 +182,13 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       await setBankSmsEnabled(true)
       setEnabledState(true)
       await startSmsBackgroundService()
+      // Bank push alerts need Notification access (separate from SMS).
+      applyWalletNotificationAllowlist()
+      await setBankNotifEnabled(true)
+      setNotifEnabledState(true)
+      const notifGranted = getNotificationListenerGranted()
+      setNotifPermissionGranted(notifGranted)
+      if (!notifGranted) openNotificationListenerSettings()
       return
     }
     await setBankSmsEnabled(false)

@@ -1,36 +1,73 @@
-# EAS upload rules (repo root). When this file exists, EAS ignores .gitignore.
-# Keep secrets out of git, but DO upload google-services.json for Android FCM.
+# EAS upload rules (repo root). If this file exists, .gitignore is NOT used for the archive.
+# Keep the Android mobile build lean — exclude everything the Expo worker does not need.
 
+# --- dependencies / caches (reinstalled on the builder) ---
 node_modules/
 **/node_modules/
+.npm-cache/
+**/.npm-cache/
 .expo/
 **/.expo/
+.expo-shared/
 dist/
+**/dist/
 web-build/
+**/web-build/
+coverage/
+**/coverage/
+*.log
 npm-debug.*
 yarn-error.*
-*.log
+package-lock.json.bak
+
+# --- VCS / IDE / local tooling ---
 .git/
-coverage/
+.cursor/
 .vscode/
 .idea/
+**/.DS_Store
+Thumbs.db
+
+# --- secrets / signing (google-services force-included below) ---
 .env
 .env*.local
 *.jks
 *.keystore
 *.p12
 *.pem
-researches/
 **/firebase-service-account*.json
 **/*-firebase-adminsdk-*.json
+
+# --- native folders generated on EAS (prebuild) ---
 mobile/ios/
 mobile/android/
-frontend/node_modules/
-frontend-admin/node_modules/
-backend/**/__pycache__/
-backend/.venv/
-backend/venv/
-**/*.pyc
+ios/
+android/
+
+# --- not needed for CashTrail mobile Android builds ---
+frontend/
+frontend-admin/
+backend/
+wallet-manager-ui/
+docs/
+researches/
+packages/
+# Local dump from prior archive-size debugging (~200MB+)
+mobile/eas-archive-check/
+**/eas-archive-check/
+
+# --- build artifacts / large unrelated files ---
+**/*.apk
+**/*.aab
+**/*.ipa
+**/*.pdf
+**/*.zip
+**/*.tar
+**/*.tar.gz
+**/*.tgz
+tmp/
+**/tmp-*.apk
+mobile/tmp-check.apk
 
 # Force-include FCM config for Android native builds (still gitignored).
 !mobile/google-services.json

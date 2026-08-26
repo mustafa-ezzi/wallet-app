@@ -245,7 +245,7 @@ Confidence score example:
 | **Merchant / RAAST name → category** | “sent to …” → Transfer / People suggest |
 | **People link** | Outbound to a known person name → propose People lend/pay instead of plain expense |
 | **Notification listener (Android)** | Some OEMs restrict SMS; reading bank **notifications** as fallback |
-| **Duplicate defense** | Same TID within 48h ignored; same amount+minute soft-warn |
+| **Duplicate defense** | Same TID within 48h ignored; same amount+minute soft-warn; **cross-source** SMS vs notification (see §16) |
 | **Balance line parse** (if SMS includes available balance) | Cross-check wallet drift; warn “books off by X” |
 | **Quiet hours / batch review** | One “Review 4 bank alerts” screen instead of spam |
 | **OCR of screenshot** | User shares SMS screenshot when paste fails |
@@ -423,14 +423,15 @@ Do **not** start with SMS permission alone — Play review + false positives are
 - [ ] ATM with Cash wallet → transfer; without Cash → create Cash (confirmed) or record as expense  
 - [ ] Received → income; Reversed → income/refund; Sent/RAAST → expense  
 - [ ] OTP / failed / non-money SMS rarely enter queue  
-- [ ] Dedupe by fingerprint / TID  
+- [ ] Dedupe by fingerprint / TID (**including SMS vs notification** — §16.2)  
 - [ ] Privacy Policy + in-app explanation  
+- [ ] Play distribution path (not sideload-only) for Protect; OEM SMS coach + Bank apps fallback (§16.3–16.4)  
 
 ---
 
 ## 14. Open decisions (historical)
 
-1. ~~**SMS API vs Notification Listener**~~ → **Both:** SMS for bank alerts; Notification Listener for Meezan / NayaPay / SadaPay (Phase 3b)  
+1. ~~**SMS API vs Notification Listener**~~ → **Both:** SMS for bank alerts; Notification Listener for major PK banks/wallets (Phase 3b). See §16 for double-entry and launch risk.  
 2. Store **raw snippet** on server for web review, or web-only after mobile approve? (Recommend: structured fields always; snippet optional + short TTL)  
 3. ATM default Cash wallet: always “Cash” name vs last-used cash  
 4. RAAST “sent to” → plain expense vs People flow when name matches  
@@ -440,4 +441,94 @@ Do **not** start with SMS permission alone — Play review + false positives are
 
 ## 15. Summary
 
-CashTrail gains a **permissioned bank-alert assistant**: detect or paste SMS → classify Expense / ATM / Received / Reversed → match wallet → user approves (editable) → write books. ATM moves money to Cash (create Cash if needed). Mobile (Android) captures; **web shares the review queue**. Accuracy grows via templates, aliases, and user corrections — never via silent autopost.
+CashTrail gains a **permissioned bank-alert assistant**: detect or paste SMS / bank-app notifications → classify Expense / ATM / Received / Reversed → match wallet → user approves (editable) → write books. ATM moves money to Cash (create Cash if needed). Mobile (Android) captures; **web shares the review queue**. Accuracy grows via templates, aliases, and user corrections — never via silent autopost.
+
+---
+
+## 16. Dual capture (SMS + bank-app notifications) & launch hardening
+
+### 16.1 What we ship today
+
+CashTrail has **two Android capture paths** (both optional, both draft-only):
+
+| Path | Settings toggle | When it helps |
+|------|-----------------|---------------|
+| **SMS** | SMS | Classic bank debit/credit SMS |
+| **Bank apps** | Bank apps (Notification access) | Wallets/banks that alert in-app (NayaPay, SadaPay, Meezan, HBL, …) or when SMS is delayed/blocked |
+| **Paste** | Always | Fallback on all platforms |
+
+Nothing posts to wallets until the user **Approves**. Reject / edit still apply.
+
+### 16.2 Will SMS + notification create a double entry?
+
+**Books (posted transactions):** No silent double-post — Approve is required twice if two drafts exist. The risk is **two pending drafts** for the same payment, which is confusing and easy to approve twice by mistake.
+
+**Pending queue today:**
+
+- Create API dedupes on `fingerprint` while status is `pending` (same user + same fingerprint → return existing row).
+- Fingerprint is derived from **kind + amount + date + TID + account mask + first ~120 chars of raw text**.
+
+**Implication:** If the SMS body and the app notification text differ (common), fingerprints often **differ** → **two pending drafts** for one payment. Same TID in both texts improves the chance of a match, but is not guaranteed.
+
+**Launch hardening (do before / with public release):**
+
+1. **Cross-source soft dedupe (P0)**  
+   - If a new ingest shares the same **TID** (and user) as a pending or recently approved import within ~48h → attach to existing / skip create.  
+   - Else if same **amount + account mask + calendar day** (and no conflicting TID) → soft-merge or warn in inbox (“Possible duplicate”).
+2. **Prefer one signal when both fire**  
+   - Prefer the alert that arrived first; second source with matching TID is ignored.  
+   - Optional preference: “Prefer SMS” vs “Prefer bank app” in Settings (default: first-wins).
+3. **Inbox UX**  
+   - Show source chip (`sms` / `notification` / `paste`).  
+   - Duplicate banner + one-tap “Keep one / Reject other”.
+4. **Never auto-approve** either path (unchanged).
+
+Until (1)–(3) ship, dual-on is fine for testing; tell power users to enable **one** path, or review pending carefully.
+
+### 16.3 Play Protect / “package appears invalid” / blocked sideload
+
+**What happened in testing:** Sideloading a preview APK (e.g. WhatsApp / Files) + SMS-related permissions triggers **Google Play Protect** (“App blocked… sensitive data”). That is expected for **unknown installer** builds, not proof the APK is malware.
+
+**What we will *not* do at launch:** Ask end users to turn off Play Protect. That is a test-only workaround.
+
+**Launch approach:**
+
+| Channel | Why it helps |
+|---------|----------------|
+| **Google Play** (Internal testing → Closed → Production) | Play-signed, Play-distributed apps are far less often blocked by Play Protect than random APKs |
+| **Play Console declarations** | Declare **financial SMS** use case; link Privacy Policy; document Approve-only + allowlist (see `BANK_SMS_PRIVACY.md`) |
+| **Same signing key forever** | Avoid “update blocked / invalid package” when users already have an older sideload with a different key — migrate testers to Play builds and uninstall old sideloads once |
+| **Internal testing track** | Replace WhatsApp APK shares for QA; testers install from Play |
+
+Sideload / EAS preview APKs remain for **dev/QA only**, with a short internal note: uninstall old builds, allow unknown sources for Files, Play Protect may warn until Play distribution.
+
+### 16.4 OEM SMS permission (Xiaomi / MIUI and similar)
+
+**Symptom:** App installed, but **SMS detection cannot be granted** or never fires — common on Xiaomi/Redmi/POCO (also some Oppo/Vivo/Huawei): runtime SMS permission ≠ “Autostart” ≠ “Display pop-up windows” ≠ MIUI “Other permissions” / SMS special access.
+
+**Launch approach (product + UX):**
+
+1. **Do not rely on SMS alone**  
+   - **Bank apps** (Notification access) is a first-class path for wallets and for OEMs that throttle SMS.  
+   - Paste remains the universal fallback.
+2. **In-app permission coach (Android)**  
+   - If SMS toggle on but permission denied / no events: short steps — App info → Permissions → SMS; MIUI → Other permissions / Autostart; link “Open settings”.  
+   - Same for Notification access: deep-link to listener settings (already partially there).
+3. **Graceful degradation copy**  
+   - “SMS blocked on this phone? Turn on **Bank apps**, or paste the alert.”  
+   - Never imply the app is broken if OEM blocks SMS.
+4. **QA matrix before launch**  
+   - At least one Xiaomi/MIUI, one Samsung, one Pixel/stock device: SMS path, notification path, both on (dedupe), Play Protect on Play build.
+5. **Play policy alignment**  
+   - SMS only for financial alerts the user opted into; Notification Listener only allowlisted bank/wallet packages; both opt-in with kill switches.
+
+### 16.5 Recommended launch posture
+
+| Priority | Capture | Why |
+|----------|---------|-----|
+| Primary store story | Paste + Approve (all platforms) | Zero sensitive permission; always works |
+| Android recommended | Bank apps (Notification access) for wallets + banks that notify | Avoids SMS Play scrutiny / OEM SMS hell where possible |
+| Android optional | SMS auto-detect | Best for banks that only SMS — with coach + Play declaration |
+| Hard requirement | Fingerprint + **TID cross-source dedupe** before dual-on is default-on | Prevents double pending / double Approve |
+
+**Default for new installs (proposed):** Paste available; prompt for **Bank apps** where native module exists; SMS opt-in secondary with clear OEM caveat — not both forced on in onboarding until §16.2 hardening ships.
