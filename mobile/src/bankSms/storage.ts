@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store'
 
 const ENABLED = 'cashtrail_bank_sms_enabled'
 const PROMPTED = 'cashtrail_bank_sms_prompted'
-/** NayaPay / SadaPay via Android Notification Listener */
+/** Bank / wallet app alerts via Android Notification Listener */
 const NOTIF_ENABLED = 'cashtrail_bank_notif_enabled'
 
 async function getItem(key: string): Promise<string | null> {

@@ -2,7 +2,8 @@
  * Thin wrapper around expo-android-notification-listener-service.
  * Safe stubs on iOS / web / Expo Go when the native module is missing.
  *
- * Used for NayaPay / SadaPay (and similar) which alert via app notifications, not SMS.
+ * Used for bank / wallet apps that alert via notifications
+ * (NayaPay, SadaPay, Meezan, …) when SMS is missing or delayed.
  */
 import { Platform } from 'react-native'
 import {

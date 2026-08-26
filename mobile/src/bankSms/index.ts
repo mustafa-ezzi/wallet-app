@@ -8,4 +8,4 @@ export {
   getBankNotifEnabled,
   setBankNotifEnabled,
 } from './storage'
-export { WALLET_NOTIFICATION_PACKAGES } from './walletApps'
+export { WALLET_NOTIFICATION_PACKAGES, BANK_NOTIFICATION_APPS } from './walletApps'

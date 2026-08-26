@@ -42,7 +42,7 @@ type BankSmsContextValue = {
   prompted: boolean
   permissionGranted: boolean
   nativeAvailable: boolean
-  /** NayaPay / SadaPay notification listener. */
+  /** Bank app notification listener (Meezan / NayaPay / SadaPay). */
   notifEnabled: boolean
   notifPermissionGranted: boolean
   notifNativeAvailable: boolean
@@ -145,7 +145,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     }
   }, [user, enabled, permissionGranted, refreshPending])
 
-  // NayaPay / SadaPay notifications → pending only
+  // Bank app notifications (Meezan / NayaPay / SadaPay) → pending only
   useEffect(() => {
     if (
       Platform.OS !== 'android'

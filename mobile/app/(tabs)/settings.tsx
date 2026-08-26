@@ -139,71 +139,70 @@ export default function SettingsScreen() {
           </View>
         </Pressable>
 
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Bank SMS</Text>
+        <Text style={[styles.section, { color: colors.primaryDark }]}>Bank alerts</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
-          <View style={styles.rowBetween}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>Auto-detect bank SMS</Text>
-              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                {Platform.OS === 'android'
-                  ? (bankSms.enabled
-                    ? (bankSms.permissionGranted
-                      ? 'Listening for bank alerts — nothing posts until you Approve'
-                      : 'On, but SMS permission is off — tap Open settings')
-                    : 'Off — turn on to draft expenses / ATM / received from SMS')
-                  : 'Auto-detect is Android-only. Paste alerts anytime below.'}
-              </Text>
-            </View>
-            {Platform.OS === 'android' ? (
-              <Switch
-                value={bankSms.enabled && bankSms.permissionGranted}
-                onValueChange={(v) => void bankSms.setEnabled(v)}
-              />
-            ) : null}
-          </View>
-          {Platform.OS === 'android' && bankSms.enabled && !bankSms.permissionGranted ? (
-            <Pressable onPress={() => void bankSms.openSettings()} style={{ marginTop: 10 }}>
-              <Text style={{ color: colors.primary, fontWeight: '800' }}>Open SMS settings →</Text>
-            </Pressable>
-          ) : null}
-
-          {Platform.OS === 'android' && bankSms.notifNativeAvailable ? (
-            <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+          {Platform.OS === 'android' ? (
+            <>
               <View style={styles.rowBetween}>
                 <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={[styles.rowTitle, { color: colors.text }]}>NayaPay / SadaPay alerts</Text>
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>SMS</Text>
                   <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                    {bankSms.notifEnabled
-                      ? (bankSms.notifPermissionGranted
-                        ? 'Reading wallet app notifications — Approve still required'
-                        : 'On — enable CashTrail under Notification access')
-                      : 'Uses Notification access (these apps don’t send SMS)'}
+                    {bankSms.enabled && bankSms.permissionGranted ? 'On' : 'Off'}
                   </Text>
                 </View>
                 <Switch
-                  value={bankSms.notifEnabled}
-                  onValueChange={(v) => void bankSms.setNotifEnabled(v)}
+                  value={bankSms.enabled && bankSms.permissionGranted}
+                  onValueChange={(v) => void bankSms.setEnabled(v)}
                 />
               </View>
-              {bankSms.notifEnabled && !bankSms.notifPermissionGranted ? (
-                <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 10 }}>
-                  <Text style={{ color: colors.primary, fontWeight: '800' }}>Open Notification access →</Text>
+              {bankSms.enabled && !bankSms.permissionGranted ? (
+                <Pressable onPress={() => void bankSms.openSettings()} style={{ marginTop: 8 }}>
+                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Allow SMS access</Text>
                 </Pressable>
               ) : null}
-            </View>
+
+              {bankSms.notifNativeAvailable ? (
+                <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                  <View style={styles.rowBetween}>
+                    <View style={{ flex: 1, paddingRight: 12 }}>
+                      <Text style={[styles.rowTitle, { color: colors.text }]}>Bank apps</Text>
+                      <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                        {bankSms.notifEnabled && bankSms.notifPermissionGranted
+                          ? 'On'
+                          : bankSms.notifEnabled
+                            ? 'Needs Notification access'
+                            : 'App alerts (Meezan, HBL, …)'}
+                      </Text>
+                    </View>
+                    <Switch
+                      value={bankSms.notifEnabled}
+                      onValueChange={(v) => void bankSms.setNotifEnabled(v)}
+                    />
+                  </View>
+                  {bankSms.notifEnabled && !bankSms.notifPermissionGranted ? (
+                    <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 8 }}>
+                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Allow Notification access</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
           ) : null}
 
           <Pressable
             onPress={() => router.push('/bank-sms')}
-            style={{ marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}
+            style={{
+              marginTop: Platform.OS === 'android' ? 12 : 0,
+              paddingTop: Platform.OS === 'android' ? 12 : 0,
+              borderTopWidth: Platform.OS === 'android' ? StyleSheet.hairlineWidth : 0,
+              borderTopColor: colors.border,
+            }}
           >
             <View style={styles.rowBetween}>
               <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={[styles.rowTitle, { color: colors.text }]}>Paste & review inbox</Text>
+                <Text style={[styles.rowTitle, { color: colors.text }]}>Inbox</Text>
                 <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                  {bankSms.pendingCount > 0
-                    ? `${bankSms.pendingCount} pending — approve or reject`
-                    : 'Paste a bank alert or review synced drafts'}
+                  {bankSms.pendingCount > 0 ? `${bankSms.pendingCount} to review` : 'Paste or review drafts'}
                 </Text>
               </View>
               {bankSms.pendingCount > 0 ? (
@@ -211,7 +210,7 @@ export default function SettingsScreen() {
                   <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{bankSms.pendingCount}</Text>
                 </View>
               ) : null}
-              <Text style={{ color: colors.primary, fontWeight: '800' }}>Open →</Text>
+              <Text style={{ color: colors.primary, fontWeight: '800' }}>→</Text>
             </View>
           </Pressable>
         </View>

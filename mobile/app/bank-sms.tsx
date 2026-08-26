@@ -109,6 +109,7 @@ export default function BankSmsScreen() {
   const [aliasMask, setAliasMask] = useState('')
   const [aliasHint, setAliasHint] = useState('')
   const [aliasWalletId, setAliasWalletId] = useState('')
+  const [showMapping, setShowMapping] = useState(false)
   const [error, setError] = useState('')
   const [okMsg, setOkMsg] = useState('')
   const [busy, setBusy] = useState(false)
@@ -452,54 +453,29 @@ export default function BankSmsScreen() {
     <View style={[styles.root, { paddingTop: insets.top + 8, backgroundColor: colors.background }]}>
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
-          <Text style={{ color: colors.primary, fontWeight: '800' }}>← Back</Text>
+          <Text style={{ color: colors.primary, fontWeight: '700' }}>Back</Text>
         </Pressable>
-        <View style={{ alignItems: 'center', flex: 1 }}>
-          <Text style={[styles.title, { color: colors.text }]}>{BANK_SMS_UX.settingsTitle}</Text>
-          {pending.length > 0 ? (
-            <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 2 }}>
-              {pending.length} pending
-            </Text>
-          ) : null}
-        </View>
+        <Text style={[styles.title, { color: colors.text }]}>Bank alerts</Text>
         <View style={{ width: 56 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.pad} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <Text style={[styles.heroSub, { color: colors.textSecondary }]}>
-          Paste a bank alert, review the draft, then Approve — nothing posts without you.
-        </Text>
-
         {Platform.OS === 'android' ? (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
             <View style={styles.switchRow}>
-              <View style={{ flex: 1, paddingRight: 8 }}>
-                <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>Auto-detect SMS</Text>
-                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4, lineHeight: 17 }}>
-                  {bankSms.enabled && bankSms.permissionGranted
-                    ? 'Listening — Approve pending items below'
-                    : 'Off or missing permission'}
-                </Text>
-              </View>
+              <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>SMS</Text>
               <Switch
                 value={bankSms.enabled && bankSms.permissionGranted}
                 onValueChange={(v) => void bankSms.setEnabled(v)}
               />
             </View>
             {bankSms.notifNativeAvailable ? (
-              <View style={[styles.switchRow, { marginTop: 14, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+              <View style={[styles.switchRow, { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
                 <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>NayaPay / SadaPay</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4, lineHeight: 17 }}>
-                    {bankSms.notifEnabled && bankSms.notifPermissionGranted
-                      ? 'Notification listener on — Approve still required'
-                      : bankSms.notifEnabled
-                        ? 'Enable CashTrail in Notification access'
-                        : 'App notifications (not SMS)'}
-                  </Text>
+                  <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>Bank apps</Text>
                   {bankSms.notifEnabled && !bankSms.notifPermissionGranted ? (
-                    <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 8 }}>
-                      <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>Open Notification access →</Text>
+                    <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 4 }}>
+                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>Allow access</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -521,7 +497,7 @@ export default function BankSmsScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
           <View style={styles.sectionHead}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Pending inbox</Text>
+            <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>Pending</Text>
             {pending.length > 0 ? (
               <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
                 <Text style={styles.countPillText}>{pending.length}</Text>
@@ -531,7 +507,7 @@ export default function BankSmsScreen() {
 
           {pending.length === 0 ? (
             <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
-              No drafts yet. Paste a bank SMS below.
+              Nothing to review yet.
             </Text>
           ) : (
             <>
@@ -590,10 +566,9 @@ export default function BankSmsScreen() {
                         <View style={[styles.kindPill, { backgroundColor: tone.bg }]}>
                           <Text style={[styles.kindPillText, { color: tone.fg }]}>{kindLabel(row.kind)}</Text>
                         </View>
-                        <Text style={{ color: colors.textMuted, fontSize: 11 }}>#{row.id}</Text>
                       </View>
                       <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 16 }} numberOfLines={2}>
-                        {row.raw_snippet || row.notes || 'Bank SMS'}
+                        {row.raw_snippet || row.notes || 'Alert'}
                       </Text>
                     </Pressable>
                     <Text style={{ color: colors.text, fontWeight: '800' }}>
@@ -607,20 +582,17 @@ export default function BankSmsScreen() {
         </View>
 
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Paste bank SMS</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 10 }}>
-            {BANK_SMS_UX.privacyBlurb}
-          </Text>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Paste</Text>
           <TextInput
             value={paste}
             onChangeText={setPaste}
-            placeholder={BANK_SMS_UX.pastePlaceholder}
+            placeholder="Paste bank SMS or alert…"
             placeholderTextColor={colors.textMuted}
             multiline
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
           />
           <PrimaryButton
-            title={BANK_SMS_UX.parseButton}
+            title="Detect"
             onPress={() => void onDetect()}
             disabled={!paste.trim() || busy}
             loading={busy && !draft}
@@ -630,7 +602,7 @@ export default function BankSmsScreen() {
         {draft && parsed ? (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>
-              {BANK_SMS_UX.reviewTitle}{pendingId ? ` · #${pendingId}` : ''}
+              Review{pendingId ? ` · #${pendingId}` : ''}
             </Text>
             <View style={styles.metaRow}>
               <View style={[styles.kindPill, { backgroundColor: kindTone(parsed.kind, colors).bg }]}>
@@ -654,13 +626,12 @@ export default function BankSmsScreen() {
                 </Text>
               </View>
             </View>
-            <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 10 }}>{parsed.reason}</Text>
 
             {mustPickType ? (
               <View style={[styles.warn, { backgroundColor: colors.warningBg, borderColor: colors.warningBorder, marginBottom: 12 }]}>
-                <Text style={{ color: colors.warning, fontWeight: '800' }}>Type unclear — confirm before approving</Text>
+                <Text style={{ color: colors.warning, fontWeight: '800' }}>Confirm the type below</Text>
                 <Pressable onPress={() => setTypeConfirmed(true)} style={{ marginTop: 8 }}>
-                  <Text style={{ color: colors.primary, fontWeight: '800' }}>I’ve confirmed the type</Text>
+                  <Text style={{ color: colors.primary, fontWeight: '800' }}>Confirmed</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -688,7 +659,7 @@ export default function BankSmsScreen() {
               }}
             />
 
-            <Text style={[styles.label, { color: colors.textMuted }]}>Amount (PKR)</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>Amount</Text>
             <TextInput
               value={String(draft.amount)}
               onChangeText={(t) => patchDraft({ amount: Number(t.replace(/,/g, '')) || 0 })}
@@ -699,18 +670,18 @@ export default function BankSmsScreen() {
             <DateField label="Date" value={draft.date} onChange={(date) => patchDraft({ date })} />
 
             <SelectField
-              label="Bank wallet"
+              label="Wallet"
               value={draft.bankAccountId != null ? String(draft.bankAccountId) : ''}
               options={banks.map((w) => ({ value: String(w.id), label: w.name }))}
               onChange={(v) => patchDraft({ bankAccountId: Number(v) })}
-              placeholder="Select wallet…"
+              placeholder="Select…"
             />
 
             {draft.kind === 'atm' ? (
               <View style={{ marginBottom: 12 }}>
                 <View style={[styles.toggleCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
                   <Text style={{ flex: 1, color: colors.text, fontWeight: '600', fontSize: 13 }}>
-                    {BANK_SMS_UX.atmAsExpense}
+                    Record as expense
                   </Text>
                   <Switch
                     value={draft.recordAtmAsExpense}
@@ -727,8 +698,9 @@ export default function BankSmsScreen() {
                     />
                   ) : (
                     <View style={[styles.warn, { backgroundColor: colors.warningBg, borderColor: colors.warningBorder }]}>
-                      <Text style={{ color: colors.text, fontWeight: '800' }}>{BANK_SMS_UX.atmNoCashTitle}</Text>
-                      <Text style={{ color: colors.textMuted, marginTop: 6, fontSize: 13 }}>{BANK_SMS_UX.atmNoCashBody}</Text>
+                      <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>
+                        No Cash wallet — approving will create one.
+                      </Text>
                     </View>
                   )
                 ) : null}
@@ -753,13 +725,13 @@ export default function BankSmsScreen() {
 
             <View style={[styles.toggleCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
               <Text style={{ flex: 1, color: colors.text, fontWeight: '600', fontSize: 13 }}>
-                Always use this wallet for matching mask / bank hint
+                Remember wallet
               </Text>
               <Switch value={rememberWallet} onValueChange={setRememberWallet} />
             </View>
             <View style={[styles.toggleCard, { borderColor: colors.border, backgroundColor: colors.background, marginBottom: 12 }]}>
               <Text style={{ flex: 1, color: colors.text, fontWeight: '600', fontSize: 13 }}>
-                Always treat similar SMS as this type
+                Remember type
               </Text>
               <Switch value={rememberKind} onValueChange={setRememberKind} />
             </View>
@@ -777,78 +749,80 @@ export default function BankSmsScreen() {
         ) : null}
 
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Wallet intelligence</Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 10, lineHeight: 17 }}>
-            Map last-4 / bank name → wallet so future SMS auto-selects the right account.
-          </Text>
-
-          <SelectField
-            label="Default Cash wallet (ATM)"
-            value={defaultCashId != null ? String(defaultCashId) : ''}
-            options={[
-              { value: '', label: 'First Cash wallet' },
-              ...cashWallets.map((w) => ({ value: String(w.id), label: w.name })),
-            ]}
-            onChange={(v) => void saveDefaultCash(v)}
-          />
-
-          <Text style={[styles.label, { color: colors.textMuted }]}>Last-4 / mask</Text>
-          <TextInput
-            value={aliasMask}
-            onChangeText={setAliasMask}
-            placeholder="2554"
-            placeholderTextColor={colors.textMuted}
-            style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-          />
-          <Text style={[styles.label, { color: colors.textMuted }]}>Bank hint</Text>
-          <TextInput
-            value={aliasHint}
-            onChangeText={setAliasHint}
-            placeholder="meezan"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-          />
-          <SelectField
-            label="Wallet"
-            value={aliasWalletId}
-            options={banks.map((w) => ({ value: String(w.id), label: w.name }))}
-            onChange={setAliasWalletId}
-            placeholder="Select…"
-          />
-          <PrimaryButton title="Save mapping" onPress={() => void saveAlias()} disabled={busy} />
-
-          {aliases.length > 0 ? (
-            aliases.map((a, i) => {
-              const w = wallets.find((x) => x.id === a.account_id)
-              return (
-                <View key={`${a.account_id}-${a.mask}-${a.hint}-${i}`} style={[styles.aliasRow, { borderColor: colors.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.text, fontWeight: '800' }}>{w?.name || `Wallet #${a.account_id}`}</Text>
-                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                      {a.mask ? (
-                        <View style={[styles.aliasChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                          <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>…{a.mask}</Text>
-                        </View>
-                      ) : null}
-                      {a.hint ? (
-                        <View style={[styles.aliasChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                          <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>{a.hint}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                  </View>
-                  <Pressable onPress={() => void removeAlias(i)} hitSlop={8}>
-                    <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 12 }}>Remove</Text>
-                  </Pressable>
-                </View>
-              )
-            })
-          ) : (
-            <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 10 }}>
-              No aliases yet — save one after you approve a draft.
+          <Pressable onPress={() => setShowMapping((v) => !v)} style={styles.sectionHead}>
+            <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0, flex: 1 }]}>Wallet mapping</Text>
+            <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
+              {showMapping ? 'Hide' : 'Show'}
             </Text>
-          )}
+          </Pressable>
+
+          {showMapping ? (
+            <>
+              <SelectField
+                label="Default Cash (ATM)"
+                value={defaultCashId != null ? String(defaultCashId) : ''}
+                options={[
+                  { value: '', label: 'First Cash wallet' },
+                  ...cashWallets.map((w) => ({ value: String(w.id), label: w.name })),
+                ]}
+                onChange={(v) => void saveDefaultCash(v)}
+              />
+
+              <Text style={[styles.label, { color: colors.textMuted }]}>Last-4</Text>
+              <TextInput
+                value={aliasMask}
+                onChangeText={setAliasMask}
+                placeholder="2554"
+                placeholderTextColor={colors.textMuted}
+                style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              />
+              <Text style={[styles.label, { color: colors.textMuted }]}>Bank</Text>
+              <TextInput
+                value={aliasHint}
+                onChangeText={setAliasHint}
+                placeholder="meezan"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                style={[styles.inputSingle, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+              />
+              <SelectField
+                label="Wallet"
+                value={aliasWalletId}
+                options={banks.map((w) => ({ value: String(w.id), label: w.name }))}
+                onChange={setAliasWalletId}
+                placeholder="Select…"
+              />
+              <PrimaryButton title="Save" onPress={() => void saveAlias()} disabled={busy} />
+
+              {aliases.length > 0 ? (
+                aliases.map((a, i) => {
+                  const w = wallets.find((x) => x.id === a.account_id)
+                  return (
+                    <View key={`${a.account_id}-${a.mask}-${a.hint}-${i}`} style={[styles.aliasRow, { borderColor: colors.border }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: colors.text, fontWeight: '800' }}>{w?.name || `Wallet #${a.account_id}`}</Text>
+                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                          {a.mask ? (
+                            <View style={[styles.aliasChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                              <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>…{a.mask}</Text>
+                            </View>
+                          ) : null}
+                          {a.hint ? (
+                            <View style={[styles.aliasChip, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                              <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '700' }}>{a.hint}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                      <Pressable onPress={() => void removeAlias(i)} hitSlop={8}>
+                        <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 12 }}>Remove</Text>
+                      </Pressable>
+                    </View>
+                  )
+                })
+              ) : null}
+            </>
+          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -866,9 +840,8 @@ function makeStyles(_colors: ColorTokens) {
       paddingBottom: 10,
     },
     backBtn: { width: 56 },
-    title: { ...typography.title, fontSize: 17 },
+    title: { ...typography.title, fontSize: 18, fontWeight: '800', textAlign: 'center', flex: 1 },
     pad: { padding: spacing.md, paddingBottom: 56, gap: 12 },
-    heroSub: { fontSize: 14, lineHeight: 20, marginBottom: 4 },
     label: { fontSize: 12, fontWeight: '700', marginBottom: 6, marginTop: 8 },
     input: {
       minHeight: 118,

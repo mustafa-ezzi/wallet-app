@@ -12,13 +12,13 @@ CashTrail’s **Bank SMS assist** turns bank transaction alerts into **draft** b
 |------|-----------|------------|
 | Paste | Android, iOS, web | None |
 | Auto-detect SMS | Android only (opt-in) | `RECEIVE_SMS` / `READ_SMS` |
-| Wallet app notifications | Android only (opt-in) | Notification access (Listener) — **NayaPay / SadaPay** |
+| Wallet app notifications | Android only (opt-in) | Notification access — major PK banks & wallets |
 
 ## What we process
 
 - Money alerts that look like expense, ATM cash-out, money received, or reversal  
 - Structured fields: amount, date, type, TID, counterparty, account mask, short snippet  
-- For NayaPay / SadaPay: **posted notification title/text only**, from those two apps’ packages (`com.nayapay.app`, `com.sadapay.app`)
+- For bank/wallet apps: **posted notification title/text only**, from an allowlist (Meezan, HBL, UBL, Alfalah, Allied, MCB, Faysal, BankIslami, JazzCash, Easypaisa, NayaPay, SadaPay)
 
 ## What we filter out (hard ignore)
 
@@ -53,7 +53,7 @@ Use when declaring financial SMS use case:
 
 Use when explaining Notification Listener for digital wallets:
 
-1. **Why?** NayaPay and SadaPay send transaction alerts as **app notifications**, not SMS.  
-2. **Scope?** Allowlist only those two packages; other apps’ notifications are ignored.  
-3. **User control?** Separate Settings toggle; system “Notification access” screen; Approve still required.  
-4. **Not a core requirement?** Paste still works without Notification access.  
+1. **Why?** Many banks/wallets send transaction alerts as **app notifications**, not only SMS.  
+2. **Scope?** Allowlist of major Pakistani bank/wallet packages only; other apps ignored.  
+3. **User control?** Settings “Bank apps” toggle; system Notification access; Approve still required.  
+4. **Not a core requirement?** Paste and SMS auto-detect still work without Notification access.  

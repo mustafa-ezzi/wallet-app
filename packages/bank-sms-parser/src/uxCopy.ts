@@ -31,7 +31,7 @@ export const BANK_SMS_UX = {
 
   privacyBlurb:
     'Bank SMS assist drafts bookkeeping entries from alerts you paste or (on Android) opt in to detect '
-    + 'via SMS and, for NayaPay / SadaPay, via Notification access. '
+    + 'via SMS and, for Meezan / NayaPay / SadaPay, via Notification access. '
     + 'Nothing posts until you Approve. OTP and marketing messages are filtered out.',
 } as const
 
@@ -43,7 +43,7 @@ CashTrail may help you turn bank transaction alerts into draft bookkeeping entri
 ### What we ask
 - **Paste:** You paste a message yourself. Parsing runs in the app.
 - **Android SMS auto-detect:** Optional READ_SMS / RECEIVE_SMS only if you opt in (onboarding or Settings).
-- **NayaPay / SadaPay:** Optional Android Notification access; only those two apps’ notifications are read.
+- **Bank app alerts:** Optional Android Notification access for Meezan / NayaPay / SadaPay when SMS is missing.
 
 ### What we do not do
 - We do not post expenses or transfers without your Approve.
