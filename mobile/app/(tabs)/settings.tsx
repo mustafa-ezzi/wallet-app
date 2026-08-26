@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  DeviceEventEmitter,
   Platform,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import { useAuth } from '@/src/context/AuthContext'
 import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
 import { useBankSms } from '@/src/bankSms'
+import { FORCE_RATING_EVENT } from '@/src/rating'
 import { registerDeviceTokenDetailed } from '@/src/notifications/pushRegistration'
 import { requestReminderPermission } from '@/src/notifications/schedule'
 import api, { apiErrorMessage, API_ROOT, probeApiConnection } from '@/src/api/client'
@@ -621,6 +623,15 @@ export default function SettingsScreen() {
           >
             <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Open support</Text>
           </Pressable>
+          <Pressable
+            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, marginTop: spacing.sm }]}
+            onPress={() => DeviceEventEmitter.emit(FORCE_RATING_EVENT)}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Preview rating form</Text>
+          </Pressable>
+          <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>
+            Skips the 4-day streak so you can test stars, feedback, and share.
+          </Text>
         </View>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Offline</Text>

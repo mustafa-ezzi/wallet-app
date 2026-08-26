@@ -84,3 +84,13 @@ export async function markRatingSubmitted(stars: number): Promise<void> {
   })
   offeredThisProcess = true
 }
+
+/** Test helper: reset gate + pretend 4-day streak so the prompt can show immediately. */
+export async function prepareRatingPromptForTest(): Promise<void> {
+  offeredThisProcess = false
+  await setRatingPromptState({
+    lastOpenDate: localDateKey(),
+    streakCount: RATING_STREAK_DAYS,
+    status: 'none',
+  })
+}

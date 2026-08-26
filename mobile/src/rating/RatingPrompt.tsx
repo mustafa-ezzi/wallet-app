@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  DeviceEventEmitter,
   Modal,
   Pressable,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
   markRatingDismissed,
   markRatingShown,
   markRatingSubmitted,
+  prepareRatingPromptForTest,
   recordAppOpen,
 } from './streak'
 import { shareCashTrailLink } from './shareCashTrail'
@@ -24,9 +26,12 @@ import { CASHTRAIL_SHARE_URL } from './storage'
 
 type Step = 'stars' | 'feedback' | 'share'
 
+export const FORCE_RATING_EVENT = 'cashtrail:force-rating'
+
 /**
  * Shows once after 4 consecutive calendar-day opens.
  * ≥4 stars → what’s nice / what to change; &lt;4 → troubles faced; then share link.
+ * Settings can emit FORCE_RATING_EVENT to preview without waiting.
  */
 export function RatingPrompt() {
   const colors = useColors()
@@ -41,22 +46,41 @@ export function RatingPrompt() {
   const [trouble, setTrouble] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const openPrompt = useCallback(async () => {
+    await markRatingShown()
+    track('rating_prompt_shown')
+    setStep('stars')
+    setStars(0)
+    setNice('')
+    setChange('')
+    setTrouble('')
+    setVisible(true)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     const t = setTimeout(() => {
       void (async () => {
         const { shouldShowPrompt } = await recordAppOpen()
         if (cancelled || !shouldShowPrompt) return
-        await markRatingShown()
-        track('rating_prompt_shown')
-        if (!cancelled) setVisible(true)
+        await openPrompt()
       })()
     }, 1800)
     return () => {
       cancelled = true
       clearTimeout(t)
     }
-  }, [])
+  }, [openPrompt])
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(FORCE_RATING_EVENT, () => {
+      void (async () => {
+        await prepareRatingPromptForTest()
+        await openPrompt()
+      })()
+    })
+    return () => sub.remove()
+  }, [openPrompt])
 
   const closeDismiss = useCallback(async () => {
     await markRatingDismissed()
