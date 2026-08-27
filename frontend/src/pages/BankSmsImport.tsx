@@ -6,6 +6,7 @@ import {
   Link2,
   MessageSquareText,
   ShieldCheck,
+  Smartphone,
   Wallet,
   X,
 } from 'lucide-react'
@@ -466,6 +467,33 @@ export default function BankSmsImportPage() {
       <div className="bsms-layout">
         {error ? <div className="auth-error">{error}</div> : null}
         {okMsg ? <div className="auth-success">{okMsg}</div> : null}
+
+        <section className="glass bsms-panel get-android-promo">
+          <div className="bsms-panel-head" style={{ marginBottom: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', flex: 1 }}>
+              <div className="bsms-hero-icon" style={{ width: '2.35rem', height: '2.35rem' }} aria-hidden>
+                <Smartphone size={17} strokeWidth={1.75} />
+              </div>
+              <div>
+                <h2 className="bsms-panel-title" style={{ marginBottom: '0.25rem' }}>
+                  Want auto bank alerts?
+                </h2>
+                <p className="bsms-panel-sub" style={{ margin: 0 }}>
+                  Web can paste &amp; approve. Auto SMS / bank apps need the Android APK — full install guide
+                  (including Play Protect).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+              onClick={() => navigate('/get-android')}
+            >
+              Get Android app
+            </button>
+          </div>
+        </section>
 
         <section className="glass bsms-panel">
           <div className="bsms-panel-head">

@@ -1,4 +1,5 @@
 export { BankSmsProvider, useBankSms } from './BankSmsProvider'
+export { BankSmsAlertBanner } from './BankSmsAlertBanner'
 export { ingestBankSmsBody } from './ingest'
 export {
   getBankSmsEnabled,

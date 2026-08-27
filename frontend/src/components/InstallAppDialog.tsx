@@ -1,4 +1,5 @@
-import { Download, Share, Plus, X } from 'lucide-react'
+import { Download, Share, Plus, Smartphone, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 interface Props {
   open: boolean
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function InstallAppDialog({ open, ios, canPrompt, onClose, onInstall }: Props) {
+  const navigate = useNavigate()
   if (!open) return null
 
   return (
@@ -69,6 +71,26 @@ export default function InstallAppDialog({ open, ios, canPrompt, onClose, onInst
             </button>
           </>
         )}
+
+        {!ios ? (
+          <div className="install-android-apk">
+            <p>
+              Need <strong>auto bank SMS</strong>? The home-screen install can’t read messages — get the Android APK instead.
+            </p>
+            <button
+              type="button"
+              className="btn-glass"
+              style={{ width: '100%' }}
+              onClick={() => {
+                onClose()
+                navigate('/get-android')
+              }}
+            >
+              <Smartphone size={16} strokeWidth={2} />
+              Android APK install guide
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   )

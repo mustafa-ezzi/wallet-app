@@ -31,7 +31,9 @@ export function OfflineBanner() {
           </Text>
         </Pressable>
       ) : null}
-      {offline.lastError ? <Text style={styles.err}>{offline.lastError}</Text> : null}
+      {offline.lastError && !offline.lastError.includes('NativeDatabase') ? (
+        <Text style={styles.err}>{offline.lastError}</Text>
+      ) : null}
     </View>
   )
 }

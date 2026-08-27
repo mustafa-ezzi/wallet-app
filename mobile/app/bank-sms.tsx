@@ -37,6 +37,7 @@ import {
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/src/constants/categories'
 import { useOffline } from '@/src/offline'
 import { useBankSms } from '@/src/bankSms'
+import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { useColors } from '@/src/theme/ThemeContext'
 import { iosShadow, radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { fmt } from '@/src/utils/format'
@@ -89,8 +90,9 @@ export default function BankSmsScreen() {
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
-  const { syncNow, getCachedAccounts } = useOffline()
+  const { hydrateNow, getCachedAccounts } = useOffline()
   const bankSms = useBankSms()
+  const { bumpRefresh } = useMoneyUi()
 
   const [paste, setPaste] = useState('')
   const [parsed, setParsed] = useState<ParsedBankSms | null>(null)
@@ -275,6 +277,19 @@ export default function BankSmsScreen() {
     return EXPENSE_CATEGORIES
   }, [draft])
 
+  const refreshBooksAfterAction = useCallback(async () => {
+    try {
+      await hydrateNow()
+      await loadWallets()
+      await loadPending()
+      await loadSettings()
+    } catch {
+      /* server already updated — cache refresh is best-effort */
+    }
+    void bankSms.refreshPending()
+    bumpRefresh()
+  }, [hydrateNow, loadWallets, loadPending, loadSettings, bankSms, bumpRefresh])
+
   const onApprove = async () => {
     if (!draft || !pendingId) {
       setError('Detect a message first, or open one from the pending inbox.')
@@ -306,10 +321,6 @@ export default function BankSmsScreen() {
         remember_wallet: rememberWallet,
         remember_kind: rememberKind,
       })
-      await syncNow()
-      await loadWallets()
-      await loadPending()
-      await loadSettings()
       setOkMsg(
         `Approved #${res.data.id}`
         + (res.data.linked_import ? ` · linked #${res.data.linked_import}` : '')
@@ -323,6 +334,7 @@ export default function BankSmsScreen() {
       setTypeConfirmed(false)
       setRememberKind(false)
       setPeopleHint(null)
+      await refreshBooksAfterAction()
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not approve this draft.'))
     } finally {
@@ -339,13 +351,13 @@ export default function BankSmsScreen() {
     setBusy(true)
     try {
       await bankSmsApi.reject(pendingId)
-      await loadPending()
       setOkMsg(`Rejected #${pendingId}.`)
       setDraft(null)
       setParsed(null)
       setPendingId(null)
       setPaste('')
       setTypeConfirmed(false)
+      await refreshBooksAfterAction()
     } catch (err) {
       setError(apiErrorMessage(err, 'Reject failed.'))
     } finally {
@@ -421,12 +433,11 @@ export default function BankSmsScreen() {
     setError('')
     try {
       const res = await bankSmsApi.batchApprove({ ids: selectedIds })
-      await syncNow()
-      await loadPending()
       setSelectedIds([])
       const errN = res.data.errors?.length || 0
       setOkMsg(`Batch approved ${res.data.approved.length}${errN ? ` · ${errN} failed` : ''}.`)
       if (errN) setError(res.data.errors.map((e) => `#${e.id}: ${e.detail}`).join(' · '))
+      await refreshBooksAfterAction()
     } catch (err) {
       setError(apiErrorMessage(err, 'Batch approve failed.'))
     } finally {
@@ -439,9 +450,9 @@ export default function BankSmsScreen() {
     setBusy(true)
     try {
       const res = await bankSmsApi.batchReject({ ids: selectedIds })
-      await loadPending()
       setSelectedIds([])
       setOkMsg(`Rejected ${res.data.rejected_count} item(s).`)
+      await refreshBooksAfterAction()
     } catch (err) {
       setError(apiErrorMessage(err, 'Batch reject failed.'))
     } finally {

@@ -30,7 +30,7 @@ import { toMoney } from '@/src/utils/format'
 import { AdBanner } from '@/src/ads/AdBanner'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { formatForeignSubtitle } from '@/src/travel/currencies'
-import { useBankSms } from '@/src/bankSms'
+import { useBankSms, BankSmsAlertBanner } from '@/src/bankSms'
 import { BANK_SMS_UX } from '@/src/lib/bank-sms-parser'
 
 const MONTH_NAMES = [
@@ -144,9 +144,11 @@ export default function HomeScreen() {
     } catch (err) {
       try {
         await loadFromCache()
-        setError(apiErrorMessage(err, 'Showing cached data (offline).'))
+        const msg = apiErrorMessage(err, 'Showing cached data (offline).')
+        if (!msg.includes('NativeDatabase')) setError(msg)
       } catch {
-        setError(apiErrorMessage(err, 'Could not load dashboard.'))
+        const msg = apiErrorMessage(err, 'Could not load dashboard.')
+        if (!msg.includes('NativeDatabase')) setError(msg)
       }
     } finally {
       setLoading(false)
@@ -271,22 +273,10 @@ export default function HomeScreen() {
         ) : null}
 
         {pendingCount > 0 ? (
-          <Pressable
+          <BankSmsAlertBanner
+            count={pendingCount}
             onPress={() => router.push('/bank-sms')}
-            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: spacing.md }]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>
-                  {pendingCount} bank alert{pendingCount === 1 ? '' : 's'} to review
-                </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 4 }}>
-                  Detected SMS drafts — Approve or Reject before books change
-                </Text>
-              </View>
-              <Text style={{ color: colors.primary, fontWeight: '800' }}>Review →</Text>
-            </View>
-          </Pressable>
+          />
         ) : null}
 
         {loading && !data ? (

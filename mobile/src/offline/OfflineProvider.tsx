@@ -54,11 +54,15 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     if (!user) return
     const net = await NetInfo.fetch()
     if (net.isConnected === false) return
-    const store = await getOfflineStore()
-    const [aRes, tRes] = await Promise.all([accountsApi.list(), transactionsApi.list()])
-    await hydrateFromServer(store, aRes.data, tRes.data, user.id)
-    await refreshStatus()
-    void updateAllWidgets()
+    try {
+      const store = await getOfflineStore()
+      const [aRes, tRes] = await Promise.all([accountsApi.list(), transactionsApi.list()])
+      await hydrateFromServer(store, aRes.data, tRes.data, user.id)
+      await refreshStatus()
+      void updateAllWidgets()
+    } catch (err) {
+      console.warn('[CashTrail] hydrate failed', err)
+    }
   }, [user, refreshStatus])
 
   const syncNow = useCallback(async () => {
@@ -83,7 +87,10 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       }
       await refreshStatus()
     } catch (err) {
-      setLastError(err instanceof Error ? err.message : 'Sync failed')
+      const msg = err instanceof Error ? err.message : 'Sync failed'
+      if (!msg.includes('NativeDatabase')) {
+        setLastError(msg)
+      }
       track('transaction_sync_failed')
     } finally {
       syncingRef.current = false

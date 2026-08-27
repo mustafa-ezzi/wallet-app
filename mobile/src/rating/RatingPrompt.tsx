@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DeviceEventEmitter,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -140,123 +143,145 @@ export function RatingPrompt() {
 
   if (!visible) return null
 
+  const bottomPad = Math.max(insets.bottom, 16)
+  const cardAlign = step === 'feedback' ? 'center' : 'flex-end'
+
   return (
     <Modal visible transparent animationType="fade" onRequestClose={() => void closeDismiss()}>
-      <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => void closeDismiss()} />
-        <View
-          style={[
-            styles.card,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              marginBottom: Math.max(insets.bottom, 16),
-            },
-          ]}
-        >
-          {step === 'stars' ? (
-            <>
-              <Text style={[styles.kicker, { color: colors.primary }]}>Quick check-in</Text>
-              <Text style={[styles.title, { color: colors.text }]}>How’s CashTrail?</Text>
-              <Text style={[styles.sub, { color: colors.textMuted }]}>
-                You’ve opened the app a few days in a row — we’d love a quick rating.
-              </Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Pressable
-                    key={n}
-                    onPress={() => onPickStars(n)}
-                    hitSlop={6}
-                    style={styles.starBtn}
-                  >
-                    <Text style={[styles.star, { color: n <= stars ? '#F5A623' : colors.borderStrong }]}>
-                      ★
+      <KeyboardAvoidingView
+        style={styles.avoidRoot}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+      >
+        <View style={[styles.backdrop, { justifyContent: cardAlign }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => void closeDismiss()} />
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: bottomPad },
+            ]}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+          >
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              {step === 'stars' ? (
+                <>
+                  <Text style={[styles.kicker, { color: colors.primary }]}>Quick check-in</Text>
+                  <Text style={[styles.title, { color: colors.text }]}>How’s CashTrail?</Text>
+                  <Text style={[styles.sub, { color: colors.textMuted }]}>
+                    You’ve opened the app a few days in a row — we’d love a quick rating.
+                  </Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <Pressable
+                        key={n}
+                        onPress={() => onPickStars(n)}
+                        hitSlop={6}
+                        style={styles.starBtn}
+                      >
+                        <Text style={[styles.star, { color: n <= stars ? '#F5A623' : colors.borderStrong }]}>
+                          ★
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <PrimaryButton title="Continue" onPress={goFeedback} disabled={stars < 1} />
+                  <Pressable onPress={() => void closeDismiss()} style={styles.later}>
+                    <Text style={{ color: colors.textMuted, fontWeight: '700', textAlign: 'center' }}>
+                      Not now
                     </Text>
                   </Pressable>
-                ))}
-              </View>
-              <PrimaryButton title="Continue" onPress={goFeedback} disabled={stars < 1} />
-              <Pressable onPress={() => void closeDismiss()} style={styles.later}>
-                <Text style={{ color: colors.textMuted, fontWeight: '700', textAlign: 'center' }}>
-                  Not now
-                </Text>
-              </Pressable>
-            </>
-          ) : null}
-
-          {step === 'feedback' ? (
-            <>
-              <Text style={[styles.title, { color: colors.text }]}>
-                {stars >= 4 ? 'Glad it’s working' : 'Sorry it’s rough'}
-              </Text>
-              {stars >= 4 ? (
-                <>
-                  <Text style={[styles.label, { color: colors.textMuted }]}>What’s nice?</Text>
-                  <TextInput
-                    value={nice}
-                    onChangeText={setNice}
-                    placeholder="What do you like?"
-                    placeholderTextColor={colors.textMuted}
-                    multiline
-                    style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                  />
-                  <Text style={[styles.label, { color: colors.textMuted }]}>What should change?</Text>
-                  <TextInput
-                    value={change}
-                    onChangeText={setChange}
-                    placeholder="Any improvements?"
-                    placeholderTextColor={colors.textMuted}
-                    multiline
-                    style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
-                  />
                 </>
-              ) : (
-                <>
-                  <Text style={[styles.label, { color: colors.textMuted }]}>What troubles did you face?</Text>
-                  <TextInput
-                    value={trouble}
-                    onChangeText={setTrouble}
-                    placeholder="Tell us what went wrong…"
-                    placeholderTextColor={colors.textMuted}
-                    multiline
-                    style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, minHeight: 110 }]}
-                  />
-                </>
-              )}
-              <PrimaryButton title="Next" onPress={() => void submitFeedback()} loading={busy} />
-            </>
-          ) : null}
+              ) : null}
 
-          {step === 'share' ? (
-            <>
-              <Text style={[styles.title, { color: colors.text }]}>Thanks</Text>
-              <Text style={[styles.sub, { color: colors.textMuted }]}>
-                Know someone who needs clearer money tracking? Share CashTrail.
-              </Text>
-              <Text style={[styles.linkHint, { color: colors.primaryDark }]} numberOfLines={1}>
-                {CASHTRAIL_SHARE_URL}
-              </Text>
-              <PrimaryButton title="Share link" onPress={() => void onShare()} loading={busy} />
-              <Pressable onPress={onSkipShare} style={styles.later}>
-                <Text style={{ color: colors.textMuted, fontWeight: '700', textAlign: 'center' }}>
-                  Done
-                </Text>
-              </Pressable>
-            </>
-          ) : null}
+              {step === 'feedback' ? (
+                <>
+                  <Text style={[styles.title, { color: colors.text }]}>
+                    {stars >= 4 ? 'Glad it’s working' : 'Sorry it’s rough'}
+                  </Text>
+                  {stars >= 4 ? (
+                    <>
+                      <Text style={[styles.label, { color: colors.textMuted }]}>What’s nice?</Text>
+                      <TextInput
+                        value={nice}
+                        onChangeText={setNice}
+                        placeholder="What do you like?"
+                        placeholderTextColor={colors.textMuted}
+                        multiline
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                      />
+                      <Text style={[styles.label, { color: colors.textMuted }]}>What should change?</Text>
+                      <TextInput
+                        value={change}
+                        onChangeText={setChange}
+                        placeholder="Any improvements?"
+                        placeholderTextColor={colors.textMuted}
+                        multiline
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[styles.label, { color: colors.textMuted }]}>What troubles did you face?</Text>
+                      <TextInput
+                        value={trouble}
+                        onChangeText={setTrouble}
+                        placeholder="Tell us what went wrong…"
+                        placeholderTextColor={colors.textMuted}
+                        multiline
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background, minHeight: 110 }]}
+                      />
+                    </>
+                  )}
+                  <PrimaryButton title="Next" onPress={() => void submitFeedback()} loading={busy} />
+                </>
+              ) : null}
+
+              {step === 'share' ? (
+                <>
+                  <Text style={[styles.title, { color: colors.text }]}>Thanks</Text>
+                  <Text style={[styles.sub, { color: colors.textMuted }]}>
+                    Know someone who needs clearer money tracking? Share CashTrail.
+                  </Text>
+                  <Text style={[styles.linkHint, { color: colors.primaryDark }]} numberOfLines={1}>
+                    {CASHTRAIL_SHARE_URL}
+                  </Text>
+                  <PrimaryButton title="Share link" onPress={() => void onShare()} loading={busy} />
+                  <Pressable onPress={onSkipShare} style={styles.later}>
+                    <Text style={{ color: colors.textMuted, fontWeight: '700', textAlign: 'center' }}>
+                      Done
+                    </Text>
+                  </Pressable>
+                </>
+              ) : null}
+            </View>
+          </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   )
 }
 
 function makeStyles(_colors: ColorTokens) {
   return StyleSheet.create({
+    avoidRoot: { flex: 1 },
     backdrop: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'flex-end',
       paddingHorizontal: spacing.md,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'flex-end',
     },
     card: {
       borderRadius: radii.lg,

@@ -9,6 +9,18 @@ import type {
 
 const DB_NAME = 'cashtrail-offline.db'
 
+/** expo-sqlite on Android throws NPE if prepareAsync runs concurrently. */
+let dbChain: Promise<unknown> = Promise.resolve()
+
+function serial<T>(fn: () => Promise<T>): Promise<T> {
+  const run = dbChain.then(fn, fn)
+  dbChain = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
+
 async function migrate(db: SQLite.SQLiteDatabase) {
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
@@ -98,27 +110,34 @@ export async function createSqliteStore(): Promise<OfflineStore> {
 
   const store: OfflineStore = {
     async getMeta(key) {
-      const row = await db.getFirstAsync<{ value: string }>(
-        'SELECT value FROM meta WHERE key = ?',
-        [key],
-      )
-      return row?.value ?? null
+      return serial(async () => {
+        const row = await db.getFirstAsync<{ value: string }>(
+          'SELECT value FROM meta WHERE key = ?',
+          [key],
+        )
+        return row?.value ?? null
+      })
     },
     async setMeta(key, value) {
-      await db.runAsync(
-        'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-        [key, value],
-      )
+      return serial(async () => {
+        await db.runAsync(
+          'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+          [key, value],
+        )
+      })
     },
     async clearAll() {
-      await db.execAsync(`
-        DELETE FROM meta;
-        DELETE FROM accounts;
-        DELETE FROM transactions;
-        DELETE FROM outbox;
-      `)
+      return serial(async () => {
+        await db.execAsync(`
+          DELETE FROM meta;
+          DELETE FROM accounts;
+          DELETE FROM transactions;
+          DELETE FROM outbox;
+        `)
+      })
     },
     async upsertAccounts(accounts) {
+      return serial(async () => {
       for (const a of accounts) {
         await db.runAsync(
           `INSERT INTO accounts (local_id, server_id, name, type, opening_balance, current_balance, updated_at)
@@ -133,27 +152,35 @@ export async function createSqliteStore(): Promise<OfflineStore> {
           [a.localId, a.serverId, a.name, a.type, a.openingBalance, a.currentBalance, a.updatedAt],
         )
       }
+      })
     },
     async listAccounts() {
-      const rows = await db.getAllAsync<Record<string, unknown>>(
-        'SELECT * FROM accounts ORDER BY name COLLATE NOCASE ASC',
-      )
-      return rows.map(rowToAccount)
+      return serial(async () => {
+        const rows = await db.getAllAsync<Record<string, unknown>>(
+          'SELECT * FROM accounts ORDER BY name COLLATE NOCASE ASC',
+        )
+        return rows.map(rowToAccount)
+      })
     },
     async getAccountByServerId(serverId) {
-      const row = await db.getFirstAsync<Record<string, unknown>>(
-        'SELECT * FROM accounts WHERE server_id = ?',
-        [serverId],
-      )
-      return row ? rowToAccount(row) : undefined
+      return serial(async () => {
+        const row = await db.getFirstAsync<Record<string, unknown>>(
+          'SELECT * FROM accounts WHERE server_id = ?',
+          [serverId],
+        )
+        return row ? rowToAccount(row) : undefined
+      })
     },
     async updateAccountBalance(serverId, currentBalance) {
-      await db.runAsync(
-        'UPDATE accounts SET current_balance = ?, updated_at = ? WHERE server_id = ?',
-        [currentBalance, new Date().toISOString(), serverId],
-      )
+      return serial(async () => {
+        await db.runAsync(
+          'UPDATE accounts SET current_balance = ?, updated_at = ? WHERE server_id = ?',
+          [currentBalance, new Date().toISOString(), serverId],
+        )
+      })
     },
     async upsertTransactions(txs) {
+      return serial(async () => {
       for (const t of txs) {
         await db.runAsync(
           `INSERT INTO transactions (
@@ -188,43 +215,57 @@ export async function createSqliteStore(): Promise<OfflineStore> {
           ],
         )
       }
+      })
     },
     async listTransactions() {
-      const rows = await db.getAllAsync<Record<string, unknown>>(
-        'SELECT * FROM transactions ORDER BY date DESC, created_at DESC',
-      )
-      return rows.map(rowToTx)
+      return serial(async () => {
+        const rows = await db.getAllAsync<Record<string, unknown>>(
+          'SELECT * FROM transactions ORDER BY date DESC, created_at DESC',
+        )
+        return rows.map(rowToTx)
+      })
     },
     async getTransaction(localId) {
-      const row = await db.getFirstAsync<Record<string, unknown>>(
-        'SELECT * FROM transactions WHERE local_id = ?',
-        [localId],
-      )
-      return row ? rowToTx(row) : undefined
+      return serial(async () => {
+        const row = await db.getFirstAsync<Record<string, unknown>>(
+          'SELECT * FROM transactions WHERE local_id = ?',
+          [localId],
+        )
+        return row ? rowToTx(row) : undefined
+      })
     },
     async listPendingTransactions() {
-      const rows = await db.getAllAsync<Record<string, unknown>>(
-        `SELECT * FROM transactions WHERE sync_status IN ('pending', 'failed')
-         ORDER BY date DESC, created_at DESC`,
-      )
-      return rows.map(rowToTx)
+      return serial(async () => {
+        const rows = await db.getAllAsync<Record<string, unknown>>(
+          `SELECT * FROM transactions WHERE sync_status IN ('pending', 'failed')
+           ORDER BY date DESC, created_at DESC`,
+        )
+        return rows.map(rowToTx)
+      })
     },
     async clearSyncedTransactions() {
-      await db.runAsync(`DELETE FROM transactions WHERE sync_status = 'synced'`)
+      return serial(async () => {
+        await db.runAsync(`DELETE FROM transactions WHERE sync_status = 'synced'`)
+      })
     },
     async markTransactionSynced(localId, serverId) {
-      await db.runAsync(
-        `UPDATE transactions SET server_id = ?, sync_status = 'synced', last_error = NULL WHERE local_id = ?`,
-        [serverId, localId],
-      )
+      return serial(async () => {
+        await db.runAsync(
+          `UPDATE transactions SET server_id = ?, sync_status = 'synced', last_error = NULL WHERE local_id = ?`,
+          [serverId, localId],
+        )
+      })
     },
     async markTransactionFailed(localId, error) {
-      await db.runAsync(
-        `UPDATE transactions SET sync_status = 'failed', last_error = ? WHERE local_id = ?`,
-        [error, localId],
-      )
+      return serial(async () => {
+        await db.runAsync(
+          `UPDATE transactions SET sync_status = 'failed', last_error = ? WHERE local_id = ?`,
+          [error, localId],
+        )
+      })
     },
     async addOutbox(item) {
+      return serial(async () => {
       await db.runAsync(
         `INSERT INTO outbox (id, entity, local_id, payload, attempts, last_error, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -245,21 +286,28 @@ export async function createSqliteStore(): Promise<OfflineStore> {
           item.createdAt,
         ],
       )
+      })
     },
     async listOutbox() {
-      const rows = await db.getAllAsync<Record<string, unknown>>(
-        'SELECT * FROM outbox ORDER BY created_at ASC',
-      )
-      return rows.map(rowToOutbox)
+      return serial(async () => {
+        const rows = await db.getAllAsync<Record<string, unknown>>(
+          'SELECT * FROM outbox ORDER BY created_at ASC',
+        )
+        return rows.map(rowToOutbox)
+      })
     },
     async removeOutbox(id) {
-      await db.runAsync('DELETE FROM outbox WHERE id = ?', [id])
+      return serial(async () => {
+        await db.runAsync('DELETE FROM outbox WHERE id = ?', [id])
+      })
     },
     async bumpOutboxAttempt(id, error) {
-      await db.runAsync(
-        `UPDATE outbox SET attempts = attempts + 1, last_error = ? WHERE id = ?`,
-        [error, id],
-      )
+      return serial(async () => {
+        await db.runAsync(
+          `UPDATE outbox SET attempts = attempts + 1, last_error = ? WHERE id = ?`,
+          [error, id],
+        )
+      })
     },
   }
 
