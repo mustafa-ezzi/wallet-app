@@ -1,12 +1,7 @@
 import { useNavigate } from 'react-router-dom'
-import {
-  Download,
-  MessageSquareText,
-  ShieldAlert,
-  Smartphone,
-  X,
-} from 'lucide-react'
+import { Download, Play, Smartphone, X } from 'lucide-react'
 import { ANDROID_APK_URL, ANDROID_APP_LABEL } from '../config/androidApp'
+import { startAndroidInstallTour } from '../components/AndroidInstallTour'
 import { track } from '../lib/analytics'
 
 export default function GetAndroidAppPage() {
@@ -15,6 +10,10 @@ export default function GetAndroidAppPage() {
   const onDownload = () => {
     track('android_apk_download_click')
     window.open(ANDROID_APK_URL, '_blank', 'noopener,noreferrer')
+  }
+
+  const onStartTour = () => {
+    startAndroidInstallTour(0)
   }
 
   return (
@@ -27,7 +26,7 @@ export default function GetAndroidAppPage() {
           <div>
             <h1 style={{ margin: 0 }}>Android app</h1>
             <p className="page-subtitle" style={{ marginTop: '0.35rem' }}>
-              Auto bank SMS &amp; wallet notifications need the native Android app — not the website PWA.
+              Auto bank SMS needs the native Android app — follow the guided walkthrough below.
             </p>
           </div>
         </div>
@@ -36,99 +35,49 @@ export default function GetAndroidAppPage() {
         </button>
       </div>
 
-      <section className="glass get-android-card">
+      <section className="glass get-android-card get-android-hero" data-tour="android-walkthrough-start">
         <p className="get-android-label">{ANDROID_APP_LABEL}</p>
         <p className="text-muted" style={{ fontSize: '0.88rem', lineHeight: 1.45, margin: '0 0 1rem' }}>
-          Direct Expo install (not from Google Play). Open this page on your <strong>Android phone</strong>,
-          then follow the steps below.
+          We’ll highlight each step on screen — Settings → Android app → Download → Play Protect → Bank alerts.
         </p>
-        <button type="button" className="btn-primary" style={{ width: '100%' }} onClick={onDownload}>
-          <Download size={16} strokeWidth={2.25} />
-          Download Android APK
+        <button type="button" className="btn-primary" style={{ width: '100%' }} onClick={onStartTour}>
+          <Play size={16} strokeWidth={2.25} fill="currentColor" />
+          Start install walkthrough
         </button>
-        <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.65rem', textAlign: 'center' }}>
-          Opens the Expo build page — tap Install / Download APK there.
-        </p>
+        <button
+          type="button"
+          className="btn-glass"
+          style={{ width: '100%', marginTop: '0.55rem' }}
+          data-tour="android-download"
+          onClick={onDownload}
+        >
+          <Download size={16} strokeWidth={2.25} />
+          Download Android APK directly
+        </button>
       </section>
 
-      <section className="glass get-android-card">
-        <h2 className="get-android-h2">
-          <Download size={16} strokeWidth={2} color="var(--primary)" />
-          1. Download &amp; install
-        </h2>
+      <section className="glass get-android-card get-android-warn" data-tour="android-play-protect">
+        <h2 className="get-android-h2">If Play Protect blocks install</h2>
         <ol className="get-android-steps">
-          <li>On your phone, tap <strong>Download Android APK</strong> above.</li>
-          <li>On the Expo page, choose <strong>Install</strong> or download the <strong>.apk</strong> file.</li>
-          <li>
-            If Android asks “Install unknown apps?”, allow it for <strong>Chrome</strong> or{' '}
-            <strong>Files</strong> (whichever opened the APK).
-          </li>
-          <li>Open the downloaded file and tap <strong>Install</strong>.</li>
+          <li>Open <strong>Play Store</strong> → profile → <strong>Play Protect</strong>.</li>
+          <li>Settings gear → turn <strong>Scan apps</strong> off temporarily.</li>
+          <li>Or tap <strong>Install anyway</strong> on the block screen.</li>
+          <li>After CashTrail installs, turn Play Protect <strong>back on</strong>.</li>
         </ol>
       </section>
 
-      <section className="glass get-android-card get-android-warn">
-        <h2 className="get-android-h2">
-          <ShieldAlert size={16} strokeWidth={2} color="#c2410c" />
-          2. If Play Protect blocks the install
-        </h2>
-        <p className="text-muted" style={{ fontSize: '0.85rem', lineHeight: 1.45, margin: '0 0 0.75rem' }}>
-          Sideloaded apps that use SMS often trigger Google Play Protect. This is common for Expo preview
-          builds — not proof CashTrail is malware. Pause Protect only while installing, then turn it back on.
-        </p>
+      <section className="glass get-android-card" data-tour="android-bank-setup">
+        <h2 className="get-android-h2">After install — bank alerts</h2>
         <ol className="get-android-steps">
-          <li>Open the <strong>Play Store</strong> app on your phone.</li>
-          <li>Tap your profile picture → <strong>Play Protect</strong>.</li>
-          <li>Tap the settings gear → turn <strong>Scan apps with Play Protect</strong> off temporarily.</li>
-          <li>Or on the block screen, tap <strong>More details</strong> → <strong>Install anyway</strong> if shown.</li>
-          <li>Install CashTrail, open it once, then return to Play Protect and turn scanning <strong>back on</strong>.</li>
+          <li>Open CashTrail on Android and sign in.</li>
+          <li>Go to <strong>Settings → Bank alerts</strong>.</li>
+          <li>Enable <strong>SMS</strong> and/or <strong>Bank apps</strong>.</li>
+          <li><strong>Approve</strong> or <strong>Reject</strong> each draft — same queue as this website.</li>
         </ol>
-        <p className="get-android-note">
-          Leaving Play Protect off long-term is not recommended. Turn it back on after CashTrail is installed.
-        </p>
-      </section>
-
-      <section className="glass get-android-card">
-        <h2 className="get-android-h2">
-          <MessageSquareText size={16} strokeWidth={2} color="var(--primary)" />
-          3. Turn on bank auto-detect
-        </h2>
-        <ol className="get-android-steps">
-          <li>Open <strong>CashTrail</strong> and sign in with the same account as the website.</li>
-          <li>Go to <strong>Settings → Bank alerts</strong> (or the Home banner).</li>
-          <li>
-            Enable <strong>SMS</strong> and/or <strong>Bank apps</strong> (notification access for Meezan,
-            NayaPay, SadaPay, etc.).
-          </li>
-          <li>Grant the permissions Android asks for.</li>
-          <li>
-            When a bank alert arrives, open the pending draft → <strong>Approve</strong> or{' '}
-            <strong>Reject</strong>. Nothing posts without you.
-          </li>
-          <li>The same pending queue also appears here on the website under Bank SMS.</li>
-        </ol>
-      </section>
-
-      <section className="glass get-android-card">
-        <h2 className="get-android-h2">Tips</h2>
-        <ul className="get-android-tips">
-          <li>
-            The website <strong>Install</strong> (PWA) is only a home-screen shortcut — it cannot read SMS.
-          </li>
-          <li>
-            On Xiaomi / Redmi / POCO, also check Autostart and “other permissions” if SMS never arrives.
-          </li>
-          <li>
-            Prefer <strong>Bank apps</strong> notification access if SMS is blocked on your phone.
-          </li>
-          <li>
-            Need a newer build? Ask for an updated Expo link — old build pages expire.
-          </li>
-        </ul>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.55rem', marginTop: '1rem' }}>
-          <button type="button" className="btn-primary" onClick={onDownload}>
-            <Download size={16} strokeWidth={2.25} />
-            Download again
+          <button type="button" className="btn-glass" onClick={onStartTour}>
+            <Play size={14} strokeWidth={2.25} />
+            Replay walkthrough
           </button>
           <button type="button" className="btn-glass" onClick={() => navigate('/bank-sms')}>
             Open Bank SMS on web

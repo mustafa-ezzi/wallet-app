@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { startAndroidInstallTour } from '../components/AndroidInstallTour'
 import {
   Check,
   Inbox,
@@ -479,8 +480,7 @@ export default function BankSmsImportPage() {
                   Want auto bank alerts?
                 </h2>
                 <p className="bsms-panel-sub" style={{ margin: 0 }}>
-                  Web can paste &amp; approve. Auto SMS / bank apps need the Android APK — full install guide
-                  (including Play Protect).
+                  Web can paste &amp; approve. Auto SMS needs the Android app — use the guided walkthrough.
                 </p>
               </div>
             </div>
@@ -488,9 +488,9 @@ export default function BankSmsImportPage() {
               type="button"
               className="btn-primary"
               style={{ fontSize: '0.8rem', whiteSpace: 'nowrap' }}
-              onClick={() => navigate('/get-android')}
+              onClick={() => startAndroidInstallTour(0)}
             >
-              Get Android app
+              Start walkthrough
             </button>
           </div>
         </section>

@@ -1,5 +1,5 @@
-import { Download, Share, Plus, Smartphone, X } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { Download, Share, Plus, Play, X } from 'lucide-react'
+import { startAndroidInstallTour } from './AndroidInstallTour'
 
 interface Props {
   open: boolean
@@ -10,7 +10,6 @@ interface Props {
 }
 
 export default function InstallAppDialog({ open, ios, canPrompt, onClose, onInstall }: Props) {
-  const navigate = useNavigate()
   if (!open) return null
 
   return (
@@ -79,15 +78,15 @@ export default function InstallAppDialog({ open, ios, canPrompt, onClose, onInst
             </p>
             <button
               type="button"
-              className="btn-glass"
+              className="btn-primary"
               style={{ width: '100%' }}
               onClick={() => {
                 onClose()
-                navigate('/get-android')
+                startAndroidInstallTour(0)
               }}
             >
-              <Smartphone size={16} strokeWidth={2} />
-              Android APK install guide
+              <Play size={16} strokeWidth={2.25} fill="currentColor" />
+              Start Android install walkthrough
             </button>
           </div>
         ) : null}

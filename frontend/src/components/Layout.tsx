@@ -19,6 +19,8 @@ import anime from 'animejs'
 import AddTransactionModal from './AddTransactionModal'
 import InstallAppDialog from './InstallAppDialog'
 import OnboardingTour from './OnboardingTour'
+import AndroidInstallTour from './AndroidInstallTour'
+import { ANDROID_APK_URL } from '../config/androidApp'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 import { useTravelMode } from '../travel/TravelModeContext'
 
@@ -137,6 +139,7 @@ export default function Layout() {
           </button>
           <button
             className="mobile-header-settings"
+            data-tour="settings-nav"
             onClick={() => navigate('/settings')}
             aria-label="Settings"
           >
@@ -210,6 +213,7 @@ export default function Layout() {
           )}
           <button
             className={`sidebar-nav-item ${location.pathname === '/settings' ? 'active' : ''}`}
+            data-tour="settings-nav"
             onClick={() => navigate('/settings')}
           >
             <span className="nav-icon"><Settings size={18} strokeWidth={1.75} /></span>
@@ -285,6 +289,7 @@ export default function Layout() {
       />
 
       <OnboardingTour />
+      <AndroidInstallTour apkUrl={ANDROID_APK_URL} />
     </div>
   )
 }
