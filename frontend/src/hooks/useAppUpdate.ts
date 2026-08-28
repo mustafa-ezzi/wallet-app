@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
+import { markAndroidTourAfterUpdate } from '../components/AndroidInstallTour'
 
 const CHECK_INTERVAL_MS = 60 * 1000
 
@@ -108,6 +109,7 @@ export function useAppUpdate() {
     if (refreshing) return
     setRefreshing(true)
     setNeedRefresh(false)
+    markAndroidTourAfterUpdate()
     try {
       await applyUpdate()
     } catch {

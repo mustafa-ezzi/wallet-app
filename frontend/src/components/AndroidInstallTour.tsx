@@ -4,6 +4,26 @@ import anime from 'animejs'
 import { track } from '../lib/analytics'
 
 export const ANDROID_INSTALL_TOUR_EVENT = 'cashtrail:android-install-tour'
+const TOUR_AFTER_UPDATE_KEY = 'cashtrail_android_tour_after_update'
+
+/** Call right before applying a PWA update — tour starts on the next page load. */
+export function markAndroidTourAfterUpdate() {
+  try {
+    sessionStorage.setItem(TOUR_AFTER_UPDATE_KEY, '1')
+  } catch {
+    /* ignore */
+  }
+}
+
+function consumeTourAfterUpdateFlag(): boolean {
+  try {
+    if (sessionStorage.getItem(TOUR_AFTER_UPDATE_KEY) !== '1') return false
+    sessionStorage.removeItem(TOUR_AFTER_UPDATE_KEY)
+    return true
+  } catch {
+    return false
+  }
+}
 
 export type AndroidInstallTourStep = {
   id: string
@@ -92,6 +112,16 @@ export default function AndroidInstallTour({ apkUrl }: Props) {
     }
     window.addEventListener(ANDROID_INSTALL_TOUR_EVENT, onStart)
     return () => window.removeEventListener(ANDROID_INSTALL_TOUR_EVENT, onStart)
+  }, [])
+
+  useEffect(() => {
+    if (!consumeTourAfterUpdateFlag()) return
+    const t = window.setTimeout(() => {
+      setStep(0)
+      setActive(true)
+      track('android_install_tour_started', { from_step: 0, trigger: 'after_update' })
+    }, 900)
+    return () => window.clearTimeout(t)
   }, [])
 
   const current = ANDROID_INSTALL_STEPS[step]

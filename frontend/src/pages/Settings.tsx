@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, LogOut, MessageSquareText, Palette, Play, Smartphone, UserRound, X } from 'lucide-react'
-import { startAndroidInstallTour } from '../components/AndroidInstallTour'
+import { KeyRound, LogOut, MessageSquareText, Palette, Smartphone, UserRound, X } from 'lucide-react'
 import { BANK_SMS_UX } from '../lib/bank-sms-parser'
 import { authApi, apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -185,59 +184,50 @@ export default function Settings() {
         </div>
       </div>
 
-      <div data-tour="android-app-settings" style={{ marginBottom: '1rem' }}>
-        <button
-          type="button"
-          className="glass glass-hover"
-          style={{
-            display: 'block',
-            width: '100%',
-            textAlign: 'left',
-            padding: '1.15rem 1.2rem',
-            borderRadius: 'var(--radius-md)',
-            cursor: 'pointer',
-            border: '1px solid var(--border-2)',
-            background: 'var(--surface)',
-          }}
-          onClick={() => navigate('/get-android')}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem' }}>
-              <div
-                style={{
-                  width: '2.35rem',
-                  height: '2.35rem',
-                  borderRadius: '0.7rem',
-                  display: 'grid',
-                  placeItems: 'center',
-                  background: 'rgba(var(--primary-rgb, 5, 150, 105), 0.12)',
-                  flexShrink: 0,
-                }}
-              >
-                <Smartphone size={17} strokeWidth={1.75} color="var(--primary)" />
-              </div>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Android app (auto bank alerts)</h3>
-                <p className="text-muted" style={{ fontSize: '0.78rem', margin: '0.3rem 0 0', lineHeight: 1.4 }}>
-                  Guided walkthrough: Settings → download APK → Play Protect → bank alerts.
-                </p>
-              </div>
+      <button
+        type="button"
+        className="glass glass-hover"
+        data-tour="android-app-settings"
+        style={{
+          display: 'block',
+          width: '100%',
+          textAlign: 'left',
+          padding: '1.15rem 1.2rem',
+          marginBottom: '1rem',
+          borderRadius: 'var(--radius-md)',
+          cursor: 'pointer',
+          border: '1px solid var(--border-2)',
+          background: 'var(--surface)',
+        }}
+        onClick={() => navigate('/get-android')}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.7rem' }}>
+            <div
+              style={{
+                width: '2.35rem',
+                height: '2.35rem',
+                borderRadius: '0.7rem',
+                display: 'grid',
+                placeItems: 'center',
+                background: 'rgba(var(--primary-rgb, 5, 150, 105), 0.12)',
+                flexShrink: 0,
+              }}
+            >
+              <Smartphone size={17} strokeWidth={1.75} color="var(--primary)" />
             </div>
-            <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-              Open →
-            </span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '0.95rem' }}>Android app (auto bank alerts)</h3>
+              <p className="text-muted" style={{ fontSize: '0.78rem', margin: '0.3rem 0 0', lineHeight: 1.4 }}>
+                Download the Expo APK and enable SMS / bank notifications.
+              </p>
+            </div>
           </div>
-        </button>
-        <button
-          type="button"
-          className="btn-primary"
-          style={{ width: '100%', marginTop: '0.55rem' }}
-          onClick={() => startAndroidInstallTour(0)}
-        >
-          <Play size={14} strokeWidth={2.25} fill="currentColor" />
-          Start install walkthrough
-        </button>
-      </div>
+          <span style={{ color: 'var(--primary)', fontWeight: 800, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+            Open →
+          </span>
+        </div>
+      </button>
 
       <button
         type="button"
