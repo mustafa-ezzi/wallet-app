@@ -58,6 +58,10 @@ export async function ingestBankSmsBody(
   const parsed = parseBankSms(text, { kindOverrides })
   if (parsed.ignore) return { ok: false, reason: parsed.ignoreReason || 'ignored' }
   if (!parsed.amount) return { ok: false, reason: 'no-amount' }
+  // Auto-capture: only queue when the parse looks like a real bank money alert
+  if (source !== 'paste' && !parsed.ok) {
+    return { ok: false, reason: 'weak-parse' }
+  }
 
   const wallets = await loadWallets()
   const draft = buildApproveDraft(parsed, wallets, undefined, { aliases, defaultCashId })

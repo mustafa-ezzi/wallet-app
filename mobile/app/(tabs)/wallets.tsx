@@ -58,6 +58,7 @@ export default function WalletsScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const [editing, setEditing] = useState<Account | null>(null)
   const [name, setName] = useState('')
   const [type, setType] = useState<'bank' | 'cash'>('bank')
   const [opening, setOpening] = useState('0')
@@ -157,6 +158,57 @@ export default function WalletsScreen() {
     }
   }
 
+  const openCreate = () => {
+    setEditing(null)
+    setName('')
+    setType('bank')
+    setOpening('0')
+    setFormError('')
+    setCreateOpen(true)
+  }
+
+  const openEdit = (a: Account) => {
+    setEditing(a)
+    setName(a.name)
+    setType(a.type === 'cash' ? 'cash' : 'bank')
+    setOpening(String(a.opening_balance ?? 0))
+    setFormError('')
+    setCreateOpen(true)
+  }
+
+  const closeWalletForm = () => {
+    setCreateOpen(false)
+    setEditing(null)
+    setName('')
+    setOpening('0')
+    setFormError('')
+  }
+
+  const deleteWallet = (a: Account) => {
+    Alert.alert(
+      'Delete wallet?',
+      `Delete “${a.name}”? All its transactions will also be deleted. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await accountsApi.remove(a.id)
+                bumpRefresh()
+                await load(true)
+              } catch (err) {
+                setError(apiErrorMessage(err, 'Could not delete wallet.'))
+              }
+            })()
+          },
+        },
+      ],
+    )
+  }
+
   const create = async () => {
     if (savingRef.current) return
     setFormError('')
@@ -167,18 +219,21 @@ export default function WalletsScreen() {
     savingRef.current = true
     setSaving(true)
     try {
-      await accountsApi.create({
+      const payload = {
         name: name.trim(),
         type,
         opening_balance: toMoney(opening),
-      })
-      setCreateOpen(false)
-      setName('')
-      setOpening('0')
+      }
+      if (editing) {
+        await accountsApi.update(editing.id, payload)
+      } else {
+        await accountsApi.create(payload)
+      }
+      closeWalletForm()
       bumpRefresh()
       await load(true)
     } catch (err) {
-      setFormError(apiErrorMessage(err, 'Could not create wallet.'))
+      setFormError(apiErrorMessage(err, editing ? 'Could not update wallet.' : 'Could not create wallet.'))
     } finally {
       savingRef.current = false
       setSaving(false)
@@ -233,10 +288,13 @@ export default function WalletsScreen() {
             >
               <Text style={styles.actionText}>Transactions</Text>
             </BouncyPressable>
-            <BouncyPressable style={styles.actionBtn}>
+            <BouncyPressable style={styles.actionBtn} onPress={() => openEdit(a)}>
               <Text style={styles.actionText}>Edit</Text>
             </BouncyPressable>
-            <BouncyPressable style={[styles.actionBtn, styles.actionBtnDanger]}>
+            <BouncyPressable
+              style={[styles.actionBtn, styles.actionBtnDanger]}
+              onPress={() => deleteWallet(a)}
+            >
               <Text style={styles.actionTextDanger}>Delete</Text>
             </BouncyPressable>
           </View>
@@ -362,7 +420,7 @@ export default function WalletsScreen() {
             </View>
             <Text style={styles.sub}>Manage bank, cash, and people balances.</Text>
           </View>
-          <BouncyPressable style={styles.addBtn} onPress={() => setCreateOpen(true)}>
+          <BouncyPressable style={styles.addBtn} onPress={openCreate}>
             <Text style={styles.addBtnText}>+ Create Wallet</Text>
           </BouncyPressable>
         </View>
@@ -545,21 +603,31 @@ export default function WalletsScreen() {
         }}
       />
 
-      <Modal visible={createOpen} animationType="fade" transparent onRequestClose={() => setCreateOpen(false)}>
+      <Modal visible={createOpen} animationType="fade" transparent onRequestClose={closeWalletForm}>
         <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
-          <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)} />
+          <Pressable style={styles.backdrop} onPress={closeWalletForm} />
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>New wallet</Text>
+            <Text style={styles.sheetTitle}>{editing ? 'Edit wallet' : 'New wallet'}</Text>
             <ErrorBanner message={formError} />
             <Field label="Name" value={name} onChangeText={setName} placeholder="Meezan / Cash" autoCapitalize="words" />
             <Text style={styles.label}>Type</Text>
             <View style={styles.seg}>
               {(['bank', 'cash'] as const).map((t) => (
-                <Pressable key={t} onPress={() => setType(t)} style={[styles.segBtn, type === t && styles.segBtnOn]}>
+                <Pressable
+                  key={t}
+                  onPress={() => setType(t)}
+                  style={[styles.segBtn, type === t && styles.segBtnOn]}
+                  disabled={Boolean(editing)}
+                >
                   <Text style={[styles.segText, type === t && styles.segTextOn]}>{t === 'bank' ? 'Bank' : 'Cash'}</Text>
                 </Pressable>
               ))}
             </View>
+            {editing ? (
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
+                Type can’t be changed after create. Opening balance is the ledger starting point.
+              </Text>
+            ) : null}
             <Field
               label="Opening balance"
               value={opening}
@@ -567,7 +635,11 @@ export default function WalletsScreen() {
               keyboardType="decimal-pad"
               placeholder="0"
             />
-            <PrimaryButton title="Create wallet" onPress={() => void create()} loading={saving} />
+            <PrimaryButton
+              title={editing ? 'Save changes' : 'Create wallet'}
+              onPress={() => void create()}
+              loading={saving}
+            />
           </View>
         </KeyboardAvoidingView>
       </Modal>

@@ -92,6 +92,18 @@ export const FIXTURE_SMS: FixtureSms[] = [
     expectedKind: 'ignore',
     text: 'Limited offer! Get 20% off on transfer fees. Download our app now.',
   },
+  {
+    id: 'ignore-zong-dbazar',
+    label: 'Zong DBazar restaurant deal',
+    expectedKind: 'ignore',
+    text: 'A Perfect Pairing Deal!Get 2 Chinese Dishes + 2 Mint Margaritas For Rs. 1,999 At Incantare Coffee Cafe & Grill. https://bit.ly/4uRLzQI',
+  },
+  {
+    id: 'ignore-telco-per-day',
+    label: 'Missed Call Alerts /Day telco promo',
+    expectedKind: 'ignore',
+    text: 'Ab koe call miss nahi ho ge, Abhi 1 likh ker reply karain aur hasil karain Missed Call Alerts sirf RS 2.51+Tax/Day mai. To block this SMS send REG to 3627',
+  },
 
   // ── ATM keyword variants ─────────────────────────────────────────────────
   {

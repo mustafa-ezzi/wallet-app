@@ -162,7 +162,13 @@ describe('phase 5 — corrections, templates, people', () => {
   })
 
   it('hard-filters verification / promo SMS', () => {
-    for (const id of ['ignore-verification-code', 'ignore-declined', 'ignore-promo-offer']) {
+    for (const id of [
+      'ignore-verification-code',
+      'ignore-declined',
+      'ignore-promo-offer',
+      'ignore-zong-dbazar',
+      'ignore-telco-per-day',
+    ]) {
       const f = FIXTURE_SMS.find((x) => x.id === id)!
       expect(parseBankSms(f.text).ignore).toBe(true)
     }

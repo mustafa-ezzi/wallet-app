@@ -69,6 +69,26 @@ const IGNORE_RES = [
   /\blucky\s+draw\b/i,
   /\bpin\s+(?:is|code)\b/i,
   /\byour\s+code\s+is\b/i,
+  // Telco / marketplace / restaurant promos (Rs amount ≠ bank transaction)
+  /\bmissed\s+call\s+alerts?\b/i,
+  /\b\+?\s*tax\s*\/\s*day\b/i,
+  /\brs\.?\s*[\d,]+(?:\.\d+)?\s*\+?\s*tax\s*\/\s*day\b/i,
+  /\b\/\s*day\b/i,
+  /\bto\s+block\s+this\s+sms\b/i,
+  /\bsend\s+reg\s+to\b/i,
+  /\breply\s+(?:with\s+)?['"]?\d['"]?\b/i,
+  /\blikh\s+ker\s+reply\b/i,
+  /\bhasil\s+karain\b/i,
+  /\babhi\s+\d\s+likh\b/i,
+  /\bzong\s*d?bazar\b|\bdbazar\b|\bzongbazaar\b/i,
+  /\bbit\.ly\/|\btinyurl\.com\/|\bgoo\.gl\//i,
+  /\bperfect\s+pairing\s+deal\b/i,
+  /\bfor\s+rs\.?\s*[\d,]+\s+at\b/i,
+  /\bget\s+\d+\s+.+\s+for\s+rs\.?\s*[\d,]/i,
+  /\bdeal!\b/i,
+  /\bsubscribe\b/i,
+  /\bpackage\s+offer\b/i,
+  /\bshort\s*code\b/i,
 ]
 
 function normalize(text: string): string {
@@ -190,6 +210,18 @@ function classify(text: string, tid: string | null): { kind: BankSmsKind; reason
   return { kind: 'unknown', reason: 'no-match', confidence: 0.2 }
 }
 
+function hasBankMoneySignal(
+  text: string,
+  parts: { tid: string | null; accountMask: string | null; bankHint: string | null; kind: BankSmsKind },
+): boolean {
+  if (parts.tid || parts.accountMask || parts.bankHint) return true
+  if (parts.kind !== 'unknown') return true
+  // Extra transactional verbs not always enough alone in classify edge cases
+  return (
+    /\b(?:debited|credited|withdrawn|purchased?|pos|raast|iban|a\/c|ac#)\b/i.test(text)
+  )
+}
+
 /**
  * Parse a bank SMS / alert body into a structured draft.
  * Phase 1: on-device / paste only — no network.
@@ -242,6 +274,26 @@ export function parseBankSms(
   const { isoDate, occurredAt } = parseOccurred(raw)
   const base = classify(raw, tid)
   const { kind, reason, confidence } = applyBankTemplate(raw, bankHint, base)
+
+  // Rs. amount alone (restaurant deal, telco /Day offer) is not a bank alert
+  if (
+    amount != null
+    && !hasBankMoneySignal(raw, { tid, accountMask, bankHint, kind })
+  ) {
+    return {
+      ...empty,
+      ok: false,
+      ignore: true,
+      ignoreReason: 'filtered:no-bank-signal',
+      fingerprint: fingerprint({
+        amount, date: isoDate, tid, kind: 'ignore', mask: accountMask, raw,
+      }),
+      reason: 'ignored',
+      amount,
+      date: isoDate,
+      occurredAt,
+    }
+  }
 
   const ok = amount != null && kind !== 'unknown'
   const parsed: ParsedBankSms = {
