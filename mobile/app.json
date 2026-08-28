@@ -118,7 +118,8 @@
         }
       ],
       "expo-sharing",
-      "expo-sms-listener"
+      "expo-sms-listener",
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true

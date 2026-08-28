@@ -5,6 +5,7 @@ import { View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import { AnimatedSplashScreen } from '@/src/components/AnimatedSplashScreen'
 import { AuthProvider } from '@/src/context/AuthContext'
+import { PostHogRoot } from '@/src/lib/PostHogRoot'
 import { MoneyUiProvider } from '@/src/context/MoneyUiContext'
 import { OfflineProvider } from '@/src/offline'
 import { RemindersProvider } from '@/src/notifications'
@@ -55,6 +56,7 @@ export default function RootLayout() {
     <ThemeProvider>
       <View style={{ flex: 1 }}>
         <AuthProvider>
+          <PostHogRoot>
           <OfflineProvider>
             <RemindersProvider>
               <BankSmsProvider>
@@ -70,6 +72,7 @@ export default function RootLayout() {
               </BankSmsProvider>
             </RemindersProvider>
           </OfflineProvider>
+          </PostHogRoot>
         </AuthProvider>
         <ThemeRevealOverlay />
       </View>

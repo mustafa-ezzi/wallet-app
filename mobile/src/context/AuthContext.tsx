@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react'
 import { apiErrorMessage, authApi } from '../api/client'
+import { track } from '../lib/analytics'
 import {
   clearSession,
   getAccessToken,
@@ -134,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await authApi.login(email.trim(), password)
     await setTokens(data.access, data.refresh)
     await refreshUser()
+    track('user_logged_in')
   }, [refreshUser])
 
   const register = useCallback(async (payload: {
@@ -149,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     await clearSession()
     setUser(null)
+    track('user_logged_out')
   }, [])
 
   const value = useMemo(

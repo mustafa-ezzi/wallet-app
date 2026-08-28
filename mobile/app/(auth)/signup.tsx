@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { apiErrorMessage, useAuth } from '@/src/context/AuthContext'
+import { track } from '@/src/lib/analytics'
 import { BrandMark, ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
 import { colors, spacing, typography } from '@/src/theme/colors'
 
@@ -40,6 +41,7 @@ export default function SignupScreen() {
         currency: 'PKR',
       })
       await login(trimmedEmail, password)
+      track('user_signed_up', { source: 'signup_screen', currency: 'PKR' })
     } catch (err) {
       setError(apiErrorMessage(err, 'Registration failed.'))
     } finally {
