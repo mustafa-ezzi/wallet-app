@@ -58,6 +58,20 @@ export const BANK_TEMPLATES: BankTemplate[] = [
     ],
   },
   {
+    hint: 'nayapay',
+    rules: [
+      { re: /\byou\s+received\b|\breceived\b|\bcredited\b|\bincoming\b/i, kind: 'income', confidence: 0.92, reason: 'nayapay:in' },
+      { re: /\byou\s+paid\b|\byou\s+sent\b|\byou\s+spent\b|\bpaid\b|\bsent\b|\bspent\b|\bpayment\b/i, kind: 'expense', confidence: 0.92, reason: 'nayapay:out' },
+    ],
+  },
+  {
+    hint: 'sadapay',
+    rules: [
+      { re: /\byou\s+received\b|\breceived\b|\bcredited\b|\bincoming\b/i, kind: 'income', confidence: 0.92, reason: 'sadapay:in' },
+      { re: /\byou\s+paid\b|\byou\s+sent\b|\byou\s+spent\b|\bpaid\b|\bsent\b|\bspent\b|\bpayment\b/i, kind: 'expense', confidence: 0.92, reason: 'sadapay:out' },
+    ],
+  },
+  {
     hint: 'alfalah',
     rules: [
       { re: /\batm\b|\bcwdr\b/i, kind: 'atm', confidence: 0.94, reason: 'alfalah:atm' },

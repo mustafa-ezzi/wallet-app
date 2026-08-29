@@ -11,9 +11,10 @@ import {
 const PRODUCTION_API_ROOT = 'https://tranquil-radiance-production.up.railway.app'
 
 /** Railway cold starts often need a long first wait + retries. */
-const DEFAULT_TIMEOUT_MS = 45000
-const MAX_NETWORK_RETRIES = 2
-const RETRY_BASE_DELAY_MS = 1200
+const DEFAULT_TIMEOUT_MS = 60000
+const MAX_NETWORK_RETRIES = 4
+const RETRY_BASE_DELAY_MS = 2000
+const MUTATING = new Set(['post', 'put', 'patch', 'delete'])
 
 function normalizeApiRoot(raw: string | undefined | null): string {
   const value = (raw ?? '').trim().replace(/\/$/, '')
@@ -141,10 +142,16 @@ function assertApiResponse(res: AxiosResponse) {
 }
 
 api.interceptors.request.use(async (config: RetryConfig) => {
-  // Never block the UI waiting for Railway wake — kick it off in the background.
-  // Retries below still force-wake if the first attempt fails.
+  const method = (config.method || 'get').toLowerCase()
+  const isMutating = MUTATING.has(method)
+  // Mutations: wait for Railway wake so DELETE/PATCH don't race a sleeping dyno
+  // (client timeout while server still applies the change → "failed" but gone on refresh).
   if (!config._skipWake) {
-    void wakeServer(false)
+    if (isMutating) {
+      await wakeServer(true)
+    } else {
+      void wakeServer(false)
+    }
   }
   const token = await getAccessToken()
   if (token) {
@@ -163,10 +170,12 @@ api.interceptors.response.use(
     const original = err.config as RetryConfig | undefined
     if (!original) return Promise.reject(err)
 
-    // Retry transient network / cold-start failures
+    // Retry transient network / cold-start failures (more attempts for mutations)
     if (isRetryableNetworkError(err)) {
+      const method = (original.method || 'get').toLowerCase()
+      const maxRetries = MUTATING.has(method) ? MAX_NETWORK_RETRIES + 1 : MAX_NETWORK_RETRIES
       const attempt = original._networkRetry ?? 0
-      if (attempt < MAX_NETWORK_RETRIES) {
+      if (attempt < maxRetries) {
         original._networkRetry = attempt + 1
         await wakeServer(true)
         await sleep(RETRY_BASE_DELAY_MS * (attempt + 1))

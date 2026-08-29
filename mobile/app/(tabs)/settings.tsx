@@ -188,6 +188,23 @@ export default function SettingsScreen() {
                   ) : null}
                 </View>
               ) : null}
+
+              <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
+                <View style={styles.rowBetween}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text style={[styles.rowTitle, { color: colors.text }]}>Add automatically</Text>
+                    <Text style={[styles.rowHint, { color: colors.textMuted }]}>
+                      {bankSms.autoApprove
+                        ? 'Detected alerts become transactions (no approve step)'
+                        : 'Off — review and approve in Inbox first'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={bankSms.autoApprove}
+                    onValueChange={(v) => void bankSms.setAutoApprove(v)}
+                  />
+                </View>
+              </View>
             </>
           ) : null}
 

@@ -8,5 +8,7 @@ export {
   setBankSmsPromptSeen,
   getBankNotifEnabled,
   setBankNotifEnabled,
+  getBankSmsAutoApprove,
+  setBankSmsAutoApprove,
 } from './storage'
 export { WALLET_NOTIFICATION_PACKAGES, BANK_NOTIFICATION_APPS, isBankishNotification } from './walletApps'

@@ -111,9 +111,16 @@ export function subscribeWalletNotifications(
   applyWalletNotificationAllowlist()
   try {
     const sub = mod.addListener('onNotificationReceived', (event) => {
-      if (!isBankishNotification(event)) return
-      const body = bodyFromWalletNotification(event)
-      if (body) onNotification(body, event)
+      try {
+        if (__DEV__) {
+          console.log('[CashTrail notif]', event.packageName, event.title, event.text || event.bigText)
+        }
+        if (!isBankishNotification(event)) return
+        const body = bodyFromWalletNotification(event)
+        if (body) onNotification(body, event)
+      } catch (err) {
+        console.warn('[CashTrail notif] handler failed', err)
+      }
     })
     return () => {
       try {

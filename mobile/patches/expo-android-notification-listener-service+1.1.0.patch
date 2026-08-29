@@ -1,0 +1,153 @@
+diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
+index 77e247a..c0656a9 100644
+--- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
++++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
+@@ -8,14 +8,13 @@ import android.graphics.Bitmap
+ import android.graphics.Canvas
+ import java.io.File
+ import java.io.FileOutputStream
++import java.util.concurrent.CopyOnWriteArrayList
+ 
+ class ExpoNotificationListenerService : NotificationListenerService() {
+     private var lastNotificationKey: String? = null
+     private var lastNotificationTime: Long = 0
+ 
+     override fun onNotificationPosted(sbn: StatusBarNotification) {
+-        val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance() ?: return
+-        
+         val packageManager = applicationContext.packageManager
+         try {
+             val applicationInfo = packageManager.getApplicationInfo(sbn.packageName, 0)
+@@ -32,7 +31,9 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+                 null
+             }
+ 
+-            if (!moduleInstance.isPackageAllowed(sbn.packageName)) {
++            val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance()
++            // When JS module isn't loaded yet, still accept (allow-all) and buffer.
++            if (moduleInstance != null && !moduleInstance.isPackageAllowed(sbn.packageName)) {
+                 return
+             }
+ 
+@@ -48,12 +49,34 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+             val notification = sbn.notification
+             val extras = notification.extras
+ 
++            val textLines = try {
++                val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
++                lines?.mapNotNull { it?.toString()?.trim()?.takeIf { s -> s.isNotEmpty() } }?.joinToString("\n") ?: ""
++            } catch (e: Exception) {
++                ""
++            }
++
++            val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
++            val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
++            val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
++            // Prefer the richest body; fall back to text lines for custom layouts
++            val effectiveBig = when {
++                bigText.isNotBlank() -> bigText
++                textLines.isNotBlank() && textLines.length > text.length -> textLines
++                else -> bigText
++            }
++            val effectiveText = when {
++                text.isNotBlank() -> text
++                textLines.isNotBlank() -> textLines
++                else -> ""
++            }
++
+             val notificationData = mapOf(
+                 "packageName" to sbn.packageName,
+                 "id" to sbn.id,
+-                "title" to (extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""),
+-                "text" to (extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""),
+-                "bigText" to (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""),
++                "title" to title,
++                "text" to effectiveText,
++                "bigText" to effectiveBig,
+                 "subText" to (extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""),
+                 "summaryText" to (extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString() ?: ""),
+                 "postTime" to sbn.postTime,
+@@ -62,7 +85,15 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+                 "appIconPath" to (iconPath ?: "")
+             )
+ 
+-            ExpoAndroidNotificationListenerServiceModule.getInstance()?.emitNotificationEvent(notificationData)
++            if (moduleInstance != null) {
++                moduleInstance.emitNotificationEvent(notificationData)
++            } else {
++                // App process restarted for listener only — queue until Expo module boots
++                bufferedNotifications.add(notificationData)
++                if (bufferedNotifications.size > 40) {
++                    bufferedNotifications.removeAt(0)
++                }
++            }
+         } catch (e: Exception) {
+             e.printStackTrace()
+         }
+@@ -72,28 +103,23 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+         if (drawable == null) return null
+ 
+         try {
+-            // Create icons directory if it doesn't exist
+             val iconsDir = File(applicationContext.filesDir, "icons").apply {
+                 if (!exists()) mkdirs()
+             }
+ 
+-            // Generate a unique filename based on the package name
+             val fileName = "app_icon_${packageName}.png"
+             val file = File(iconsDir, fileName)
+ 
+-            // Return the path if the icon is already saved
+             if (file.exists()) {
+                 return "file://${file.absolutePath}"
+             }
+ 
+-            // Convert Drawable to a Bitmap of appropriate size
+-            val size = 256  // Icon size (256x256)
++            val size = 256
+             val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+             val canvas = Canvas(bitmap)
+             drawable.setBounds(0, 0, size, size)
+             drawable.draw(canvas)
+ 
+-            // Save to file
+             FileOutputStream(file).use { out ->
+                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+             }
+@@ -105,13 +131,14 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+         }
+     }
+ 
+-    // Function to update icon when app is updated
+-    private fun shouldUpdateIcon(packageName: String): Boolean {
+-        val iconFile = File(applicationContext.filesDir, "icons/app_icon_${packageName}.png")
+-        if (!iconFile.exists()) return true
++    companion object {
++        /** Notifications posted before the Expo module was constructed. */
++        val bufferedNotifications: CopyOnWriteArrayList<Map<String, Any>> = CopyOnWriteArrayList()
+ 
+-        // Update icon if last modified time is more than a week ago
+-        val weekInMillis = 7 * 24 * 60 * 60 * 1000L
+-        return System.currentTimeMillis() - iconFile.lastModified() > weekInMillis
++        fun drainBuffered(): List<Map<String, Any>> {
++            val copy = bufferedNotifications.toList()
++            bufferedNotifications.clear()
++            return copy
++        }
+     }
+ }
+diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
+index 8c92037..30e88b6 100644
+--- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
++++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
+@@ -24,7 +24,10 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+ 
+         OnCreate {
+             isReady.set(true)
++            // Flush anything the NotificationListenerService buffered before JS booted
++            val drained = ExpoNotificationListenerService.drainBuffered()
+             synchronized(pendingNotifications) {
++                pendingNotifications.addAll(drained)
+                 pendingNotifications.forEach { notification ->
+                     sendEvent("onNotificationReceived", notification)
+                 }

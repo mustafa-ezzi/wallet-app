@@ -29,9 +29,11 @@ import {
 } from './nativeNotification'
 import {
   getBankNotifEnabled,
+  getBankSmsAutoApprove,
   getBankSmsEnabled,
   getBankSmsPromptSeen,
   setBankNotifEnabled,
+  setBankSmsAutoApprove,
   setBankSmsEnabled,
   setBankSmsPromptSeen,
 } from './storage'
@@ -46,11 +48,14 @@ type BankSmsContextValue = {
   notifEnabled: boolean
   notifPermissionGranted: boolean
   notifNativeAvailable: boolean
+  /** Skip inbox — create transactions as soon as SMS/app alerts are detected. Default off. */
+  autoApprove: boolean
   pendingCount: number
   showPromptBanner: boolean
   refreshing: boolean
   setEnabled: (on: boolean) => Promise<void>
   setNotifEnabled: (on: boolean) => Promise<void>
+  setAutoApprove: (on: boolean) => Promise<void>
   markPromptSeen: () => Promise<void>
   requestPermissionAndEnable: () => Promise<boolean>
   openSettings: () => Promise<void>
@@ -68,6 +73,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
   const [permissionGranted, setPermissionGranted] = useState(false)
   const [notifEnabled, setNotifEnabledState] = useState(false)
   const [notifPermissionGranted, setNotifPermissionGranted] = useState(false)
+  const [autoApprove, setAutoApproveState] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
   const nativeAvailable = Platform.OS === 'android' && isBankSmsNativeAvailable()
@@ -91,18 +97,20 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
   }, [user])
 
   const reloadLocal = useCallback(async () => {
-    const [en, seen, granted, notifOn, notifGranted] = await Promise.all([
+    const [en, seen, granted, notifOn, notifGranted, autoOn] = await Promise.all([
       getBankSmsEnabled(),
       getBankSmsPromptSeen(),
       getSmsPermissionGranted(),
       getBankNotifEnabled(),
       Promise.resolve(getNotificationListenerGranted()),
+      getBankSmsAutoApprove(),
     ])
     setEnabledState(en)
     setPrompted(seen)
     setPermissionGranted(granted)
     setNotifEnabledState(notifOn)
     setNotifPermissionGranted(notifGranted)
+    setAutoApproveState(autoOn)
   }, [])
 
   useEffect(() => {
@@ -129,7 +137,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     return () => sub.remove()
   }, [user, refreshPending])
 
-  // Live SMS → pending only (never auto-approve)
+  // Live SMS → ingest (pending, or auto-approve if user opted in)
   useEffect(() => {
     if (Platform.OS !== 'android' || !user || !enabled || !permissionGranted) {
       return undefined
@@ -145,7 +153,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     }
   }, [user, enabled, permissionGranted, refreshPending])
 
-  // Bank app notifications → pending only.
+  // Bank app notifications → ingest (pending, or auto-approve if user opted in).
   // Also listen when SMS auto-detect is on (same user intent), once Notification access is granted.
   useEffect(() => {
     const wantNotifs = notifEnabled || enabled
@@ -159,8 +167,14 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       return undefined
     }
     applyWalletNotificationAllowlist()
-    const unsub = subscribeWalletNotifications((body) => {
-      void ingestBankSmsBody(body, 'notification').then((r) => {
+    const unsub = subscribeWalletNotifications((body, meta) => {
+      void ingestBankSmsBody(body, 'notification', {
+        packageName: meta.packageName,
+        appName: meta.appName,
+      }).then((r) => {
+        if (__DEV__) {
+          console.log('[CashTrail notif ingest]', r.ok ? r.kind : r.reason, meta.packageName)
+        }
         if (r.ok) void refreshPending()
       })
     })
@@ -216,6 +230,11 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     setNotifEnabledState(false)
   }, [])
 
+  const setAutoApprove = useCallback(async (on: boolean) => {
+    await setBankSmsAutoApprove(on)
+    setAutoApproveState(on)
+  }, [])
+
   const markPromptSeen = useCallback(async () => {
     await setBankSmsPromptSeen()
     setPrompted(true)
@@ -230,6 +249,13 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     await setBankSmsEnabled(true)
     setEnabledState(true)
     await startSmsBackgroundService()
+    // Also enable bank-app notifications (NayaPay / SadaPay / Meezan push).
+    applyWalletNotificationAllowlist()
+    await setBankNotifEnabled(true)
+    setNotifEnabledState(true)
+    const notifGranted = getNotificationListenerGranted()
+    setNotifPermissionGranted(notifGranted)
+    if (!notifGranted) openNotificationListenerSettings()
     return true
   }, [markPromptSeen])
 
@@ -253,11 +279,13 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       notifEnabled,
       notifPermissionGranted,
       notifNativeAvailable,
+      autoApprove,
       pendingCount,
       showPromptBanner,
       refreshing,
       setEnabled,
       setNotifEnabled,
+      setAutoApprove,
       markPromptSeen,
       requestPermissionAndEnable,
       openSettings: openAppPermissionSettings,
@@ -273,11 +301,13 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       notifEnabled,
       notifPermissionGranted,
       notifNativeAvailable,
+      autoApprove,
       pendingCount,
       showPromptBanner,
       refreshing,
       setEnabled,
       setNotifEnabled,
+      setAutoApprove,
       markPromptSeen,
       requestPermissionAndEnable,
       refreshPending,

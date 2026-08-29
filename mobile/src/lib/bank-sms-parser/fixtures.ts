@@ -104,6 +104,38 @@ export const FIXTURE_SMS: FixtureSms[] = [
     expectedKind: 'ignore',
     text: 'Ab koe call miss nahi ho ge, Abhi 1 likh ker reply karain aur hasil karain Missed Call Alerts sirf RS 2.51+Tax/Day mai. To block this SMS send REG to 3627',
   },
+  {
+    id: 'nayapay-paid',
+    label: 'NayaPay you paid push',
+    bank: 'nayapay',
+    expectedKind: 'expense',
+    expectedAmount: 500,
+    text: 'NayaPay\nYou paid Rs. 500 to Ali Khan',
+  },
+  {
+    id: 'nayapay-received',
+    label: 'NayaPay you received push',
+    bank: 'nayapay',
+    expectedKind: 'income',
+    expectedAmount: 1200,
+    text: 'You received Rs 1,200 from Sara',
+  },
+  {
+    id: 'sadapay-spent',
+    label: 'SadaPay you spent push',
+    bank: 'sadapay',
+    expectedKind: 'expense',
+    expectedAmount: 1999,
+    text: 'SadaPay\nYou spent Rs. 1,999 at DARAZ',
+  },
+  {
+    id: 'sadapay-payment',
+    label: 'SadaPay payment successful',
+    bank: 'sadapay',
+    expectedKind: 'expense',
+    expectedAmount: 250,
+    text: 'Payment of PKR 250 successful',
+  },
 
   // ── ATM keyword variants ─────────────────────────────────────────────────
   {

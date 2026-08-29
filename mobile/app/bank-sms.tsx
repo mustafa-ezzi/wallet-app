@@ -486,8 +486,8 @@ export default function BankSmsScreen() {
                   <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>Bank apps</Text>
                   <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
                     {bankSms.notifPermissionGranted
-                      ? (bankSms.notifEnabled ? 'Listening' : 'Off')
-                      : 'Needed for Meezan push alerts'}
+                      ? (bankSms.notifEnabled ? 'Listening for NayaPay, SadaPay, Meezan…' : 'Off')
+                      : 'Turn on Notification access for NayaPay / SadaPay / bank apps'}
                   </Text>
                   {!bankSms.notifPermissionGranted ? (
                     <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 6 }}>
@@ -503,6 +503,20 @@ export default function BankSmsScreen() {
                 />
               </View>
             ) : null}
+            <View style={[styles.switchRow, { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>Add automatically</Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4 }}>
+                  {bankSms.autoApprove
+                    ? 'Creates transactions when SMS/app alerts are detected'
+                    : 'Off — approve each draft in Inbox'}
+                </Text>
+              </View>
+              <Switch
+                value={bankSms.autoApprove}
+                onValueChange={(v) => void bankSms.setAutoApprove(v)}
+              />
+            </View>
           </View>
         ) : null}
 

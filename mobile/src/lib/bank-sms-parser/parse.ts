@@ -96,9 +96,13 @@ function normalize(text: string): string {
 }
 
 function parseAmount(text: string): number | null {
-  const m = text.match(/(?:PKR|Rs\.?)\s*([\d,]+(?:\.\d{1,2})?)/i)
+  // "PKR 1,200" / "Rs. 500" / "₨500" / "250.00 PKR" / "Rs:1,999"
+  const m =
+    text.match(/(?:PKR|Rs\.?|₨)\s*:?\s*([\d,]+(?:\.\d{1,2})?)/i)
+    || text.match(/\b([\d,]+(?:\.\d{1,2})?)\s*(?:PKR|Rs\.?|₨)\b/i)
   if (!m) return null
-  const n = parseFloat(m[1].replace(/,/g, ''))
+  const raw = (m[1] || '').replace(/,/g, '')
+  const n = parseFloat(raw)
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
@@ -184,11 +188,33 @@ function classify(text: string, tid: string | null): { kind: BankSmsKind; reason
   if (/\breversed?\b/i.test(t) || /\bis reversed into\b/i.test(t)) {
     return { kind: 'reversal', reason: 'keyword:reversed', confidence: 0.92 }
   }
-  if (/\breceived from\b/i.test(t) || /\byou have received\b/i.test(t) || /\bhas been credited\b/i.test(t) || /\bcredited to\b/i.test(t) || /\bdeposited\b/i.test(t)) {
+  // Wallet push styles: "You received Rs…", "Money received", "Incoming payment"
+  if (
+    /\breceived from\b/i.test(t)
+    || /\byou have received\b/i.test(t)
+    || /\byou\s+received\b/i.test(t)
+    || /\bmoney\s+received\b/i.test(t)
+    || /\bincoming\s+payment\b/i.test(t)
+    || /\bhas been credited\b/i.test(t)
+    || /\bcredited to\b/i.test(t)
+    || /\bdeposited\b/i.test(t)
+    || /\bfunds?\s+(?:added|received)\b/i.test(t)
+  ) {
     return { kind: 'income', reason: 'keyword:received/credited', confidence: 0.9 }
   }
-  if (/\bsent to\b/i.test(t) || /\braast payment from your\b/i.test(t) || /\btransfer(?:red)? to\b/i.test(t)) {
-    return { kind: 'expense', reason: 'keyword:sent/raast', confidence: 0.9 }
+  // Wallet push: "You paid", "You spent", "You sent", "Payment of Rs… successful"
+  if (
+    /\bsent to\b/i.test(t)
+    || /\byou\s+sent\b/i.test(t)
+    || /\byou\s+paid\b/i.test(t)
+    || /\byou\s+spent\b/i.test(t)
+    || /\bpaid\s+(?:to|at|for)\b/i.test(t)
+    || /\bspent\s+(?:at|on|Rs|PKR)\b/i.test(t)
+    || /\bpayment\s+(?:of|to|successful|completed|sent)\b/i.test(t)
+    || /\braast payment from your\b/i.test(t)
+    || /\btransfer(?:red)? to\b/i.test(t)
+  ) {
+    return { kind: 'expense', reason: 'keyword:paid/sent', confidence: 0.9 }
   }
   if (/\batm\b/i.test(t) || /\bcash withdraw(?:al)?\b/i.test(t) || /\bwithdrawn from atm\b/i.test(t) || /\bcwdr\b/i.test(t)) {
     return { kind: 'atm', reason: 'keyword:atm', confidence: 0.93 }
@@ -206,6 +232,13 @@ function classify(text: string, tid: string | null): { kind: BankSmsKind; reason
   if (/\bwithdrawn\b/i.test(t)) {
     return { kind: 'atm', reason: 'keyword:withdrawn', confidence: 0.7 }
   }
+  // Bare wallet verbs (after currency already found upstream)
+  if (/\b(?:paid|spent|sent)\b/i.test(t)) {
+    return { kind: 'expense', reason: 'keyword:paid/spent/sent', confidence: 0.72 }
+  }
+  if (/\breceived\b/i.test(t)) {
+    return { kind: 'income', reason: 'keyword:received', confidence: 0.72 }
+  }
 
   return { kind: 'unknown', reason: 'no-match', confidence: 0.2 }
 }
@@ -218,7 +251,9 @@ function hasBankMoneySignal(
   if (parts.kind !== 'unknown') return true
   // Extra transactional verbs not always enough alone in classify edge cases
   return (
-    /\b(?:debited|credited|withdrawn|purchased?|pos|raast|iban|a\/c|ac#)\b/i.test(text)
+    /\b(?:debited|credited|withdrawn|purchased?|pos|raast|iban|a\/c|ac#|paid|spent|sent|received|payment)\b/i.test(
+      text,
+    )
   )
 }
 

@@ -200,6 +200,19 @@ export default function WalletsScreen() {
                 bumpRefresh()
                 await load(true)
               } catch (err) {
+                // Cold-start timeout: server may have deleted while the phone timed out.
+                try {
+                  const { data } = await accountsApi.list()
+                  const list = asList<Account>(data)
+                  setAccounts(list)
+                  if (!list.some((x) => x.id === a.id)) {
+                    bumpRefresh()
+                    setError('')
+                    return
+                  }
+                } catch {
+                  /* keep original error */
+                }
                 setError(apiErrorMessage(err, 'Could not delete wallet.'))
               }
             })()
@@ -233,6 +246,23 @@ export default function WalletsScreen() {
       bumpRefresh()
       await load(true)
     } catch (err) {
+      // Timeout after save: reload — update may already be on the server
+      try {
+        await load(true)
+        if (editing) {
+          const { data } = await accountsApi.list()
+          const list = asList<Account>(data)
+          const updated = list.find((x) => x.id === editing.id)
+          if (updated && updated.name === name.trim()) {
+            setAccounts(list)
+            closeWalletForm()
+            bumpRefresh()
+            return
+          }
+        }
+      } catch {
+        /* show original error */
+      }
       setFormError(apiErrorMessage(err, editing ? 'Could not update wallet.' : 'Could not create wallet.'))
     } finally {
       savingRef.current = false
