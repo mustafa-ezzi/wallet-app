@@ -783,7 +783,7 @@ class HouseholdPhase5PotSplitTests(TestCase):
         self.assertEqual(float(settle.data["total_contributions"]), 10000.0)
         self.assertEqual(float(settle.data["fair_share"]), 10000.0)
         self.assertEqual(settle.data["member_count"], 3)
-        self.assertIn("does not move bank money", settle.data["disclaimer"].lower())
+        self.assertIn("settle outside the app", settle.data["disclaimer"].lower())
 
         by_name = {c["name"]: c for c in settle.data["credits"]}
         self.assertEqual(float(by_name["You"]["credit"]), 25000.0)

@@ -3,7 +3,6 @@ import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import { householdsApi, apiErrorMessage } from '../api/client'
 import { fmt } from '../utils/format'
 import { downloadHouseholdReportCSV } from '../utils/reportExport'
-import HouseholdSettlementPanel from './HouseholdSettlementPanel'
 import { track } from '../lib/analytics'
 
 const MONTH_NAMES = [
@@ -291,7 +290,6 @@ export default function HouseholdReportPanel({ ledger, householdName, refreshKey
             </div>
           )}
 
-          <HouseholdSettlementPanel ledgerId={ledger.id} refreshKey={refreshKey} />
         </>
       )}
     </div>

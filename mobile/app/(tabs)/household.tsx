@@ -27,10 +27,10 @@ import type {
   HouseholdLedger,
   HouseholdMember,
   LedgerSummary,
-  SettlementRow,
 } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
 import { CategoryDonut } from '@/src/components/CategoryDonut'
+import { HouseholdSettleUp, type SettlementData } from '@/src/components/HouseholdSettleUp'
 import { MemberSpendBars } from '@/src/components/MemberSpendBars'
 import { BouncyPressable, Reveal } from '@/src/components/motion'
 import { DateField, SelectField } from '@/src/components/SelectFields'
@@ -71,9 +71,11 @@ export default function HouseholdScreen() {
   const [members, setMembers] = useState<HouseholdMember[]>([])
   const [invite, setInvite] = useState<HouseholdInvite | null>(null)
   const [summary, setSummary] = useState<LedgerSummary | null>(null)
-  const [settlement, setSettlement] = useState<SettlementRow[]>([])
+  const [settlement, setSettlement] = useState<SettlementData | null>(null)
+  const [settlementLoading, setSettlementLoading] = useState(false)
+  const [settlementError, setSettlementError] = useState('')
   const [accounts, setAccounts] = useState<Account[]>([])
-  const [ledgerTab, setLedgerTab] = useState<'feed' | 'report' | 'split'>('feed')
+  const [ledgerTab, setLedgerTab] = useState<'feed' | 'report' | 'settle'>('feed')
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -163,10 +165,14 @@ export default function HouseholdScreen() {
     }
   }
 
-  const openLedger = async (ledger: HouseholdLedger, nextPeriod: PeriodMode = 'month') => {
+  const openLedger = async (ledger: HouseholdLedger, nextPeriod: PeriodMode = 'month', keepTab = false) => {
     setActiveLedger(ledger)
     setView('ledger')
-    setLedgerTab('feed')
+    if (!keepTab) {
+      setLedgerTab('feed')
+      setSettlement(null)
+      setSettlementError('')
+    }
     setPeriod(nextPeriod)
     setError('')
     setBusy(true)
@@ -219,21 +225,36 @@ export default function HouseholdScreen() {
     void openLedger(activeLedger, next)
   }
 
-  const loadSettlement = async () => {
+  const loadSettlement = useCallback(async () => {
     if (!activeLedger) return
+    setSettlementLoading(true)
+    setSettlementError('')
     try {
       const { data } = await householdsApi.settlement(activeLedger.id)
-      const rows = asList<SettlementRow>((data as { transfers?: unknown })?.transfers)
-      setSettlement(
-        rows.map((r) => ({
-          ...r,
-          from_name: r.from_name || (r as { from_name?: string }).from_name,
-          to_name: r.to_name || (r as { to_name?: string }).to_name,
-        })),
-      )
-      setLedgerTab('split')
+      setSettlement(data as SettlementData)
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not load split.'))
+      setSettlementError(apiErrorMessage(err, 'Could not load settle-up.'))
+    } finally {
+      setSettlementLoading(false)
+    }
+  }, [activeLedger])
+
+  useEffect(() => {
+    if (ledgerTab === 'settle' && activeLedger) void loadSettlement()
+  }, [ledgerTab, activeLedger?.id, loadSettlement])
+
+  const markSettlementPaid = async (t: SettlementData['transfers'][0]) => {
+    if (!activeLedger) return
+    try {
+      const { data } = await householdsApi.markSettlement(activeLedger.id, {
+        from_user_id: t.from_user_id,
+        to_user_id: t.to_user_id,
+        amount: t.amount,
+        note: 'Paid outside CashTrail',
+      })
+      setSettlement((data as { settlement?: SettlementData }).settlement ?? null)
+    } catch (err) {
+      setSettlementError(apiErrorMessage(err, 'Could not mark as paid.'))
     }
   }
 
@@ -460,7 +481,8 @@ export default function HouseholdScreen() {
         pot_amount: '',
         linked_account: '',
       })
-      await openLedger(activeLedger)
+      await openLedger(activeLedger, period, true)
+      if (ledgerTab === 'settle') void loadSettlement()
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not add expense.'))
     } finally {
@@ -488,7 +510,8 @@ export default function HouseholdScreen() {
       await householdsApi.addContribution(activeLedger.id, payload)
       setContribOpen(false)
       setContribForm({ amount: '', date: todayISO(), notes: '', linked_account: '' })
-      await openLedger(activeLedger)
+      await openLedger(activeLedger, period, true)
+      if (ledgerTab === 'settle') void loadSettlement()
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not add contribution.'))
     } finally {
@@ -799,17 +822,14 @@ export default function HouseholdScreen() {
             </View>
 
             <View style={styles.tabRow}>
-              {(['feed', 'report', 'split'] as const).map((t) => (
+              {(['feed', 'report', 'settle'] as const).map((t) => (
                 <Pressable
                   key={t}
                   style={[styles.tab, ledgerTab === t && styles.tabOn]}
-                  onPress={() => {
-                    if (t === 'split') void loadSettlement()
-                    else setLedgerTab(t)
-                  }}
+                  onPress={() => setLedgerTab(t)}
                 >
                   <Text style={[styles.tabText, ledgerTab === t && styles.tabTextOn]}>
-                    {t === 'feed' ? 'Feed' : t === 'report' ? 'Report' : 'Split'}
+                    {t === 'feed' ? 'Expenses' : t === 'report' ? 'Report' : 'Settle up'}
                   </Text>
                 </Pressable>
               ))}
@@ -913,45 +933,15 @@ export default function HouseholdScreen() {
               )
             ) : null}
 
-            {ledgerTab === 'split' ? (
-              settlement.length === 0 ? (
-                <View style={styles.emptyCard}>
-                  <View style={styles.emptyIcon}>
-                    <FontAwesome name="check" size={18} color={colors.success} />
-                  </View>
-                  <Text style={styles.emptyTitle}>Already even</Text>
-                  <Text style={styles.emptyBody}>No transfers needed for an equal split.</Text>
-                </View>
-              ) : (
-                settlement.map((row, i) => (
-                  <Reveal index={i} key={`s-${i}`}>
-                    <View style={styles.splitCard}>
-                      <View style={styles.splitAvatars}>
-                        <View style={[styles.splitAvatar, { backgroundColor: '#ecfdf5' }]}>
-                          <Text style={[styles.splitAvatarText, { color: colors.success }]}>
-                            {((row.from_name || 'M')[0] || 'M').toUpperCase()}
-                          </Text>
-                        </View>
-                        <FontAwesome name="long-arrow-right" size={12} color={colors.textMuted} />
-                        <View style={[styles.splitAvatar, { backgroundColor: colors.infoBg }]}>
-                          <Text style={[styles.splitAvatarText, { color: colors.infoText }]}>
-                            {((row.to_name || 'M')[0] || 'M').toUpperCase()}
-                          </Text>
-                        </View>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.cardTitle}>
-                          {(row.from_name || 'Member')} → {(row.to_name || 'Member')}
-                        </Text>
-                        <Text style={styles.cardMeta}>Equal-split settlement</Text>
-                      </View>
-                      <Text style={[styles.expenseAmt, money.amountStyle]}>
-                        {money.fmt(row.amount)}
-                      </Text>
-                    </View>
-                  </Reveal>
-                ))
-              )
+            {ledgerTab === 'settle' ? (
+              <HouseholdSettleUp
+                data={settlement}
+                loading={settlementLoading}
+                error={settlementError}
+                fmt={money.fmt}
+                onRefresh={() => void loadSettlement()}
+                onMarkPaid={(t) => void markSettlementPaid(t)}
+              />
             ) : null}
           </>
         ) : null}

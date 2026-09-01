@@ -244,6 +244,25 @@ def compute_settlement(ledger):
         ledger.settlement_marks.select_related('from_user', 'to_user', 'marked_by').all()
     )
 
+    member_ids = set(user_ids)
+    external_paid = Decimal('0.00')
+    for e in expenses:
+        if e.paid_by_id not in member_ids:
+            personal = _money(e.amount) - _money(e.pot_amount or 0)
+            if personal > 0:
+                external_paid = _money(external_paid + personal)
+
+    is_even = all(abs(n) < Decimal('0.01') for n in nets.values())
+    if n and total_expenses > 0:
+        summary_line = (
+            f'{float(total_expenses):,.2f} split among {n} '
+            f'= {float(fair_share):,.2f} each'
+        )
+    elif n:
+        summary_line = f'No shared expenses yet ({n} members).'
+    else:
+        summary_line = 'Add members to split expenses.'
+
     def mark_key(a, b, amount):
         return (a, b, float(_money(amount)))
 
@@ -282,9 +301,12 @@ def compute_settlement(ledger):
         'pot_spent': pot_stats['pot_spent'],
         'pot_balance': pot_stats['pot_balance'],
         'fair_share': float(fair_share),
+        'external_paid': float(external_paid),
+        'is_even': is_even,
+        'summary_line': summary_line,
         'credits': credits,
         'transfers': transfers,
-        'disclaimer': 'Suggestions only — CashTrail does not move bank money.',
+        'disclaimer': 'Split equally among members. CashTrail suggests payments — you settle outside the app.',
     }
 
 

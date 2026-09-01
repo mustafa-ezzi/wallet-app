@@ -6,6 +6,7 @@ import { fmt, fmtBalance } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
 import { useAuth } from '../context/AuthContext'
 import HouseholdReportPanel from '../components/HouseholdReportPanel'
+import HouseholdSettlementPanel from '../components/HouseholdSettlementPanel'
 import InviteQr from '../components/InviteQr'
 import { track } from '../lib/analytics'
 
@@ -128,7 +129,7 @@ export default function HouseholdPage() {
   const [saving, setSaving] = useState(false)
   const [myAccounts, setMyAccounts] = useState<{ id: number; name: string; current_balance: number }[]>([])
   const [summary, setSummary] = useState<LedgerSummary | null>(null)
-  const [viewMode, setViewMode] = useState<'feed' | 'report'>('feed')
+  const [viewMode, setViewMode] = useState<'feed' | 'report' | 'settle'>('feed')
   const [reportRefresh, setReportRefresh] = useState(0)
   const [contributions, setContributions] = useState<{
     id: number; amount: number; date: string; notes: string
@@ -640,7 +641,7 @@ export default function HouseholdPage() {
       (code ? `Invite code: ${code}\n\n` : '\n') +
       `Why CashTrail?\n` +
       `• Shared household ledger — everyone sees what was spent\n` +
-      `• Split equal — know who owes whom, instantly\n` +
+      `• Settle up — split costs equally and see who owes whom\n` +
       `• Your personal wallets stay private\n` +
       `• Also track bills, loans & EMI reminders in PKR\n\n` +
       `Join with this link:\n${inviteUrl}\n\n` +
@@ -1020,6 +1021,13 @@ export default function HouseholdPage() {
                 >
                   Report
                 </button>
+                <button
+                  type="button"
+                  className={`rpt-chip ${viewMode === 'settle' ? 'active' : ''}`}
+                  onClick={() => setViewMode('settle')}
+                >
+                  Settle up
+                </button>
               </div>
 
               {viewMode === 'report' ? (
@@ -1028,6 +1036,8 @@ export default function HouseholdPage() {
                   householdName={selected.name}
                   refreshKey={reportRefresh}
                 />
+              ) : viewMode === 'settle' ? (
+                <HouseholdSettlementPanel ledgerId={activeLedger.id} refreshKey={reportRefresh} />
               ) : (
             <>
               <div className="grid-2" style={{ marginBottom: '1rem' }}>
@@ -1640,7 +1650,7 @@ export default function HouseholdPage() {
               <button className="modal-close" onClick={() => setContribOpen(false)} aria-label="Close"><X size={18} /></button>
             </div>
             <p className="text-muted" style={{ fontSize: '0.82rem', marginBottom: '0.85rem' }}>
-              Puts money toward the shared pot. Counts as your credit on Split equal. Link a wallet to drop your balance.
+              Puts money in the shared pot. Counts toward what you’ve put in when you settle up. Link a wallet to update your balance.
             </p>
             <form onSubmit={addContribution} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div className="grid-2">

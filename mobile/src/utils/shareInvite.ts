@@ -22,7 +22,7 @@ export function buildHouseholdInviteMessage(opts: {
     `Invite code: ${code}\n\n` +
     `Why CashTrail?\n` +
     `• Shared household ledger — everyone sees what was spent\n` +
-    `• Split equal — know who owes whom, instantly\n` +
+    `• Settle up — split costs equally and see who owes whom\n` +
     `• Your personal wallets stay private\n` +
     `• Also track bills, loans & EMI reminders in PKR\n\n` +
     `How to join:\n` +
