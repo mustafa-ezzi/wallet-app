@@ -26,7 +26,7 @@ const MIN_HOLD_MS = 2200
 const EXIT_MS = 480
 
 const logoSource = require('../../assets/images/splash-logo.png')
-const trisiteSource = require('../../assets/images/splash-trisite.png')
+const studioLogoSource = require('../../assets/images/splash-powerpulse-labs.png')
 
 /**
  * Professional black splash — clean mark, wordmark, quiet footer.
@@ -122,8 +122,8 @@ export function AnimatedSplashScreen() {
       >
         <Text style={styles.poweredBy}>powered by</Text>
         <View style={styles.footerRow}>
-          <Image source={trisiteSource} style={styles.trisiteIcon} resizeMode="contain" fadeDuration={0} />
-          <Text style={styles.trisiteName}>TrisiteSolutions</Text>
+          <Image source={studioLogoSource} style={styles.studioIcon} resizeMode="contain" fadeDuration={0} />
+          <Text style={styles.studioName}>PowerPulse Labs</Text>
         </View>
       </Animated.View>
     </Animated.View>
@@ -215,12 +215,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  trisiteIcon: {
+  studioIcon: {
     width: 20,
     height: 20,
     borderRadius: 5,
   },
-  trisiteName: {
+  studioName: {
     fontSize: 14,
     fontWeight: '700',
     letterSpacing: 0.2,
