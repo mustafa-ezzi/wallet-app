@@ -14,6 +14,7 @@ import {
   Settings,
   Users,
   Plane,
+  PieChart,
 } from 'lucide-react'
 import anime from 'animejs'
 import AddTransactionModal from './AddTransactionModal'
@@ -29,6 +30,7 @@ const NAV: { path: string; label: string; short: string; tour: string; icon: Rea
   { path: '/accounts',  label: 'Wallets',  icon: <Wallet size={18} strokeWidth={1.75} />, short: 'Wallets', tour: 'nav-accounts' },
   { path: '/income',    label: 'Income',   icon: <Coins size={18} strokeWidth={1.75} />, short: 'Income', tour: 'nav-income' },
   { path: '/expenses',  label: 'Bills',    icon: <Receipt size={18} strokeWidth={1.75} />, short: 'Bills', tour: 'nav-bills' },
+  { path: '/budgets',   label: 'Budgets',  icon: <PieChart size={18} strokeWidth={1.75} />, short: 'Budgets', tour: 'nav-budgets' },
   { path: '/household', label: 'Family',   icon: <Users size={18} strokeWidth={1.75} />, short: 'Family', tour: 'nav-family' },
 ]
 

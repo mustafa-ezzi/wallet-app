@@ -20,6 +20,7 @@ import Settings from './pages/Settings'
 import BankSmsImportPage from './pages/BankSmsImport'
 import GetAndroidAppPage from './pages/GetAndroidApp'
 import HouseholdPage from './pages/Household'
+import BudgetsPage from './pages/Budgets'
 import TravelModePage from './pages/TravelMode'
 import PersonHistoryPage from './pages/PersonHistory'
 
@@ -86,6 +87,7 @@ function AppRoutes() {
           <Route path="/expenses" element={<Expenses />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/household" element={<HouseholdPage />} />
+          <Route path="/budgets" element={<BudgetsPage />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/bank-sms" element={<BankSmsImportPage />} />
           <Route path="/get-android" element={<GetAndroidAppPage />} />

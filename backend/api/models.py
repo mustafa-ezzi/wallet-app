@@ -1499,3 +1499,42 @@ class BankSmsImport(models.Model):
 
     def __str__(self):
         return f'BankSmsImport({self.id} {self.kind} {self.status})'
+
+
+# ── Personal monthly category budgets ────────────────────────────────────────
+
+class CategoryBudget(models.Model):
+    """
+    User-defined PKR spending limit for a calendar month + category.
+    Spent is always computed live from Transaction rows (never stored here).
+    Use category='__all__' for an overall monthly expense cap.
+    """
+    ALL_CATEGORY = '__all__'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='category_budgets')
+    year = models.PositiveSmallIntegerField()
+    month = models.PositiveSmallIntegerField()  # 1–12
+    category = models.CharField(max_length=100)
+    limit_amount = models.DecimalField(max_digits=14, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'year', 'month', 'category'],
+                name='uniq_user_month_category_budget',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(month__gte=1, month__lte=12),
+                name='category_budget_month_1_12',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(limit_amount__gt=0),
+                name='category_budget_limit_positive',
+            ),
+        ]
+
+    def __str__(self):
+        return f'Budget({self.user_id} {self.year}-{self.month:02d} {self.category}={self.limit_amount})'

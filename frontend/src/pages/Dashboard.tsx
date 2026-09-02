@@ -221,8 +221,8 @@ export default function Dashboard() {
         <section className="home-card">
           <div className="home-card-head">
             <h3>{monthName} spending</h3>
-            <button type="button" className="section-link" onClick={() => navigate('/reports')}>
-              Reports →
+            <button type="button" className="section-link" onClick={() => navigate('/budgets')}>
+              Budgets →
             </button>
           </div>
           <CategoryDonut data={breakdown} />

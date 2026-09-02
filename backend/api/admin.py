@@ -13,6 +13,7 @@ from .models import (
     Account,
     AdminAuditLog,
     AppRemoteConfig,
+    CategoryBudget,
     DeviceToken,
     Entitlement,
     FxRateCache,
@@ -145,6 +146,13 @@ class ReceivableInstallmentAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
 @admin.register(PayableInstallment)
 class PayableInstallmentAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
     list_display = ('id', 'name', 'user', 'status')
+
+
+@admin.register(CategoryBudget)
+class CategoryBudgetAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
+    list_display = ('id', 'user', 'year', 'month', 'category', 'limit_amount', 'updated_at')
+    list_filter = ('year', 'month', 'category')
+    search_fields = ('user__username', 'user__email', 'category')
 
 
 @admin.register(Household)

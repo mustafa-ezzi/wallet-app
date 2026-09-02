@@ -7,6 +7,7 @@ import { BouncingFab } from '@/src/components/BouncingFab'
 import { FloatingIslandTabBar } from '@/src/components/FloatingIslandTabBar'
 import { OfflineBanner } from '@/src/offline'
 import { AmountUnlockSheet } from '@/src/privacy/AmountUnlockSheet'
+import { BudgetsWhatsNewDialog } from '@/src/components/BudgetsWhatsNewDialog'
 import { RatingPrompt } from '@/src/rating'
 import { useColors } from '@/src/theme/ThemeContext'
 
@@ -55,6 +56,7 @@ function TabsShell() {
         <Tabs.Screen name="wallets" options={{ title: 'Wallets' }} />
         <Tabs.Screen name="income" options={{ title: 'Income' }} />
         <Tabs.Screen name="bills" options={{ title: 'Bills' }} />
+        <Tabs.Screen name="budgets" options={{ title: 'Budgets' }} />
         <Tabs.Screen name="household" options={{ title: 'Family' }} />
         <Tabs.Screen
           name="reports"
@@ -75,6 +77,7 @@ function TabsShell() {
       ) : null}
 
       <AmountUnlockSheet />
+      {user ? <BudgetsWhatsNewDialog /> : null}
       {user ? <RatingPrompt /> : null}
     </View>
   )

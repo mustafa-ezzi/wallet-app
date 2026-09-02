@@ -530,3 +530,18 @@ export const householdsApi = {
   removeExpense: (id: number) => api.delete(`/household-expenses/${id}/`),
   unreadNotificationCount: () => api.get('/household-notifications/unread_count/'),
 }
+
+export const budgetsApi = {
+  get: (year: number, month: number) =>
+    api.get<import('./types').BudgetPayload>('/budgets/', { params: { year, month } }),
+  upsert: (data: {
+    year: number
+    month: number
+    category: string
+    limit_amount: number | null
+  }) => api.put<import('./types').BudgetPayload>('/budgets/', data),
+  remove: (id: number, year: number, month: number) =>
+    api.delete<import('./types').BudgetPayload>(`/budgets/${id}/`, { params: { year, month } }),
+  copyFromPrevious: (year: number, month: number) =>
+    api.post<import('./types').BudgetPayload>('/budgets/copy-from-previous/', { year, month }),
+}

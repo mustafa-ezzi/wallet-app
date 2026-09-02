@@ -210,6 +210,45 @@ export const forecastApi = {
   get: (year: number, month: number) => api.get(`/forecast/${year}/${month}/`),
 }
 
+export type BudgetRow = {
+  id: number | null
+  category: string
+  label: string
+  limit: number | null
+  spent: number
+  remaining: number | null
+  over: number | null
+  percent: number | null
+  status: 'unset' | 'ok' | 'warning' | 'over' | string
+  has_limit: boolean
+}
+
+export type BudgetPayload = {
+  year: number
+  month: number
+  period_label: string
+  currency: string
+  total_spent: number
+  total_limit: number | null
+  overall_limit: number | null
+  category_limits_sum: number
+  days_in_month: number
+  rows: BudgetRow[]
+  copied?: number
+  cleared?: boolean
+}
+
+export const budgetsApi = {
+  get: (year: number, month: number) =>
+    api.get<BudgetPayload>('/budgets/', { params: { year, month } }),
+  upsert: (data: { year: number; month: number; category: string; limit_amount: number | null }) =>
+    api.put<BudgetPayload>('/budgets/', data),
+  remove: (id: number, year: number, month: number) =>
+    api.delete<BudgetPayload>(`/budgets/${id}/`, { params: { year, month } }),
+  copyFromPrevious: (year: number, month: number) =>
+    api.post<BudgetPayload>('/budgets/copy-from-previous/', { year, month }),
+}
+
 export const householdsApi = {
   list: () => api.get('/households/'),
   create: (data: object) => api.post('/households/', data),

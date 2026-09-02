@@ -357,8 +357,8 @@ export default function HomeScreen() {
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.cardHead}>
                   <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>{monthName} spending</Text>
-                  <Pressable onPress={() => router.push('/(tabs)/reports')} hitSlop={8}>
-                    <Text style={[styles.link, { color: colors.primary }]}>Reports →</Text>
+                  <Pressable onPress={() => router.push('/(tabs)/budgets' as '/(tabs)/reports')} hitSlop={8}>
+                    <Text style={[styles.link, { color: colors.primary }]}>Budgets →</Text>
                   </Pressable>
                 </View>
                 <CategoryDonut data={breakdown} />

@@ -1,6 +1,6 @@
 # Budget Feature — Research & Implementation Plan
 
-**Status:** Research / not implemented  
+**Status:** Phase 1 implemented (backend + web + mobile). Phase 2 alerts optional.  
 **Reference UI:** Category list with monthly spend + “Set” per category (see attached screenshot)  
 **App context:** CashTrail — PKR-first personal finance (wallets, income/expense, bank SMS, family/household, reports)
 

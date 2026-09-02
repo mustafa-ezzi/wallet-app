@@ -19,7 +19,8 @@ export default function UpdateAvailableDialog({ open, refreshing, onRefresh }: P
           <img src="/logo.png" alt="" style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'cover' }} />
         </div>
         <p style={{ margin: '0 0 1.25rem', fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.5, textAlign: 'center' }}>
-          A new version of CashTrail is ready. Refresh to get the latest updates.
+          We’ve added <strong>Budgets</strong> — set monthly spending limits by category.
+          Refresh to get the update, then look for <strong>Budgets</strong> in the nav.
         </p>
         <button
           type="button"

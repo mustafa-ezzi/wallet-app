@@ -15,6 +15,7 @@ from . import health
 from . import travel_people_api
 from . import people_linked_api
 from . import bank_sms_api
+from . import budgets_api
 
 router = DefaultRouter()
 router.register('accounts', views.AccountViewSet, basename='account')
@@ -41,6 +42,9 @@ urlpatterns = [
     path('me/', views.MeView.as_view(), name='me'),
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
     path('forecast/<int:year>/<int:month>/', views.ForecastView.as_view(), name='forecast'),
+    path('budgets/', budgets_api.BudgetsView.as_view(), name='budgets'),
+    path('budgets/copy-from-previous/', budgets_api.BudgetCopyPreviousView.as_view(), name='budgets-copy'),
+    path('budgets/<int:pk>/', budgets_api.BudgetDetailView.as_view(), name='budget-detail'),
     path('fx/', travel_people_api.FxQuoteView.as_view(), name='fx-quote'),
     path('travel-mode/', travel_people_api.TravelModeView.as_view(), name='travel-mode'),
     path(

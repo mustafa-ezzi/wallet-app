@@ -52,6 +52,7 @@ const ICONS: Record<string, IconName> = {
   wallets: 'credit-card',
   income: 'briefcase',
   bills: 'file-text-o',
+  budgets: 'pie-chart',
   reports: 'bar-chart',
   household: 'users',
   settings: 'cog',

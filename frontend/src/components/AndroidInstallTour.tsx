@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useState, useCallback, type CSSProperties }
 import { useNavigate } from 'react-router-dom'
 import anime from 'animejs'
 import { track } from '../lib/analytics'
+import { BUDGETS_AFTER_UPDATE_KEY } from '../features/budgetsAnnounce'
 
 export const ANDROID_INSTALL_TOUR_EVENT = 'cashtrail:android-install-tour'
 const TOUR_AFTER_UPDATE_KEY = 'cashtrail_android_tour_after_update'
@@ -116,10 +117,16 @@ export default function AndroidInstallTour({ apkUrl }: Props) {
 
   useEffect(() => {
     if (!consumeTourAfterUpdateFlag()) return
+    // Same reload may open Budgets What’s New — don’t stack two post-update flows.
+    try {
+      if (sessionStorage.getItem(BUDGETS_AFTER_UPDATE_KEY) === '1') return
+    } catch {
+      /* ignore */
+    }
     const t = window.setTimeout(() => {
       setStep(0)
       setActive(true)
-      track('android_install_tour_started', { from_step: 0, trigger: 'after_update' })
+      track('android_install_tour_started', { from_step: 0, reason: 'after_update' })
     }, 900)
     return () => window.clearTimeout(t)
   }, [])
