@@ -34,7 +34,7 @@ export default function Settings() {
   const handleLogout = async () => {
     const ok = await confirm({
       title: 'Sign out?',
-      message: 'You will need to sign in again to access your CashTrail.',
+      message: 'You will need to sign in again to access your WalletTrails.',
       confirmLabel: 'Sign out',
       danger: true,
     })

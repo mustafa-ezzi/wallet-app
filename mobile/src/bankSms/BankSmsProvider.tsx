@@ -173,7 +173,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
         appName: meta.appName,
       }).then((r) => {
         if (__DEV__) {
-          console.log('[CashTrail notif ingest]', r.ok ? r.kind : r.reason, meta.packageName)
+          console.log('[WalletTrails notif ingest]', r.ok ? r.kind : r.reason, meta.packageName)
         }
         if (r.ok) void refreshPending()
       })

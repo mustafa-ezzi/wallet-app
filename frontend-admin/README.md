@@ -1,4 +1,4 @@
-# CashTrail Ops (Phase 0–1)
+# WalletTrails Ops (Phase 0–1)
 
 Staff-only console: hosted users + dashboard metrics. **Never** shows wallets, balances, or transactions.
 

@@ -526,7 +526,7 @@ export default function Accounts() {
               <div className="glass empty-state" style={{ padding: '1.1rem' }}>
                 <p style={{ margin: 0, fontWeight: 700 }}>No people yet</p>
                 <p className="page-subtitle" style={{ marginTop: 6 }}>
-                  Add a local person or invite a CashTrail user for lend/borrow.
+                  Add a local person or invite a WalletTrails user for lend/borrow.
                 </p>
               </div>
             ) : (
@@ -546,7 +546,7 @@ export default function Accounts() {
                               {isLinked ? <span className="people-linked-badge">Linked</span> : null}
                             </div>
                             <div className="travel-muted" style={{ fontSize: '0.75rem' }}>
-                              {isLinked ? 'CashTrail user' : 'Local'} · {status}
+                              {isLinked ? 'WalletTrails user' : 'Local'} · {status}
                             </div>
                           </div>
                           <strong style={{ color: bal < 0 ? 'var(--danger)' : 'var(--primary)' }}>

@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store'
 
-const SEEN_KEY = 'cashtrail_seen_feature_budgets_v1'
+const SEEN_KEY = 'wallettrails_seen_feature_budgets_v1'
 
 export async function hasSeenBudgetsFeature(): Promise<boolean> {
   try {

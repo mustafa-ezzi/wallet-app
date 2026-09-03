@@ -22,7 +22,7 @@ export function QuickGlanceWidget({
     return (
       <FlexWidget
         clickAction="OPEN_APP"
-        accessibilityLabel={`CashTrail ${balanceLabel}`}
+        accessibilityLabel={`WalletTrails ${balanceLabel}`}
         style={{
           height: 'match_parent',
           width: 'match_parent',
@@ -52,7 +52,7 @@ export function QuickGlanceWidget({
         />
         <FlexWidget style={{ flex: 1, flexDirection: 'column', justifyContent: 'center' }}>
           <TextWidget
-            text="CashTrail"
+            text="WalletTrails"
             style={{ fontSize: L.brand, fontWeight: '800', color: W.accentSoft }}
           />
           <TextWidget
@@ -80,7 +80,7 @@ export function QuickGlanceWidget({
   return (
     <FlexWidget
       clickAction="OPEN_APP"
-      accessibilityLabel={`CashTrail ${balanceLabel}`}
+      accessibilityLabel={`WalletTrails ${balanceLabel}`}
       style={{
         height: 'match_parent',
         width: 'match_parent',
@@ -101,7 +101,7 @@ export function QuickGlanceWidget({
     >
       <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <TextWidget
-          text="CashTrail"
+          text="WalletTrails"
           style={{
             fontSize: L.brand,
             fontWeight: '800',

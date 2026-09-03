@@ -61,7 +61,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       await refreshStatus()
       void updateAllWidgets()
     } catch (err) {
-      console.warn('[CashTrail] hydrate failed', err)
+      console.warn('[WalletTrails] hydrate failed', err)
     }
   }, [user, refreshStatus])
 

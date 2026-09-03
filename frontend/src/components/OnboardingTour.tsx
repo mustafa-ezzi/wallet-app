@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useState, useCallback, type CSSProperties }
 import { useNavigate } from 'react-router-dom'
 import anime from 'animejs'
 
-const TOUR_KEY = 'cashtrail_tour_v1_done'
+const TOUR_KEY = 'wallettrails_tour_v1_done'
 
 export type TourStep = {
   id: string
@@ -16,7 +16,7 @@ const STEPS: TourStep[] = [
   {
     id: 'welcome',
     selector: '[data-tour="brand"]',
-    title: 'Welcome to CashTrail',
+    title: 'Welcome to WalletTrails',
     body: 'A quick tour of where your money lives — wallets, income, bills, and reports.',
     path: '/',
   },

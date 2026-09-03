@@ -306,7 +306,7 @@ def compute_settlement(ledger):
         'summary_line': summary_line,
         'credits': credits,
         'transfers': transfers,
-        'disclaimer': 'Split equally among members. CashTrail suggests payments — you settle outside the app.',
+        'disclaimer': 'Split equally among members. WalletTrails suggests payments — you settle outside the app.',
     }
 
 

@@ -4,8 +4,8 @@ import anime from 'animejs'
 import { track } from '../lib/analytics'
 import { BUDGETS_AFTER_UPDATE_KEY } from '../features/budgetsAnnounce'
 
-export const ANDROID_INSTALL_TOUR_EVENT = 'cashtrail:android-install-tour'
-const TOUR_AFTER_UPDATE_KEY = 'cashtrail_android_tour_after_update'
+export const ANDROID_INSTALL_TOUR_EVENT = 'wallettrails:android-install-tour'
+const TOUR_AFTER_UPDATE_KEY = 'wallettrails_android_tour_after_update'
 
 /** Call right before applying a PWA update — tour starts on the next page load. */
 export function markAndroidTourAfterUpdate() {
@@ -70,7 +70,7 @@ export const ANDROID_INSTALL_STEPS: AndroidInstallTourStep[] = [
     id: 'bank-setup',
     selector: '[data-tour="android-bank-setup"]',
     title: 'Step 5 · Bank auto-detect',
-    body: 'After install, open CashTrail on your phone → Settings → Bank alerts. Enable SMS and/or Bank apps, then Approve drafts.',
+    body: 'After install, open WalletTrails on your phone → Settings → Bank alerts. Enable SMS and/or Bank apps, then Approve drafts.',
     path: '/get-android',
   },
 ]

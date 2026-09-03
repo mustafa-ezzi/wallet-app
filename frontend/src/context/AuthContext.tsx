@@ -4,7 +4,7 @@ import { identifyUser, resetAnalytics, track } from '../lib/analytics'
 import { getOfflineStore } from '../offline/store'
 import { isBrowserOnline } from '../offline/network'
 
-const USER_CACHE_KEY = 'cashtrail_user'
+const USER_CACHE_KEY = 'WalletTrails_user'
 
 interface User {
   id: number

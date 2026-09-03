@@ -1,12 +1,12 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 
-const ENABLED = 'cashtrail_bank_sms_enabled'
-const PROMPTED = 'cashtrail_bank_sms_prompted'
+const ENABLED = 'wallettrails_bank_sms_enabled'
+const PROMPTED = 'wallettrails_bank_sms_prompted'
 /** Bank / wallet app alerts via Android Notification Listener */
-const NOTIF_ENABLED = 'cashtrail_bank_notif_enabled'
+const NOTIF_ENABLED = 'wallettrails_bank_notif_enabled'
 /** When on, detected SMS/notifications create transactions without inbox approval. Default off. */
-const AUTO_APPROVE = 'cashtrail_bank_sms_auto_approve'
+const AUTO_APPROVE = 'wallettrails_bank_sms_auto_approve'
 
 async function getItem(key: string): Promise<string | null> {
   try {

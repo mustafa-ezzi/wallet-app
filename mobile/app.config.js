@@ -21,7 +21,7 @@ module.exports = ({ config }) => {
         fs.copyFileSync(fromEnv, localPath)
       }
     } catch (err) {
-      console.warn('[CashTrail] could not copy GOOGLE_SERVICES_JSON → google-services.json', err)
+      console.warn('[WalletTrails] could not copy GOOGLE_SERVICES_JSON → google-services.json', err)
     }
   }
 
@@ -36,7 +36,7 @@ module.exports = ({ config }) => {
     }
   } else {
     console.warn(
-      '[CashTrail] google-services.json missing — Android push will fail until FCM is wired (see PUSH_SETUP.md).',
+      '[WalletTrails] google-services.json missing — Android push will fail until FCM is wired (see PUSH_SETUP.md).',
     )
   }
 

@@ -492,7 +492,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
               <p className="add-tx-hint">
                 {selectedLink
                   ? `Linked: posts on your books now and sends ${selectedLink.other_user?.name || 'them'} an Accept request to pick their wallet.`
-                  : 'Local = name only. Invite = CashTrail user (email/username or code). Pay & Receive on History.'}
+                  : 'Local = name only. Invite = WalletTrails user (email/username or code). Pay & Receive on History.'}
               </p>
             </div>
           ) : (

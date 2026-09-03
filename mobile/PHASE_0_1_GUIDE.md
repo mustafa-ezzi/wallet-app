@@ -38,7 +38,7 @@ npm install
 
 ## Important: what “localhost:8081” is
 
-`http://localhost:8081` is the **Metro bundler**, not the CashTrail UI. A blank / status page in the browser is normal.
+`http://localhost:8081` is the **Metro bundler**, not the WalletTrails UI. A blank / status page in the browser is normal.
 
 - **Phone:** Expo Go → open `exp://192.168.1.9:8081` (use your PC’s LAN IP if different)
 - **Browser UI (optional):** `npx expo start --web` then open the URL Expo prints (often `http://localhost:8081`)
@@ -67,7 +67,7 @@ npx expo start --localhost
 ```
 4. In Expo Go, open: `exp://127.0.0.1:8081`
 
-### C) Existing CashTrail web PWA
+### C) Existing WalletTrails web PWA
 Your React web app already works — run `frontend` or open the Railway frontend URL. Same data/API; mobile is a separate RN client.
 
 ### D) Later: installable APK
@@ -146,7 +146,7 @@ eas init
 eas build -p android --profile preview
 ```
 
-`eas.json` already has `development` / `preview` / `production` profiles. Package id is locked: **`com.cashtrail.app`**.
+`eas.json` already has `development` / `preview` / `production` profiles. Package id is locked: **`com.WalletTrails.app`**.
 
 ---
 

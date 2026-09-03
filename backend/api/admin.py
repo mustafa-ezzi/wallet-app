@@ -1,5 +1,5 @@
 """
-Django Admin for CashTrail.
+Django Admin for WalletTrails.
 
 Phase 0: finance models are superuser-only (emergency).
 Staff day-to-day work should use the Ops panel (/api/ops/*), not transaction browsing.
@@ -45,8 +45,8 @@ from .models import (
 )
 
 
-admin.site.site_header = 'CashTrail Admin'
-admin.site.site_title = 'CashTrail'
+admin.site.site_header = 'WalletTrails Admin'
+admin.site.site_title = 'WalletTrails'
 admin.site.index_title = 'Emergency admin (prefer Ops panel for day-to-day)'
 
 

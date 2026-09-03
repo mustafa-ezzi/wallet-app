@@ -3,14 +3,14 @@
 export const BANK_SMS_UX = {
   permissionTitle: 'Read bank SMS?',
   permissionBody:
-    'CashTrail can detect bank alerts and draft expenses, ATM cash-outs, and money received. '
+    'WalletTrails can detect bank alerts and draft expenses, ATM cash-outs, and money received. '
     + 'Nothing is saved to your books until you approve. You can turn this off anytime in Settings.',
   permissionAllow: 'Allow',
   permissionNotNow: 'Not now',
 
   pasteTitle: 'Paste bank SMS',
   pasteHint:
-    'Paste a bank transaction message. CashTrail will suggest the type and wallet — you approve before anything is posted.',
+    'Paste a bank transaction message. WalletTrails will suggest the type and wallet — you approve before anything is posted.',
   pastePlaceholder: 'Paste SMS here…',
   parseButton: 'Detect transaction',
 
@@ -38,7 +38,7 @@ export const BANK_SMS_UX = {
 export const BANK_SMS_PRIVACY_DRAFT = `
 ## Bank SMS assist
 
-CashTrail may help you turn bank transaction alerts into draft bookkeeping entries.
+WalletTrails may help you turn bank transaction alerts into draft bookkeeping entries.
 
 ### What we ask
 - **Paste:** You paste a message yourself. Parsing runs in the app.

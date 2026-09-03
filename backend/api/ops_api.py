@@ -1,5 +1,5 @@
 """
-CashTrail Ops API — Phase 0–1.
+WalletTrails Ops API — Phase 0–1.
 
 Privacy: serializers expose hosted-user metadata and *counts* only.
 Never include Transaction rows, balances, installment amounts, or household ledgers.

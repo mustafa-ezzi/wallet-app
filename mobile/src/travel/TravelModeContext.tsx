@@ -14,7 +14,7 @@ import type { FxQuote, TravelModeState } from '@/src/api/types'
 import { useAuth } from '@/src/context/AuthContext'
 import { foreignToPkr, formatRateLine } from '@/src/travel/currencies'
 
-const CACHE_KEY = 'cashtrail_travel_mode_v1'
+const CACHE_KEY = 'wallettrails_travel_mode_v1'
 
 const EMPTY: TravelModeState = {
   enabled: false,

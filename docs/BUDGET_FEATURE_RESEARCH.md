@@ -2,7 +2,7 @@
 
 **Status:** Phase 1 implemented (backend + web + mobile). Phase 2 alerts optional.  
 **Reference UI:** Category list with monthly spend + “Set” per category (see attached screenshot)  
-**App context:** CashTrail — PKR-first personal finance (wallets, income/expense, bank SMS, family/household, reports)
+**App context:** WalletTrails — PKR-first personal finance (wallets, income/expense, bank SMS, family/household, reports)
 
 ---
 
@@ -51,11 +51,11 @@ Typical “Budgets” screen structure:
 - **Set** opens flow to define a monthly limit (e.g. PKR 15,000 for Food)
 - Optional **All** row = total monthly budget (sum of categories or one overall cap)
 
-**CashTrail adaptation:** Use PKR, existing category icons/colours from `mobile/src/constants/categories.ts` and `frontend/src/constants/categories.ts`.
+**WalletTrails adaptation:** Use PKR, existing category icons/colours from `mobile/src/constants/categories.ts` and `frontend/src/constants/categories.ts`.
 
 ---
 
-## 3. What CashTrail already has (foundation)
+## 3. What WalletTrails already has (foundation)
 
 ### Data
 
@@ -340,4 +340,4 @@ class CategoryBudget(models.Model):
 
 ---
 
-*Related:* `docs/CASHTRAIL_USER_GUIDE.md`, `docs/TRAVEL_AND_PEOPLE_PHASES.md`
+*Related:* `docs/WalletTrails_USER_GUIDE.md`, `docs/TRAVEL_AND_PEOPLE_PHASES.md`

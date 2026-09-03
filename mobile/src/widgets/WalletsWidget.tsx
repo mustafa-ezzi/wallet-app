@@ -26,7 +26,7 @@ export function WalletsWidget({
   return (
     <FlexWidget
       clickAction="OPEN_APP"
-      accessibilityLabel={`CashTrail wallets ${totalLabel}`}
+      accessibilityLabel={`WalletTrails wallets ${totalLabel}`}
       style={{
         height: 'match_parent',
         width: 'match_parent',
@@ -95,7 +95,7 @@ export function WalletsWidget({
         <FlexWidget style={{ flexDirection: 'column', flexGap: L.compact ? 5 : 6, marginTop: L.compact ? 8 : 10 }}>
           {display.length === 0 ? (
             <TextWidget
-              text="Open CashTrail to sync wallets"
+              text="Open WalletTrails to sync wallets"
               style={{ fontSize: L.label, fontWeight: '500', color: W.muted }}
             />
           ) : (

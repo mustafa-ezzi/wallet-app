@@ -44,7 +44,7 @@ mobile/android/
 ios/
 android/
 
-# --- not needed for CashTrail mobile Android builds ---
+# --- not needed for WalletTrails mobile Android builds ---
 frontend/
 frontend-admin/
 backend/

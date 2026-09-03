@@ -12,7 +12,7 @@ app.innerHTML = `
       <div class="brand">
         <div class="brand__logo">CT</div>
         <div>
-          <p class="brand__title">CashTrail</p>
+          <p class="brand__title">WalletTrails</p>
           <p class="brand__subtitle">Follow every rupee</p>
         </div>
       </div>

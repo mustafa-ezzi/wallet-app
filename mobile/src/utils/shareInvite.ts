@@ -1,5 +1,5 @@
 /**
- * WhatsApp-ready invite copy for CashTrail household sharing.
+ * WhatsApp-ready invite copy for WalletTrails household sharing.
  * Keep claims truthful — no Play Store claim until listing is live.
  */
 
@@ -13,23 +13,23 @@ export function buildHouseholdInviteMessage(opts: {
   const who = (opts.inviterName || '').trim()
 
   const opener = who
-    ? `${who} invited you to track shared expenses together on CashTrail.`
-    : `You've been invited to track shared expenses together on CashTrail.`
+    ? `${who} invited you to track shared expenses together on WalletTrails.`
+    : `You've been invited to track shared expenses together on WalletTrails.`
 
   return (
     `${opener}\n\n` +
     `Household: “${house}”\n` +
     `Invite code: ${code}\n\n` +
-    `Why CashTrail?\n` +
+    `Why WalletTrails?\n` +
     `• Shared household ledger — everyone sees what was spent\n` +
     `• Settle up — split costs equally and see who owes whom\n` +
     `• Your personal wallets stay private\n` +
     `• Also track bills, loans & EMI reminders in PKR\n\n` +
     `How to join:\n` +
-    `1) Install CashTrail (Android)\n` +
+    `1) Install WalletTrails (Android)\n` +
     `2) Open Family / Household\n` +
     `3) Tap Join and enter the code above\n\n` +
     `Fair house money. No WhatsApp IOU fights.\n` +
-    `CashTrail — Follow every rupee.`
+    `WalletTrails — Follow every rupee.`
   )
 }

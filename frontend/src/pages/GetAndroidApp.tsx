@@ -62,14 +62,14 @@ export default function GetAndroidAppPage() {
           <li>Open <strong>Play Store</strong> → profile → <strong>Play Protect</strong>.</li>
           <li>Settings gear → turn <strong>Scan apps</strong> off temporarily.</li>
           <li>Or tap <strong>Install anyway</strong> on the block screen.</li>
-          <li>After CashTrail installs, turn Play Protect <strong>back on</strong>.</li>
+          <li>After WalletTrails installs, turn Play Protect <strong>back on</strong>.</li>
         </ol>
       </section>
 
       <section className="glass get-android-card" data-tour="android-bank-setup">
         <h2 className="get-android-h2">After install — bank alerts</h2>
         <ol className="get-android-steps">
-          <li>Open CashTrail on Android and sign in.</li>
+          <li>Open WalletTrails on Android and sign in.</li>
           <li>Go to <strong>Settings → Bank alerts</strong>.</li>
           <li>Enable <strong>SMS</strong> and/or <strong>Bank apps</strong>.</li>
           <li><strong>Approve</strong> or <strong>Reject</strong> each draft — same queue as this website.</li>

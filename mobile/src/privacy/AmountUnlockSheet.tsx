@@ -57,7 +57,7 @@ export function AmountUnlockSheet() {
     setBusy(true)
     try {
       const ok = await unlockWithBiometrics()
-      if (!ok) setError('Unlock cancelled or failed. Try again or use your CashTrail PIN.')
+      if (!ok) setError('Unlock cancelled or failed. Try again or use your WalletTrails PIN.')
     } finally {
       setBusy(false)
     }
@@ -96,7 +96,7 @@ export function AmountUnlockSheet() {
         <View style={styles.sheet}>
           <Text style={styles.title}>Reveal amounts</Text>
           <Text style={styles.sub}>
-            Confirm with biometrics or your CashTrail PIN. Labels and the rest of the screen stay visible.
+            Confirm with biometrics or your WalletTrails PIN. Labels and the rest of the screen stay visible.
           </Text>
 
           {busy ? <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.md }} /> : null}
@@ -120,7 +120,7 @@ export function AmountUnlockSheet() {
                   onPress={() => setShowPin(true)}
                   disabled={busy}
                 >
-                  <Text style={styles.secondaryText}>Use CashTrail PIN</Text>
+                  <Text style={styles.secondaryText}>Use WalletTrails PIN</Text>
                 </Pressable>
               ) : (
                 <View style={styles.pinBox}>
@@ -147,7 +147,7 @@ export function AmountUnlockSheet() {
             </>
           ) : !biometricsAvailable ? (
             <Text style={styles.warn}>
-              Open Settings and set a CashTrail PIN to reveal amounts.
+              Open Settings and set a WalletTrails PIN to reveal amounts.
             </Text>
           ) : null}
 

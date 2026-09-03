@@ -169,7 +169,7 @@ export const THEMES: ThemeOption[] = [
   },
 ]
 
-export const THEME_STORAGE_KEY = 'cashtrail_theme'
+export const THEME_STORAGE_KEY = 'wallettrails_theme'
 export const DEFAULT_THEME: ThemeId = 'forest'
 
 export function isThemeId(value: string | null | undefined): value is ThemeId {

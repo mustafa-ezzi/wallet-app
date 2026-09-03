@@ -9,7 +9,7 @@
 
 ## 1. What we are building
 
-CashTrail should optionally read **bank transaction SMS** (with explicit user permission), parse amount / type / bank hints, match a **wallet**, and queue a draft for the user to **Approve**, **Reject**, or **edit** (wallet, category, notes) — never silently create books without consent.
+WalletTrails should optionally read **bank transaction SMS** (with explicit user permission), parse amount / type / bank hints, match a **wallet**, and queue a draft for the user to **Approve**, **Reject**, or **edit** (wallet, category, notes) — never silently create books without consent.
 
 Think of it like OTP autofill apps: the system notices a relevant message, then asks the user to confirm the action.
 
@@ -31,7 +31,7 @@ We support five transaction kinds derived from real Pakistani bank SMS patterns.
 
 ### 2.1 Real examples (from product)
 
-| User type | Example SMS | CashTrail action on Approve |
+| User type | Example SMS | WalletTrails action on Approve |
 |-----------|-------------|-----------------------------|
 | **ATM** | `PKR 50,000.00 has been debited at 16:58 on 20-Aug-2026 TID:302750, If you have not done this…` | Treat as **cash withdrawal**: debit bank wallet, credit **Cash** wallet (transfer), not an expense |
 | **Online / card expense** | `PKR 2,041.00 has been debited at 00:02 on 25-Aug-2026, If you have not done this…` | **Expense** on the matched bank wallet |
@@ -81,7 +81,7 @@ Internally we store finer kinds; in the approval UI we show three main buckets +
 After account basics (or alongside notification permission), show a dedicated step:
 
 > **Read bank SMS?**  
-> CashTrail can detect bank alerts and draft expenses, ATM cash-outs, and money received. Messages stay on your device until you approve. You can change this anytime in Settings.  
+> WalletTrails can detect bank alerts and draft expenses, ATM cash-outs, and money received. Messages stay on your device until you approve. You can change this anytime in Settings.  
 > [Allow] [Not now]
 
 **Existing users**  
@@ -103,7 +103,7 @@ On next app open (once per install, until answered): same sheet / modal. If dism
 3. Extract: amount, date/time, kind, bank/account hints, counterparty, TID, raw fingerprint.  
 4. Deduplicate (same fingerprint / TID+amount+time).  
 5. Create **PendingBankImport** (local + sync later).  
-6. When user opens CashTrail → **Review detected transactions** sheet / inbox badge.
+6. When user opens WalletTrails → **Review detected transactions** sheet / inbox badge.
 
 ### 3.3 Approval UI (required)
 
@@ -161,12 +161,12 @@ So “mobile + web” means:
 
 - **Capture:** Android-first; iOS/web use paste / share / sync  
 - **Books:** Same API models; web UI for the approval inbox  
-- Marketing copy must not say “CashTrail reads SMS on iPhone” — say “Android can auto-detect; on iOS/web paste or approve from phone”
+- Marketing copy must not say “WalletTrails reads SMS on iPhone” — say “Android can auto-detect; on iOS/web paste or approve from phone”
 
 ### Alternative capture (accuracy + iOS/web)
 
 1. **Paste SMS** on web and iOS → same parser  
-2. **Share sheet** “Share to CashTrail” from Messages (iOS)  
+2. **Share sheet** “Share to WalletTrails” from Messages (iOS)  
 3. Later: email bank alerts (forward rules) — Phase optional  
 4. Later: bank statement CSV — separate feature  
 
@@ -206,7 +206,7 @@ On Approve:
 
 - **Expense / sent** → one expense tx on bank wallet  
 - **Received / reversal** → one income tx on bank wallet  
-- **ATM** → two legs or one transfer: bank −amount, cash +amount (same pattern as internal transfer if CashTrail already has transfer; otherwise expense+income pair with linked notes / `client_mutation_id` pair)
+- **ATM** → two legs or one transfer: bank −amount, cash +amount (same pattern as internal transfer if WalletTrails already has transfer; otherwise expense+income pair with linked notes / `client_mutation_id` pair)
 
 ---
 
@@ -315,7 +315,7 @@ Confidence score example:
 
 **No SMS permission yet** — users paste a message; we parse and open Approve flow.
 
-- Shared parser: `@cashtrail/bank-sms-parser` (Vite + Expo aliases)  
+- Shared parser: `@WalletTrails/bank-sms-parser` (Vite + Expo aliases)  
 - Fixtures + unit tests (`npm test` in `packages/bank-sms-parser` — 29 passing)  
 - UI: Paste → preview → Approve creates real txs  
 - ATM → Cash transfer (`Bank Transfer` double entry); prompt create Cash if missing  
@@ -341,7 +341,7 @@ Confidence score example:
 ### Phase 3 — Android SMS permission & auto-detect ✅
 
 - Onboarding: Android step `bank-sms-permission` after user-type  
-- Existing users: one-time Home banner (SecureStore `cashtrail_bank_sms_prompted`)  
+- Existing users: one-time Home banner (SecureStore `WalletTrails_bank_sms_prompted`)  
 - Capture: `expo-sms-listener` (RECEIVE_SMS / READ_SMS) → parse → `bankSmsApi.create` (**pending only**)  
 - Headless task `ExpoSmsListenerBackground` in `mobile/index.js`  
 - Home badge for pending count → `/bank-sms`  
@@ -441,7 +441,7 @@ Do **not** start with SMS permission alone — Play review + false positives are
 
 ## 15. Summary
 
-CashTrail gains a **permissioned bank-alert assistant**: detect or paste SMS / bank-app notifications → classify Expense / ATM / Received / Reversed → match wallet → user approves (editable) → write books. ATM moves money to Cash (create Cash if needed). Mobile (Android) captures; **web shares the review queue**. Accuracy grows via templates, aliases, and user corrections — never via silent autopost.
+WalletTrails gains a **permissioned bank-alert assistant**: detect or paste SMS / bank-app notifications → classify Expense / ATM / Received / Reversed → match wallet → user approves (editable) → write books. ATM moves money to Cash (create Cash if needed). Mobile (Android) captures; **web shares the review queue**. Accuracy grows via templates, aliases, and user corrections — never via silent autopost.
 
 ---
 
@@ -449,7 +449,7 @@ CashTrail gains a **permissioned bank-alert assistant**: detect or paste SMS / b
 
 ### 16.1 What we ship today
 
-CashTrail has **two Android capture paths** (both optional, both draft-only):
+WalletTrails has **two Android capture paths** (both optional, both draft-only):
 
 | Path | Settings toggle | When it helps |
 |------|-----------------|---------------|

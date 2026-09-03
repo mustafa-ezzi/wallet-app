@@ -1,4 +1,4 @@
-# CashTrail
+# WalletTrails
 
 Follow every rupee. Personal finance management for freelancers and small businesses — accounts, projects, installments, bills, and monthly forecasts.
 

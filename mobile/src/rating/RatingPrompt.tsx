@@ -24,12 +24,12 @@ import {
   prepareRatingPromptForTest,
   recordAppOpen,
 } from './streak'
-import { shareCashTrailLink } from './shareCashTrail'
-import { CASHTRAIL_SHARE_URL } from './storage'
+import { shareWalletTrailsLink } from './shareWalletTrails'
+import { WalletTrails_SHARE_URL } from './storage'
 
 type Step = 'stars' | 'feedback' | 'share'
 
-export const FORCE_RATING_EVENT = 'cashtrail:force-rating'
+export const FORCE_RATING_EVENT = 'WalletTrails:force-rating'
 
 /**
  * Shows once after 4 consecutive calendar-day opens.
@@ -129,7 +129,7 @@ export function RatingPrompt() {
   const onShare = async () => {
     setBusy(true)
     try {
-      await shareCashTrailLink()
+      await shareWalletTrailsLink()
       track('rating_prompt_shared')
     } finally {
       setBusy(false)
@@ -176,7 +176,7 @@ export function RatingPrompt() {
               {step === 'stars' ? (
                 <>
                   <Text style={[styles.kicker, { color: colors.primary }]}>Quick check-in</Text>
-                  <Text style={[styles.title, { color: colors.text }]}>How’s CashTrail?</Text>
+                  <Text style={[styles.title, { color: colors.text }]}>How’s WalletTrails?</Text>
                   <Text style={[styles.sub, { color: colors.textMuted }]}>
                     You’ve opened the app a few days in a row — we’d love a quick rating.
                   </Text>
@@ -250,10 +250,10 @@ export function RatingPrompt() {
                 <>
                   <Text style={[styles.title, { color: colors.text }]}>Thanks</Text>
                   <Text style={[styles.sub, { color: colors.textMuted }]}>
-                    Know someone who needs clearer money tracking? Share CashTrail.
+                    Know someone who needs clearer money tracking? Share WalletTrails.
                   </Text>
                   <Text style={[styles.linkHint, { color: colors.primaryDark }]} numberOfLines={1}>
-                    {CASHTRAIL_SHARE_URL}
+                    {WalletTrails_SHARE_URL}
                   </Text>
                   <PrimaryButton title="Share link" onPress={() => void onShare()} loading={busy} />
                   <Pressable onPress={onSkipShare} style={styles.later}>

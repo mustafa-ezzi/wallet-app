@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Do not await network — UI must leave the spinner immediately
         void refreshUser()
       } catch (err) {
-        console.warn('[CashTrail] auth boot failed', err)
+        console.warn('[WalletTrails] auth boot failed', err)
       } finally {
         if (!cancelled) setLoading(false)
       }

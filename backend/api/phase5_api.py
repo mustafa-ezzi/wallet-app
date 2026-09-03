@@ -330,5 +330,5 @@ class OpsUsersExportView(APIView):
             request=request,
         )
         resp = HttpResponse(buf.getvalue(), content_type='text/csv; charset=utf-8')
-        resp['Content-Disposition'] = 'attachment; filename="cashtrail_users.csv"'
+        resp['Content-Disposition'] = 'attachment; filename="wallettrails_users.csv"'
         return resp

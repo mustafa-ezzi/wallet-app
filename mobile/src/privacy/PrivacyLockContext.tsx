@@ -164,7 +164,7 @@ export function PrivacyLockProvider({ children }: { children: React.ReactNode })
     if (Platform.OS === 'web') return false
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Reveal CashTrail amounts',
+        promptMessage: 'Reveal WalletTrails amounts',
         cancelLabel: 'Cancel',
         disableDeviceFallback: false,
         fallbackLabel: 'Use device PIN',

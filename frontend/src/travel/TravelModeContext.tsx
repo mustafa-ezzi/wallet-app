@@ -34,8 +34,8 @@ export type FxQuote = {
   warning?: string
 }
 
-const CACHE_KEY = 'cashtrail_travel_mode_v1'
-const RATE_REFRESH_KEY = 'cashtrail_travel_rate_refreshed_day'
+const CACHE_KEY = 'wallettrails_travel_mode_v1'
+const RATE_REFRESH_KEY = 'wallettrails_travel_rate_refreshed_day'
 
 const EMPTY: TravelModeState = {
   enabled: false,

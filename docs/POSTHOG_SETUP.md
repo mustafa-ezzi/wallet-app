@@ -1,6 +1,6 @@
 # PostHog setup — what to send us
 
-CashTrail has **PostHog on web** (`frontend/src/lib/analytics.ts`) and **mobile APK** (`mobile/src/lib/PostHogRoot.tsx`). Add keys via Railway / EAS — never commit them to git.
+WalletTrails has **PostHog on web** (`frontend/src/lib/analytics.ts`) and **mobile APK** (`mobile/src/lib/PostHogRoot.tsx`). Add keys via Railway / EAS — never commit them to git.
 
 ---
 
@@ -32,8 +32,8 @@ VITE_POSTHOG_HOST=https://us.i.posthog.com
 
 | Question | Your answer |
 |----------|-------------|
-| Railway service name for web frontend | e.g. `cashtrail-web` / `frontend` |
-| Production URL users open | e.g. `https://cashtrail.up.railway.app` |
+| Railway service name for web frontend | e.g. `WalletTrails-web` / `frontend` |
+| Production URL users open | e.g. `https://WalletTrails.up.railway.app` |
 
 ### Mobile (Expo — wired in `mobile/src/lib/PostHogRoot.tsx`)
 
@@ -94,7 +94,7 @@ Add these under **Project settings → Authorized URLs** (or equivalent):
 
 | URL | Purpose |
 |-----|---------|
-| `https://cashtrail.up.railway.app` | Production web |
+| `https://WalletTrails.up.railway.app` | Production web |
 | `http://localhost:5173` | Local Vite dev (if you test analytics locally) |
 | `exp://` / custom scheme | Only if PostHog mobile SDK needs it |
 

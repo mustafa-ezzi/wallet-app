@@ -1,5 +1,5 @@
 """
-Scenario / regression tests for CashTrail core money flows.
+Scenario / regression tests for WalletTrails core money flows.
 Run from backend/:  python manage.py test api.tests_scenarios -v 2
 """
 from decimal import Decimal

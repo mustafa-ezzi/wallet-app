@@ -42,7 +42,7 @@ def _play_package_name() -> str:
     return (
         getattr(settings, 'GOOGLE_PLAY_PACKAGE_NAME', None)
         or os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', '')
-        or 'com.cashtrail.app'
+        or 'com.wallettrails.app'
     ).strip()
 
 

@@ -181,8 +181,8 @@ export default function ReportsScreen() {
     })
     const csv = [header, ...lines].join('\n')
     await Share.share({
-      title: `CashTrail ${monthLabel}`,
-      message: `CashTrail ledger — ${monthLabel}\n\n${csv}`,
+      title: `WalletTrails ${monthLabel}`,
+      message: `WalletTrails ledger — ${monthLabel}\n\n${csv}`,
     })
   }
 
@@ -210,7 +210,7 @@ export default function ReportsScreen() {
       const username =
         [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim()
         || user?.email
-        || 'CashTrail user'
+        || 'WalletTrails user'
       await shareReportPdf(rows, {
         username,
         monthLabel,

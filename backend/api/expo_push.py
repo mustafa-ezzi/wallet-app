@@ -17,7 +17,7 @@ def send_expo_push(
     title: str,
     body: str,
     data: dict | None = None,
-    channel_id: str = 'cashtrail-due-reminders',
+    channel_id: str = 'wallettrails-due-reminders',
 ) -> dict:
     """
     Send push messages via Expo.

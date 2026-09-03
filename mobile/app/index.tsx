@@ -11,7 +11,7 @@ export default function Index() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
         <ActivityIndicator color={colors.primary} size="large" />
-        <Text style={{ marginTop: spacing.md, color: colors.textMuted, fontWeight: '600' }}>Starting CashTrail…</Text>
+        <Text style={{ marginTop: spacing.md, color: colors.textMuted, fontWeight: '600' }}>Starting WalletTrails…</Text>
       </View>
     )
   }

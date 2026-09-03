@@ -8,10 +8,10 @@ import type { MonthFlowWidgetData } from './MonthFlowWidget'
 import type { QuickGlanceWidgetData } from './QuickGlanceWidget'
 import type { WalletsWidgetData } from './WalletsWidget'
 
-export const BALANCE_WIDGET_NAME = 'CashTrailBalance'
-export const MONTH_FLOW_WIDGET_NAME = 'CashTrailMonthFlow'
-export const WALLETS_WIDGET_NAME = 'CashTrailWallets'
-export const QUICK_GLANCE_WIDGET_NAME = 'CashTrailQuickGlance'
+export const BALANCE_WIDGET_NAME = 'WalletTrailsBalance'
+export const MONTH_FLOW_WIDGET_NAME = 'WalletTrailsMonthFlow'
+export const WALLETS_WIDGET_NAME = 'WalletTrailsWallets'
+export const QUICK_GLANCE_WIDGET_NAME = 'WalletTrailsQuickGlance'
 
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -45,14 +45,14 @@ export async function loadBalanceWidgetData(): Promise<BalanceWidgetData> {
       balanceLabel: fmtBalance(total),
       subtitle: accounts.length
         ? `${accounts.length} wallet${accounts.length === 1 ? '' : 's'} · tap to open`
-        : 'Open CashTrail to sync wallets',
+        : 'Open WalletTrails to sync wallets',
       walletCount: accounts.length,
       updatedLabel: updatedClockLabel(),
     }
   } catch {
     return {
       balanceLabel: '—',
-      subtitle: 'Open CashTrail to sync',
+      subtitle: 'Open WalletTrails to sync',
       walletCount: 0,
     }
   }
@@ -127,7 +127,7 @@ export async function loadQuickGlanceWidgetData(): Promise<QuickGlanceWidgetData
       txCountLabel: monthTx ? `${monthTx} tx this month` : 'Tap to add a transaction',
     }
   } catch {
-    return { balanceLabel: '—', txCountLabel: 'Open CashTrail' }
+    return { balanceLabel: '—', txCountLabel: 'Open WalletTrails' }
   }
 }
 
@@ -143,7 +143,7 @@ async function safeRequest(
   })
 }
 
-/** Push latest data to every CashTrail home-screen widget. */
+/** Push latest data to every WalletTrails home-screen widget. */
 export async function updateAllWidgets() {
   if (Platform.OS !== 'android') return
   try {
@@ -182,7 +182,7 @@ export async function updateAllWidgets() {
       )),
     ])
   } catch (err) {
-    console.warn('[CashTrail] widget update failed', err)
+    console.warn('[WalletTrails] widget update failed', err)
   }
 }
 

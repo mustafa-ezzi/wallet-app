@@ -12,14 +12,14 @@ export function ForceUpdateGate() {
   if (!needsForceUpdate) return null
 
   const store = (config.store_url || '').trim()
-    || 'https://play.google.com/store/apps/details?id=com.cashtrail.app'
+    || 'https://play.google.com/store/apps/details?id=com.wallettrails.app'
 
   return (
     <Modal visible animationType="fade" transparent={false}>
       <View style={[styles.wrap, { backgroundColor: colors.background }]}>
         <Text style={[styles.title, { color: colors.primaryDark }]}>Update required</Text>
         <Text style={[styles.body, { color: colors.textMuted }]}>
-          This version of CashTrail is no longer supported. Please update from the Play Store to continue.
+          This version of WalletTrails is no longer supported. Please update from the Play Store to continue.
         </Text>
         <Pressable
           style={[styles.btn, { backgroundColor: colors.primary }]}

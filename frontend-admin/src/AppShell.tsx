@@ -18,7 +18,7 @@ export function AppShell() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <strong>CashTrail Ops</strong>
+          <strong>WalletTrails Ops</strong>
           <span>Phase 0–5</span>
         </div>
         <nav>

@@ -180,7 +180,7 @@ export default function TravelModeScreen() {
               </View>
               <Text style={[styles.introTitle, { color: colors.primaryDark }]}>TRAVEL MODE</Text>
               <Text style={[styles.introBody, { color: colors.textSecondary }]}>
-                Traveling outside Pakistan? Track expenses in the local currency. CashTrail
+                Traveling outside Pakistan? Track expenses in the local currency. WalletTrails
                 converts to PKR using your trip rate so wallets stay accurate.
               </Text>
               <PrimaryButton title="TURN ON TRAVEL MODE" onPress={turnOn} />

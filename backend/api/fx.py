@@ -50,7 +50,7 @@ def validate_rate(rate) -> Decimal:
 def _http_json(url: str) -> dict:
     req = urllib.request.Request(
         url,
-        headers={'User-Agent': 'CashTrail/1.0', 'Accept': 'application/json'},
+        headers={'User-Agent': 'WalletTrails/1.0', 'Accept': 'application/json'},
     )
     with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SEC) as resp:
         return json.loads(resp.read().decode('utf-8'))

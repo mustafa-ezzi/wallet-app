@@ -16,15 +16,15 @@ export default function InstallAppDialog({ open, ios, canPrompt, onClose, onInst
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet install-dialog">
         <div className="modal-header">
-          <h2>Install CashTrail</h2>
+          <h2>Install WalletTrails</h2>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             <X size={18} strokeWidth={2} />
           </button>
         </div>
 
         <div className="install-dialog-hero">
-          <img src="/logo.png" alt="CashTrail" className="install-dialog-logo" />
-          <p>Add CashTrail to your home screen for a faster, full-screen experience.</p>
+          <img src="/logo.png" alt="WalletTrails" className="install-dialog-logo" />
+          <p>Add WalletTrails to your home screen for a faster, full-screen experience.</p>
         </div>
 
         {canPrompt ? (

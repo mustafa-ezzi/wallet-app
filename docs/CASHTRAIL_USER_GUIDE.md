@@ -1,7 +1,7 @@
-# CashTrail — Quick User Guide
+# WalletTrails — Quick User Guide
 
 **Follow every rupee.**  
-CashTrail is a simple money app for Pakistan (PKR). Track wallets, daily spending, bills, loans, and family expenses — all in one place.
+WalletTrails is a simple money app for Pakistan (PKR). Track wallets, daily spending, bills, loans, and family expenses — all in one place.
 
 ---
 
@@ -68,4 +68,4 @@ Log every expense for 7 days. Then open **Reports** — you’ll clearly see whe
 
 ---
 
-*CashTrail — Follow every rupee.*
+*WalletTrails — Follow every rupee.*

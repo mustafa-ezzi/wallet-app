@@ -402,7 +402,7 @@ export default function WalletsScreen() {
                 >
                   {money.fmtBalance(bal)}
                 </Text>
-                <Text style={styles.cardType}>{isLinked ? 'CashTrail user' : 'Local'}</Text>
+                <Text style={styles.cardType}>{isLinked ? 'WalletTrails user' : 'Local'}</Text>
               </View>
             </View>
           </BouncyPressable>
@@ -614,7 +614,7 @@ export default function WalletsScreen() {
             {people.length === 0 && incomingInvites.length === 0 ? (
               <View style={styles.emptyPeople}>
                 <Text style={styles.emptyBody}>
-                  No people yet. Tap + Add for a local person or invite a CashTrail user.
+                  No people yet. Tap + Add for a local person or invite a WalletTrails user.
                 </Text>
               </View>
             ) : (

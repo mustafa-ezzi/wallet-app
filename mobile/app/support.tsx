@@ -133,7 +133,7 @@ export default function SupportScreen() {
         </Pressable>
         <Text style={[styles.title, { color: colors.text }]}>Help & Support</Text>
         <Text style={[styles.hint, { color: colors.textMuted }]}>
-          Message CashTrail support. We’ll reply in this chat (and notify you if push is on).
+          Message WalletTrails support. We’ll reply in this chat (and notify you if push is on).
         </Text>
 
         {(() => {
@@ -141,7 +141,7 @@ export default function SupportScreen() {
           if (!raw) return null
           const url = raw.startsWith('http')
             ? raw
-            : `https://wa.me/${raw.replace(/[^\d]/g, '')}?text=${encodeURIComponent('Hi CashTrail support')}`
+            : `https://wa.me/${raw.replace(/[^\d]/g, '')}?text=${encodeURIComponent('Hi WalletTrails support')}`
           return (
             <Pressable
               style={[styles.waBtn, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}

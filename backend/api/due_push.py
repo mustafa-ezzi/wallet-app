@@ -115,7 +115,7 @@ def collect_due_events(today: date | None = None) -> list[dict]:
                 'object_id': p.id,
                 'lead_days': lead,
                 'title': 'Loan reminder',
-                'body': f'{p.name} is {lead_label(lead)}. Open CashTrail to review.',
+                'body': f'{p.name} is {lead_label(lead)}. Open WalletTrails to review.',
                 'data': {
                     'screen': 'bills',
                     'kind': 'payable',
@@ -146,7 +146,7 @@ def collect_due_events(today: date | None = None) -> list[dict]:
                 'object_id': r.id,
                 'lead_days': lead,
                 'title': 'Money owed reminder',
-                'body': f'{name} is {lead_label(lead)}. Open CashTrail to review.',
+                'body': f'{name} is {lead_label(lead)}. Open WalletTrails to review.',
                 'data': {
                     'screen': 'bills',
                     'kind': 'receivable',

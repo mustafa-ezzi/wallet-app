@@ -1,6 +1,6 @@
-# Web animations for CashTrail (React Bits + what fits)
+# Web animations for WalletTrails (React Bits + what fits)
 
-**Question:** Can we add transitions / animations to the CashTrail **web app**?  
+**Question:** Can we add transitions / animations to the WalletTrails **web app**?  
 **Short answer:** Yes. The web frontend already uses light motion (`animejs` + CSS). [React Bits](https://reactbits.dev/) is a good source of polished React components, but we should pick **calm, finance-app** motion — not marketing-site fireworks.
 
 ---
@@ -13,7 +13,7 @@
 - **165+** free components (growing)  
 - Variants: JS/TS × CSS/Tailwind  
 - Mostly **CSS** under the hood; heavier pieces optionally pull **GSAP**, **Motion**, **Three.js**, etc. only when that component needs them  
-- Works with Vite + React (CashTrail web is Vite) — no Next.js requirement  
+- Works with Vite + React (WalletTrails web is Vite) — no Next.js requirement  
 
 Docs / install: [reactbits.dev](https://reactbits.dev/) · GitHub: [DavidHDev/react-bits](https://github.com/davidhdev/react-bits)
 
@@ -21,7 +21,7 @@ There is also a paid **React Bits Pro** ([pro.reactbits.dev](https://pro.reactbi
 
 ---
 
-## What CashTrail already has (web)
+## What WalletTrails already has (web)
 
 | Area | Today |
 |------|--------|
@@ -46,9 +46,9 @@ Prefer **extend** what we have. Do not add GSAP or Framer Motion unless a specif
 
 ---
 
-## What looks good on CashTrail
+## What looks good on WalletTrails
 
-CashTrail is a **money app** (wallets, bills, people, family). Motion should feel:
+WalletTrails is a **money app** (wallets, bills, people, family). Motion should feel:
 
 - Fast (150–400ms), soft easing  
 - Useful (feedback, hierarchy, orientation)  
@@ -72,7 +72,7 @@ CashTrail is a **money app** (wallets, bills, people, family). Motion should fee
 | Cursor trails, magnetic globs, 3D blobs | Toys, not money UI |
 | Infinite scroll-jacking / heavy parallax | Frustrating on long ledgers |
 | Glitch / scramble text on amounts | Undermines trust |
-| Purple neon / glow stacks | Conflicts with CashTrail emerald / glass language |
+| Purple neon / glow stacks | Conflicts with WalletTrails emerald / glass language |
 | Auto-playing loud text loops on Home | Noise next to real balances |
 
 Use flashy React Bits backgrounds only on **marketing / signup** if we ever want a splash — not inside Dashboard / Accounts / Reports.
@@ -81,7 +81,7 @@ Use flashy React Bits backgrounds only on **marketing / signup** if we ever want
 
 ## Can we use React Bits here?
 
-| Check | CashTrail web |
+| Check | WalletTrails web |
 |-------|----------------|
 | React + Vite | Yes |
 | TypeScript | Yes — pick **TS + CSS** variants (we don’t use Tailwind in `frontend/`) |

@@ -1,5 +1,5 @@
 {
-  "name": "@cashtrail/bank-sms-parser",
+  "name": "@wallettrails/bank-sms-parser",
   "version": "0.1.0",
   "private": true,
   "main": "./src/index.ts",

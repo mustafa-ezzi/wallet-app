@@ -93,7 +93,7 @@ export function PremiumPage() {
       <div className="page-head">
         <div>
           <h1>Premium</h1>
-          <p>Play Billing + manual grants — who is Premium, never what they spend in CashTrail.</p>
+          <p>Play Billing + manual grants — who is Premium, never what they spend in WalletTrails.</p>
         </div>
         <select value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="live">Live</option>

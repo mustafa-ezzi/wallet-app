@@ -10,8 +10,8 @@ function normalizeApiRoot(raw: string | undefined): string {
 const API_ROOT = normalizeApiRoot(import.meta.env.VITE_API_URL)
 const API_BASE = API_ROOT ? `${API_ROOT}/api` : '/api'
 
-const TOKEN_KEY = 'cashtrail_ops_access'
-const REFRESH_KEY = 'cashtrail_ops_refresh'
+const TOKEN_KEY = 'wallettrails_ops_access'
+const REFRESH_KEY = 'wallettrails_ops_refresh'
 
 export const opsApi = axios.create({
   baseURL: API_BASE,
@@ -534,7 +534,7 @@ export async function downloadUsersCsv(params?: Record<string, string | undefine
   const url = URL.createObjectURL(data)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'cashtrail_users.csv'
+  a.download = 'wallettrails_users.csv'
   a.click()
   URL.revokeObjectURL(url)
 }

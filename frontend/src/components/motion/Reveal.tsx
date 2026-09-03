@@ -16,7 +16,7 @@ function prefersReducedMotion() {
 }
 
 /**
- * Soft fade + slight rise on mount (CashTrail list / card reveal).
+ * Soft fade + slight rise on mount (WalletTrails list / card reveal).
  */
 export function Reveal({
   children,

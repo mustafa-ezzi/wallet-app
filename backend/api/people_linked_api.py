@@ -113,7 +113,7 @@ def _notify_people_user(
             title=title[:160],
             body=(body or '')[:255],
             data=payload,
-            channel_id='cashtrail-updates',
+            channel_id='WalletTrails-updates',
         )
     except Exception:
         pass
@@ -395,7 +395,7 @@ class PeopleInvitationCreateView(APIView):
             return Response(
                 {
                     'detail': (
-                        'No CashTrail account with that email or username. '
+                        'No WalletTrails account with that email or username. '
                         'Add them as a local person instead, or share your link code.'
                     ),
                 },
@@ -435,7 +435,7 @@ class PeopleInvitationCreateView(APIView):
             actor=request.user,
             kind='link_invite',
             title=f'{_display_name_for(request.user)} wants to link for lend/borrow',
-            body='Open CashTrail to accept or decline.',
+            body='Open WalletTrails to accept or decline.',
             invitation=invite,
             data={'route': 'people-invites'},
         )
@@ -588,7 +588,7 @@ class PeopleJoinByCodeView(APIView):
             actor=request.user,
             kind='link_invite',
             title=f'{_display_name_for(request.user)} used your code to request a people link',
-            body='Open CashTrail to accept or decline.',
+            body='Open WalletTrails to accept or decline.',
             invitation=invite,
             data={'route': 'people-invites'},
         )

@@ -192,7 +192,7 @@ export default function Reports() {
   const accountType = (id: number) => (accounts.find(a => a.id === id)?.type === 'cash' ? 'Cash' : 'Bank')
 
   // ── Export ──
-  const userName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || user?.email || 'CashTrail user'
+  const userName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.username || user?.email || 'WalletTrails user'
   const monthLabel = `${MONTH_NAMES[month - 1]} ${year}`
 
   const buildExport = (): { rows: LedgerRow[]; meta: ReportMeta } => {

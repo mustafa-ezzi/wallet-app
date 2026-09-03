@@ -9,7 +9,7 @@ async function createDefaultStore(): Promise<OfflineStore> {
   try {
     return await createSqliteStore()
   } catch (err) {
-    console.warn('[CashTrail] SQLite unavailable, using memory store', err)
+    console.warn('[WalletTrails] SQLite unavailable, using memory store', err)
     return createMemoryStore()
   }
 }

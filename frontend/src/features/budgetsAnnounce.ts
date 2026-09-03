@@ -1,8 +1,8 @@
 /** One-time “Budgets” feature announce after PWA refresh / first open of this build. */
 
 export const BUDGETS_FEATURE_ID = 'budgets_v1'
-export const BUDGETS_SEEN_KEY = 'cashtrail_seen_feature_budgets_v1'
-export const BUDGETS_AFTER_UPDATE_KEY = 'cashtrail_announce_budgets_after_update'
+export const BUDGETS_SEEN_KEY = 'wallettrails_seen_feature_budgets_v1'
+export const BUDGETS_AFTER_UPDATE_KEY = 'wallettrails_announce_budgets_after_update'
 
 /** Call right before applying a PWA update — What’s New opens on the next page load. */
 export function markBudgetsAnnounceAfterUpdate() {

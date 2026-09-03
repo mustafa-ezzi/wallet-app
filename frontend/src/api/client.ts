@@ -99,7 +99,7 @@ api.interceptors.response.use(
           }
           localStorage.removeItem('access_token')
           localStorage.removeItem('refresh_token')
-          try { localStorage.removeItem('cashtrail_user') } catch { /* ignore */ }
+          try { localStorage.removeItem('wallettrails_user') } catch { /* ignore */ }
           window.location.href = '/login'
         }
       } else {

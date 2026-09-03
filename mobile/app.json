@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "CashTrail",
-    "slug": "cashtrail",
+    "name": "WalletTrails",
+    "slug": "wallettrails",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "cashtrail",
+    "scheme": "wallettrails",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.cashtrail.app"
+      "bundleIdentifier": "com.wallettrails.app"
     },
     "android": {
-      "package": "com.cashtrail.app",
+      "package": "com.wallettrails.app",
       "adaptiveIcon": {
         "backgroundColor": "#04333b",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -41,7 +41,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow CashTrail to use Face ID to reveal your balances."
+          "faceIDPermission": "Allow WalletTrails to use Face ID to reveal your balances."
         }
       ],
       [
@@ -49,7 +49,7 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#047857",
-          "defaultChannel": "cashtrail-due-reminders"
+          "defaultChannel": "wallettrails-due-reminders"
         }
       ],
       [
@@ -67,8 +67,8 @@
         {
           "widgets": [
             {
-              "name": "CashTrailBalance",
-              "label": "CashTrail Balance",
+              "name": "WalletTrailsBalance",
+              "label": "WalletTrails Balance",
               "description": "Total balance with live sync — resizes cleanly",
               "minWidth": "180dp",
               "minHeight": "110dp",
@@ -79,8 +79,8 @@
               "updatePeriodMillis": 1800000
             },
             {
-              "name": "CashTrailMonthFlow",
-              "label": "CashTrail Month Flow",
+              "name": "WalletTrailsMonthFlow",
+              "label": "WalletTrails Month Flow",
               "description": "Month in / out / net with a flow bar",
               "minWidth": "180dp",
               "minHeight": "110dp",
@@ -91,8 +91,8 @@
               "updatePeriodMillis": 1800000
             },
             {
-              "name": "CashTrailWallets",
-              "label": "CashTrail Wallets",
+              "name": "WalletTrailsWallets",
+              "label": "WalletTrails Wallets",
               "description": "Top wallets — shows more when you enlarge it",
               "minWidth": "180dp",
               "minHeight": "140dp",
@@ -103,8 +103,8 @@
               "updatePeriodMillis": 1800000
             },
             {
-              "name": "CashTrailQuickGlance",
-              "label": "CashTrail Glance",
+              "name": "WalletTrailsQuickGlance",
+              "label": "WalletTrails Glance",
               "description": "Compact glance — stacks or goes wide when resized",
               "minWidth": "110dp",
               "minHeight": "70dp",

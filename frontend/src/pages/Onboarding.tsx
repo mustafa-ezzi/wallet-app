@@ -14,7 +14,7 @@ type Draft = {
   country: string
 }
 
-const DRAFT_KEY = 'cashtrail_onboarding_draft'
+const DRAFT_KEY = 'wallettrails_onboarding_draft'
 
 const USER_TYPES: { id: UserType; label: string; emoji: string }[] = [
   { id: 'student', label: 'Student', emoji: '🎓' },
@@ -118,7 +118,7 @@ export function OnboardingAbout() {
           ← Back
         </button>
         <h2 style={{ marginBottom: '0.35rem' }}>Help us know you</h2>
-        <p className="text-muted" style={{ marginBottom: '1.25rem' }}>A few details to personalize CashTrail</p>
+        <p className="text-muted" style={{ marginBottom: '1.25rem' }}>A few details to personalize WalletTrails</p>
         {error && <div className="auth-error" style={{ marginBottom: '1rem' }}>{error}</div>}
         <form className="auth-form" onSubmit={onContinue}>
           <div className="form-group">
@@ -244,7 +244,7 @@ export function OnboardingUserType() {
         </button>
         <h2 style={{ marginBottom: '0.35rem', textAlign: 'center' }}>What kind of user are you?</h2>
         <p className="text-muted" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
-          This helps us tailor CashTrail for you
+          This helps us tailor WalletTrails for you
         </p>
         {error && <div className="auth-error" style={{ marginBottom: '1rem' }}>{error}</div>}
         <form className="auth-form" onSubmit={finish}>

@@ -1,9 +1,9 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 
-const ACCESS = 'cashtrail_access_token'
-const REFRESH = 'cashtrail_refresh_token'
-const USER = 'cashtrail_user'
+const ACCESS = 'wallettrails_access_token'
+const REFRESH = 'wallettrails_refresh_token'
+const USER = 'wallettrails_user'
 
 export type CachedUser = {
   id: number

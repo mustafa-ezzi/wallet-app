@@ -14,7 +14,7 @@ When Travel Mode is **on** (e.g. Dubai / AED):
 
 - The user types amounts in **AED**.
 - The app shows a clear line: *Travel Mode on · 1 AED = 73.26 PKR*.
-- CashTrail converts to PKR and **saves PKR** on the wallet (books never mix currencies).
+- WalletTrails converts to PKR and **saves PKR** on the wallet (books never mix currencies).
 - Lists can show both: `AED 50` · `PKR 3,663`.
 
 When it is **off**, nothing changes — input and display stay PKR.
@@ -40,12 +40,12 @@ Person net:
 
 | Kind | Who | How entries work |
 |------|-----|------------------|
-| **Local person** (now) | Anyone not on CashTrail (e.g. Idrees) | You add the name yourself. You alone post Lend / Borrow / Pay / Receive. No invite, no mirror. |
-| **Linked person** (after E/F) | Another CashTrail user (e.g. Hussain) | Like household: invite → they accept → shared debt link. One side proposes a movement; the other gets a notification and **accepts** → both books update with mirrored legs so nets stay in sync. |
+| **Local person** (now) | Anyone not on WalletTrails (e.g. Idrees) | You add the name yourself. You alone post Lend / Borrow / Pay / Receive. No invite, no mirror. |
+| **Linked person** (after E/F) | Another WalletTrails user (e.g. Hussain) | Like household: invite → they accept → shared debt link. One side proposes a movement; the other gets a notification and **accepts** → both books update with mirrored legs so nets stay in sync. |
 
 **Linked flow (example — Mustafa ↔ Hussain):**
 
-1. Mustafa taps **+ New person → Invite CashTrail user**, types Hussain’s **email or username**, optional display name, sends **Link request**.  
+1. Mustafa taps **+ New person → Invite WalletTrails user**, types Hussain’s **email or username**, optional display name, sends **Link request**.  
 2. Hussain gets a push / in-app invite → **Accept** or **Decline**.  
 3. On Accept → both see each other under People as **Linked**.  
 4. Hussain records **Lend 500 to Mustafa** → Mustafa gets a notification: “Hussain lent you PKR 500”.  
@@ -63,11 +63,11 @@ Rules that must stay true for both kinds:
 
 ### How a link request works (Linked People — Phase G+)
 
-CashTrail users find each other the same way household email invites work, with one search box.
+WalletTrails users find each other the same way household email invites work, with one search box.
 
 | Step | What happens |
 |------|----------------|
-| 1. Open invite | **+ New person → Invite CashTrail user** (or “Link CashTrail user” on an existing local person). |
+| 1. Open invite | **+ New person → Invite WalletTrails user** (or “Link WalletTrails user” on an existing local person). |
 | 2. Type who | One field: **email or username** (case-insensitive). Most accounts use email as username at signup, so either works. |
 | 3. Optional label | Display name on *your* People list (defaults to their first name / email local-part). |
 | 4. Send | Creates a `PeopleInvitation` → they get **push + in-app** “Mustafa wants to link for lend/borrow”. |
@@ -79,7 +79,7 @@ CashTrail users find each other the same way household email invites work, with 
 - `POST /api/people/invitations/` body: `{ "query": "hussain@… or hussain", "display_name": "Hussain" }`.  
 - Resolve user by `email__iexact` **or** `username__iexact` (exact match only — no public user directory / search-as-you-type of all users).  
 - Cannot invite yourself; cannot invite if an active link or pending invite already exists between the pair.  
-- If no user found: clear error — “No CashTrail account with that email or username. Add them as a local person instead, or share your link code.”
+- If no user found: clear error — “No WalletTrails account with that email or username. Add them as a local person instead, or share your link code.”
 
 **What you do *not* type for v1:** phone number, contacts sync, or free-text “find friends” browse.
 
@@ -87,7 +87,7 @@ CashTrail users find each other the same way household email invites work, with 
 
 ```
 ┌─────────────────────────────────┐
-│  Link a CashTrail user      ✕   │
+│  Link a WalletTrails user      ✕   │
 │                                 │
 │  Email or username              │
 │  [ hussain@mail.com        ]    │
@@ -164,7 +164,7 @@ People          ← Hussain +500 / you owe −200
 
 Tapping a person opens History. Creating a person is only from People flow or “+ New person”, not from “Create Wallet”.
 
-**Later (Linked People):** on “+ New person” offer **Local** vs **Invite CashTrail user**. Linked people show a link badge; History shows **Pending invitations** (awaiting their accept) separate from posted lines.
+**Later (Linked People):** on “+ New person” offer **Local** vs **Invite WalletTrails user**. Linked people show a link badge; History shows **Pending invitations** (awaiting their accept) separate from posted lines.
 
 ---
 
@@ -288,7 +288,7 @@ Phase F can add: daily auto-refresh of the trip rate while the trip is active (s
 5. Person net is **not** income/expense of the month. Reports: filter “People” or exclude from spending chart.  
 6. You can delete a person even with a non-zero balance (app warns first). Deleting also removes that person’s matching wallet legs so your bank/cash totals stay consistent.  
 7. Travel Mode can apply to People amounts the same way (type AED, store PKR).  
-8. Local people stay forever as option 2 — no CashTrail account required.
+8. Local people stay forever as option 2 — no WalletTrails account required.
 
 ### People (linked — after Phase F)
 
@@ -405,7 +405,7 @@ Phase F can add: daily auto-refresh of the trip rate while the trip is active (s
 
 ### Phase H — Linked People mobile UI ✅
 
-- “+ New person”: **Local** | **Invite CashTrail user** (email/username field + optional name + Send request).  
+- “+ New person”: **Local** | **Invite WalletTrails user** (email/username field + optional name + Send request).  
 - Share-my-code / join-with-code on the same sheet.  
 - Pending **incoming link requests** (Accept / Decline).  
 - Linked badge on Wallets People list.  
@@ -461,7 +461,7 @@ Expense / Income / Transfer stay as they are today. People **replaces** the cate
 **Later (+ New person):**
 
 ```
-[ Local person ]  [ Invite CashTrail user ]
+[ Local person ]  [ Invite WalletTrails user ]
 ```
 
 ---
@@ -486,7 +486,7 @@ Web (`E`) can start after `C` if needed. Linked web (`I`) waits on `H`.
 - Interest, due dates, or “loan product” on a person  
 - More than one active travel currency  
 - Auto-linking without explicit invite/accept  
-- Forcing every person to be a CashTrail user (local always remains)
+- Forcing every person to be a WalletTrails user (local always remains)
 
 ---
 

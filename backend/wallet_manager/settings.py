@@ -215,12 +215,12 @@ EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '12') or '12')
 _default_from = os.environ.get('DEFAULT_FROM_EMAIL', '').strip()
 if not _default_from and EMAIL_HOST_USER:
     _default_from = EMAIL_HOST_USER
-DEFAULT_FROM_EMAIL = _default_from or 'CashTrail <onboarding@resend.dev>'
+DEFAULT_FROM_EMAIL = _default_from or 'WalletTrails <onboarding@resend.dev>'
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 # Optional explicit Resend key (otherwise EMAIL_HOST_PASSWORD is used when it starts with re_)
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
 
 # Google Play Billing (Phase 4) — path to service-account JSON for purchase verification
-GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.cashtrail.app').strip()
+GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.wallettrails.app').strip()
 GOOGLE_PLAY_SERVICE_ACCOUNT_JSON = os.environ.get('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON', '').strip()
 

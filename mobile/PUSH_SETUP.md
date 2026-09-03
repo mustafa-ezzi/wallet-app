@@ -1,4 +1,4 @@
-# CashTrail Android push (FCM) setup
+# WalletTrails Android push (FCM) setup
 
 Campaigns / product updates need an **Expo push token** on each phone. Local test banners work without this; **remote** ops campaigns do not.
 
@@ -19,7 +19,7 @@ Put Firebase’s Android config at:
 
 `mobile/google-services.json`
 
-Package must be `com.cashtrail.app`.
+Package must be `com.WalletTrails.app`.
 
 ### 2. Make EAS upload it (repo-root `.easignore`)
 
@@ -41,7 +41,7 @@ Use **sensitive** (not secret) so config resolution can see the path. Or create 
 
 ### 4. FCM V1 credentials
 
-expo.dev → Credentials → Android (`com.cashtrail.app`) → **Google Service Account (FCM V1)**  
+expo.dev → Credentials → Android (`com.WalletTrails.app`) → **Google Service Account (FCM V1)**  
 Upload the Firebase **service account private key** JSON (Project settings → Service accounts → Generate new private key).  
 This is **not** the same file as `google-services.json`.
 
@@ -60,7 +60,7 @@ npx eas build:inspect --platform android --profile preview --stage archive --out
 
 Look for `google-services.json` inside that folder. If it’s missing, stop and fix env/easignore first.
 
-Install the **new** APK (uninstall the old CashTrail first if the phone still has the previous build), open Settings → **Link this device for push**.
+Install the **new** APK (uninstall the old WalletTrails first if the phone still has the previous build), open Settings → **Link this device for push**.
 
 ## After linking
 

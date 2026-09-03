@@ -15,7 +15,7 @@ from .models import PasswordResetOTP
 
 logger = logging.getLogger(__name__)
 
-RESET_SALT = 'cashtrail-password-reset'
+RESET_SALT = 'wallettrails-password-reset'
 RESET_MAX_AGE = 15 * 60  # seconds after OTP verified
 GENERIC_OK = {'detail': 'If an account exists for that email, a code has been sent.'}
 
@@ -32,13 +32,13 @@ def _find_user(email: str):
 
 def _otp_email_content(code: str, first_name: str = '') -> tuple[str, str]:
     name = (first_name or '').strip() or 'there'
-    subject = 'CashTrail password reset code'
+    subject = 'WalletTrails password reset code'
     body = (
         f'Hi {name},\n\n'
-        f'Your CashTrail password reset code is:\n\n'
+        f'Your WalletTrails password reset code is:\n\n'
         f'    {code}\n\n'
         f'This code expires in 10 minutes. If you did not request a reset, ignore this email.\n\n'
-        f'— CashTrail\n'
+        f'— WalletTrails\n'
         f'Follow every rupee.\n'
     )
     return subject, body
@@ -46,8 +46,8 @@ def _otp_email_content(code: str, first_name: str = '') -> tuple[str, str]:
 
 def _from_email() -> str:
     from_email = (getattr(settings, 'DEFAULT_FROM_EMAIL', None) or '').strip()
-    if not from_email or from_email.lower() in ('resend', 'noreply@cashtrail.app'):
-        return 'CashTrail <onboarding@resend.dev>'
+    if not from_email or from_email.lower() in ('resend', 'noreply@wallettrails.app'):
+        return 'WalletTrails <onboarding@resend.dev>'
     return from_email
 
 
@@ -94,7 +94,7 @@ def _send_via_resend_api(to_email: str, subject: str, body: str) -> None:
         headers={
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json',
-            'User-Agent': 'CashTrail/1.0',
+            'User-Agent': 'WalletTrails/1.0',
         },
         method='POST',
     )

@@ -544,7 +544,7 @@ class HouseholdContribution(models.Model):
 
 
 class HouseholdSettlementMark(models.Model):
-    """Optional note that a suggested settlement pair was settled outside CashTrail."""
+    """Optional note that a suggested settlement pair was settled outside WalletTrails."""
     ledger = models.ForeignKey(HouseholdLedger, on_delete=models.CASCADE, related_name='settlement_marks')
     from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='settlement_marks_from')
     to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='settlement_marks_to')
@@ -978,7 +978,7 @@ class SupportMessage(models.Model):
 # ── Premium + remote ads config (Phase 4) ─────────────────────────────────────
 
 class Entitlement(models.Model):
-    """Who has Premium — metadata only; never store CashTrail spending."""
+    """Who has Premium — metadata only; never store WalletTrails spending."""
 
     PRODUCT_MONTHLY = 'premium_monthly'
     PRODUCT_YEARLY = 'premium_yearly'

@@ -281,7 +281,7 @@ export function apiErrorMessage(err: unknown, fallback = 'Request failed.'): str
       return 'Server is waking up or slow. Wait a few seconds and try again.'
     }
     if (msg.includes('network') || code === 'ERR_NETWORK') {
-      return 'Cannot reach CashTrail right now (server may be waking up). Check Wi‑Fi/mobile data, disable VPN, wait ~15s, then retry.'
+      return 'Cannot reach WalletTrails right now (server may be waking up). Check Wi‑Fi/mobile data, disable VPN, wait ~15s, then retry.'
     }
     return ax?.message || fallback
   }

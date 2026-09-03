@@ -94,7 +94,7 @@ export default function SettingsScreen() {
   const onTogglePrivacy = async (on: boolean) => {
     setEnableError('')
     if (on && !privacy.hasPin && !privacy.biometricsAvailable) {
-      setEnableError('Set a CashTrail PIN below before enabling privacy lock (required on web / devices without biometrics).')
+      setEnableError('Set a WalletTrails PIN below before enabling privacy lock (required on web / devices without biometrics).')
       return
     }
     if (on && !privacy.hasPin) {
@@ -182,7 +182,7 @@ export default function SettingsScreen() {
                   {!bankSms.notifPermissionGranted ? (
                     <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 8 }}>
                       <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
-                        Turn on Notification access for CashTrail
+                        Turn on Notification access for WalletTrails
                       </Text>
                     </Pressable>
                   ) : null}
@@ -332,7 +332,7 @@ export default function SettingsScreen() {
           ) : null}
         </View>
 
-        <Text style={[styles.section, { color: colors.primaryDark }]}>CashTrail PIN</Text>
+        <Text style={[styles.section, { color: colors.primaryDark }]}>WalletTrails PIN</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.rowHint, { color: colors.textMuted }]}>
             {privacy.hasPin ? 'PIN is set. Enter a new one to change it.' : 'Create a 4–6 digit PIN fallback.'}
@@ -432,7 +432,7 @@ export default function SettingsScreen() {
                 setTestMsg(
                   ok
                     ? 'Test notification coming in ~3 seconds. You can leave this screen.'
-                    : 'Could not send — allow notifications for CashTrail first.',
+                    : 'Could not send — allow notifications for WalletTrails first.',
                 )
                 setTestBusy(false)
               })()
@@ -451,7 +451,7 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, paddingRight: spacing.md }}>
               <Text style={[styles.rowTitle, { color: colors.text }]}>App news & tips</Text>
               <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                Occasional CashTrail updates. Separate from due-date reminders.
+                Occasional WalletTrails updates. Separate from due-date reminders.
               </Text>
             </View>
             <Switch
@@ -527,7 +527,7 @@ export default function SettingsScreen() {
         <Text style={[styles.section, { color: colors.primaryDark }]}>Premium</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.rowLabel, { color: colors.text }]}>
-            {premium.is_premium ? 'CashTrail Premium' : 'Free plan'}
+            {premium.is_premium ? 'WalletTrails Premium' : 'Free plan'}
           </Text>
           <Text style={[styles.rowHint, { color: colors.textMuted }]}>
             {premium.is_premium
@@ -583,7 +583,7 @@ export default function SettingsScreen() {
         <Text style={[styles.section, { color: colors.primaryDark }]}>Promo code</Text>
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            Have a CashTrail promo? Redeem for a Premium trial.
+            Have a WalletTrails promo? Redeem for a Premium trial.
           </Text>
           <TextInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}

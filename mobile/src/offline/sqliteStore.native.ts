@@ -7,7 +7,7 @@ import type {
   SyncStatus,
 } from './types'
 
-const DB_NAME = 'cashtrail-offline.db'
+const DB_NAME = 'wallettrails-offline.db'
 
 /** expo-sqlite on Android throws NPE if prepareAsync runs concurrently. */
 let dbChain: Promise<unknown> = Promise.resolve()

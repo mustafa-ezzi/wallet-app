@@ -341,7 +341,7 @@ export default function PersonHistoryPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `cashtrail-${personName.replace(/\s+/g, '-').toLowerCase()}-${year}-${String(month).padStart(2, '0')}.csv`
+    a.download = `WalletTrails-${personName.replace(/\s+/g, '-').toLowerCase()}-${year}-${String(month).padStart(2, '0')}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

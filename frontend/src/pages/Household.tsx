@@ -350,7 +350,7 @@ export default function HouseholdPage() {
       await householdsApi.inviteByEmail(selectedId, emailInvite.trim())
       setEmailInvite('')
       setError('')
-      await confirm({ title: 'Invite sent', message: 'If they already have CashTrail they’ll see a pending invite. Otherwise the invite is held until they register with that email.', confirmLabel: 'OK' })
+      await confirm({ title: 'Invite sent', message: 'If they already have WalletTrails they’ll see a pending invite. Otherwise the invite is held until they register with that email.', confirmLabel: 'OK' })
     } catch (err) {
       setError(apiErrorMessage(err))
     } finally { setSaving(false) }
@@ -629,25 +629,25 @@ export default function HouseholdPage() {
   const inviterName = (
     [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim()
     || user?.email
-    || 'A CashTrail user'
+    || 'A WalletTrails user'
   )
 
   const buildInviteMessage = () => {
     const accountName = selected?.name || 'our household'
     const code = invite?.code ? invite.code.trim().toUpperCase() : ''
     return (
-      `${inviterName} invited you to track shared expenses together on CashTrail.\n\n` +
+      `${inviterName} invited you to track shared expenses together on WalletTrails.\n\n` +
       `Household: “${accountName}”\n` +
       (code ? `Invite code: ${code}\n\n` : '\n') +
-      `Why CashTrail?\n` +
+      `Why WalletTrails?\n` +
       `• Shared household ledger — everyone sees what was spent\n` +
       `• Settle up — split costs equally and see who owes whom\n` +
       `• Your personal wallets stay private\n` +
       `• Also track bills, loans & EMI reminders in PKR\n\n` +
       `Join with this link:\n${inviteUrl}\n\n` +
-      (code ? `Or open CashTrail → Family / Household → Join, and enter ${code}\n\n` : '') +
+      (code ? `Or open WalletTrails → Family / Household → Join, and enter ${code}\n\n` : '') +
       `Fair house money. No WhatsApp IOU fights.\n` +
-      `CashTrail — Follow every rupee.`
+      `WalletTrails — Follow every rupee.`
     )
   }
 

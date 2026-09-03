@@ -11,7 +11,7 @@ export type BalanceWidgetData = {
   updatedLabel?: string
 }
 
-/** Home-screen Android widget — total CashTrail balance (size-aware). */
+/** Home-screen Android widget — total WalletTrails balance (size-aware). */
 export function BalanceWidget({
   balanceLabel,
   subtitle,
@@ -27,7 +27,7 @@ export function BalanceWidget({
   return (
     <FlexWidget
       clickAction="OPEN_APP"
-      accessibilityLabel={`CashTrail balance ${balanceLabel}`}
+      accessibilityLabel={`WalletTrails balance ${balanceLabel}`}
       style={{
         height: 'match_parent',
         width: 'match_parent',
@@ -79,7 +79,7 @@ export function BalanceWidget({
             }}
           >
             <TextWidget
-              text="CashTrail"
+              text="WalletTrails"
               style={{ fontSize: L.brand, fontWeight: '800', color: W.accentSoft, letterSpacing: 0.3 }}
             />
             <TextWidget

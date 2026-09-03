@@ -1,7 +1,7 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 
-const KEY = 'cashtrail_rating_prompt_v1'
+const KEY = 'wallettrails_rating_prompt_v1'
 
 export type RatingPromptStatus = 'none' | 'shown' | 'dismissed' | 'submitted'
 
@@ -75,4 +75,4 @@ export function yesterdayKey(from = new Date()): string {
 }
 
 export const RATING_STREAK_DAYS = 4
-export const CASHTRAIL_SHARE_URL = 'https://cashtrail.up.railway.app/'
+export const WALLETTRAILS_SHARE_URL = 'https://wallettrails.up.railway.app/'

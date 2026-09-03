@@ -154,7 +154,7 @@ export function InvitePersonSheet({
     if (!myCode) return
     try {
       await Share.share({
-        message: `Link with me on CashTrail for lend/borrow. My code: ${myCode}`,
+        message: `Link with me on WalletTrails for lend/borrow. My code: ${myCode}`,
       })
     } catch {
       /* ignore */
@@ -216,14 +216,14 @@ export function InvitePersonSheet({
 
             {convertMode ? (
               <Text style={styles.hint}>
-                Keep this person’s history and invite a CashTrail user to link.
+                Keep this person’s history and invite a WalletTrails user to link.
               </Text>
             ) : null}
 
             {mode === 'local' && !convertMode ? (
               <>
                 <Text style={styles.hint}>
-                  For people not on CashTrail (e.g. Idrees). You post entries alone.
+                  For people not on WalletTrails (e.g. Idrees). You post entries alone.
                 </Text>
                 <Field
                   label="Name"
@@ -239,7 +239,7 @@ export function InvitePersonSheet({
             {mode === 'invite' ? (
               <>
                 <Text style={styles.hint}>
-                  Type their CashTrail email or username. They’ll get a link request to accept.
+                  Type their WalletTrails email or username. They’ll get a link request to accept.
                 </Text>
                 <Field
                   label="Email or username"

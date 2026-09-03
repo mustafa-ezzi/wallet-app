@@ -66,10 +66,10 @@ def _notify_user_staff_reply(thread: SupportThread, preview: str) -> None:
         body = body[:137] + '…'
     send_expo_push(
         tokens,
-        title='CashTrail Support replied',
+        title='WalletTrails Support replied',
         body=body or 'Open the app to read the reply.',
         data={'type': 'support', 'route': 'support', 'thread_id': thread.id},
-        channel_id='cashtrail-updates',
+        channel_id='wallettrails-updates',
     )
 
 

@@ -35,7 +35,7 @@ const TEMPLATES = [
   {
     id: 'reengage_7d',
     label: 'Re-engage 7d',
-    title: 'Your CashTrail is waiting',
+    title: 'Your WalletTrails is waiting',
     body: 'Open the app to sync wallets and stay on top of bills.',
     audience: 'inactive_7d',
     route: 'home',
@@ -43,7 +43,7 @@ const TEMPLATES = [
   {
     id: 'reengage_30d',
     label: 'Win-back 30d',
-    title: 'We miss your CashTrail',
+    title: 'We miss your WalletTrails',
     body: 'Come back — your money history is safe. Tap to open.',
     audience: 'inactive_30d',
     route: 'home',
@@ -51,7 +51,7 @@ const TEMPLATES = [
   {
     id: 'reengage_90d',
     label: 'Win-back 90d',
-    body: 'Your wallets are still here when you are ready. Open CashTrail anytime.',
+    body: 'Your wallets are still here when you are ready. Open WalletTrails anytime.',
     title: 'Still keeping your rupees?',
     audience: 'inactive_90d',
     route: 'home',
@@ -59,7 +59,7 @@ const TEMPLATES = [
   {
     id: 'whats_new',
     label: "What's new",
-    title: 'CashTrail update',
+    title: 'WalletTrails update',
     body: 'Widgets and reports got sharper — open the app to try them.',
     audience: 'all',
     route: 'home',
@@ -259,7 +259,7 @@ export function CampaignsPage() {
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
             required
-            placeholder="CashTrail update"
+            placeholder="WalletTrails update"
           />
         </div>
         <div className="field">

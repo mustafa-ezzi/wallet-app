@@ -1,10 +1,10 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 
-const ENABLED = 'cashtrail_privacy_enabled'
-const TIMEOUT = 'cashtrail_privacy_timeout'
-const PIN_HASH = 'cashtrail_privacy_pin_hash'
-const SCREENSHOT_BLOCK = 'cashtrail_privacy_block_screenshots'
+const ENABLED = 'wallettrails_privacy_enabled'
+const TIMEOUT = 'wallettrails_privacy_timeout'
+const PIN_HASH = 'wallettrails_privacy_pin_hash'
+const SCREENSHOT_BLOCK = 'wallettrails_privacy_block_screenshots'
 
 export type PrivacyTimeout = 'immediate' | '1m' | '5m'
 
@@ -44,7 +44,7 @@ async function deleteItem(key: string): Promise<void> {
 
 /** Lightweight local hash — PIN never leaves the device. */
 export function hashPin(pin: string): string {
-  const salt = 'cashtrail-privacy-v1'
+  const salt = 'wallettrails-privacy-v1'
   let h = 5381
   const s = `${salt}:${pin}`
   for (let i = 0; i < s.length; i += 1) {

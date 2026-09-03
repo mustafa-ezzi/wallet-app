@@ -1,6 +1,6 @@
 'use no memo'
 
-/** Shared CashTrail Android widget look + responsive scale helpers. */
+/** Shared WalletTrails Android widget look + responsive scale helpers. */
 
 export type WidgetSize = {
   width?: number

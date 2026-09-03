@@ -1,4 +1,4 @@
-"""Permissions for CashTrail Ops APIs — staff only, never for end users."""
+"""Permissions for WalletTrails Ops APIs — staff only, never for end users."""
 
 from rest_framework.permissions import BasePermission
 

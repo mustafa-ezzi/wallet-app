@@ -135,7 +135,7 @@ export default function TravelModePage() {
           <Plane size={40} strokeWidth={1.5} style={{ color: 'var(--primary)', marginBottom: '0.75rem' }} />
           <h2 style={{ margin: '0 0 0.5rem' }}>Heading abroad?</h2>
           <p style={{ color: 'var(--text-secondary)', margin: '0 0 1.25rem' }}>
-            Turn on Travel Mode to enter AED, USD, and more. CashTrail converts and saves PKR.
+            Turn on Travel Mode to enter AED, USD, and more. WalletTrails converts and saves PKR.
           </p>
           <button type="button" className="btn-primary" onClick={turnOn}>
             Set up Travel Mode

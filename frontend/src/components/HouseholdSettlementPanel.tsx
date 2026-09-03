@@ -75,7 +75,7 @@ export default function HouseholdSettlementPanel({ ledgerId, refreshKey = 0 }: P
         from_user_id: t.from_user_id,
         to_user_id: t.to_user_id,
         amount: t.amount,
-        note: 'Paid outside CashTrail',
+        note: 'Paid outside WalletTrails',
       })
       setData(res.data.settlement)
     } catch (err) {

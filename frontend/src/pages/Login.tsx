@@ -33,7 +33,7 @@ export default function Login() {
     <div className="auth-page">
       <div className="auth-card glass">
         <div className="auth-logo">
-          <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-lg" />
+          <img src="/logo.png" alt="WalletTrails" className="brand-logo brand-logo-lg" />
         </div>
 
         <h2 style={{ marginBottom: '0.35rem' }}>Welcome back</h2>

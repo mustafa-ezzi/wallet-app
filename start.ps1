@@ -1,5 +1,5 @@
-# CashTrail — start backend + frontend in separate windows
-Write-Host "Starting CashTrail..." -ForegroundColor Cyan
+# WalletTrails — start backend + frontend in separate windows
+Write-Host "Starting WalletTrails..." -ForegroundColor Cyan
 
 Start-Process powershell -ArgumentList '-NoExit', '-Command', "cd '$PSScriptRoot\backend'; py manage.py runserver 8000" -WindowStyle Normal
 Start-Process powershell -ArgumentList '-NoExit', '-Command', "cd '$PSScriptRoot\frontend'; npm run dev" -WindowStyle Normal

@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 def health_view(_request):
     """Django view — no DRF auth stack; used by Railway and app wake pings."""
-    return JsonResponse({'ok': True, 'service': 'cashtrail', 'ts': timezone.now().isoformat()})
+    return JsonResponse({'ok': True, 'service': 'wallettrails', 'ts': timezone.now().isoformat()})
 
 
 class ApiHealthView(APIView):
@@ -17,4 +17,4 @@ class ApiHealthView(APIView):
     authentication_classes = []
 
     def get(self, request):
-        return Response({'ok': True, 'service': 'cashtrail', 'ts': timezone.now().isoformat()})
+        return Response({'ok': True, 'service': 'wallettrails', 'ts': timezone.now().isoformat()})

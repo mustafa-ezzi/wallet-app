@@ -5,7 +5,7 @@ import { Platform } from 'react-native'
 import api from '@/src/api/client'
 import { useAuth } from '@/src/context/AuthContext'
 
-const CACHE_KEY = 'cashtrail_remote_config_v1'
+const CACHE_KEY = 'wallettrails_remote_config_v1'
 
 export type AdsConfig = {
   ads_enabled: boolean

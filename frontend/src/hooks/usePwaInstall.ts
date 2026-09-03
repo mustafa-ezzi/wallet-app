@@ -6,7 +6,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-const LS_INSTALLED = 'cashtrail_pwa_installed'
+const LS_INSTALLED = 'wallettrails_pwa_installed'
 
 /** Module-level store — survives Layout remounts so the browser install
  *  event is not lost after the first fire. */

@@ -32,7 +32,7 @@ export function MonthFlowWidget({
   return (
     <FlexWidget
       clickAction="OPEN_APP"
-      accessibilityLabel={`CashTrail month flow ${monthLabel}`}
+      accessibilityLabel={`WalletTrails month flow ${monthLabel}`}
       style={{
         height: 'match_parent',
         width: 'match_parent',
@@ -68,7 +68,7 @@ export function MonthFlowWidget({
       >
         <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <TextWidget
-            text="CashTrail"
+            text="WalletTrails"
             style={{ fontSize: L.brand, fontWeight: '800', color: W.accentSoft }}
           />
           <TextWidget

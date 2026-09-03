@@ -25,7 +25,7 @@ export function LoginPage() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={onSubmit}>
-        <h1>CashTrail Ops</h1>
+        <h1>WalletTrails Ops</h1>
         <p>Staff only. Hosted users — never wallets or transactions.</p>
         {error ? <p className="error">{error}</p> : null}
         <div className="field">

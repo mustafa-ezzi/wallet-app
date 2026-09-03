@@ -131,7 +131,7 @@ export default function InvitePersonModal({
 
   const shareCode = async () => {
     if (!myCode) return
-    const message = `Link with me on CashTrail for lend/borrow. My code: ${myCode}`
+    const message = `Link with me on WalletTrails for lend/borrow. My code: ${myCode}`
     try {
       if (navigator.share) {
         await navigator.share({ text: message })
@@ -197,14 +197,14 @@ export default function InvitePersonModal({
 
         {convertMode ? (
           <p className="page-subtitle" style={{ margin: '0 0 0.75rem' }}>
-            Keep this person’s history and invite a CashTrail user to link.
+            Keep this person’s history and invite a WalletTrails user to link.
           </p>
         ) : null}
 
         {mode === 'local' && !convertMode ? (
           <form onSubmit={submitLocal} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <p className="page-subtitle" style={{ margin: 0 }}>
-              For people not on CashTrail (e.g. Idrees). You post entries alone.
+              For people not on WalletTrails (e.g. Idrees). You post entries alone.
             </p>
             <div className="form-group">
               <label>Name</label>
@@ -226,7 +226,7 @@ export default function InvitePersonModal({
         {mode === 'invite' ? (
           <form onSubmit={submitInvite} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             <p className="page-subtitle" style={{ margin: 0 }}>
-              Type their CashTrail email or username. They’ll get a link request to accept.
+              Type their WalletTrails email or username. They’ll get a link request to accept.
             </p>
             <div className="form-group">
               <label>Email or username</label>

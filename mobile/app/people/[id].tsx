@@ -425,7 +425,7 @@ export default function PersonHistoryScreen() {
         <Pressable style={styles.linkCta} onPress={() => setConvertOpen(true)}>
           <FontAwesome name="link" size={13} color={colors.primaryDark} />
           <Text style={[styles.linkCtaText, { color: colors.primaryDark }]}>
-            Invite CashTrail user to link
+            Invite WalletTrails user to link
           </Text>
         </Pressable>
       ) : settled ? (

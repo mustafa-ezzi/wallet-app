@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['logo.png'],
       manifest: {
-        name: 'CashTrail',
-        short_name: 'CashTrail',
-        description: 'CashTrail — follow every rupee. Track accounts, projects, bills, and monthly forecasts.',
+        name: 'WalletTrails',
+        short_name: 'WalletTrails',
+        description: 'WalletTrails — follow every rupee. Track accounts, projects, bills, and monthly forecasts.',
         theme_color: '#0a2f2a',
         background_color: '#0a2f2a',
         display: 'standalone',

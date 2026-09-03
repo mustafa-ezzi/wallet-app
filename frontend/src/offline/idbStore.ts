@@ -5,7 +5,7 @@ import type {
   OutboxItem,
 } from './types'
 
-const DB_NAME = 'cashtrail-offline'
+const DB_NAME = 'wallettrails-offline'
 const DB_VERSION = 1
 
 function openDb(): Promise<IDBDatabase> {

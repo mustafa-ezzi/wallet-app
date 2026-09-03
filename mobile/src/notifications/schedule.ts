@@ -6,8 +6,8 @@ import { track } from '@/src/lib/analytics'
 import { getPrivacyEnabled } from '@/src/privacy/storage'
 import { getReminderPrefs, leadDaysFromPrefs } from './storage'
 
-const CHANNEL_ID = 'cashtrail-due-reminders'
-export const REMINDER_CATEGORY = 'cashtrail_due'
+const CHANNEL_ID = 'WalletTrails-due-reminders'
+export const REMINDER_CATEGORY = 'WalletTrails_due'
 
 export type ReminderData = {
   kind: 'payable' | 'receivable' | 'expense'
@@ -79,10 +79,10 @@ export async function ensureAndroidChannel(): Promise<void> {
     importance: Notifications.AndroidImportance.DEFAULT,
     description: 'Loan and money-owed due reminders',
   })
-  await Notifications.setNotificationChannelAsync('cashtrail-updates', {
+  await Notifications.setNotificationChannelAsync('WalletTrails-updates', {
     name: 'Product updates',
     importance: Notifications.AndroidImportance.DEFAULT,
-    description: 'CashTrail news and product updates',
+    description: 'WalletTrails news and product updates',
   })
 }
 
@@ -115,7 +115,7 @@ export async function sendTestNotification(): Promise<boolean> {
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'CashTrail test',
+      title: 'WalletTrails test',
       body: 'Notifications are working. You’ll get reminders like this for loans and bills.',
       data: { screen: 'bills', kind: 'payable', id: 0, test: true },
       sound: true,
@@ -131,7 +131,7 @@ export async function sendTestNotification(): Promise<boolean> {
   return true
 }
 
-async function cancelCashTrailReminders(): Promise<void> {
+async function cancelWalletTrailsReminders(): Promise<void> {
   if (Platform.OS === 'web') return
   const scheduled = await Notifications.getAllScheduledNotificationsAsync()
   await Promise.all(
@@ -157,12 +157,12 @@ function bodyFor(
   const when = leadLabel(lead)
   if (privacyOn) {
     if (kind === 'payable') {
-      return { title: 'Loan reminder', body: `An installment is ${when}. Open CashTrail to review.` }
+      return { title: 'Loan reminder', body: `An installment is ${when}. Open WalletTrails to review.` }
     }
     if (kind === 'receivable') {
-      return { title: 'Money owed reminder', body: `A receipt is ${when}. Open CashTrail to review.` }
+      return { title: 'Money owed reminder', body: `A receipt is ${when}. Open WalletTrails to review.` }
     }
-    return { title: 'Bill reminder', body: `A bill is ${when}. Open CashTrail to review.` }
+    return { title: 'Bill reminder', body: `A bill is ${when}. Open WalletTrails to review.` }
   }
   const money = fmt(toMoney(amount))
   if (kind === 'payable') {
@@ -210,7 +210,7 @@ export async function rescheduleDueReminders(input: ScheduleInput): Promise<numb
   if (Platform.OS === 'web') return 0
 
   const prefs = await getReminderPrefs()
-  await cancelCashTrailReminders()
+  await cancelWalletTrailsReminders()
 
   if (!prefs.enabled) return 0
   const permission = await getPermissionStatus()

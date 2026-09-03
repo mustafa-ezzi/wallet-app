@@ -39,7 +39,7 @@ export async function getExpoPushToken(): Promise<{ token: string | null; error?
   if (isExpoGo()) {
     return {
       token: null,
-      error: 'Expo Go cannot register CashTrail push. Install a native APK from EAS Build, then tap “Link this device for push”.',
+      error: 'Expo Go cannot register WalletTrails push. Install a native APK from EAS Build, then tap “Link this device for push”.',
     }
   }
 
@@ -49,7 +49,7 @@ export async function getExpoPushToken(): Promise<{ token: string | null; error?
     if (status !== 'granted') {
       const next = await Notifications.requestPermissionsAsync()
       if (!next.granted) {
-        return { token: null, error: 'Notifications permission is off. Enable it in system settings for CashTrail.' }
+        return { token: null, error: 'Notifications permission is off. Enable it in system settings for WalletTrails.' }
       }
     }
 
@@ -63,7 +63,7 @@ export async function getExpoPushToken(): Promise<{ token: string | null; error?
     }
     return { token }
   } catch (err) {
-    console.warn('[CashTrail] push token failed', err)
+    console.warn('[WalletTrails] push token failed', err)
     const msg = err instanceof Error ? err.message : String(err)
     const lower = msg.toLowerCase()
     if (
@@ -121,7 +121,7 @@ export async function registerDeviceTokenDetailed(): Promise<RegisterDeviceResul
   // One hard wake (cold start), then a few POSTs — avoid nested wake storms that hang for minutes.
   const woke = await wakeServer(true)
   if (!woke) {
-    console.warn('[CashTrail] health wake failed before device register; still trying POST')
+    console.warn('[WalletTrails] health wake failed before device register; still trying POST')
   }
 
   let lastErr: unknown
@@ -138,7 +138,7 @@ export async function registerDeviceTokenDetailed(): Promise<RegisterDeviceResul
       return { token, ok: true }
     } catch (err) {
       lastErr = err
-      console.warn('[CashTrail] device register attempt failed', attempt + 1, err)
+      console.warn('[WalletTrails] device register attempt failed', attempt + 1, err)
       if (attempt < 2) {
         await wakeServer(true)
         await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))

@@ -101,8 +101,8 @@ export default function Layout() {
     <div className="app-shell" key={refreshKey}>
       <header className="mobile-header">
         <div className="mobile-header-brand" data-tour="brand">
-          <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-sm" />
-          <span className="mobile-header-title">CashTrail</span>
+          <img src="/logo.png" alt="WalletTrails" className="brand-logo brand-logo-sm" />
+          <span className="mobile-header-title">WalletTrails</span>
           {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
         </div>
         <div className="mobile-header-actions">
@@ -152,10 +152,10 @@ export default function Layout() {
 
       <aside className="sidebar">
         <div className="sidebar-brand" data-tour="brand">
-          <img src="/logo.png" alt="CashTrail" className="brand-logo brand-logo-md" />
+          <img src="/logo.png" alt="WalletTrails" className="brand-logo brand-logo-md" />
           <div>
             <div className="sidebar-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              CashTrail
+              WalletTrails
               {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
             </div>
             <div className="sidebar-subtitle">Follow every rupee</div>

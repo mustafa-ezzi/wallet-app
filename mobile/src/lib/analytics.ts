@@ -46,7 +46,7 @@ export function track(
 ) {
   if (!client) {
     if (__DEV__) {
-      console.log('[CashTrail analytics]', event, properties ?? {})
+      console.log('[WalletTrails analytics]', event, properties ?? {})
     }
     return
   }

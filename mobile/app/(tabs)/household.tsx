@@ -250,7 +250,7 @@ export default function HouseholdScreen() {
         from_user_id: t.from_user_id,
         to_user_id: t.to_user_id,
         amount: t.amount,
-        note: 'Paid outside CashTrail',
+        note: 'Paid outside WalletTrails',
       })
       setSettlement((data as { settlement?: SettlementData }).settlement ?? null)
     } catch (err) {
@@ -326,7 +326,7 @@ export default function HouseholdScreen() {
       inviteCode: invite.code,
       inviterName,
     })
-    await Share.share({ message: msg, title: 'Join my CashTrail household' })
+    await Share.share({ message: msg, title: 'Join my WalletTrails household' })
   }
 
   const isOwner = selected?.my_role === 'owner'

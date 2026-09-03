@@ -1,11 +1,11 @@
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 
-const ENABLED = 'cashtrail_reminders_enabled'
-const LEAD_3 = 'cashtrail_reminders_lead_3'
-const LEAD_1 = 'cashtrail_reminders_lead_1'
-const LEAD_0 = 'cashtrail_reminders_lead_0'
-const PROMPTED = 'cashtrail_reminders_prompted'
+const ENABLED = 'wallettrails_reminders_enabled'
+const LEAD_3 = 'wallettrails_reminders_lead_3'
+const LEAD_1 = 'wallettrails_reminders_lead_1'
+const LEAD_0 = 'wallettrails_reminders_lead_0'
+const PROMPTED = 'wallettrails_reminders_prompted'
 
 export type ReminderPrefs = {
   enabled: boolean

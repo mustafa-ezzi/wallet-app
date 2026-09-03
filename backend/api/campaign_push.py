@@ -25,7 +25,7 @@ from .models import (
 # Soft rate limit for accidental spam
 MAX_CAMPAIGNS_PER_DAY = 20
 EXPO_BATCH = 80
-CHANNEL_ID = 'cashtrail-updates'
+CHANNEL_ID = 'wallettrails-updates'
 
 
 def audience_device_queryset(audience: str) -> QuerySet[DeviceToken]:
