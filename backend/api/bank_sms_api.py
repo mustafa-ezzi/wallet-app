@@ -1,10 +1,11 @@
 """Bank SMS import — pending queue + approve/reject (Phase 2)."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework import serializers, status, viewsets
@@ -495,11 +496,49 @@ class BankSmsImportViewSet(viewsets.ModelViewSet):
         if existing:
             return Response(BankSmsImportSerializer(existing).data, status=status.HTTP_200_OK)
 
+        # Cross-source / SMS+push dedupe: same TID already pending or recently approved.
+        tid = (data.get('tid') or '').strip()
+        if tid:
+            recent_cut = timezone.now() - timedelta(days=14)
+            twin = (
+                BankSmsImport.objects.filter(user=request.user, tid=tid)
+                .filter(
+                    Q(status=BankSmsImport.STATUS_PENDING)
+                    | Q(status=BankSmsImport.STATUS_APPROVED, created_at__gte=recent_cut)
+                )
+                .order_by('-id')
+                .first()
+            )
+            if twin:
+                return Response(BankSmsImportSerializer(twin).data, status=status.HTTP_200_OK)
+
+        # Soft dedupe without TID: same amount + mask + date within 2 days (pending or approved).
+        amount = data.get('amount')
+        mask = (data.get('account_mask') or '').strip()
+        tx_date = data.get('tx_date') or date.today()
+        if amount is not None and mask:
+            soft_cut = timezone.now() - timedelta(days=2)
+            soft = (
+                BankSmsImport.objects.filter(
+                    user=request.user,
+                    amount=amount,
+                    account_mask=mask,
+                    tx_date=tx_date,
+                )
+                .filter(
+                    Q(status=BankSmsImport.STATUS_PENDING)
+                    | Q(status=BankSmsImport.STATUS_APPROVED, created_at__gte=soft_cut)
+                )
+                .order_by('-id')
+                .first()
+            )
+            if soft:
+                return Response(BankSmsImportSerializer(soft).data, status=status.HTTP_200_OK)
+
         suggested = _user_wallet(request.user, data.get('suggested_account_id'))
         resolved = _user_wallet(request.user, data.get('resolved_account_id')) or suggested
         cash = _user_wallet(request.user, data.get('cash_account_id'))
 
-        tx_date = data.get('tx_date') or date.today()
         amount = data.get('amount')
 
         try:

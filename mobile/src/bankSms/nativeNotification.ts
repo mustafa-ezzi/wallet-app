@@ -32,6 +32,8 @@ type ListenerApi = {
     event: 'onNotificationReceived',
     cb: (event: NotificationPayload) => void,
   ) => { remove: () => void }
+  /** Returns + clears native SharedPreferences queue (background catch-up). */
+  drainQueuedNotifications?: () => NotificationPayload[] | Promise<NotificationPayload[]>
 }
 
 function loadNative(): ListenerApi | null {
@@ -132,4 +134,40 @@ export function subscribeWalletNotifications(
   } catch {
     return () => undefined
   }
+}
+
+/**
+ * Drain notifications captured while JS was frozen/killed.
+ * Call on AppState active and when enabling bank-app listening.
+ */
+export async function drainQueuedWalletNotifications(): Promise<NotificationPayload[]> {
+  const mod = loadNative()
+  if (!mod?.drainQueuedNotifications) return []
+  try {
+    const raw = await Promise.resolve(mod.drainQueuedNotifications())
+    if (!Array.isArray(raw)) return []
+    return raw.filter((n) => n && typeof n === 'object' && n.packageName)
+  } catch {
+    return []
+  }
+}
+
+/** Ingest any queued bank notifications (dedupe happens server-side). */
+export async function processQueuedWalletNotifications(
+  ingest: (body: string, meta: NotificationPayload) => Promise<void>,
+): Promise<number> {
+  const queued = await drainQueuedWalletNotifications()
+  let n = 0
+  for (const event of queued) {
+    try {
+      if (!isBankishNotification(event)) continue
+      const body = bodyFromWalletNotification(event)
+      if (!body) continue
+      await ingest(body, event)
+      n += 1
+    } catch {
+      /* continue next */
+    }
+  }
+  return n
 }

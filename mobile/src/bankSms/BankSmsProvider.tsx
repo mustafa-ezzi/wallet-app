@@ -25,6 +25,7 @@ import {
   getNotificationListenerGranted,
   isBankNotificationNativeAvailable,
   openNotificationListenerSettings,
+  processQueuedWalletNotifications,
   subscribeWalletNotifications,
 } from './nativeNotification'
 import {
@@ -132,10 +133,21 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
         setNotifPermissionGranted(getNotificationListenerGranted())
         if (user) void refreshPending()
         void getSmsPermissionGranted().then(setPermissionGranted)
+        // Catch bank notifications received while JS was frozen / app closed.
+        const wantNotifs = notifEnabled || enabled
+        if (user && wantNotifs && notifPermissionGranted && notifNativeAvailable) {
+          void processQueuedWalletNotifications(async (body, meta) => {
+            const r = await ingestBankSmsBody(body, 'notification', {
+              packageName: meta.packageName,
+              appName: meta.appName,
+            })
+            if (r.ok) void refreshPending()
+          })
+        }
       }
     })
     return () => sub.remove()
-  }, [user, refreshPending])
+  }, [user, refreshPending, notifEnabled, enabled, notifPermissionGranted, notifNativeAvailable])
 
   // Live SMS → ingest (pending, or auto-approve if user opted in)
   useEffect(() => {
@@ -167,6 +179,14 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       return undefined
     }
     applyWalletNotificationAllowlist()
+    // Drain anything captured while backgrounded before attaching live listener.
+    void processQueuedWalletNotifications(async (body, meta) => {
+      const r = await ingestBankSmsBody(body, 'notification', {
+        packageName: meta.packageName,
+        appName: meta.appName,
+      })
+      if (r.ok) void refreshPending()
+    })
     const unsub = subscribeWalletNotifications((body, meta) => {
       void ingestBankSmsBody(body, 'notification', {
         packageName: meta.packageName,

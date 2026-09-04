@@ -151,6 +151,10 @@ export async function ingestBankSmsBody(
 
     const id = res.data.id
     const kind = res.data.kind
+    // Already approved (cross-source TID dedupe) — do not create a second transaction.
+    if ((res.data as { status?: string }).status === 'approved') {
+      return { ok: true, id, kind }
+    }
     const autoOn = await getBankSmsAutoApprove()
     const canAuto =
       autoOn

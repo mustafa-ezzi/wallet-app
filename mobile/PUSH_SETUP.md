@@ -10,8 +10,22 @@ That message means the **installed APK was built without Firebase** in the nativ
 2. `GOOGLE_SERVICES_JSON` file env was never created on expo.dev.
 3. You installed an **older APK** (or Expo Go) instead of the new build.
 4. FCM V1 service account is missing under EAS **Credentials** (needed for Expo to deliver pushes).
+5. **Package rename:** `google-services.json` still lists `com.cashtrail.app` while the app is `com.wallettrails.app` → Gradle fails with *No matching client found for package name*.
 
 ## Fix (do all of these, then rebuild)
+
+### 0. Firebase app must match package `com.wallettrails.app`
+
+1. Open [Firebase Console](https://console.firebase.google.com) → your project.
+2. Project settings → **Your apps**.
+3. If you only have an Android app for `com.cashtrail.app`, click **Add app** → Android.
+4. Android package name: **`com.wallettrails.app`** (all lowercase — must match `mobile/app.json`).
+5. Download the new **`google-services.json`** and save it as:
+
+`mobile/google-services.json`
+
+6. Confirm the file contains `"package_name": "com.wallettrails.app"` (search inside the JSON).
+7. Re-upload to EAS (step 3 below) so the builder does not keep using the old CashTrail file.
 
 ### 1. Keep the file locally
 
@@ -19,7 +33,7 @@ Put Firebase’s Android config at:
 
 `mobile/google-services.json`
 
-Package must be `com.WalletTrails.app`.
+Package inside it must be `com.wallettrails.app`.
 
 ### 2. Make EAS upload it (repo-root `.easignore`)
 
@@ -37,11 +51,13 @@ npx eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-serv
 npx eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --environment production --visibility sensitive
 ```
 
+If the env already exists with the **old** CashTrail file, **update/replace** it on expo.dev → Project → Environment variables → `GOOGLE_SERVICES_JSON` (do not leave the old file).
+
 Use **sensitive** (not secret) so config resolution can see the path. Or create the same on expo.dev → Environment variables (type **File**).
 
 ### 4. FCM V1 credentials
 
-expo.dev → Credentials → Android (`com.WalletTrails.app`) → **Google Service Account (FCM V1)**  
+expo.dev → Credentials → Android (`com.wallettrails.app`) → **Google Service Account (FCM V1)**  
 Upload the Firebase **service account private key** JSON (Project settings → Service accounts → Generate new private key).  
 This is **not** the same file as `google-services.json`.
 

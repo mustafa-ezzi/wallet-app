@@ -244,7 +244,8 @@ export default function HouseholdScreen() {
   }, [ledgerTab, activeLedger?.id, loadSettlement])
 
   const markSettlementPaid = async (t: SettlementData['transfers'][0]) => {
-    if (!activeLedger) return
+    if (!activeLedger || busyRef.current) return
+    busyRef.current = true
     try {
       const { data } = await householdsApi.markSettlement(activeLedger.id, {
         from_user_id: t.from_user_id,
@@ -255,6 +256,8 @@ export default function HouseholdScreen() {
       setSettlement((data as { settlement?: SettlementData }).settlement ?? null)
     } catch (err) {
       setSettlementError(apiErrorMessage(err, 'Could not mark as paid.'))
+    } finally {
+      busyRef.current = false
     }
   }
 

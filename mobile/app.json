@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "WalletTrails",
-    "slug": "wallettrails",
+    "slug": "cashtrail",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

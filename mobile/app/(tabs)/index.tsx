@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { apiErrorMessage, asList, dashboardApi, transactionsApi } from '@/src/api/client'
 import type { Dashboard, Transaction } from '@/src/api/types'
@@ -156,10 +156,19 @@ export default function HomeScreen() {
     }
   }, [online, syncNow, hydrateNow, loadFromCache])
 
+  // Always soft-refresh after add/delete (await sync+hydrate) so totals update immediately.
   useEffect(() => {
-    void load()
+    void load(true)
     void refreshPending()
   }, [load, refreshKey, refreshPending])
+
+  // Returning from Add Transaction / other screens — refetch books.
+  useFocusEffect(
+    useCallback(() => {
+      void load(true)
+      void refreshPending()
+    }, [load, refreshPending]),
+  )
 
   const txs: Transaction[] = data?.recent_transactions ?? asList(data?.recent_transactions)
   const balanceNeg = toMoney(data?.total_balance) < 0

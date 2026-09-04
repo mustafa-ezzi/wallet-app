@@ -279,10 +279,12 @@ export default function BankSmsScreen() {
 
   const refreshBooksAfterAction = useCallback(async () => {
     try {
-      await hydrateNow()
-      await loadWallets()
+      // Pending inbox first (fast) so the row disappears immediately.
       await loadPending()
+      await loadWallets()
       await loadSettings()
+      // Full books hydrate in background — don't block the approve UI.
+      void hydrateNow()
     } catch {
       /* server already updated — cache refresh is best-effort */
     }
@@ -290,7 +292,23 @@ export default function BankSmsScreen() {
     bumpRefresh()
   }, [hydrateNow, loadWallets, loadPending, loadSettings, bankSms, bumpRefresh])
 
+  const clearReviewForm = () => {
+    setPaste('')
+    setParsed(null)
+    setDraft(null)
+    setPendingId(null)
+    setTypeConfirmed(false)
+    setRememberKind(false)
+    setPeopleHint(null)
+  }
+
+  const isAlreadyHandledError = (err: unknown) => {
+    const msg = apiErrorMessage(err, '').toLowerCase()
+    return msg.includes('only pending') || msg.includes('already')
+  }
+
   const onApprove = async () => {
+    if (busy) return
     if (!draft || !pendingId) {
       setError('Detect a message first, or open one from the pending inbox.')
       return
@@ -303,63 +321,78 @@ export default function BankSmsScreen() {
       setError('Confirm the transaction type — detection confidence is low.')
       return
     }
+    const id = pendingId
+    const snapshot = draft
+    const rememberW = rememberWallet
+    const rememberK = rememberKind
     setBusy(true)
     setError('')
     setOkMsg('')
+    // Optimistic: remove from inbox immediately so a second tap can't re-open it.
+    setPending((rows) => rows.filter((r) => r.id !== id))
+    setSelectedIds((ids) => ids.filter((x) => x !== id))
+    clearReviewForm()
     try {
-      const res = await bankSmsApi.approve(pendingId, {
-        kind: draft.kind,
-        amount: draft.amount,
-        tx_date: draft.date,
-        category: draft.category,
-        notes: draft.notes,
-        resolved_account_id: draft.bankAccountId,
-        cash_account_id: draft.cashAccountId,
-        record_atm_as_expense: draft.recordAtmAsExpense,
-        create_cash: draft.kind === 'atm' && !draft.recordAtmAsExpense && !draft.cashAccountId,
-        create_cash_name: draft.createCashNamed || 'Cash',
-        remember_wallet: rememberWallet,
-        remember_kind: rememberKind,
+      const res = await bankSmsApi.approve(id, {
+        kind: snapshot.kind,
+        amount: snapshot.amount,
+        tx_date: snapshot.date,
+        category: snapshot.category,
+        notes: snapshot.notes,
+        resolved_account_id: snapshot.bankAccountId,
+        cash_account_id: snapshot.cashAccountId,
+        record_atm_as_expense: snapshot.recordAtmAsExpense,
+        create_cash: snapshot.kind === 'atm' && !snapshot.recordAtmAsExpense && !snapshot.cashAccountId,
+        create_cash_name: snapshot.createCashNamed || 'Cash',
+        remember_wallet: rememberW,
+        remember_kind: rememberK,
       })
       setOkMsg(
         `Approved #${res.data.id}`
         + (res.data.linked_import ? ` · linked #${res.data.linked_import}` : '')
-        + (rememberWallet ? ' · wallet remembered' : '')
-        + (rememberKind ? ' · type saved' : ''),
+        + (rememberW ? ' · wallet remembered' : '')
+        + (rememberK ? ' · type saved' : ''),
       )
-      setPaste('')
-      setParsed(null)
-      setDraft(null)
-      setPendingId(null)
-      setTypeConfirmed(false)
-      setRememberKind(false)
-      setPeopleHint(null)
       await refreshBooksAfterAction()
     } catch (err) {
-      setError(apiErrorMessage(err, 'Could not approve this draft.'))
+      if (isAlreadyHandledError(err)) {
+        setOkMsg(`Already handled #${id}.`)
+        await refreshBooksAfterAction()
+      } else {
+        setError(apiErrorMessage(err, 'Could not approve this draft.'))
+        // Put the row back if approve truly failed before commit.
+        await loadPending()
+      }
     } finally {
       setBusy(false)
     }
   }
 
   const onReject = async () => {
+    if (busy) return
     if (!pendingId) {
       setDraft(null)
       setParsed(null)
       return
     }
+    const id = pendingId
     setBusy(true)
+    setError('')
+    setPending((rows) => rows.filter((r) => r.id !== id))
+    setSelectedIds((ids) => ids.filter((x) => x !== id))
+    clearReviewForm()
     try {
-      await bankSmsApi.reject(pendingId)
-      setOkMsg(`Rejected #${pendingId}.`)
-      setDraft(null)
-      setParsed(null)
-      setPendingId(null)
-      setPaste('')
-      setTypeConfirmed(false)
+      await bankSmsApi.reject(id)
+      setOkMsg(`Rejected #${id}.`)
       await refreshBooksAfterAction()
     } catch (err) {
-      setError(apiErrorMessage(err, 'Reject failed.'))
+      if (isAlreadyHandledError(err)) {
+        setOkMsg(`Already handled #${id}.`)
+        await refreshBooksAfterAction()
+      } else {
+        setError(apiErrorMessage(err, 'Reject failed.'))
+        await loadPending()
+      }
     } finally {
       setBusy(false)
     }
@@ -428,33 +461,41 @@ export default function BankSmsScreen() {
   }
 
   const onBatchApprove = async () => {
-    if (!selectedIds.length) return
+    if (busy || !selectedIds.length) return
+    const ids = [...selectedIds]
     setBusy(true)
     setError('')
+    setPending((rows) => rows.filter((r) => !ids.includes(r.id)))
+    setSelectedIds([])
+    if (pendingId && ids.includes(pendingId)) clearReviewForm()
     try {
-      const res = await bankSmsApi.batchApprove({ ids: selectedIds })
-      setSelectedIds([])
+      const res = await bankSmsApi.batchApprove({ ids })
       const errN = res.data.errors?.length || 0
       setOkMsg(`Batch approved ${res.data.approved.length}${errN ? ` · ${errN} failed` : ''}.`)
       if (errN) setError(res.data.errors.map((e) => `#${e.id}: ${e.detail}`).join(' · '))
       await refreshBooksAfterAction()
     } catch (err) {
       setError(apiErrorMessage(err, 'Batch approve failed.'))
+      await loadPending()
     } finally {
       setBusy(false)
     }
   }
 
   const onBatchReject = async () => {
-    if (!selectedIds.length) return
+    if (busy || !selectedIds.length) return
+    const ids = [...selectedIds]
     setBusy(true)
+    setPending((rows) => rows.filter((r) => !ids.includes(r.id)))
+    setSelectedIds([])
+    if (pendingId && ids.includes(pendingId)) clearReviewForm()
     try {
-      const res = await bankSmsApi.batchReject({ ids: selectedIds })
-      setSelectedIds([])
+      const res = await bankSmsApi.batchReject({ ids })
       setOkMsg(`Rejected ${res.data.rejected_count} item(s).`)
       await refreshBooksAfterAction()
     } catch (err) {
       setError(apiErrorMessage(err, 'Batch reject failed.'))
+      await loadPending()
     } finally {
       setBusy(false)
     }
@@ -774,7 +815,11 @@ export default function BankSmsScreen() {
               disabled={busy || !pendingId || mustPickType}
               loading={busy}
             />
-            <Pressable onPress={() => void onReject()} style={{ marginTop: 14, alignItems: 'center', paddingVertical: 6 }}>
+            <Pressable
+              onPress={() => void onReject()}
+              disabled={busy || !pendingId}
+              style={{ marginTop: 14, alignItems: 'center', paddingVertical: 6, opacity: busy ? 0.5 : 1 }}
+            >
               <Text style={{ color: colors.danger, fontWeight: '700' }}>{BANK_SMS_UX.reject}</Text>
             </Pressable>
           </View>

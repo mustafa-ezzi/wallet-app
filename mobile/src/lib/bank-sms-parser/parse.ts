@@ -166,14 +166,18 @@ function fingerprint(parts: {
   mask: string | null
   raw: string
 }): string {
-  const base = [
-    parts.kind,
-    parts.amount ?? '',
-    parts.date ?? '',
-    parts.tid ?? '',
-    parts.mask ?? '',
-    parts.raw.slice(0, 120).toLowerCase().replace(/\s+/g, ' '),
-  ].join('|')
+  // Prefer TID — same payment via SMS vs bank-app notification must not double-post.
+  const tid = (parts.tid || '').trim().toLowerCase()
+  const base = tid
+    ? ['tid', tid, parts.amount ?? '', parts.date ?? '', parts.mask ?? ''].join('|')
+    : [
+        parts.kind,
+        parts.amount ?? '',
+        parts.date ?? '',
+        parts.mask ?? '',
+        // Normalize whitespace only — do NOT include full raw (SMS vs push text differs).
+        parts.raw.slice(0, 80).toLowerCase().replace(/\s+/g, ' ').replace(/[^\w. ]/g, ''),
+      ].join('|')
   let h = 0
   for (let i = 0; i < base.length; i += 1) {
     h = ((h << 5) - h) + base.charCodeAt(i)

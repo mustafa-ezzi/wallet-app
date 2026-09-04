@@ -1,9 +1,17 @@
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-index 77e247a..c0656a9 100644
+index 77e247a..8a4e5e2 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-@@ -8,14 +8,13 @@ import android.graphics.Bitmap
+@@ -3,19 +3,21 @@ package expo.modules.androidnotificationlistenerservice
+ import android.service.notification.NotificationListenerService
+ import android.service.notification.StatusBarNotification
+ import android.app.Notification
++import android.content.Context
+ import android.graphics.drawable.Drawable
+ import android.graphics.Bitmap
  import android.graphics.Canvas
++import org.json.JSONArray
++import org.json.JSONObject
  import java.io.File
  import java.io.FileOutputStream
 +import java.util.concurrent.CopyOnWriteArrayList
@@ -18,7 +26,7 @@ index 77e247a..c0656a9 100644
          val packageManager = applicationContext.packageManager
          try {
              val applicationInfo = packageManager.getApplicationInfo(sbn.packageName, 0)
-@@ -32,7 +31,9 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -32,7 +34,9 @@ class ExpoNotificationListenerService : NotificationListenerService() {
                  null
              }
  
@@ -29,7 +37,7 @@ index 77e247a..c0656a9 100644
                  return
              }
  
-@@ -48,12 +49,34 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -48,12 +52,34 @@ class ExpoNotificationListenerService : NotificationListenerService() {
              val notification = sbn.notification
              val extras = notification.extras
  
@@ -67,24 +75,23 @@ index 77e247a..c0656a9 100644
                  "subText" to (extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""),
                  "summaryText" to (extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString() ?: ""),
                  "postTime" to sbn.postTime,
-@@ -62,7 +85,15 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -62,7 +88,14 @@ class ExpoNotificationListenerService : NotificationListenerService() {
                  "appIconPath" to (iconPath ?: "")
              )
  
 -            ExpoAndroidNotificationListenerServiceModule.getInstance()?.emitNotificationEvent(notificationData)
-+            if (moduleInstance != null) {
-+                moduleInstance.emitNotificationEvent(notificationData)
-+            } else {
-+                // App process restarted for listener only — queue until Expo module boots
-+                bufferedNotifications.add(notificationData)
-+                if (bufferedNotifications.size > 40) {
-+                    bufferedNotifications.removeAt(0)
-+                }
++            // Always persist — JS may be frozen/killed while this service still receives posts.
++            persistNotification(applicationContext, notificationData)
++            bufferedNotifications.add(notificationData)
++            if (bufferedNotifications.size > 40) {
++                bufferedNotifications.removeAt(0)
 +            }
++
++            moduleInstance?.emitNotificationEvent(notificationData)
          } catch (e: Exception) {
              e.printStackTrace()
          }
-@@ -72,28 +103,23 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -72,28 +105,23 @@ class ExpoNotificationListenerService : NotificationListenerService() {
          if (drawable == null) return null
  
          try {
@@ -114,7 +121,7 @@ index 77e247a..c0656a9 100644
              FileOutputStream(file).use { out ->
                  bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
              }
-@@ -105,13 +131,14 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -105,13 +133,69 @@ class ExpoNotificationListenerService : NotificationListenerService() {
          }
      }
  
@@ -123,31 +130,118 @@ index 77e247a..c0656a9 100644
 -        val iconFile = File(applicationContext.filesDir, "icons/app_icon_${packageName}.png")
 -        if (!iconFile.exists()) return true
 +    companion object {
-+        /** Notifications posted before the Expo module was constructed. */
++        private const val PREFS = "wallettrails_notif_queue"
++        private const val KEY = "queue"
++
++        /** In-memory buffer (also mirrored to SharedPreferences). */
 +        val bufferedNotifications: CopyOnWriteArrayList<Map<String, Any>> = CopyOnWriteArrayList()
- 
--        // Update icon if last modified time is more than a week ago
--        val weekInMillis = 7 * 24 * 60 * 60 * 1000L
--        return System.currentTimeMillis() - iconFile.lastModified() > weekInMillis
++
 +        fun drainBuffered(): List<Map<String, Any>> {
 +            val copy = bufferedNotifications.toList()
 +            bufferedNotifications.clear()
 +            return copy
 +        }
++
++        fun persistNotification(context: Context, data: Map<String, Any>) {
++            try {
++                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                val arr = JSONArray(prefs.getString(KEY, "[]") ?: "[]")
++                val obj = JSONObject()
++                for ((k, v) in data) {
++                    obj.put(k, v)
++                }
++                arr.put(obj)
++                // Cap queue size
++                while (arr.length() > 40) {
++                    arr.remove(0)
++                }
++                prefs.edit().putString(KEY, arr.toString()).apply()
++            } catch (e: Exception) {
++                e.printStackTrace()
++            }
++        }
+ 
+-        // Update icon if last modified time is more than a week ago
+-        val weekInMillis = 7 * 24 * 60 * 60 * 1000L
+-        return System.currentTimeMillis() - iconFile.lastModified() > weekInMillis
++        fun drainPersisted(context: Context?): List<Map<String, Any>> {
++            val out = mutableListOf<Map<String, Any>>()
++            out.addAll(drainBuffered())
++            if (context == null) return out
++            try {
++                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                val raw = prefs.getString(KEY, "[]") ?: "[]"
++                prefs.edit().putString(KEY, "[]").apply()
++                val arr = JSONArray(raw)
++                for (i in 0 until arr.length()) {
++                    val obj = arr.getJSONObject(i)
++                    val map = mutableMapOf<String, Any>()
++                    val keys = obj.keys()
++                    while (keys.hasNext()) {
++                        val k = keys.next()
++                        map[k] = obj.get(k)
++                    }
++                    out.add(map)
++                }
++            } catch (e: Exception) {
++                e.printStackTrace()
++            }
++            // Dedupe by notification key when present
++            val seen = HashSet<String>()
++            return out.filter { item ->
++                val key = (item["key"] as? String) ?: "${item["packageName"]}|${item["id"]}|${item["postTime"]}"
++                if (seen.contains(key)) false else {
++                    seen.add(key)
++                    true
++                }
++            }
++        }
      }
  }
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
-index 8c92037..30e88b6 100644
+index 8c92037..085b3b0 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
-@@ -24,7 +24,10 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+@@ -2,11 +2,8 @@ package expo.modules.androidnotificationlistenerservice
+ 
+ import expo.modules.kotlin.modules.Module
+ import expo.modules.kotlin.modules.ModuleDefinition
+-import android.service.notification.NotificationListenerService
+-import android.service.notification.StatusBarNotification
+ import android.content.Intent
+ import android.provider.Settings
+-import expo.modules.kotlin.Promise
+ import android.os.Handler
+ import android.os.Looper
+ import java.util.concurrent.atomic.AtomicBoolean
+@@ -24,7 +21,11 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
  
          OnCreate {
              isReady.set(true)
-+            // Flush anything the NotificationListenerService buffered before JS booted
++            // Only flush in-memory buffer here. SharedPreferences queue is drained by JS
++            // (drainQueuedNotifications) so events aren't lost before a listener attaches.
 +            val drained = ExpoNotificationListenerService.drainBuffered()
              synchronized(pendingNotifications) {
 +                pendingNotifications.addAll(drained)
                  pendingNotifications.forEach { notification ->
                      sendEvent("onNotificationReceived", notification)
                  }
+@@ -54,6 +55,12 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+         Function("setAllowedPackages") { packages: List<String> ->
+             allowedPackages = packages.toSet()
+         }
++
++        /** Drain persisted + in-memory queue (for AppState active / subscribe). */
++        Function("drainQueuedNotifications") {
++            val context = appContext.reactContext
++            ExpoNotificationListenerService.drainPersisted(context)
++        }
+     }
+ 
+     companion object {
+@@ -88,5 +95,3 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+         return allowedPackages.isEmpty() || allowedPackages.contains(packageName)
+     }
+ }
+-
+-

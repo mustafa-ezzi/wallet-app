@@ -18,6 +18,7 @@ import { getOfflineStore, __resetOfflineStore } from './store'
 import { pendingCount, syncOutbox } from './syncEngine'
 import type { OfflineAccount, OfflineTransaction } from './types'
 import { updateAllWidgets } from '@/src/widgets/updateWidgets'
+import { emitBooksChanged } from '@/src/context/MoneyUiContext'
 
 interface OfflineContextValue {
   ready: boolean
@@ -80,6 +81,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       if (result.pushed > 0) {
         track('transaction_sync_success', { count: result.pushed })
         await hydrateNow()
+        emitBooksChanged()
       }
       if (result.failed > 0 && result.errors[0]) {
         setLastError(result.errors[0])

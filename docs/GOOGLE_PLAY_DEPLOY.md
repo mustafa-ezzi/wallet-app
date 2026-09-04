@@ -5,8 +5,8 @@ Step-by-step guide for publishing the Expo Android app (`mobile/`) under **Power
 | Item | Value |
 |------|--------|
 | App name | WalletTrails |
-| Package / application ID | `com.WalletTrails.app` |
-| Expo slug / owner | `WalletTrails` / `mustafaezzi` |
+| Package / application ID | `com.wallettrails.app` |
+| Expo slug / owner | `cashtrail` (locked to EAS projectId — cannot rename) / `mustafaezzi` |
 | Play build type | **AAB** (Android App Bundle) via EAS `production` |
 | Config | `mobile/eas.json` → profile `production` → `buildType: "app-bundle"` |
 
@@ -46,7 +46,7 @@ Do not start building store listings until Create app works; you need an app ent
 3. Accept the declarations (Play policies, US export laws, etc.).
 4. Create the app. You land in that app’s dashboard.
 
-**Package name note:** The Play Console package is locked to whatever you upload in the **first** AAB. Your project already uses `com.WalletTrails.app` in `mobile/app.json`. Do **not** change this after the first upload.
+**Package name note:** The Play Console package is locked to whatever you upload in the **first** AAB. Your project already uses `com.wallettrails.app` in `mobile/app.json`. Do **not** change this after the first upload.
 
 ---
 
@@ -178,7 +178,7 @@ npx eas whoami
 npx eas project:info
 ```
 
-Confirm the project matches Expo owner `mustafaezzi` / slug `WalletTrails`.
+Confirm the project matches Expo owner `mustafaezzi` / slug `cashtrail`.
 
 ### 5.2 Credentials (signing key)
 
@@ -275,7 +275,7 @@ Production also requires all **App content** / policy tasks to be **Completed** 
 - [ ] Data safety form matches real behavior  
 - [ ] Content rating completed  
 - [ ] Store listing: icon, feature graphic, ≥2 screenshots, descriptions  
-- [ ] Production EAS build succeeded (`.aab`, package `com.WalletTrails.app`)  
+- [ ] Production EAS build succeeded (`.aab`, package `com.wallettrails.app`)  
 - [ ] Internal test install works against production API (`EXPO_PUBLIC_API_URL`)  
 - [ ] Demo account ready for Google reviewers if login is required  
 - [ ] SMS / notification permission justification (+ video if requested)  
@@ -306,7 +306,7 @@ Keep the same package name and the same upload keystore (EAS-managed).
 | Create app grayed out | Finish **Android developer verification** / account setup (§0) |
 | “You need a privacy policy” | Host HTTPS policy and paste URL in Store listing |
 | Rejected for SMS | Narrow policy text, in-app disclosure, demo video; or remove SMS for v1 |
-| Wrong package / signing | Never change `com.WalletTrails.app` after first upload; keep EAS credentials |
+| Wrong package / signing | Never change `com.wallettrails.app` after first upload; keep EAS credentials |
 | Uploaded APK rejected | Use `production` profile AAB only |
 | App crashes on review device | Test internal track; ensure API URL and CORS/auth work for reviewers |
 | “Incomplete store listing” | Feature graphic + screenshots + all App content tasks |
@@ -337,7 +337,7 @@ npx eas build --platform android --profile preview
 ## 12. What you should do next (today)
 
 1. Complete **Android developer verification** until Create app is enabled.  
-2. Create the **WalletTrails** app (`com.WalletTrails.app` will be set by the first AAB).  
+2. Create the **WalletTrails** app (`com.wallettrails.app` will be set by the first AAB).  
 3. Draft privacy policy + store screenshots.  
 4. Run `eas build --platform android --profile production`.  
 5. Upload the AAB to **Internal testing** and install it yourself.  

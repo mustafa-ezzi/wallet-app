@@ -62,7 +62,7 @@ export default function AddTransactionScreen() {
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const { bumpRefresh } = useMoneyUi()
-  const { online, queueTransaction, getCachedAccounts, hydrateNow } = useOffline()
+  const { online, queueTransaction, getCachedAccounts, hydrateNow, syncNow } = useOffline()
   const {
     isActive: travelOn,
     currency: travelCurrency,
@@ -292,8 +292,12 @@ export default function AddTransactionScreen() {
           category: 'Bank Transfer',
           notes: `${note} (in)`,
         })
+        if (online) {
+          await syncNow()
+          await hydrateNow()
+        }
         succeeded = true
-        finishOk()
+        await finishOk()
         return
       }
 
@@ -333,9 +337,9 @@ export default function AddTransactionScreen() {
             ...fxApiFields,
           })
         }
-        void hydrateNow()
+        await hydrateNow()
         succeeded = true
-        finishOk()
+        await finishOk()
         return
       }
 
@@ -366,9 +370,9 @@ export default function AddTransactionScreen() {
               }
             : {}),
         })
-        void hydrateNow()
+        await hydrateNow()
         succeeded = true
-        finishOk()
+        await finishOk()
         return
       }
 
@@ -381,8 +385,13 @@ export default function AddTransactionScreen() {
         notes: notes.trim(),
         ...fxPayload,
       })
+      // Push outbox to server before navigating so Home refetch sees new totals.
+      if (online) {
+        await syncNow()
+        await hydrateNow()
+      }
       succeeded = true
-      finishOk()
+      await finishOk()
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not save transaction.'))
     } finally {
@@ -393,7 +402,7 @@ export default function AddTransactionScreen() {
     }
   }
 
-  const finishOk = () => {
+  const finishOk = async () => {
     bumpRefresh()
     if (router.canGoBack()) router.back()
     else router.replace('/(tabs)')
