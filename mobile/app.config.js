@@ -1,11 +1,19 @@
 const fs = require('fs')
 const path = require('path')
 
+function hasWalletTrailsPackage(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf8').includes('com.wallettrails.app')
+  } catch {
+    return false
+  }
+}
+
 /**
  * Dynamic Expo config:
- * - Local: use ./google-services.json when present
- * - EAS: prefer GOOGLE_SERVICES_JSON file env (path on builder), and copy into project
- *   so prebuild always finds it. Also rely on repo-root .easignore to upload the local file.
+ * - Prefer google-services-wallettrails.json (new Android package)
+ * - Else local google-services.json / GOOGLE_SERVICES_JSON env
+ * - Never let a stale CashTrail-only env file overwrite a WalletTrails config
  */
 module.exports = ({ config }) => {
   const appJsonPath = path.join(__dirname, 'app.json')
@@ -13,21 +21,31 @@ module.exports = ({ config }) => {
   const expo = { ...(appJson.expo || config) }
 
   const localPath = path.join(__dirname, 'google-services.json')
+  const walletTrailsPath = path.join(__dirname, 'google-services-wallettrails.json')
   const fromEnv = process.env.GOOGLE_SERVICES_JSON
 
-  if (fromEnv && fs.existsSync(fromEnv)) {
+  const candidates = [walletTrailsPath, localPath, fromEnv].filter(
+    (p) => p && fs.existsSync(p),
+  )
+
+  // Prefer any file that already lists com.wallettrails.app
+  const preferred =
+    candidates.find((p) => hasWalletTrailsPackage(p))
+    || candidates[0]
+
+  if (preferred) {
     try {
-      if (path.resolve(fromEnv) !== path.resolve(localPath)) {
-        fs.copyFileSync(fromEnv, localPath)
+      if (path.resolve(preferred) !== path.resolve(localPath)) {
+        fs.copyFileSync(preferred, localPath)
       }
     } catch (err) {
-      console.warn('[WalletTrails] could not copy GOOGLE_SERVICES_JSON → google-services.json', err)
+      console.warn('[WalletTrails] could not stage google-services.json', err)
     }
   }
 
   const googleServicesFile = fs.existsSync(localPath)
     ? './google-services.json'
-    : (fromEnv && fs.existsSync(fromEnv) ? fromEnv : undefined)
+    : undefined
 
   if (googleServicesFile) {
     expo.android = {

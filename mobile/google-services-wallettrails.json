@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "85845263961",
+    "project_id": "cashtrail-e7a04",
+    "storage_bucket": "cashtrail-e7a04.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:85845263961:android:77f2d5a61d942dbe7a5348",
+        "android_client_info": {
+          "package_name": "com.cashtrail.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxFqWRVr6mudh-p28GsMrjj6ldb8xBPjU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:85845263961:android:18138180fdc9a89d7a5348",
+        "android_client_info": {
+          "package_name": "com.wallettrails.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAxFqWRVr6mudh-p28GsMrjj6ldb8xBPjU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

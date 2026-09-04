@@ -71,3 +71,4 @@ mobile/tmp-check.apk
 
 # Force-include FCM config for Android native builds (still gitignored).
 !mobile/google-services.json
+!mobile/google-services-wallettrails.json
