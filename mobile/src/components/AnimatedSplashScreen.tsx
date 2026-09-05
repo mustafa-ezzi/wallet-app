@@ -107,8 +107,8 @@ export function AnimatedSplashScreen() {
 
         <Animated.View entering={FadeInUp.duration(580).delay(280)} style={styles.nameBlock}>
           <Text style={styles.name}>
-            <Text style={styles.nameCash}>Cash</Text>
-            <Text style={styles.nameTrail}>Trail</Text>
+            <Text style={styles.nameWallet}>Wallet</Text>
+            <Text style={styles.nameTrails}>Trails</Text>
           </Text>
           <Text style={styles.tagline}>Follow every rupee</Text>
         </Animated.View>
@@ -175,10 +175,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -0.3,
   },
-  nameCash: {
+  nameWallet: {
     color: WHITE,
   },
-  nameTrail: {
+  nameTrails: {
     color: GREEN_SOFT,
   },
   tagline: {

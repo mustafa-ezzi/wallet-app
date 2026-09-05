@@ -23,7 +23,7 @@ export function BrandMark({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
   return (
     <View style={styles.brandWrap}>
       <View style={[styles.logoBadge, { backgroundColor: colors.primary }, big && styles.logoBadgeLg]}>
-        <Text style={[styles.logoLetter, big && styles.logoLetterLg]}>C</Text>
+        <Text style={[styles.logoLetter, big && styles.logoLetterLg]}>W</Text>
       </View>
       <Text style={[styles.brandName, { color: colors.primaryDark }, big && styles.brandNameLg]}>WalletTrails</Text>
       {big ? <Text style={[styles.brandTag, { color: colors.textMuted }]}>Follow every rupee</Text> : null}
