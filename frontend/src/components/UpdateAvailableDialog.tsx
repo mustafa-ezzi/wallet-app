@@ -16,7 +16,7 @@ export default function UpdateAvailableDialog({ open, refreshing, onRefresh }: P
           <h2 id="update-title">Update available</h2>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.85rem' }}>
-          <img src="/logo.png" alt="" style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'cover' }} />
+          <img src="/wallettrail-logo.png" alt="" style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'cover' }} />
         </div>
         <p style={{ margin: '0 0 1.25rem', fontSize: '0.92rem', color: 'var(--text-secondary)', lineHeight: 1.5, textAlign: 'center' }}>
           We’ve added <strong>Budgets</strong> — set monthly spending limits by category.

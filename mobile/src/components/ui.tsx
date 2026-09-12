@@ -1,6 +1,7 @@
 import React from 'react'
 import {
   ActivityIndicator,
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +13,8 @@ import { BouncyPressable } from './motion'
 import { iosShadow, radii, spacing, typography } from '../theme/colors'
 import { useColors } from '../theme/ThemeContext'
 
+const walletTrailsLogo = require('../../assets/images/wallettrail-logo.png')
+
 export function Screen({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
   const colors = useColors()
   return <View style={[{ flex: 1, backgroundColor: colors.background }, style]}>{children}</View>
@@ -22,9 +25,7 @@ export function BrandMark({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
   const big = size === 'lg'
   return (
     <View style={styles.brandWrap}>
-      <View style={[styles.logoBadge, { backgroundColor: colors.primary }, big && styles.logoBadgeLg]}>
-        <Text style={[styles.logoLetter, big && styles.logoLetterLg]}>W</Text>
-      </View>
+      <Image source={walletTrailsLogo} accessibilityLabel="WalletTrails logo" style={[styles.logoImage, big && styles.logoImageLg]} />
       <Text style={[styles.brandName, { color: colors.primaryDark }, big && styles.brandNameLg]}>WalletTrails</Text>
       {big ? <Text style={[styles.brandTag, { color: colors.textMuted }]}>Follow every rupee</Text> : null}
     </View>
@@ -109,17 +110,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xl,
   },
-  logoBadge: {
+  logoImage: {
     width: 42,
     height: 42,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: spacing.sm,
   },
-  logoBadgeLg: { width: 56, height: 56, borderRadius: 16 },
-  logoLetter: { color: '#fff', fontWeight: '900', fontSize: 20 },
-  logoLetterLg: { fontSize: 24 },
+  logoImageLg: { width: 64, height: 64, borderRadius: 18 },
   brandName: { fontSize: typography.subtitle, fontWeight: '800' },
   brandNameLg: { fontSize: typography.title },
   brandTag: { fontSize: typography.caption, marginTop: 3 },

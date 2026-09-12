@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
+import walletTrailsLogo from '../assets/wallettrail-logo.png'
 
 export function LoginPage() {
   const { user, loading, login, error } = useAuth()
@@ -25,6 +26,7 @@ export function LoginPage() {
   return (
     <div className="login-wrap">
       <form className="login-card" onSubmit={onSubmit}>
+        <img className="login-brand-logo" src={walletTrailsLogo} alt="WalletTrails" />
         <h1>WalletTrails Ops</h1>
         <p>Staff only. Hosted users — never wallets or transactions.</p>
         {error ? <p className="error">{error}</p> : null}

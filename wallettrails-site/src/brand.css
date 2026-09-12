@@ -1,0 +1,19 @@
+.logo > img {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  object-fit: cover;
+  box-shadow: 0 5px 12px rgba(23, 59, 60, 0.18);
+}
+
+.logo--inverse > img {
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 650px) {
+  .logo > img {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+}

@@ -1,5 +1,6 @@
 import { NavLink, Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from './AuthContext'
+import walletTrailsLogo from './assets/wallettrail-logo.png'
 
 export function AppShell() {
   const { user, loading, logout } = useAuth()
@@ -18,6 +19,7 @@ export function AppShell() {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
+          <img src={walletTrailsLogo} alt="WalletTrails" />
           <strong>WalletTrails Ops</strong>
           <span>Phase 0–5</span>
         </div>

@@ -87,6 +87,14 @@ select {
   gap: 4px;
 }
 
+.brand > img,
+.login-brand-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
 .brand strong {
   font-size: 1.15rem;
   letter-spacing: 0.02em;

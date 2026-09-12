@@ -4,7 +4,7 @@
     "slug": "cashtrail",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/wallettrail-logo.png",
     "scheme": "wallettrails",
     "userInterfaceStyle": "light",
     "ios": {
@@ -15,9 +15,7 @@
       "package": "com.wallettrails.app",
       "adaptiveIcon": {
         "backgroundColor": "#04333b",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/wallettrail-logo.png"
       },
       "permissions": [
         "android.permission.INTERNET",
@@ -32,7 +30,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/wallettrail-logo.png"
     },
     "plugins": [
       "expo-router",
@@ -47,7 +45,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/wallettrail-logo.png",
           "color": "#047857",
           "defaultChannel": "wallettrails-due-reminders"
         }
@@ -55,7 +53,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/wallettrail-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000000"

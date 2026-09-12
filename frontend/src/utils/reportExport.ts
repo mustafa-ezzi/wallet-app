@@ -115,7 +115,7 @@ export async function downloadReportPDF(rows: LedgerRow[], meta: ReportMeta) {
   const pageW = doc.internal.pageSize.getWidth()
   const margin = 40
 
-  const logo = await loadDataUrl('/logo.png')
+  const logo = await loadDataUrl('/wallettrail-logo.png')
 
   // ── Header band ──
   const bandH = 92

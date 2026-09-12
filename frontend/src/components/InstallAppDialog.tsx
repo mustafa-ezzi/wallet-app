@@ -23,7 +23,7 @@ export default function InstallAppDialog({ open, ios, canPrompt, onClose, onInst
         </div>
 
         <div className="install-dialog-hero">
-          <img src="/logo.png" alt="WalletTrails" className="install-dialog-logo" />
+          <img src="/wallettrail-logo.png" alt="WalletTrails" className="install-dialog-logo" />
           <p>Add WalletTrails to your home screen for a faster, full-screen experience.</p>
         </div>
 

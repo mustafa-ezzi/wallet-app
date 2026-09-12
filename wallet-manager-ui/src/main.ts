@@ -10,7 +10,7 @@ app.innerHTML = `
   <div class="layout-shell">
     <aside class="sidebar desktop-only">
       <div class="brand">
-        <div class="brand__logo">CT</div>
+        <img class="brand__logo" src="/wallettrail-logo.png" alt="WalletTrails" />
         <div>
           <p class="brand__title">WalletTrails</p>
           <p class="brand__subtitle">Follow every rupee</p>

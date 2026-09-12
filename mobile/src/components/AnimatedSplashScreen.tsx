@@ -25,7 +25,7 @@ const MUTED = 'rgba(255,255,255,0.4)'
 const MIN_HOLD_MS = 2200
 const EXIT_MS = 480
 
-const logoSource = require('../../assets/images/splash-logo.png')
+const logoSource = require('../../assets/images/wallettrail-logo.png')
 const studioLogoSource = require('../../assets/images/splash-powerpulse-labs.png')
 
 /**
