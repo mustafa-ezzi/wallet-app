@@ -13,16 +13,18 @@ import {
   Plane,
   Receipt,
   Smartphone,
+  Tags,
   UserRound,
   Wallet,
   X,
 } from 'lucide-react'
 import { authApi, accountsApi, asList, apiErrorMessage } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useCategories } from '../context/CategoriesContext'
 import { useConfirm } from '../hooks/useConfirm'
 import { useTheme } from '../theme/ThemeProvider'
 
-type ExpandId = 'profile' | 'password' | 'appearance' | null
+type ExpandId = 'profile' | 'password' | 'appearance' | 'categories' | null
 
 function Row({
   icon,
@@ -52,6 +54,7 @@ function Row({
 export default function Settings() {
   const { user, refreshUser, logout } = useAuth()
   const { themeId, themes, setTheme, transitioning } = useTheme()
+  const { custom, create: createCategory, remove: removeCategory } = useCategories()
   const navigate = useNavigate()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const themeName = themes.find((t) => t.id === themeId)?.name ?? 'System'
@@ -78,6 +81,11 @@ export default function Settings() {
   const [pwOk, setPwOk] = useState('')
 
   const [currencyBusy, setCurrencyBusy] = useState(false)
+
+  const [catKind, setCatKind] = useState<'expense' | 'income'>('expense')
+  const [catName, setCatName] = useState('')
+  const [catError, setCatError] = useState('')
+  const [catBusy, setCatBusy] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -162,7 +170,42 @@ export default function Settings() {
     }
   }
 
+  const saveCategory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = catName.trim()
+    if (!name) {
+      setCatError('Enter a category name.')
+      return
+    }
+    setCatBusy(true)
+    setCatError('')
+    try {
+      await createCategory(catKind, name)
+      setCatName('')
+    } catch (err: unknown) {
+      setCatError(apiErrorMessage(err, 'Could not create category.'))
+    } finally {
+      setCatBusy(false)
+    }
+  }
+
+  const deleteCategory = async (id: number, name: string) => {
+    const ok = await confirm({
+      title: 'Delete category?',
+      message: `“${name}” will be removed from your pickers. Existing transactions keep this name.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await removeCategory(id)
+    } catch (err: unknown) {
+      setCatError(apiErrorMessage(err, 'Could not delete category.'))
+    }
+  }
+
   const icon = { size: 15, strokeWidth: 1.85 }
+  const customForKind = custom.filter((c) => c.kind === catKind)
 
   return (
     <div className="page settings-page">
@@ -255,6 +298,67 @@ export default function Settings() {
               <option value="INR">INR</option>
             </select>
           </label>
+
+          <Row
+            icon={<Tags {...icon} />}
+            title="Categories"
+            value={custom.length ? String(custom.length) : 'Add'}
+            onClick={() => toggle('categories')}
+          />
+          {expand === 'categories' ? (
+            <div className="settings-expand">
+              <p className="text-muted" style={{ fontSize: '0.78rem', margin: '0 0 0.85rem' }}>
+                Built-in categories stay available. Add your own for income or expenses.
+              </p>
+              {catError ? <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{catError}</div> : null}
+              <div className="settings-cat-kind">
+                <button
+                  type="button"
+                  className={catKind === 'expense' ? 'btn-primary' : 'btn-glass'}
+                  style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}
+                  onClick={() => setCatKind('expense')}
+                >
+                  Expense
+                </button>
+                <button
+                  type="button"
+                  className={catKind === 'income' ? 'btn-primary' : 'btn-glass'}
+                  style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem' }}
+                  onClick={() => setCatKind('income')}
+                >
+                  Income
+                </button>
+              </div>
+              <form onSubmit={(e) => void saveCategory(e)} className="settings-cat-form">
+                <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                  <label>New category</label>
+                  <input
+                    value={catName}
+                    onChange={(e) => setCatName(e.target.value)}
+                    placeholder={catKind === 'income' ? 'e.g. Freelance' : 'e.g. Pet care'}
+                    maxLength={40}
+                  />
+                </div>
+                <button type="submit" className="btn-primary" disabled={catBusy} style={{ padding: '0.55rem 1rem', alignSelf: 'flex-end' }}>
+                  {catBusy ? <span className="spinner" /> : 'Add'}
+                </button>
+              </form>
+              <ul className="settings-cat-list">
+                {customForKind.length === 0 ? (
+                  <li className="text-muted" style={{ fontSize: '0.8rem' }}>No custom {catKind} categories yet.</li>
+                ) : (
+                  customForKind.map((c) => (
+                    <li key={c.id}>
+                      <span>{c.name}</span>
+                      <button type="button" className="btn-glass" style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem' }} onClick={() => void deleteCategory(c.id, c.name)}>
+                        Delete
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </div>
+          ) : null}
 
           <Row icon={<Download {...icon} />} title="Export" onClick={() => navigate('/reports')} />
           <Row icon={<Plane {...icon} />} title="Travel Mode" onClick={() => navigate('/travel-mode')} />

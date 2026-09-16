@@ -30,6 +30,13 @@ export type Transaction = {
   wallet_name?: string | null
 }
 
+export type UserCategory = {
+  id: number
+  kind: 'expense' | 'income'
+  name: string
+  created_at?: string
+}
+
 export type PeopleHistory = {
   person: Account
   year: number

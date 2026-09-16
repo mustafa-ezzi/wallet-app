@@ -5,6 +5,7 @@ from . import household_api
 from . import devices_api
 from . import password_reset_api
 from . import google_auth_api
+from . import categories_api
 from . import ops_api
 from . import ops_campaigns_api
 from . import support_api
@@ -19,6 +20,7 @@ from . import bank_sms_api
 from . import budgets_api
 
 router = DefaultRouter()
+router.register('categories', categories_api.UserCategoryViewSet, basename='category')
 router.register('accounts', views.AccountViewSet, basename='account')
 router.register('projects', views.ProjectViewSet, basename='project')
 router.register('transactions', views.TransactionViewSet, basename='transaction')

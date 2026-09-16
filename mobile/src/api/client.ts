@@ -341,6 +341,13 @@ export const accountsApi = {
   remove: (id: number) => api.delete(`/accounts/${id}/`),
 }
 
+export const categoriesApi = {
+  list: (params?: object) => api.get('/categories/', { params }),
+  create: (data: { kind: 'expense' | 'income'; name: string }) =>
+    api.post('/categories/', data),
+  remove: (id: number) => api.delete(`/categories/${id}/`),
+}
+
 export const transactionsApi = {
   list: (params?: object) => api.get('/transactions/', { params }),
   create: (data: object) => api.post('/transactions/', data),

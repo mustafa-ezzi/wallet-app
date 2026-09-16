@@ -34,6 +34,30 @@ class UserProfile(models.Model):
         return f"Profile({self.user.username})"
 
 
+class UserCategory(models.Model):
+    KIND_CHOICES = [
+        ('expense', 'Expense'),
+        ('income', 'Income'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_categories')
+    kind = models.CharField(max_length=10, choices=KIND_CHOICES)
+    name = models.CharField(max_length=80)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['kind', 'name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'kind', 'name'],
+                name='uniq_user_category_kind_name',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.kind}:{self.name} ({self.user.username})"
+
+
 class Account(models.Model):
     ACCOUNT_TYPES = [
         ('bank', 'Bank'),

@@ -34,7 +34,7 @@ import {
   peopleApi,
   type BankSmsImportRow,
 } from '@/src/api/client'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/src/constants/categories'
+import { useCategories } from '@/src/context/CategoriesContext'
 import { useOffline } from '@/src/offline'
 import { useBankSms } from '@/src/bankSms'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
@@ -93,6 +93,7 @@ export default function BankSmsScreen() {
   const { hydrateNow, getCachedAccounts } = useOffline()
   const bankSms = useBankSms()
   const { bumpRefresh } = useMoneyUi()
+  const { expenseCategories, incomeCategories } = useCategories()
 
   const [paste, setPaste] = useState('')
   const [parsed, setParsed] = useState<ParsedBankSms | null>(null)
@@ -272,10 +273,10 @@ export default function BankSmsScreen() {
 
   const categoryOptions = useMemo(() => {
     if (!draft) return []
-    if (draft.kind === 'income' || draft.kind === 'reversal') return INCOME_CATEGORIES
+    if (draft.kind === 'income' || draft.kind === 'reversal') return incomeCategories
     if (draft.kind === 'atm' && !draft.recordAtmAsExpense) return []
-    return EXPENSE_CATEGORIES
-  }, [draft])
+    return expenseCategories
+  }, [draft, expenseCategories, incomeCategories])
 
   const refreshBooksAfterAction = useCallback(async () => {
     try {

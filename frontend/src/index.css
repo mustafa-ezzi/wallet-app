@@ -2672,4 +2672,31 @@ select option { background: var(--surface); color: var(--text-primary); }
 .settings-expand .form-group {
   margin-bottom: 0.75rem;
 }
+.settings-cat-kind {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+.settings-cat-form {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-end;
+  margin-bottom: 0.9rem;
+}
+.settings-cat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.settings-cat-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
 

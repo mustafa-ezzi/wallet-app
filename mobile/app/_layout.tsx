@@ -15,6 +15,7 @@ import { RemoteConfigProvider } from '@/src/config/RemoteConfigContext'
 import { ForceUpdateGate, MaintenanceBanner } from '@/src/config/ForceUpdateGate'
 import { ThemeProvider, ThemeRevealOverlay, useColors } from '@/src/theme/ThemeContext'
 import { TravelModeProvider } from '@/src/travel/TravelModeContext'
+import { CategoriesProvider } from '@/src/context/CategoriesContext'
 
 export { ErrorBoundary } from 'expo-router'
 
@@ -64,7 +65,9 @@ export default function RootLayout() {
                 <RemoteConfigProvider>
                   <MoneyUiProvider>
                     <TravelModeProvider>
+                      <CategoriesProvider>
                       <ThemedStack />
+                      </CategoriesProvider>
                     </TravelModeProvider>
                   </MoneyUiProvider>
                 </RemoteConfigProvider>

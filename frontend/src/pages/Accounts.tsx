@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { accountsApi, peopleApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
+import { useCategories } from '../context/CategoriesContext'
 import { CountUp } from '../components/motion/CountUp'
 import { Reveal } from '../components/motion/Reveal'
 import { fmt, fmtBalance, toMoney } from '../utils/format'
@@ -43,6 +43,7 @@ const EMPTY_TX_FORM = {
 export default function Accounts() {
   const navigate = useNavigate()
   const { confirm, dialog: confirmDialog } = useConfirm()
+  const { expenseCategories, incomeCategories } = useCategories()
   const { getCachedAccounts, getCachedTransactions } = useOffline()
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading]   = useState(true)
@@ -337,9 +338,7 @@ export default function Accounts() {
     ...people.map(a => Math.abs(toMoney(a.current_balance))),
   )
 
-  const catOptions = txForm.type === 'income'
-    ? INCOME_CATEGORIES.map(c => c.key)
-    : EXPENSE_CATEGORIES.map(c => c.key)
+  const catOptions = (txForm.type === 'income' ? incomeCategories : expenseCategories).map(c => c.key)
 
   // ─────────────────────────────────────────────────────────────────────
   return (

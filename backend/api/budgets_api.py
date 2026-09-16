@@ -18,7 +18,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .currencies import user_home_currency
-from .models import CategoryBudget, Transaction
+from .models import CategoryBudget, Transaction, UserCategory
 
 MONTH_NAMES = [
     '', 'January', 'February', 'March', 'April', 'May', 'June',
@@ -141,8 +141,14 @@ def build_budget_payload(user, year: int, month: int) -> dict:
 
     # Prefer known categories; also include any custom/legacy categories with spend or a limit.
     known = set(EXPENSE_CATEGORY_KEYS)
+    custom_names = set(
+        UserCategory.objects.filter(user=user, kind='expense').values_list('name', flat=True)
+    )
     extras = sorted(
-        (c for c in set(spent_map.keys()) | set(budgets.keys()) if c not in known and c != ALL_CATEGORY),
+        (
+            c for c in set(spent_map.keys()) | set(budgets.keys()) | custom_names
+            if c not in known and c != ALL_CATEGORY
+        ),
         key=lambda c: (-float(spent_map.get(c, 0)), c.lower()),
     )
 

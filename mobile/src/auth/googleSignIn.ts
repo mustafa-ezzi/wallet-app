@@ -12,17 +12,22 @@ type GoogleModule = {
   statusCodes?: { SIGN_IN_CANCELLED?: string; IN_PROGRESS?: string; PLAY_SERVICES_NOT_AVAILABLE?: string }
 }
 
+const DEFAULT_WEB_CLIENT_ID =
+  '85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com'
+
 function extraWebClientId(): string {
-  const extra = (Constants.expoConfig?.extra || {}) as { googleWebClientId?: string }
+  const extra = (Constants.expoConfig?.extra || Constants.manifest?.extra || {}) as {
+    googleWebClientId?: string
+  }
   return (
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim()
     || extra.googleWebClientId?.trim()
-    || ''
+    || DEFAULT_WEB_CLIENT_ID
   )
 }
 
 function loadModule(): GoogleModule | null {
-  if (Platform.OS !== 'android') return null
+  if (Platform.OS !== 'android' && Platform.OS !== 'web') return null
   try {
     return require('@react-native-google-signin/google-signin') as GoogleModule
   } catch {
@@ -62,7 +67,9 @@ export async function getGoogleIdToken(): Promise<string> {
     throw new Error('Google Sign-In is only available on the Android app.')
   }
   ensureConfigured(mod)
-  await mod.GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true })
+  if (Platform.OS === 'android') {
+    await mod.GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true })
+  }
   const response = await mod.GoogleSignin.signIn()
   if (mod.isSuccessResponse && !mod.isSuccessResponse(response)) {
     throw new Error('cancelled')

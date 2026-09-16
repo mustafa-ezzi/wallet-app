@@ -93,7 +93,7 @@ export default function LoginScreen() {
               Forgot password?
             </Link>
             <PrimaryButton title="Sign In" onPress={onSubmit} loading={loading} />
-            {Platform.OS === 'android' ? (
+            {(Platform.OS === 'android' || Platform.OS === 'web') ? (
               <>
                 <Text style={styles.or}>or</Text>
                 <GoogleSignInButton onPress={() => void onGoogle()} loading={googleLoading} disabled={loading} />

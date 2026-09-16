@@ -6,6 +6,7 @@ import Layout from './components/Layout'
 import AppUpdateGate from './hooks/AppUpdateGate'
 import { ThemeProvider } from './theme/ThemeProvider'
 import { TravelModeProvider } from './travel/TravelModeContext'
+import { CategoriesProvider } from './context/CategoriesContext'
 import { capturePageview } from './lib/analytics'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -106,11 +107,13 @@ export default function App() {
       <AuthProvider>
         <OfflineProvider>
           <TravelModeProvider>
+            <CategoriesProvider>
             <BrowserRouter>
               <AppUpdateGate>
                 <AppRoutes />
               </AppUpdateGate>
             </BrowserRouter>
+            </CategoriesProvider>
           </TravelModeProvider>
         </OfflineProvider>
       </AuthProvider>

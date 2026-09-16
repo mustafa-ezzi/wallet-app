@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   DeviceEventEmitter,
   Modal,
   Platform,
@@ -16,6 +17,7 @@ import { useRouter } from 'expo-router'
 import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import { SettingsGroup, SettingsLogoutRow, SettingsRow } from '@/src/components/SettingsList'
 import { useAuth } from '@/src/context/AuthContext'
+import { useCategories } from '@/src/context/CategoriesContext'
 import { getHomeCurrency, HOME_CURRENCIES, setHomeCurrency } from '@/src/currency/homeCurrency'
 import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
@@ -38,7 +40,7 @@ const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
   { id: '5m', label: '5 minutes' },
 ]
 
-type Panel = 'home' | 'appearance' | 'privacy' | 'notifications' | 'advanced'
+type Panel = 'home' | 'appearance' | 'privacy' | 'notifications' | 'advanced' | 'categories'
 
 export default function SettingsScreen() {
   const { user, logout, refreshUser } = useAuth()
@@ -49,6 +51,7 @@ export default function SettingsScreen() {
   const { themeId, themes, setThemeAnimated, colors } = useTheme()
   const { premium, refresh: refreshConfig } = useRemoteConfig()
   const { isActive: travelOn } = useTravelMode()
+  const { custom, create: createCategory, remove: removeCategory } = useCategories()
   const bankSms = useBankSms()
   const homeMeta = getHomeCurrency(user?.currency)
   const themeName = themes.find((t) => t.id === themeId)?.name ?? 'System'
@@ -75,6 +78,10 @@ export default function SettingsScreen() {
   const [currencyBusy, setCurrencyBusy] = useState(false)
   const [currencyError, setCurrencyError] = useState('')
   const [restoreMsg, setRestoreMsg] = useState('')
+  const [catKind, setCatKind] = useState<'expense' | 'income'>('expense')
+  const [catName, setCatName] = useState('')
+  const [catError, setCatError] = useState('')
+  const [catBusy, setCatBusy] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -142,12 +149,50 @@ export default function SettingsScreen() {
     }
   }
 
+  const saveCategory = async () => {
+    const name = catName.trim()
+    if (!name) {
+      setCatError('Enter a category name.')
+      return
+    }
+    setCatBusy(true)
+    setCatError('')
+    try {
+      await createCategory(catKind, name)
+      setCatName('')
+    } catch (err) {
+      setCatError(apiErrorMessage(err, 'Could not create category.'))
+    } finally {
+      setCatBusy(false)
+    }
+  }
+
+  const deleteCategory = (id: number, name: string) => {
+    Alert.alert(
+      'Delete category?',
+      `“${name}” will be removed from your pickers. Existing transactions keep this name.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void removeCategory(id).catch((err) => {
+              setCatError(apiErrorMessage(err, 'Could not delete category.'))
+            })
+          },
+        },
+      ],
+    )
+  }
+
   const panelTitle =
     panel === 'appearance' ? 'Appearance'
       : panel === 'privacy' ? 'Passcode'
         : panel === 'notifications' ? 'Reminders'
           : panel === 'advanced' ? 'Advanced'
-            : ''
+            : panel === 'categories' ? 'Categories'
+              : ''
 
   return (
     <Screen>
@@ -189,6 +234,12 @@ export default function SettingsScreen() {
                 title="Currency"
                 value={homeMeta.code}
                 onPress={() => setCurrencyOpen(true)}
+              />
+              <SettingsRow
+                icon="tags"
+                title="Categories"
+                value={custom.length ? String(custom.length) : 'Add'}
+                onPress={() => setPanel('categories')}
               />
               <SettingsRow
                 icon="sun-o"
@@ -324,6 +375,57 @@ export default function SettingsScreen() {
                 )
               })}
             </View>
+          </View>
+        ) : null}
+
+        {panel === 'categories' ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.meta, { color: colors.textMuted, marginTop: 0, marginBottom: spacing.md }]}>
+              Built-in categories stay available. Add your own for income or expenses.
+            </Text>
+            <View style={styles.seg}>
+              {(['expense', 'income'] as const).map((kind) => {
+                const on = catKind === kind
+                return (
+                  <Pressable
+                    key={kind}
+                    onPress={() => setCatKind(kind)}
+                    style={[
+                      styles.segBtn,
+                      { borderColor: colors.border },
+                      on && { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark },
+                    ]}
+                  >
+                    <Text style={[styles.segText, { color: colors.textSecondary }, on && styles.segTextOn]}>
+                      {kind === 'expense' ? 'Expense' : 'Income'}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+            <ErrorBanner message={catError} />
+            <TextInput
+              value={catName}
+              onChangeText={setCatName}
+              style={[styles.catInput, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+              placeholder={catKind === 'income' ? 'e.g. Freelance' : 'e.g. Pet care'}
+              placeholderTextColor={colors.textMuted}
+              maxLength={40}
+              autoCapitalize="words"
+            />
+            <PrimaryButton title={catBusy ? 'Adding…' : 'Add category'} onPress={() => void saveCategory()} disabled={catBusy} />
+            {custom.filter((c) => c.kind === catKind).length === 0 ? (
+              <Text style={[styles.meta, { color: colors.textMuted }]}>No custom {catKind} categories yet.</Text>
+            ) : (
+              custom.filter((c) => c.kind === catKind).map((c) => (
+                <View key={c.id} style={styles.catRow}>
+                  <Text style={[styles.rowTitle, { color: colors.text, flex: 1 }]}>{c.name}</Text>
+                  <Pressable onPress={() => deleteCategory(c.id, c.name)}>
+                    <Text style={{ color: colors.danger, fontWeight: '700' }}>Delete</Text>
+                  </Pressable>
+                </View>
+              ))
+            )}
           </View>
         ) : null}
 
@@ -689,5 +791,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: typography.body,
     letterSpacing: 4,
+  },
+  catInput: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    fontSize: typography.body,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  catRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: spacing.md,
   },
 })

@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { accountsApi, transactionsApi, householdsApi, peopleApi, asList, apiErrorMessage } from '../api/client'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
+import { useCategories } from '../context/CategoriesContext'
 import { fmtBalance } from '../utils/format'
 import { track } from '../lib/analytics'
 import { useOffline } from '../offline'
@@ -55,6 +55,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
     rateLine,
     toPkr,
   } = useTravelMode()
+  const { expenseCategories, incomeCategories } = useCategories()
   const [type, setType] = useState<TxType>('expense')
 
   const [amount, setAmount] = useState('')
@@ -145,7 +146,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
     setHouseholdLedgerId('')
   }
 
-  const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  const categories = type === 'income' ? incomeCategories : expenseCategories
 
   const applyCalc = (expr: string) => {
     const v = evalSimpleMath(expr)

@@ -25,11 +25,8 @@ import type { Account, PeopleLink } from '@/src/api/types'
 import { CalculatorSheet } from '@/src/components/CalculatorSheet'
 import { DateField, SelectField } from '@/src/components/SelectFields'
 import { ErrorBanner } from '@/src/components/ui'
-import {
-  EXPENSE_CATEGORIES,
-  INCOME_CATEGORIES,
-  type CategoryMeta,
-} from '@/src/constants/categories'
+import { type CategoryMeta } from '@/src/constants/categories'
+import { useCategories } from '@/src/context/CategoriesContext'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { useOffline } from '@/src/offline'
 import { useColors } from '@/src/theme/ThemeContext'
@@ -71,6 +68,7 @@ export default function AddTransactionScreen() {
     rateLine,
     toPkr,
   } = useTravelMode()
+  const { expenseCategories, incomeCategories } = useCategories()
 
   const [kind, setKind] = useState<Kind>('expense')
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -199,7 +197,7 @@ export default function AddTransactionScreen() {
     }
   }
 
-  const categories: CategoryMeta[] = kind === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  const categories: CategoryMeta[] = kind === 'income' ? incomeCategories : expenseCategories
 
   const householdOptions = useMemo(
     () => [

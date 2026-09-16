@@ -32,7 +32,7 @@ import {
   peopleApi,
   type BankSmsImportRow,
 } from '../api/client'
-import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../constants/categories'
+import { useCategories } from '../context/CategoriesContext'
 import { useOffline } from '../offline'
 import { fmt, toMoney } from '../utils/format'
 
@@ -75,6 +75,7 @@ function draftFromRow(row: BankSmsImportRow): ApproveDraft {
 export default function BankSmsImportPage() {
   const navigate = useNavigate()
   const { hydrateNow, getCachedAccounts } = useOffline()
+  const { expenseCategories, incomeCategories } = useCategories()
 
   const [paste, setPaste] = useState('')
   const [parsed, setParsed] = useState<ParsedBankSms | null>(null)
@@ -254,11 +255,11 @@ export default function BankSmsImportPage() {
   }
 
   const categoryOptions = useMemo(() => {
-    if (!draft) return EXPENSE_CATEGORIES
-    if (draft.kind === 'income' || draft.kind === 'reversal') return INCOME_CATEGORIES
+    if (!draft) return expenseCategories
+    if (draft.kind === 'income' || draft.kind === 'reversal') return incomeCategories
     if (draft.kind === 'atm' && !draft.recordAtmAsExpense) return []
-    return EXPENSE_CATEGORIES
-  }, [draft])
+    return expenseCategories
+  }, [draft, expenseCategories, incomeCategories])
 
   const onApprove = async () => {
     if (!draft || !pendingId) {

@@ -90,7 +90,7 @@ export default function SignupScreen() {
             <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="you@example.com" />
             <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="Min 6 characters" />
             <PrimaryButton title="Create Account" onPress={onSubmit} loading={loading} />
-            {Platform.OS === 'android' ? (
+            {(Platform.OS === 'android' || Platform.OS === 'web') ? (
               <>
                 <Text style={styles.or}>or</Text>
                 <GoogleSignInButton
