@@ -17,6 +17,7 @@ import { DateField, SelectField } from '@/src/components/SelectFields'
 import { ErrorBanner, PrimaryButton } from '@/src/components/ui'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
+import { getHomeCurrencyCode } from '@/src/currency/homeCurrency'
 import { todayISO } from '@/src/utils/format'
 import {
   TRAVEL_CURRENCIES,
@@ -32,8 +33,11 @@ export default function TravelModeScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors])
   const { travel, loading, saving, setTravel, fetchQuote, isActive, refresh } = useTravelMode()
 
+  const homeCurrency = getHomeCurrencyCode()
   const [setupOpen, setSetupOpen] = useState(false)
-  const [currency, setCurrency] = useState('AED')
+  const [currency, setCurrency] = useState(
+    () => TRAVEL_CURRENCIES.find((c) => c.code !== getHomeCurrencyCode())?.code || 'USD',
+  )
   const [rate, setRate] = useState('')
   const [startDate, setStartDate] = useState(todayISO())
   const [endDate, setEndDate] = useState('')
@@ -52,12 +56,14 @@ export default function TravelModeScreen() {
   }, [travel])
 
   const currencyOptions = useMemo(
-    () => TRAVEL_CURRENCIES.map((c) => ({
-      value: c.code,
-      label: c.code,
-      hint: c.country,
-    })),
-    [],
+    () => TRAVEL_CURRENCIES
+      .filter((c) => c.code !== homeCurrency)
+      .map((c) => ({
+        value: c.code,
+        label: c.code,
+        hint: c.country,
+      })),
+    [homeCurrency],
   )
 
   const loadLiveRate = useCallback(async (code: string, force = false) => {
@@ -102,7 +108,7 @@ export default function TravelModeScreen() {
     setError('')
     const r = parseFloat(rate)
     if (!Number.isFinite(r) || r <= 0) {
-      setError('Enter a valid exchange rate (PKR per 1 foreign unit).')
+      setError(`Enter a valid exchange rate (${homeCurrency} per 1 foreign unit).`)
       return
     }
     if (endDate && endDate < startDate) {
@@ -180,8 +186,8 @@ export default function TravelModeScreen() {
               </View>
               <Text style={[styles.introTitle, { color: colors.primaryDark }]}>TRAVEL MODE</Text>
               <Text style={[styles.introBody, { color: colors.textSecondary }]}>
-                Traveling outside Pakistan? Track expenses in the local currency. WalletTrails
-                converts to PKR using your trip rate so wallets stay accurate.
+                Traveling with a different currency? Track expenses in the local currency. WalletTrails
+                converts to {homeCurrency} using your trip rate so wallets stay accurate.
               </Text>
               <PrimaryButton title="TURN ON TRAVEL MODE" onPress={turnOn} />
             </View>
@@ -189,8 +195,8 @@ export default function TravelModeScreen() {
             <>
               <View style={[styles.pairCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.pairCol}>
-                  <Text style={[styles.pairFromTo, { color: colors.text }]}>From PKR</Text>
-                  <Text style={[styles.pairCountry, { color: colors.textMuted }]}>PAKISTAN</Text>
+                  <Text style={[styles.pairFromTo, { color: colors.text }]}>From {homeCurrency}</Text>
+                  <Text style={[styles.pairCountry, { color: colors.textMuted }]}>HOME BOOKS</Text>
                 </View>
                 <FontAwesome name="exchange" size={16} color={colors.primary} />
                 <View style={[styles.pairCol, { alignItems: 'flex-end' }]}>
@@ -202,7 +208,7 @@ export default function TravelModeScreen() {
               </View>
 
               <Text style={[styles.rateLine, { color: colors.primaryDark }]}>
-                {formatRateLine(currency, rate) || 'Set a rate below'}
+                {formatRateLine(currency, rate, homeCurrency) || 'Set a rate below'}
               </Text>
               {quoteNote ? (
                 <Text style={[styles.quoteNote, { color: colors.textMuted }]}>{quoteNote}</Text>
@@ -216,7 +222,7 @@ export default function TravelModeScreen() {
               />
 
               <Text style={[styles.label, { color: colors.textMuted }]}>
-                Rate (PKR per 1 {currency})
+                Rate ({homeCurrency} per 1 {currency})
               </Text>
               <View style={styles.rateRow}>
                 <TextInput

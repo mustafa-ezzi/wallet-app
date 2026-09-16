@@ -15,6 +15,13 @@ import { authApi, apiErrorMessage, wakeServer } from '@/src/api/client'
 import { ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
 import {
+  HOME_CURRENCIES,
+  defaultCurrencyForCountry,
+  getHomeCurrency,
+  isHomeCurrency,
+  setHomeCurrency,
+} from '@/src/currency/homeCurrency'
+import {
   clearOnboardingDraft,
   getOnboardingDraft,
   patchOnboardingDraft,
@@ -66,8 +73,16 @@ export default function UserTypeScreen() {
   )
   const [country, setCountry] = useState(draft.country || user?.country || 'Pakistan')
   const [countryOpen, setCountryOpen] = useState(false)
+  const initialCurrency = isHomeCurrency(draft.currency)
+    ? draft.currency
+    : isHomeCurrency(user?.currency)
+      ? user!.currency
+      : defaultCurrencyForCountry(draft.country || user?.country || 'Pakistan')
+  const [currency, setCurrency] = useState(initialCurrency)
+  const [currencyOpen, setCurrencyOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const currencyMeta = getHomeCurrency(currency)
 
   useEffect(() => {
     void wakeServer(true)
@@ -83,6 +98,10 @@ export default function UserTypeScreen() {
       setError('Please pick your country.')
       return
     }
+    if (!isHomeCurrency(currency)) {
+      setError('Please select your currency.')
+      return
+    }
 
     const about = getOnboardingDraft()
     if (!about.name.trim() || !about.date_of_birth || !about.gender) {
@@ -90,7 +109,8 @@ export default function UserTypeScreen() {
       return
     }
 
-    patchOnboardingDraft({ user_type: userType, country })
+    patchOnboardingDraft({ user_type: userType, country, currency })
+    setHomeCurrency(currency)
     setLoading(true)
 
     const parts = about.name.trim().split(/\s+/)
@@ -103,6 +123,7 @@ export default function UserTypeScreen() {
       gender: about.gender,
       user_type: userType,
       country,
+      currency,
       onboarding_complete: true,
     }
 
@@ -144,7 +165,7 @@ export default function UserTypeScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + spacing.md }]}>
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: insets.bottom + 110 }}
+        contentContainerStyle={{ paddingHorizontal: spacing.xl, paddingBottom: insets.bottom + 140 }}
       >
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.back} accessibilityLabel="Back">
           <FontAwesome name="chevron-left" size={18} color={colors.text} />
@@ -188,6 +209,19 @@ export default function UserTypeScreen() {
           <Text style={[styles.countryValue, { color: colors.primaryDark }]}>{country}</Text>
           <FontAwesome name="chevron-right" size={12} color={colors.textMuted} />
         </Pressable>
+
+        <Pressable style={[styles.countryRow, { marginTop: spacing.md }]} onPress={() => setCurrencyOpen(true)}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.countryTitle}>Home currency</Text>
+            <Text style={[styles.countrySub, { color: colors.textMuted }]}>
+              Amounts and the currency symbol in the app
+            </Text>
+          </View>
+          <Text style={[styles.countryValue, { color: colors.primaryDark }]}>
+            {currencyMeta.symbol} {currencyMeta.code}
+          </Text>
+          <FontAwesome name="chevron-right" size={12} color={colors.textMuted} />
+        </Pressable>
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.md, borderTopColor: colors.border }]}>
@@ -213,6 +247,7 @@ export default function UserTypeScreen() {
                     key={c}
                     onPress={() => {
                       setCountry(c)
+                      setCurrency(defaultCurrencyForCountry(c))
                       setCountryOpen(false)
                     }}
                     style={[
@@ -222,6 +257,42 @@ export default function UserTypeScreen() {
                     ]}
                   >
                     <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>{c}</Text>
+                    {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={currencyOpen} transparent animationType="fade" onRequestClose={() => setCurrencyOpen(false)}>
+        <View style={styles.modalRoot}>
+          <Pressable style={styles.backdrop} onPress={() => setCurrencyOpen(false)} />
+          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>Select currency</Text>
+            <ScrollView style={{ maxHeight: 360 }}>
+              {HOME_CURRENCIES.map((c) => {
+                const active = c.code === currency
+                return (
+                  <Pressable
+                    key={c.code}
+                    onPress={() => {
+                      setCurrency(c.code)
+                      setCurrencyOpen(false)
+                    }}
+                    style={[
+                      styles.option,
+                      { borderBottomColor: colors.border },
+                      active && { backgroundColor: `${colors.primary}14` },
+                    ]}
+                  >
+                    <View>
+                      <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>
+                        {c.symbol}  {c.code}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{c.name}</Text>
+                    </View>
                     {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
                   </Pressable>
                 )

@@ -2,6 +2,8 @@ import React from 'react'
 import { Platform } from 'react-native'
 import type { WidgetInfo } from 'react-native-android-widget'
 import { getOfflineStore } from '@/src/offline/store'
+import { getCachedUser } from '@/src/api/authStorage'
+import { setHomeCurrency } from '@/src/currency/homeCurrency'
 import { fmt, fmtBalance } from '@/src/utils/format'
 import type { BalanceWidgetData } from './BalanceWidget'
 import type { MonthFlowWidgetData } from './MonthFlowWidget'
@@ -17,6 +19,15 @@ const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
+
+async function hydrateHomeCurrency() {
+  try {
+    const cached = await getCachedUser()
+    setHomeCurrency(cached?.currency)
+  } catch {
+    /* keep last known / default */
+  }
+}
 
 function todayMonthPrefix(): string {
   const d = new Date()
@@ -38,6 +49,7 @@ function bankCashAccounts<T extends { type?: string }>(accounts: T[]): T[] {
 
 export async function loadBalanceWidgetData(): Promise<BalanceWidgetData> {
   try {
+    await hydrateHomeCurrency()
     const store = await getOfflineStore()
     const accounts = bankCashAccounts(await store.listAccounts())
     const total = accounts.reduce((s, a) => s + (Number(a.currentBalance) || 0), 0)
@@ -61,6 +73,7 @@ export async function loadBalanceWidgetData(): Promise<BalanceWidgetData> {
 export async function loadMonthFlowWidgetData(): Promise<MonthFlowWidgetData> {
   const month = MONTH_NAMES[new Date().getMonth()]
   try {
+    await hydrateHomeCurrency()
     const store = await getOfflineStore()
     const txs = await store.listTransactions()
     const prefix = todayMonthPrefix()
@@ -97,6 +110,7 @@ export async function loadMonthFlowWidgetData(): Promise<MonthFlowWidgetData> {
 
 export async function loadWalletsWidgetData(): Promise<WalletsWidgetData> {
   try {
+    await hydrateHomeCurrency()
     const store = await getOfflineStore()
     const accounts = bankCashAccounts(await store.listAccounts())
     const total = accounts.reduce((s, a) => s + (Number(a.currentBalance) || 0), 0)
@@ -116,6 +130,7 @@ export async function loadWalletsWidgetData(): Promise<WalletsWidgetData> {
 
 export async function loadQuickGlanceWidgetData(): Promise<QuickGlanceWidgetData> {
   try {
+    await hydrateHomeCurrency()
     const store = await getOfflineStore()
     const [allAccounts, txs] = await Promise.all([store.listAccounts(), store.listTransactions()])
     const accounts = bankCashAccounts(allAccounts)

@@ -1,19 +1,23 @@
+import { useMemo } from 'react'
+import { maskedMoney } from '@/src/currency/homeCurrency'
 import { fmt, fmtBalance } from '@/src/utils/format'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
+import { useAuth } from '@/src/context/AuthContext'
 
 const MASK = '••••'
-const MASK_MONEY = `PKR ${MASK}`
 
 /** Format helpers that respect privacy amount masking (labels stay visible). */
 export function useMaskedMoney() {
   const { amountsHidden } = usePrivacyLock()
+  const { user } = useAuth()
+  const maskMoney = useMemo(() => maskedMoney(user?.currency), [user?.currency])
 
   return {
     amountsHidden,
-    fmt: (n: number | string | null | undefined) => (amountsHidden ? MASK_MONEY : fmt(n)),
-    fmtBalance: (n: number | string | null | undefined) => (amountsHidden ? MASK_MONEY : fmtBalance(n)),
+    fmt: (n: number | string | null | undefined) => (amountsHidden ? maskMoney : fmt(n)),
+    fmtBalance: (n: number | string | null | undefined) => (amountsHidden ? maskMoney : fmtBalance(n)),
     fmtSigned: (n: number | string | null | undefined, income: boolean) => {
-      if (amountsHidden) return income ? `+${MASK_MONEY}` : `−${MASK_MONEY}`
+      if (amountsHidden) return income ? `+${maskMoney}` : `−${maskMoney}`
       const body = fmt(n)
       return income ? `+${body}` : `−${body}`
     },

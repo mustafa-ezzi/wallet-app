@@ -106,10 +106,8 @@ def get_fx_quote(base: str, quote: str = HOME_CURRENCY, force_refresh: bool = Fa
             'source': 'identity',
             'stale': False,
         }
-    if quote != HOME_CURRENCY:
-        raise ValueError(f'Only {HOME_CURRENCY} quote is supported in v1.')
-    if base == HOME_CURRENCY:
-        raise ValueError('Travel Mode is off when base is PKR.')
+    if len(quote) != 3 or not quote.isalpha():
+        raise ValueError('Quote currency must be a 3-letter code.')
     if base not in TRAVEL_CURRENCIES:
         raise ValueError(f'Unsupported travel currency: {base}')
 

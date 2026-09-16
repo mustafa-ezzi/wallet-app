@@ -1,3 +1,5 @@
+import { getHomeCurrencyCode } from '@/src/currency/homeCurrency'
+
 /** Travel Mode currencies + helpers (Phase B). */
 export const TRAVEL_CURRENCIES = [
   { code: 'AED', country: 'United Arab Emirates' },
@@ -23,16 +25,21 @@ export function countryForCurrency(code: string): string {
   return hit?.country ?? code.toUpperCase()
 }
 
-/** Round foreign × rate → PKR (2 dp). */
+/** Round foreign × rate → home currency (2 dp). */
 export function foreignToPkr(foreign: number, rate: number): number {
   return Math.round(foreign * rate * 100) / 100
 }
 
-export function formatRateLine(currency: string, rate: number | string | null | undefined): string {
+export function formatRateLine(
+  currency: string,
+  rate: number | string | null | undefined,
+  homeCurrency = getHomeCurrencyCode(),
+): string {
   const r = Number(rate)
   if (!currency || !Number.isFinite(r) || r <= 0) return ''
   const pretty = r >= 10 ? r.toFixed(2) : r.toFixed(4)
-  return `1 ${currency.toUpperCase()} = ${pretty} PKR`
+  const home = (homeCurrency || getHomeCurrencyCode()).toUpperCase()
+  return `1 ${currency.toUpperCase()} = ${pretty} ${home}`
 }
 
 export function formatForeignSubtitle(

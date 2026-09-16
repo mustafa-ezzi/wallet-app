@@ -24,7 +24,7 @@ export function buildHouseholdInviteMessage(opts: {
     `• Shared household ledger — everyone sees what was spent\n` +
     `• Settle up — split costs equally and see who owes whom\n` +
     `• Your personal wallets stay private\n` +
-    `• Also track bills, loans & EMI reminders in PKR\n\n` +
+    `• Also track bills, loans & EMI reminders\n\n` +
     `How to join:\n` +
     `1) Install WalletTrails (Android)\n` +
     `2) Open Family / Household\n` +

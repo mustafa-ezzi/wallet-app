@@ -1,3 +1,5 @@
+import { withCurrencySymbol } from '@/src/currency/homeCurrency'
+
 export function toMoney(n: number | string | null | undefined): number {
   if (n == null || n === '') return 0
   const num = typeof n === 'number' ? n : parseFloat(String(n).replace(/,/g, ''))
@@ -13,13 +15,13 @@ export function fmtNum(n: number | string | null | undefined): string {
 }
 
 export function fmt(n: number | string | null | undefined): string {
-  return `PKR ${fmtNum(n)}`
+  return withCurrencySymbol(fmtNum(n))
 }
 
 export function fmtBalance(n: number | string | null | undefined): string {
   const num = toMoney(n)
-  if (num < 0) return `Deficit PKR ${fmtNum(num)}`
-  return `PKR ${fmtNum(num)}`
+  if (num < 0) return `Deficit ${withCurrencySymbol(fmtNum(num))}`
+  return withCurrencySymbol(fmtNum(num))
 }
 
 export function todayISO(): string {

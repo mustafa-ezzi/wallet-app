@@ -3,7 +3,7 @@ import { WALLETTRAILS_SHARE_URL } from './storage'
 
 export async function shareWalletTrailsLink(): Promise<boolean> {
   const message =
-    'I’ve been using WalletTrails to track money in PKR — wallets, bills, and household splits.\n\n'
+    'I’ve been using WalletTrails to track money — wallets, bills, and household splits.\n\n'
     + `Try it: ${WALLETTRAILS_SHARE_URL}`
 
   try {

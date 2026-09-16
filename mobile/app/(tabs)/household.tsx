@@ -1032,7 +1032,7 @@ export default function HouseholdScreen() {
             </Text>
             <ErrorBanner message={error} />
             <Field
-              label="Amount (PKR)"
+              label={`Amount (${selected?.currency || user?.currency || 'PKR'})`}
               value={expForm.amount}
               onChangeText={(t) => setExpForm((f) => ({ ...f, amount: t }))}
               keyboardType="decimal-pad"

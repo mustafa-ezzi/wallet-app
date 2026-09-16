@@ -17,8 +17,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .currencies import DEFAULT_HOME_CURRENCY, user_home_currency
 from .fx import (
-    HOME_CURRENCY,
     TRAVEL_CURRENCIES,
     convert_to_pkr,
     get_fx_quote,
@@ -59,8 +59,14 @@ class TravelModeSetSerializer(serializers.Serializer):
         currency = (attrs.get('travel_currency') or '').strip().upper()
         if not currency:
             raise serializers.ValidationError({'travel_currency': 'Required when enabling Travel Mode.'})
-        if currency == HOME_CURRENCY:
-            raise serializers.ValidationError({'travel_currency': 'Home currency PKR means Travel Mode is off.'})
+        home = DEFAULT_HOME_CURRENCY
+        request = self.context.get('request')
+        if request is not None and getattr(request, 'user', None) and request.user.is_authenticated:
+            home = user_home_currency(request.user)
+        if currency == home:
+            raise serializers.ValidationError({
+                'travel_currency': f'Home currency {home} means Travel Mode is off.',
+            })
         if currency not in TRAVEL_CURRENCIES:
             raise serializers.ValidationError({
                 'travel_currency': f'Unsupported currency. Choose one of: {", ".join(sorted(TRAVEL_CURRENCIES))}',
@@ -76,7 +82,7 @@ class TravelModeSetSerializer(serializers.Serializer):
         rate = attrs.get('rate')
         if use_live:
             try:
-                quote = get_fx_quote(currency, HOME_CURRENCY)
+                quote = get_fx_quote(currency, home)
             except ValueError as exc:
                 raise serializers.ValidationError({'rate': str(exc)}) from exc
             attrs['rate'] = Decimal(quote['rate'])
@@ -394,7 +400,7 @@ class FxQuoteView(APIView):
 
     def get(self, request):
         base = request.query_params.get('base', '')
-        quote = request.query_params.get('quote', HOME_CURRENCY)
+        quote = request.query_params.get('quote') or user_home_currency(request.user)
         force = request.query_params.get('refresh', '').lower() in ('1', 'true', 'yes')
         try:
             data = get_fx_quote(base, quote, force_refresh=force)
@@ -421,7 +427,7 @@ class TravelModeView(APIView):
         return self._set(request)
 
     def _set(self, request):
-        ser = TravelModeSetSerializer(data=request.data)
+        ser = TravelModeSetSerializer(data=request.data, context={'request': request})
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
         tm = self._get_or_create(request.user)

@@ -38,6 +38,7 @@ import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { formatForeignSubtitle, foreignToPkr, formatRateLine } from '@/src/travel/currencies'
+import { getHomeCurrencyCode } from '@/src/currency/homeCurrency'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { fmtBalance, todayISO, toMoney } from '@/src/utils/format'
 
@@ -708,7 +709,7 @@ export default function PersonHistoryScreen() {
             </ScrollView>
 
             <Field
-              label={travelOn ? `Amount (${travelCurrency})` : 'Amount (PKR)'}
+              label={travelOn ? `Amount (${travelCurrency})` : `Amount (${getHomeCurrencyCode()})`}
               value={amount}
               onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ''))}
               keyboardType="decimal-pad"

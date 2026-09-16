@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
+import { getHomeCurrencyCode } from '@/src/currency/homeCurrency'
 import { apiErrorMessage, fxApi, travelApi } from '@/src/api/client'
 import type { FxQuote, TravelModeState } from '@/src/api/types'
 import { useAuth } from '@/src/context/AuthContext'
@@ -126,10 +127,12 @@ export function TravelModeProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const homeCurrency = getHomeCurrencyCode() || user?.currency || 'PKR'
+
   const fetchQuote = useCallback(async (base: string, force = false) => {
-    const { data } = await fxApi.quote(base, 'PKR', force)
+    const { data } = await fxApi.quote(base, homeCurrency, force)
     return data as FxQuote
-  }, [])
+  }, [homeCurrency])
 
   const rate = Number(travel.rate)
   const isActive = Boolean(
@@ -139,7 +142,7 @@ export function TravelModeProvider({ children }: { children: ReactNode }) {
     && rate > 0,
   )
   const currency = isActive ? travel.travel_currency.toUpperCase() : ''
-  const rateLine = isActive ? formatRateLine(currency, rate) : ''
+  const rateLine = isActive ? formatRateLine(currency, rate, homeCurrency) : ''
 
   const value = useMemo<TravelModeContextValue>(() => ({
     travel,

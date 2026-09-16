@@ -17,6 +17,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .currencies import user_home_currency
 from .models import CategoryBudget, Transaction
 
 MONTH_NAMES = [
@@ -189,7 +190,7 @@ def build_budget_payload(user, year: int, month: int) -> dict:
         'year': year,
         'month': month,
         'period_label': f'{MONTH_NAMES[month]} {year}',
-        'currency': 'PKR',
+        'currency': user_home_currency(user),
         'total_spent': float(total_spent),
         'total_limit': summary_limit,
         'overall_limit': float(total_limit) if total_limit is not None else None,

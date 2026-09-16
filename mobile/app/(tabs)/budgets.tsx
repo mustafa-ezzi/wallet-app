@@ -22,6 +22,7 @@ import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 import { useColors } from '@/src/theme/ThemeContext'
 import { iosShadow, radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { toMoney } from '@/src/utils/format'
+import { getHomeCurrencyCode } from '@/src/currency/homeCurrency'
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -113,7 +114,7 @@ export default function BudgetsScreen() {
     const raw = limitInput.trim()
     const amount = raw === '' ? null : Number(raw)
     if (amount != null && (!Number.isFinite(amount) || amount < 0)) {
-      setError('Enter a valid PKR amount.')
+      setError(`Enter a valid ${getHomeCurrencyCode()} amount.`)
       return
     }
     setSaving(true)
@@ -338,7 +339,7 @@ export default function BudgetsScreen() {
             )}
 
             <Text style={styles.footnote}>
-              Bank transfers and people lend/borrow are excluded. Limits are PKR per calendar month.
+              Bank transfers and people lend/borrow are excluded. Limits are {getHomeCurrencyCode()} per calendar month.
             </Text>
           </>
         ) : null}
@@ -358,7 +359,7 @@ export default function BudgetsScreen() {
             </Text>
             <ErrorBanner message={error} />
             <Field
-              label="Monthly limit (PKR)"
+              label={`Monthly limit (${getHomeCurrencyCode()})`}
               value={limitInput}
               onChangeText={setLimitInput}
               keyboardType="decimal-pad"

@@ -35,6 +35,7 @@ import { useOffline } from '@/src/offline'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
 import { fmtBalance, todayISO } from '@/src/utils/format'
+import { getHomeCurrencyCode } from '@/src/currency/homeCurrency'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { formatRateLine, foreignToPkr } from '@/src/travel/currencies'
 import { InvitePersonSheet } from '@/src/people/InvitePersonSheet'
@@ -443,7 +444,7 @@ export default function AddTransactionScreen() {
 
         <View style={styles.amountCard}>
           <Text style={[styles.amountCurrency, { color: colors.textMuted }]}>
-            {travelOn && kind !== 'transfer' ? travelCurrency : 'PKR'}
+            {travelOn && kind !== 'transfer' ? travelCurrency : getHomeCurrencyCode()}
           </Text>
           <TextInput
             value={amount}
@@ -464,7 +465,7 @@ export default function AddTransactionScreen() {
         </View>
         {travelOn && kind !== 'transfer' && amount && Number(amount) > 0 ? (
           <Text style={styles.pkrHint}>
-            ≈ PKR {foreignToPkr(Number(amount), travelRate).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+            ≈ {fmtBalance(foreignToPkr(Number(amount), travelRate))}
           </Text>
         ) : null}
       </LinearGradient>

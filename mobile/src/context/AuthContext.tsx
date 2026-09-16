@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
+import { setHomeCurrency } from '../currency/homeCurrency'
 import { apiErrorMessage, authApi } from '../api/client'
 import { track } from '../lib/analytics'
 import {
@@ -67,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const booted = useRef(false)
 
   const applyUser = useCallback(async (data: User) => {
+    setHomeCurrency(data.currency)
     setUser(data)
     await setCachedUser(data)
   }, [])
@@ -108,7 +110,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!token) return
 
         const cached = await withTimeout(getCachedUser(), 1500, null)
-        if (cached && !cancelled) setUser(cached)
+        if (cached && !cancelled) {
+          setHomeCurrency(cached.currency)
+          setUser(cached)
+        }
 
         // Do not await network — UI must leave the spinner immediately
         void refreshUser()
@@ -150,6 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await clearSession()
+    setHomeCurrency(null)
     setUser(null)
     track('user_logged_out')
   }, [])

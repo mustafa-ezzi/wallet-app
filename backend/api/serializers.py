@@ -6,6 +6,7 @@ from .models import (
     RecurringExpense, ReceivableInstallment, PayableInstallment,
     HouseholdLedger, HouseholdExpense, HouseholdMembership,
 )
+from .currencies import DEFAULT_HOME_CURRENCY, normalize_home_currency
 
 
 def _month_range(today=None):
@@ -20,14 +21,20 @@ def _month_range(today=None):
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
-    currency = serializers.CharField(write_only=True, default='PKR')
+    currency = serializers.CharField(write_only=True, default=DEFAULT_HOME_CURRENCY)
 
     class Meta:
         model = User
         fields = ('id', 'first_name', 'last_name', 'username', 'email', 'password', 'currency')
 
+    def validate_currency(self, value):
+        try:
+            return normalize_home_currency(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+
     def create(self, validated_data):
-        currency = validated_data.pop('currency', 'PKR')
+        currency = validated_data.pop('currency', DEFAULT_HOME_CURRENCY)
         password = validated_data.pop('password')
         validated_data.setdefault('username', validated_data.get('email', ''))
         user = User(**validated_data)
@@ -65,7 +72,7 @@ class UserSerializer(serializers.ModelSerializer):
         try:
             return obj.profile.currency
         except Exception:
-            return 'PKR'
+            return DEFAULT_HOME_CURRENCY
 
     def get_is_premium(self, obj):
         from .entitlements import user_is_premium

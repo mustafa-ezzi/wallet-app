@@ -1,6 +1,7 @@
 import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 import { Platform } from 'react-native'
+import { fmt, fmtBalance } from '@/src/utils/format'
 
 export type ReportLedgerRow = {
   date: string
@@ -24,16 +25,12 @@ export type ReportPdfMeta = {
   netForecast?: number
 }
 
-function nf(n: number): string {
-  return Math.round(n).toLocaleString('en-US')
-}
-
 function money(n: number): string {
-  return `PKR ${nf(Math.abs(n))}`
+  return fmt(n)
 }
 
 function balanceStr(n: number): string {
-  return n < 0 ? `-PKR ${nf(Math.abs(n))}` : `PKR ${nf(n)}`
+  return fmtBalance(n)
 }
 
 function esc(s: string): string {

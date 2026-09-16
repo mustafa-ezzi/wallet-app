@@ -64,7 +64,7 @@ export default function SignupScreen() {
         >
           <BrandMark size="lg" />
           <Text style={styles.title}>Create account</Text>
-          <Text style={styles.sub}>Start tracking every rupee</Text>
+          <Text style={styles.sub}>Start tracking your money</Text>
 
           <View style={styles.card}>
             <ErrorBanner message={error} />

@@ -4,6 +4,7 @@ export type OnboardingDraft = {
   gender: 'male' | 'female' | ''
   user_type: 'student' | 'professional' | 'self_employed' | 'retired' | ''
   country: string
+  currency: string
 }
 
 export const EMPTY_DRAFT: OnboardingDraft = {
@@ -12,6 +13,7 @@ export const EMPTY_DRAFT: OnboardingDraft = {
   gender: '',
   user_type: '',
   country: 'Pakistan',
+  currency: 'PKR',
 }
 
 let draft: OnboardingDraft = { ...EMPTY_DRAFT }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   DeviceEventEmitter,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,13 +14,14 @@ import {
 import { useRouter } from 'expo-router'
 import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
+import { getHomeCurrency, HOME_CURRENCIES, maskedMoney, setHomeCurrency } from '@/src/currency/homeCurrency'
 import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
 import { useBankSms } from '@/src/bankSms'
 import { FORCE_RATING_EVENT } from '@/src/rating'
 import { registerDeviceTokenDetailed } from '@/src/notifications/pushRegistration'
 import { requestReminderPermission } from '@/src/notifications/schedule'
-import api, { apiErrorMessage, API_ROOT, probeApiConnection } from '@/src/api/client'
+import api, { apiErrorMessage, API_ROOT, authApi, probeApiConnection } from '@/src/api/client'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import type { PrivacyTimeout } from '@/src/privacy/storage'
 import { useTheme } from '@/src/theme/ThemeContext'
@@ -34,7 +36,7 @@ const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
 ]
 
 export default function SettingsScreen() {
-  const { user, logout } = useAuth()
+  const { user, logout, refreshUser } = useAuth()
   const router = useRouter()
   const { clearLocal, online, pending, syncNow, syncing } = useOffline()
   const reminders = useReminders()
@@ -44,6 +46,7 @@ export default function SettingsScreen() {
   const { isActive: travelOn, currency: travelCurrency, rateLine } = useTravelMode()
   const bankSms = useBankSms()
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email
+  const homeMeta = getHomeCurrency(user?.currency)
 
   const [pin, setPin] = useState('')
   const [pinConfirm, setPinConfirm] = useState('')
@@ -60,6 +63,9 @@ export default function SettingsScreen() {
   const [promoCode, setPromoCode] = useState('')
   const [promoBusy, setPromoBusy] = useState(false)
   const [promoMsg, setPromoMsg] = useState('')
+  const [currencyOpen, setCurrencyOpen] = useState(false)
+  const [currencyBusy, setCurrencyBusy] = useState(false)
+  const [currencyError, setCurrencyError] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -104,6 +110,25 @@ export default function SettingsScreen() {
     await privacy.setEnabled(on)
   }
 
+  const onPickCurrency = async (code: string) => {
+    setCurrencyError('')
+    if (!code || code === user?.currency) {
+      setCurrencyOpen(false)
+      return
+    }
+    setCurrencyBusy(true)
+    try {
+      await authApi.updateMe({ currency: code })
+      setHomeCurrency(code)
+      await refreshUser()
+      setCurrencyOpen(false)
+    } catch (err) {
+      setCurrencyError(apiErrorMessage(err, 'Could not update currency.'))
+    } finally {
+      setCurrencyBusy(false)
+    }
+  }
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.pad}>
@@ -120,7 +145,12 @@ export default function SettingsScreen() {
             ) : null}
           </View>
           <Text style={[styles.meta, { color: colors.textSecondary }]}>{user?.email}</Text>
-          <Text style={[styles.meta, { color: colors.textSecondary }]}>Currency: {user?.currency || 'PKR'}</Text>
+          <Pressable onPress={() => setCurrencyOpen(true)} hitSlop={8}>
+            <Text style={[styles.meta, { color: colors.primaryDark }]}>
+              Currency: {homeMeta.code} ({homeMeta.symbol})  · Change
+            </Text>
+          </Pressable>
+          {currencyError ? <Text style={styles.tip}>{currencyError}</Text> : null}
         </View>
 
         <Text style={[styles.section, { color: colors.primaryDark }]}>Travel</Text>
@@ -280,7 +310,7 @@ export default function SettingsScreen() {
             <View style={{ flex: 1, paddingRight: spacing.md }}>
               <Text style={[styles.rowTitle, { color: colors.text }]}>Hide amounts</Text>
               <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                Amounts show as PKR ••••. Tap the eye on the balance card to reveal with biometrics or PIN.
+                Amounts show as {maskedMoney(user?.currency)}. Tap the eye on the balance card to reveal with biometrics or PIN.
               </Text>
             </View>
             <Switch
@@ -676,6 +706,52 @@ export default function SettingsScreen() {
           }}
         />
       </ScrollView>
+
+      <Modal visible={currencyOpen} transparent animationType="fade" onRequestClose={() => setCurrencyOpen(false)}>
+        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+          <Pressable
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.45)' }}
+            onPress={() => !currencyBusy && setCurrencyOpen(false)}
+          />
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, zIndex: 2, marginBottom: 0 }]}>
+            <Text style={[styles.rowTitle, { color: colors.primaryDark }]}>Home currency</Text>
+            <Text style={[styles.rowHint, { color: colors.textMuted, marginBottom: spacing.sm }]}>
+              Changes the symbol on amounts. Existing numbers are not converted.
+            </Text>
+            <ScrollView style={{ maxHeight: 360 }}>
+              {HOME_CURRENCIES.map((c) => {
+                const active = c.code === homeMeta.code
+                return (
+                  <Pressable
+                    key={c.code}
+                    disabled={currencyBusy}
+                    onPress={() => void onPickCurrency(c.code)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 12,
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: colors.border,
+                      opacity: currencyBusy ? 0.55 : 1,
+                    }}
+                  >
+                    <View>
+                      <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>
+                        {c.symbol}  {c.code}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{c.name}</Text>
+                    </View>
+                    {active ? (
+                      <Text style={{ color: colors.primary, fontWeight: '800' }}>Selected</Text>
+                    ) : null}
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   )
 }

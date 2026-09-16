@@ -14,6 +14,7 @@ from .models import (
     Account, Project, Transaction,
     RecurringExpense, ReceivableInstallment, PayableInstallment
 )
+from .currencies import normalize_home_currency
 from .serializers import (
     RegisterSerializer, UserSerializer,
     AccountSerializer, ProjectSerializer, TransactionSerializer,
@@ -76,7 +77,10 @@ class MeView(APIView):
             profile = UserProfile.objects.create(user=user)
 
         if 'currency' in data:
-            profile.currency = data['currency']
+            try:
+                profile.currency = normalize_home_currency(data['currency'])
+            except ValueError as exc:
+                return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         if 'date_of_birth' in data:
             raw = data.get('date_of_birth')
             if raw in (None, ''):
