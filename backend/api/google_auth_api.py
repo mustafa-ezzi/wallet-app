@@ -1,5 +1,7 @@
 """Sign in / sign up with a Google ID token (Android)."""
 
+import base64
+import json
 import logging
 
 from django.conf import settings
@@ -23,6 +25,25 @@ def _allowed_audiences() -> list[str]:
     return list(getattr(settings, 'GOOGLE_OAUTH_CLIENT_IDS', None) or [])
 
 
+def _unverified_claims(raw_token: str) -> dict:
+    parts = raw_token.split('.')
+    if len(parts) != 3:
+        raise ValueError('Google token is not a JWT.')
+    payload = parts[1] + ('=' * (-len(parts[1]) % 4))
+    data = json.loads(base64.urlsafe_b64decode(payload.encode('ascii')))
+    if not isinstance(data, dict):
+        raise ValueError('Invalid Google token payload.')
+    return data
+
+
+def _claim_ids(value) -> list[str]:
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    if isinstance(value, (list, tuple)):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return []
+
+
 def _verify_google_id_token(raw_token: str) -> dict:
     from google.auth.transport import requests as google_requests
     from google.oauth2 import id_token
@@ -31,13 +52,46 @@ def _verify_google_id_token(raw_token: str) -> dict:
     if not audiences:
         raise RuntimeError('GOOGLE_OAUTH_CLIENT_IDS is not set on the server.')
 
+    peek = _unverified_claims(raw_token)
+    claimed = []
+    for value in (peek.get('aud'), peek.get('azp')):
+        for item in _claim_ids(value):
+            if item not in claimed:
+                claimed.append(item)
+
+    ordered = [item for item in claimed if item in audiences]
+    for item in audiences:
+        if item not in ordered:
+            ordered.append(item)
+
     request = google_requests.Request()
     last_error = None
-    for audience in audiences:
+    for audience in ordered:
         try:
-            return id_token.verify_oauth2_token(raw_token, request, audience=audience)
+            try:
+                info = id_token.verify_oauth2_token(
+                    raw_token,
+                    request,
+                    audience=audience,
+                    clock_skew_in_seconds=60,
+                )
+            except TypeError:
+                info = id_token.verify_oauth2_token(raw_token, request, audience=audience)
         except Exception as exc:  # noqa: BLE001 — try next client id
             last_error = exc
+            continue
+        token_ids = _claim_ids(info.get('aud')) + _claim_ids(info.get('azp'))
+        if any(item in audiences for item in token_ids):
+            return info
+        last_error = ValueError(f'Token audience is not allowed: {info.get("aud")}')
+
+    logger.warning(
+        'google-auth: rejected iss=%s aud=%s azp=%s err=%s',
+        peek.get('iss'),
+        peek.get('aud'),
+        peek.get('azp'),
+        last_error,
+    )
     raise ValueError(str(last_error) if last_error else 'Invalid Google token.')
 
 
@@ -53,6 +107,8 @@ class GoogleAuthView(APIView):
 
     def post(self, request):
         raw_token = (request.data.get('id_token') or request.data.get('idToken') or '').strip()
+        if raw_token.lower().startswith('bearer '):
+            raw_token = raw_token[7:].strip()
         if not raw_token:
             return Response({'detail': 'Google sign-in token is missing.'}, status=status.HTTP_400_BAD_REQUEST)
 

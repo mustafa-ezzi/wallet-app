@@ -16,6 +16,10 @@ class GoogleAuthApiTests(TestCase):
         res = self.client.post('/api/auth/google/', {}, format='json')
         self.assertEqual(res.status_code, 400)
 
+    def test_garbage_token_is_rejected(self):
+        res = self.client.post('/api/auth/google/', {'id_token': 'not-a-jwt'}, format='json')
+        self.assertEqual(res.status_code, 401)
+
     @patch('api.google_auth_api._verify_google_id_token')
     def test_creates_user_and_returns_jwt(self, verify):
         verify.return_value = {

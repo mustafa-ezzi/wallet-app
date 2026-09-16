@@ -223,19 +223,27 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 # Optional explicit Resend key (otherwise EMAIL_HOST_PASSWORD is used when it starts with re_)
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
 
-# Google Sign-In — comma-separated OAuth client IDs (Web + Android) allowed as ID-token audience.
-_google_oauth_env = os.environ.get('GOOGLE_OAUTH_CLIENT_IDS', '').strip()
-_google_oauth_default = (
-    '85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com,'
-    '85845263961-ehanc5qjtka9sc0ec3i7h5uiemup6mpe.apps.googleusercontent.com,'
-    '583266955603-jtf9eggrbcl612u3mkl20m9122ngqopv.apps.googleusercontent.com,'
-    '583266955603-rkaqs7huknvoiqql7efdo0es64nq2i8c.apps.googleusercontent.com'
-)
-GOOGLE_OAUTH_CLIENT_IDS = [
-    item.strip()
-    for item in (_google_oauth_env or _google_oauth_default).split(',')
-    if item.strip()
-]
+# Google Sign-In — Web + Android OAuth client IDs allowed as ID-token `aud` / `azp`.
+# Env values are added to the built-in list (not replaced), so Railway cannot drop the app clients.
+def _google_oauth_client_ids() -> list[str]:
+    seen: list[str] = []
+    for chunk in (
+        (
+            '85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com,'
+            '85845263961-ehanc5qjtka9sc0ec3i7h5uiemup6mpe.apps.googleusercontent.com,'
+            '583266955603-jtf9eggrbcl612u3mkl20m9122ngqopv.apps.googleusercontent.com,'
+            '583266955603-rkaqs7huknvoiqql7efdo0es64nq2i8c.apps.googleusercontent.com'
+        ),
+        os.environ.get('GOOGLE_OAUTH_CLIENT_IDS', ''),
+    ):
+        for item in (chunk or '').split(','):
+            item = item.strip()
+            if item and item not in seen:
+                seen.append(item)
+    return seen
+
+
+GOOGLE_OAUTH_CLIENT_IDS = _google_oauth_client_ids()
 
 # Google Play Billing (Phase 4) — path to service-account JSON for purchase verification
 GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.wallettrails.app').strip()
