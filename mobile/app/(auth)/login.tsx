@@ -10,15 +10,18 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { apiErrorMessage, useAuth } from '@/src/context/AuthContext'
+import { getGoogleIdToken, googleSignInErrorMessage } from '@/src/auth/googleSignIn'
 import { BrandMark, ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
+import { GoogleSignInButton } from '@/src/components/GoogleSignInButton'
 import { colors, spacing, typography } from '@/src/theme/colors'
 
 export default function LoginScreen() {
-  const { login } = useAuth()
+  const { login, loginWithGoogle } = useAuth()
   const insets = useSafeAreaInsets()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
 
   const onSubmit = async () => {
@@ -34,6 +37,20 @@ export default function LoginScreen() {
       setError(apiErrorMessage(err, 'Invalid email or password.'))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const onGoogle = async () => {
+    setError('')
+    setGoogleLoading(true)
+    try {
+      const idToken = await getGoogleIdToken()
+      await loginWithGoogle(idToken)
+    } catch (err) {
+      const msg = googleSignInErrorMessage(err, apiErrorMessage(err, 'Google sign-in failed.'))
+      if (msg) setError(msg)
+    } finally {
+      setGoogleLoading(false)
     }
   }
 
@@ -76,6 +93,12 @@ export default function LoginScreen() {
               Forgot password?
             </Link>
             <PrimaryButton title="Sign In" onPress={onSubmit} loading={loading} />
+            {Platform.OS === 'android' ? (
+              <>
+                <Text style={styles.or}>or</Text>
+                <GoogleSignInButton onPress={() => void onGoogle()} loading={googleLoading} disabled={loading} />
+              </>
+            ) : null}
           </View>
 
           <Text style={styles.footer}>
@@ -121,6 +144,13 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     marginBottom: spacing.sm,
     marginTop: -4,
+  },
+  or: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontWeight: '700',
+    marginTop: spacing.md,
+    fontSize: typography.caption,
   },
   footer: {
     marginTop: spacing.xl,

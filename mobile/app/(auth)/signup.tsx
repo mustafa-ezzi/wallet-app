@@ -10,18 +10,21 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { apiErrorMessage, useAuth } from '@/src/context/AuthContext'
+import { getGoogleIdToken, googleSignInErrorMessage } from '@/src/auth/googleSignIn'
 import { track } from '@/src/lib/analytics'
 import { BrandMark, ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
+import { GoogleSignInButton } from '@/src/components/GoogleSignInButton'
 import { colors, spacing, typography } from '@/src/theme/colors'
 
 export default function SignupScreen() {
-  const { register, login } = useAuth()
+  const { register, login, loginWithGoogle } = useAuth()
   const insets = useSafeAreaInsets()
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
 
   const onSubmit = async () => {
@@ -49,6 +52,20 @@ export default function SignupScreen() {
     }
   }
 
+  const onGoogle = async () => {
+    setError('')
+    setGoogleLoading(true)
+    try {
+      const idToken = await getGoogleIdToken()
+      await loginWithGoogle(idToken, 'PKR')
+    } catch (err) {
+      const msg = googleSignInErrorMessage(err, apiErrorMessage(err, 'Google sign-up failed.'))
+      if (msg) setError(msg)
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
+
   return (
     <Screen>
       <KeyboardAvoidingView
@@ -73,6 +90,17 @@ export default function SignupScreen() {
             <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" placeholder="you@example.com" />
             <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="Min 6 characters" />
             <PrimaryButton title="Create Account" onPress={onSubmit} loading={loading} />
+            {Platform.OS === 'android' ? (
+              <>
+                <Text style={styles.or}>or</Text>
+                <GoogleSignInButton
+                  label="Sign up with Google"
+                  onPress={() => void onGoogle()}
+                  loading={googleLoading}
+                  disabled={loading}
+                />
+              </>
+            ) : null}
           </View>
 
           <Text style={styles.footer}>
@@ -110,6 +138,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
+  },
+  or: {
+    textAlign: 'center',
+    color: colors.textMuted,
+    fontWeight: '700',
+    marginTop: spacing.md,
+    fontSize: typography.caption,
   },
   footer: {
     marginTop: spacing.xl,

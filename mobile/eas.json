@@ -10,7 +10,8 @@
       "environment": "development",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://tranquil-radiance-production.up.railway.app",
-        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com"
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "583266955603-jtf9eggrbcl612u3mkl20m9122ngqopv.apps.googleusercontent.com"
       },
       "android": {
         "buildType": "apk"
@@ -21,7 +22,8 @@
       "environment": "preview",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://tranquil-radiance-production.up.railway.app",
-        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com"
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "583266955603-jtf9eggrbcl612u3mkl20m9122ngqopv.apps.googleusercontent.com"
       },
       "android": {
         "buildType": "apk"
@@ -32,7 +34,8 @@
       "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://tranquil-radiance-production.up.railway.app",
-        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com"
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "583266955603-jtf9eggrbcl612u3mkl20m9122ngqopv.apps.googleusercontent.com"
       },
       "android": {
         "buildType": "app-bundle"

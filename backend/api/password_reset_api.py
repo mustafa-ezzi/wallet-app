@@ -1,5 +1,6 @@
 """Forgot-password OTP API (email code → verify → set new password)."""
 
+import json
 import logging
 
 from django.conf import settings
@@ -46,9 +47,13 @@ def _otp_email_content(code: str, first_name: str = '') -> tuple[str, str]:
 
 def _from_email() -> str:
     from_email = (getattr(settings, 'DEFAULT_FROM_EMAIL', None) or '').strip()
-    if not from_email or from_email.lower() in ('resend', 'noreply@wallettrails.app'):
+    if not from_email or from_email.lower() == 'resend':
         return 'WalletTrails <onboarding@resend.dev>'
     return from_email
+
+
+def _is_resend_test_from(from_email: str) -> bool:
+    return 'resend.dev' in (from_email or '').lower()
 
 
 def _resend_api_key() -> str:
@@ -74,7 +79,6 @@ def _use_resend_http() -> bool:
 
 
 def _send_via_resend_api(to_email: str, subject: str, body: str) -> None:
-    import json
     import urllib.error
     import urllib.request
 
@@ -103,10 +107,29 @@ def _send_via_resend_api(to_email: str, subject: str, body: str) -> None:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read().decode('utf-8', errors='replace')
             if resp.status >= 400:
-                raise RuntimeError(f'Resend API {resp.status}: {raw}')
+                raise RuntimeError(_resend_error_message(resp.status, raw))
     except urllib.error.HTTPError as exc:
         err_body = exc.read().decode('utf-8', errors='replace')
-        raise RuntimeError(f'Resend API {exc.code}: {err_body}') from exc
+        raise RuntimeError(_resend_error_message(exc.code, err_body)) from exc
+
+
+def _resend_error_message(status_code: int, raw: str) -> str:
+    message = raw
+    try:
+        parsed = json.loads(raw)
+        message = parsed.get('message') or parsed.get('name') or raw
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        pass
+    lowered = str(message).lower()
+    if status_code == 403 and (
+        'verify a domain' in lowered or 'only send testing emails' in lowered
+    ):
+        return (
+            'Resend is in test mode. Verify a domain at resend.com/domains, then set '
+            'DEFAULT_FROM_EMAIL on Railway to an address on that domain '
+            '(not onboarding@resend.dev).'
+        )
+    return f'Resend API {status_code}: {message}'
 
 
 def _send_via_smtp(to_email: str, subject: str, body: str) -> None:
@@ -187,28 +210,34 @@ class ForgotPasswordView(APIView):
             )
 
         payload = dict(GENERIC_OK)
-        smtp_configured = bool(getattr(settings, 'EMAIL_HOST', '').strip())
+        smtp_configured = bool(getattr(settings, 'EMAIL_HOST', '').strip()) or bool(
+            _resend_api_key()
+        )
 
         try:
+            sender = _from_email()
+            if _is_resend_test_from(sender):
+                logger.warning(
+                    'forgot-password: sending with Resend test From %s — '
+                    'Resend will only deliver to the account owner until a domain is verified.',
+                    sender,
+                )
             _send_otp_email(user.email or email, code, user.first_name)
         except Exception as exc:
-            logger.exception('forgot-password: email send failed')
-            # Always include a usable path in DEBUG; in prod return clear SMTP guidance
+            logger.exception('forgot-password: email send failed (%s)', exc)
             if settings.DEBUG or not smtp_configured:
                 payload['debug_code'] = code
                 payload['detail'] = (
                     'Email could not be sent. Use the debug code below, '
-                    'or set EMAIL_HOST / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD on Railway '
+                    'or set RESEND_API_KEY and DEFAULT_FROM_EMAIL on Railway '
                     f'({exc.__class__.__name__}).'
                 )
                 return Response(payload)
             return Response(
                 {
-                    'detail': 'Could not send the reset email. Check Resend API key / DEFAULT_FROM_EMAIL on Railway.',
-                    'transport': 'resend_http' if _use_resend_http() else 'smtp',
-                    'smtp_host': getattr(settings, 'EMAIL_HOST', ''),
-                    'from_email': _from_email(),
-                    'smtp_error': f'{exc.__class__.__name__}: {exc}',
+                    'detail': (
+                        'Could not send the reset email. Please try again in a few minutes.'
+                    ),
                 },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )

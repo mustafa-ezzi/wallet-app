@@ -28,6 +28,7 @@ class UserProfile(models.Model):
     onboarding_complete = models.BooleanField(default=False)
     # Phase G — shareable code so others can request a People link (PEEP-XXXXXX)
     people_link_code = models.CharField(max_length=16, blank=True, null=True, unique=True)
+    google_sub = models.CharField(max_length=64, blank=True, default='', db_index=True)
 
     def __str__(self):
         return f"Profile({self.user.username})"

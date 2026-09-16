@@ -9,6 +9,15 @@ from .models import (
 from .currencies import DEFAULT_HOME_CURRENCY, normalize_home_currency
 
 
+def attach_household_invites(user):
+    email = (user.email or '').strip()
+    if not email:
+        return
+    HouseholdMembership.objects.filter(
+        status='invited', user__isnull=True, invited_email__iexact=email,
+    ).update(user=user)
+
+
 def _month_range(today=None):
     today = today or date.today()
     start = today.replace(day=1)
@@ -41,14 +50,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         UserProfile.objects.create(user=user, currency=currency)
-        # Attach any household "invite to register" rows for this email
-        from django.utils import timezone
-        from .models import HouseholdMembership
-        email = (user.email or '').strip()
-        if email:
-            HouseholdMembership.objects.filter(
-                status='invited', user__isnull=True, invited_email__iexact=email,
-            ).update(user=user)
+        attach_household_invites(user)
         return user
 
 

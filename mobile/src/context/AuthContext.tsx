@@ -25,6 +25,7 @@ type AuthContextValue = {
   user: User | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
+  loginWithGoogle: (idToken: string, currency?: string) => Promise<{ created: boolean }>
   register: (data: {
     first_name: string
     last_name: string
@@ -153,6 +154,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await authApi.register(payload)
   }, [])
 
+  const loginWithGoogle = useCallback(async (idToken: string, currency?: string) => {
+    const { data } = await authApi.google(idToken, currency)
+    await setTokens(data.access, data.refresh)
+    await refreshUser()
+    if (data.created) {
+      track('user_signed_up', { source: 'google', currency: currency || 'PKR' })
+    } else {
+      track('user_logged_in', { source: 'google' })
+    }
+    return { created: Boolean(data.created) }
+  }, [refreshUser])
+
   const logout = useCallback(async () => {
     await clearSession()
     setHomeCurrency(null)
@@ -161,8 +174,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout, refreshUser }),
-    [user, loading, login, register, logout, refreshUser],
+    () => ({ user, loading, login, loginWithGoogle, register, logout, refreshUser }),
+    [user, loading, login, loginWithGoogle, register, logout, refreshUser],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

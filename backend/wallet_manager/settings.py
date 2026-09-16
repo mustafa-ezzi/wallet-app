@@ -212,6 +212,9 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '').replace(' ', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '12') or '12')
 # Prefer plain mailbox address for Gmail SMTP (display-name From often gets rejected)
+# Resend: onboarding@resend.dev is TEST-ONLY (can only mail the Resend account owner).
+# Verify a domain at https://resend.com/domains then set e.g.
+# DEFAULT_FROM_EMAIL=WalletTrails <noreply@yourdomain.com>
 _default_from = os.environ.get('DEFAULT_FROM_EMAIL', '').strip()
 if not _default_from and EMAIL_HOST_USER:
     _default_from = EMAIL_HOST_USER
@@ -219,6 +222,18 @@ DEFAULT_FROM_EMAIL = _default_from or 'WalletTrails <onboarding@resend.dev>'
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 # Optional explicit Resend key (otherwise EMAIL_HOST_PASSWORD is used when it starts with re_)
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
+
+# Google Sign-In — comma-separated OAuth client IDs (Web + Android) allowed as ID-token audience.
+_google_oauth_env = os.environ.get('GOOGLE_OAUTH_CLIENT_IDS', '').strip()
+_google_oauth_default = (
+    '583266955603-jtf9eggrbcl612u3mkl20m9122ngqopv.apps.googleusercontent.com,'
+    '583266955603-rkaqs7huknvoiqql7efdo0es64nq2i8c.apps.googleusercontent.com'
+)
+GOOGLE_OAUTH_CLIENT_IDS = [
+    item.strip()
+    for item in (_google_oauth_env or _google_oauth_default).split(',')
+    if item.strip()
+]
 
 # Google Play Billing (Phase 4) — path to service-account JSON for purchase verification
 GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.wallettrails.app').strip()

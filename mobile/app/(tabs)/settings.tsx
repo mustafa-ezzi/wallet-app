@@ -11,22 +11,25 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useRouter } from 'expo-router'
 import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
+import { SettingsGroup, SettingsLogoutRow, SettingsRow } from '@/src/components/SettingsList'
 import { useAuth } from '@/src/context/AuthContext'
-import { getHomeCurrency, HOME_CURRENCIES, maskedMoney, setHomeCurrency } from '@/src/currency/homeCurrency'
+import { getHomeCurrency, HOME_CURRENCIES, setHomeCurrency } from '@/src/currency/homeCurrency'
 import { useOffline } from '@/src/offline'
 import { useReminders } from '@/src/notifications'
 import { useBankSms } from '@/src/bankSms'
 import { FORCE_RATING_EVENT } from '@/src/rating'
 import { registerDeviceTokenDetailed } from '@/src/notifications/pushRegistration'
 import { requestReminderPermission } from '@/src/notifications/schedule'
-import api, { apiErrorMessage, API_ROOT, authApi, probeApiConnection } from '@/src/api/client'
+import api, { accountsApi, apiErrorMessage, asList, authApi, probeApiConnection, API_ROOT } from '@/src/api/client'
+import type { Account } from '@/src/api/types'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import type { PrivacyTimeout } from '@/src/privacy/storage'
 import { useTheme } from '@/src/theme/ThemeContext'
 import { useRemoteConfig } from '@/src/config/RemoteConfigContext'
-import { iosShadow, radii, spacing, typography } from '@/src/theme/colors'
+import { radii, spacing, typography } from '@/src/theme/colors'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 
 const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
@@ -35,6 +38,8 @@ const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
   { id: '5m', label: '5 minutes' },
 ]
 
+type Panel = 'home' | 'appearance' | 'privacy' | 'notifications' | 'advanced'
+
 export default function SettingsScreen() {
   const { user, logout, refreshUser } = useAuth()
   const router = useRouter()
@@ -42,12 +47,15 @@ export default function SettingsScreen() {
   const reminders = useReminders()
   const privacy = usePrivacyLock()
   const { themeId, themes, setThemeAnimated, colors } = useTheme()
-  const { premium, config, refresh: refreshConfig, shouldShowAds } = useRemoteConfig()
-  const { isActive: travelOn, currency: travelCurrency, rateLine } = useTravelMode()
+  const { premium, refresh: refreshConfig } = useRemoteConfig()
+  const { isActive: travelOn } = useTravelMode()
   const bankSms = useBankSms()
-  const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email
   const homeMeta = getHomeCurrency(user?.currency)
+  const themeName = themes.find((t) => t.id === themeId)?.name ?? 'System'
 
+  const [panel, setPanel] = useState<Panel>('home')
+  const [walletCount, setWalletCount] = useState<number | null>(null)
+  const [bankCount, setBankCount] = useState<number | null>(null)
   const [pin, setPin] = useState('')
   const [pinConfirm, setPinConfirm] = useState('')
   const [pinError, setPinError] = useState('')
@@ -66,6 +74,7 @@ export default function SettingsScreen() {
   const [currencyOpen, setCurrencyOpen] = useState(false)
   const [currencyBusy, setCurrencyBusy] = useState(false)
   const [currencyError, setCurrencyError] = useState('')
+  const [restoreMsg, setRestoreMsg] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -74,6 +83,13 @@ export default function SettingsScreen() {
       if (cancelled) return
       const v = res.data?.marketing_enabled
       if (typeof v === 'boolean') setMarketingEnabled(v)
+    }).catch(() => undefined)
+    void accountsApi.list().then((res) => {
+      if (cancelled) return
+      const list = asList<Account>(res.data)
+      const wallets = list.filter((a) => a.type === 'bank' || a.type === 'cash')
+      setWalletCount(wallets.length)
+      setBankCount(list.filter((a) => a.type === 'bank').length)
     }).catch(() => undefined)
     return () => {
       cancelled = true
@@ -100,12 +116,9 @@ export default function SettingsScreen() {
   const onTogglePrivacy = async (on: boolean) => {
     setEnableError('')
     if (on && !privacy.hasPin && !privacy.biometricsAvailable) {
-      setEnableError('Set a WalletTrails PIN below before enabling privacy lock (required on web / devices without biometrics).')
+      setPanel('privacy')
+      setEnableError('Set a PIN to enable passcode.')
       return
-    }
-    if (on && !privacy.hasPin) {
-      // Allow enable with biometrics only, but warn to set PIN as fallback
-      setEnableError('Tip: set a PIN below as a backup if biometrics fail.')
     }
     await privacy.setEnabled(on)
   }
@@ -129,582 +142,455 @@ export default function SettingsScreen() {
     }
   }
 
+  const panelTitle =
+    panel === 'appearance' ? 'Appearance'
+      : panel === 'privacy' ? 'Passcode'
+        : panel === 'notifications' ? 'Reminders'
+          : panel === 'advanced' ? 'Advanced'
+            : ''
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.pad}>
-        <Text style={[styles.title, { color: colors.text }]}>Settings</Text>
-
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.label, { color: colors.textMuted }]}>Signed in as</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-            <Text style={[styles.value, { color: colors.text }]}>{name}</Text>
-            {(premium.is_premium || user?.is_premium) ? (
-              <View style={styles.premiumBadge}>
-                <Text style={styles.premiumBadgeText}>Premium</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={[styles.meta, { color: colors.textSecondary }]}>{user?.email}</Text>
-          <Pressable onPress={() => setCurrencyOpen(true)} hitSlop={8}>
-            <Text style={[styles.meta, { color: colors.primaryDark }]}>
-              Currency: {homeMeta.code} ({homeMeta.symbol})  · Change
-            </Text>
+        {panel !== 'home' ? (
+          <Pressable onPress={() => setPanel('home')} style={styles.back}>
+            <FontAwesome name="chevron-left" size={14} color={colors.primaryDark} />
+            <Text style={[styles.backText, { color: colors.primaryDark }]}>{panelTitle}</Text>
           </Pressable>
-          {currencyError ? <Text style={styles.tip}>{currencyError}</Text> : null}
-        </View>
+        ) : null}
 
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Travel</Text>
-        <Pressable
-          onPress={() => router.push('/travel-mode')}
-          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          <View style={styles.rowBetween}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>Travel Mode</Text>
-              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                {travelOn
-                  ? `On · ${travelCurrency}${rateLine ? ` · ${rateLine}` : ''}`
-                  : 'Off — track spending in a foreign currency'}
-              </Text>
-            </View>
-            <Text style={{ color: colors.primary, fontWeight: '800' }}>{travelOn ? 'Manage' : 'Set up'} →</Text>
-          </View>
-        </Pressable>
+        {panel === 'home' ? (
+          <>
+            <SettingsGroup>
+              <SettingsRow
+                icon="wallet"
+                title="Wallets"
+                value={walletCount == null ? '' : String(walletCount)}
+                onPress={() => router.push('/(tabs)/wallets')}
+              />
+              <SettingsRow
+                icon="university"
+                title="Bank Accounts"
+                value={bankCount ? String(bankCount) : 'Add'}
+                onPress={() => router.push('/(tabs)/wallets')}
+              />
+              <SettingsRow
+                icon="clock-o"
+                title="Scheduled Transactions"
+                value="Add"
+                onPress={() => router.push('/(tabs)/bills')}
+                last
+              />
+            </SettingsGroup>
 
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Bank alerts</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, iosShadow]}>
-          {Platform.OS === 'android' ? (
-            <>
-              <View style={styles.rowBetween}>
-                <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={[styles.rowTitle, { color: colors.text }]}>SMS</Text>
-                  <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                    {bankSms.enabled && bankSms.permissionGranted ? 'On' : 'Off'}
-                  </Text>
-                </View>
-                <Switch
-                  value={bankSms.enabled && bankSms.permissionGranted}
-                  onValueChange={(v) => void bankSms.setEnabled(v)}
+            <SettingsGroup>
+              <SettingsRow
+                icon="money"
+                title="Currency"
+                value={homeMeta.code}
+                onPress={() => setCurrencyOpen(true)}
+              />
+              <SettingsRow
+                icon="sun-o"
+                title="Appearance"
+                value={themeName}
+                onPress={() => setPanel('appearance')}
+              />
+              <SettingsRow
+                icon="download"
+                title="Export"
+                onPress={() => router.push('/(tabs)/reports')}
+              />
+              {Platform.OS === 'android' ? (
+                <SettingsRow
+                  icon="bell"
+                  title="Bank alerts"
+                  value={bankSms.enabled || bankSms.notifEnabled ? 'On' : 'Off'}
+                  onPress={() => router.push('/bank-sms')}
                 />
-              </View>
-              {bankSms.enabled && !bankSms.permissionGranted ? (
-                <Pressable onPress={() => void bankSms.openSettings()} style={{ marginTop: 8 }}>
-                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>Allow SMS access</Text>
-                </Pressable>
+              ) : (
+                <SettingsRow
+                  icon="bell"
+                  title="Bank alerts"
+                  onPress={() => router.push('/bank-sms')}
+                />
+              )}
+              <SettingsRow
+                icon="plane"
+                title="Travel Mode"
+                value={travelOn ? 'On' : 'Off'}
+                onPress={() => router.push('/travel-mode')}
+              />
+              <SettingsRow
+                icon="lock"
+                title="Passcode"
+                value={privacy.hasPin ? 'On' : 'Off'}
+                onPress={() => setPanel('privacy')}
+              />
+              <SettingsRow
+                icon="eye-slash"
+                title="Hide amounts"
+                switchValue={privacy.enabled}
+                onSwitch={(v) => void onTogglePrivacy(v)}
+              />
+              {privacy.biometricsAvailable ? (
+                <SettingsRow
+                  icon="user-circle"
+                  title="Touch / Face ID"
+                  switchValue={privacy.enabled}
+                  onSwitch={(v) => void onTogglePrivacy(v)}
+                />
               ) : null}
+              <SettingsRow
+                icon="bell-o"
+                title="Reminders"
+                value={reminders.prefs.enabled ? 'On' : 'Off'}
+                onPress={() => setPanel('notifications')}
+                last
+              />
+            </SettingsGroup>
 
-              {bankSms.notifNativeAvailable ? (
-                <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                  <View style={styles.rowBetween}>
-                    <View style={{ flex: 1, paddingRight: 12 }}>
-                      <Text style={[styles.rowTitle, { color: colors.text }]}>Bank apps</Text>
-                      <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                        {bankSms.notifPermissionGranted
-                          ? (bankSms.notifEnabled ? 'Listening (Meezan, HBL, …)' : 'Off')
-                          : 'Required for Meezan app alerts'}
-                      </Text>
-                    </View>
-                    <Switch
-                      value={bankSms.notifEnabled}
-                      onValueChange={(v) => void bankSms.setNotifEnabled(v)}
-                    />
-                  </View>
-                  {!bankSms.notifPermissionGranted ? (
-                    <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 8 }}>
-                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13 }}>
-                        Turn on Notification access for WalletTrails
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : null}
+            <SettingsGroup>
+              <SettingsRow
+                icon="question-circle"
+                title="Help Center"
+                onPress={() => router.push('/support' as never)}
+              />
+              <SettingsRow
+                icon="commenting-o"
+                title="Contact Support"
+                onPress={() => router.push('/support' as never)}
+              />
+              <SettingsRow
+                icon="cloud-download"
+                title="Restore Purchase"
+                value={premium.is_premium || user?.is_premium ? 'Premium' : restoreMsg || undefined}
+                onPress={() => {
+                  setRestoreMsg('…')
+                  void refreshConfig().then(() => setRestoreMsg('Done'))
+                }}
+              />
+              <SettingsRow
+                icon="cog"
+                title="Advanced"
+                onPress={() => setPanel('advanced')}
+                last
+              />
+            </SettingsGroup>
 
-              <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                <View style={styles.rowBetween}>
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={[styles.rowTitle, { color: colors.text }]}>Add automatically</Text>
-                    <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                      {bankSms.autoApprove
-                        ? 'Detected alerts become transactions (no approve step)'
-                        : 'Off — review and approve in Inbox first'}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={bankSms.autoApprove}
-                    onValueChange={(v) => void bankSms.setAutoApprove(v)}
-                  />
-                </View>
-              </View>
-            </>
-          ) : null}
-
-          <Pressable
-            onPress={() => router.push('/bank-sms')}
-            style={{
-              marginTop: Platform.OS === 'android' ? 12 : 0,
-              paddingTop: Platform.OS === 'android' ? 12 : 0,
-              borderTopWidth: Platform.OS === 'android' ? StyleSheet.hairlineWidth : 0,
-              borderTopColor: colors.border,
-            }}
-          >
-            <View style={styles.rowBetween}>
-              <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={[styles.rowTitle, { color: colors.text }]}>Inbox</Text>
-                <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                  {bankSms.pendingCount > 0 ? `${bankSms.pendingCount} to review` : 'Paste or review drafts'}
-                </Text>
-              </View>
-              {bankSms.pendingCount > 0 ? (
-                <View style={{ backgroundColor: colors.primary, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, marginRight: 8 }}>
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{bankSms.pendingCount}</Text>
-                </View>
-              ) : null}
-              <Text style={{ color: colors.primary, fontWeight: '800' }}>→</Text>
-            </View>
-          </Pressable>
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Theme</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.swatchRow}>
-            {themes.map((t) => {
-              const selected = themeId === t.id
-              return (
-                <Pressable
-                  key={t.id}
-                  onPress={(e) => {
-                    const { pageX, pageY } = e.nativeEvent
-                    setThemeAnimated(t.id, pageX, pageY)
-                  }}
-                  style={styles.swatchWrap}
-                >
-                  <View
-                    style={[
-                      styles.swatch,
-                      {
-                        backgroundColor: t.swatch,
-                        borderColor: selected ? t.swatchEdge : 'transparent',
-                        transform: [{ scale: selected ? 1.08 : 1 }],
-                      },
-                    ]}
-                  >
-                    {selected ? <Text style={styles.swatchCheck}>✓</Text> : null}
-                  </View>
-                  <Text
-                    style={[
-                      styles.swatchLabel,
-                      { color: selected ? colors.primaryDark : colors.textMuted },
-                    ]}
-                  >
-                    {t.name}
-                  </Text>
-                </Pressable>
-              )
-            })}
-          </View>
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Privacy lock</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.row}>
-            <View style={{ flex: 1, paddingRight: spacing.md }}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>Hide amounts</Text>
-              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                Amounts show as {maskedMoney(user?.currency)}. Tap the eye on the balance card to reveal with biometrics or PIN.
-              </Text>
-            </View>
-            <Switch
-              value={privacy.enabled}
-              onValueChange={(v) => void onTogglePrivacy(v)}
-              trackColor={{ false: colors.border, true: '#86efac' }}
-              thumbColor={privacy.enabled ? colors.primary : '#f4f4f5'}
-            />
-          </View>
-
-          {enableError ? <Text style={styles.tip}>{enableError}</Text> : null}
-
-          <Text style={[styles.rowTitle, { marginTop: spacing.lg, color: colors.text }]}>Hide amounts after background</Text>
-          <View style={styles.seg}>
-            {TIMEOUTS.map((t) => (
-              <Pressable
-                key={t.id}
-                onPress={() => void privacy.setTimeoutPref(t.id)}
-                style={[
-                  styles.segBtn,
-                  { borderColor: colors.border },
-                  privacy.timeout === t.id && { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark },
-                ]}
-              >
-                <Text style={[styles.segText, { color: colors.textSecondary }, privacy.timeout === t.id && styles.segTextOn]}>{t.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <View style={[styles.row, { marginTop: spacing.lg }]}>
-            <View style={{ flex: 1, paddingRight: spacing.md }}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>Block screenshots</Text>
-              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                Stop others from capturing your balances on this device.
-              </Text>
-            </View>
-            <Switch
-              value={privacy.blockScreenshots}
-              onValueChange={(v) => void privacy.setScreenshotBlock(v)}
-              trackColor={{ false: colors.border, true: '#86efac' }}
-              thumbColor={privacy.blockScreenshots ? colors.primary : '#f4f4f5'}
-            />
-          </View>
-
-          {privacy.enabled ? (
-          <Pressable style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted }]} onPress={privacy.lockNow}>
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Hide amounts now</Text>
-          </Pressable>
-          ) : null}
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>WalletTrails PIN</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            {privacy.hasPin ? 'PIN is set. Enter a new one to change it.' : 'Create a 4–6 digit PIN fallback.'}
-          </Text>
-          <ErrorBanner message={pinError} />
-          {pinSaved ? <Text style={styles.ok}>PIN saved.</Text> : null}
-          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>New PIN</Text>
-          <TextInput
-            value={pin}
-            onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))}
-            keyboardType="number-pad"
-            secureTextEntry
-            style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-            placeholder="••••"
-            placeholderTextColor={colors.textMuted}
-            maxLength={6}
-          />
-          <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Confirm PIN</Text>
-          <TextInput
-            value={pinConfirm}
-            onChangeText={(t) => setPinConfirm(t.replace(/\D/g, '').slice(0, 6))}
-            keyboardType="number-pad"
-            secureTextEntry
-            style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
-            placeholder="••••"
-            placeholderTextColor={colors.textMuted}
-            maxLength={6}
-          />
-          <PrimaryButton title={privacy.hasPin ? 'Update PIN' : 'Save PIN'} onPress={() => void savePin()} />
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Due reminders</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            Get notified before loans and money owed are due.
-          </Text>
-          <View style={[styles.row, { marginTop: spacing.md }]}>
-            <View style={{ flex: 1, paddingRight: spacing.md }}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>Enable reminders</Text>
-              {reminders.permission === 'denied' ? (
-                <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                  Notifications are blocked — enable them in system settings.
-                </Text>
-              ) : reminders.lastScheduled > 0 ? (
-                <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                  {reminders.lastScheduled} reminder{reminders.lastScheduled === 1 ? '' : 's'} scheduled
-                </Text>
-              ) : null}
-            </View>
-            <Switch
-              value={reminders.prefs.enabled && reminders.permission === 'granted'}
-              onValueChange={(v) => {
+            <SettingsLogoutRow
+              onPress={() => {
                 void (async () => {
-                  if (v) {
-                    const ok = await reminders.enableWithPermission()
-                    if (!ok) return
-                  } else {
-                    await reminders.updatePrefs({ enabled: false })
-                  }
+                  await clearLocal()
+                  await logout()
                 })()
               }}
-              trackColor={{ false: colors.border, true: '#86efac' }}
-              thumbColor={reminders.prefs.enabled ? colors.primary : '#f4f4f5'}
             />
-          </View>
+            {enableError ? <Text style={styles.tip}>{enableError}</Text> : null}
+            {currencyError ? <Text style={styles.tip}>{currencyError}</Text> : null}
+          </>
+        ) : null}
 
-          <Text style={[styles.rowTitle, { marginTop: spacing.lg, color: colors.text }]}>Remind me</Text>
-          {(
-            [
+        {panel === 'appearance' ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.swatchRow}>
+              {themes.map((t) => {
+                const selected = themeId === t.id
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={(e) => {
+                      const { pageX, pageY } = e.nativeEvent
+                      setThemeAnimated(t.id, pageX, pageY)
+                    }}
+                    style={styles.swatchWrap}
+                  >
+                    <View
+                      style={[
+                        styles.swatch,
+                        {
+                          backgroundColor: t.swatch,
+                          borderColor: selected ? t.swatchEdge : 'transparent',
+                          transform: [{ scale: selected ? 1.08 : 1 }],
+                        },
+                      ]}
+                    >
+                      {selected ? <Text style={styles.swatchCheck}>✓</Text> : null}
+                    </View>
+                    <Text style={[styles.swatchLabel, { color: selected ? colors.primaryDark : colors.textMuted }]}>
+                      {t.name}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+          </View>
+        ) : null}
+
+        {panel === 'privacy' ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.inlineRow}>
+              <Text style={[styles.rowTitle, { color: colors.text, flex: 1 }]}>Passcode</Text>
+              <Switch
+                value={privacy.enabled}
+                onValueChange={(v) => void onTogglePrivacy(v)}
+                trackColor={{ false: colors.border, true: '#86efac' }}
+                thumbColor={privacy.enabled ? colors.primary : '#f4f4f5'}
+              />
+            </View>
+            {enableError ? <Text style={styles.tip}>{enableError}</Text> : null}
+
+            <Text style={[styles.rowTitle, { marginTop: spacing.lg, color: colors.text }]}>Lock after</Text>
+            <View style={styles.seg}>
+              {TIMEOUTS.map((t) => (
+                <Pressable
+                  key={t.id}
+                  onPress={() => void privacy.setTimeoutPref(t.id)}
+                  style={[
+                    styles.segBtn,
+                    { borderColor: colors.border },
+                    privacy.timeout === t.id && { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark },
+                  ]}
+                >
+                  <Text style={[styles.segText, { color: colors.textSecondary }, privacy.timeout === t.id && styles.segTextOn]}>{t.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={[styles.inlineRow, { marginTop: spacing.lg }]}>
+              <Text style={[styles.rowTitle, { color: colors.text, flex: 1 }]}>Block screenshots</Text>
+              <Switch
+                value={privacy.blockScreenshots}
+                onValueChange={(v) => void privacy.setScreenshotBlock(v)}
+                trackColor={{ false: colors.border, true: '#86efac' }}
+                thumbColor={privacy.blockScreenshots ? colors.primary : '#f4f4f5'}
+              />
+            </View>
+
+            {privacy.enabled ? (
+              <Pressable style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted }]} onPress={privacy.lockNow}>
+                <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Hide amounts now</Text>
+              </Pressable>
+            ) : null}
+
+            <Text style={[styles.rowTitle, { marginTop: spacing.xl, color: colors.text }]}>PIN</Text>
+            <ErrorBanner message={pinError} />
+            {pinSaved ? <Text style={styles.ok}>PIN saved.</Text> : null}
+            <TextInput
+              value={pin}
+              onChangeText={(t) => setPin(t.replace(/\D/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              secureTextEntry
+              style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text }]}
+              placeholder="New PIN"
+              placeholderTextColor={colors.textMuted}
+              maxLength={6}
+            />
+            <TextInput
+              value={pinConfirm}
+              onChangeText={(t) => setPinConfirm(t.replace(/\D/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              secureTextEntry
+              style={[styles.input, { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text, marginTop: spacing.sm }]}
+              placeholder="Confirm PIN"
+              placeholderTextColor={colors.textMuted}
+              maxLength={6}
+            />
+            <PrimaryButton title={privacy.hasPin ? 'Update PIN' : 'Save PIN'} onPress={() => void savePin()} />
+          </View>
+        ) : null}
+
+        {panel === 'notifications' ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.inlineRow}>
+              <Text style={[styles.rowTitle, { color: colors.text, flex: 1 }]}>Enable reminders</Text>
+              <Switch
+                value={reminders.prefs.enabled && reminders.permission === 'granted'}
+                onValueChange={(v) => {
+                  void (async () => {
+                    if (v) {
+                      const ok = await reminders.enableWithPermission()
+                      if (!ok) return
+                    } else {
+                      await reminders.updatePrefs({ enabled: false })
+                    }
+                  })()
+                }}
+                trackColor={{ false: colors.border, true: '#86efac' }}
+                thumbColor={reminders.prefs.enabled ? colors.primary : '#f4f4f5'}
+              />
+            </View>
+            {([
               { key: 'lead3' as const, label: '3 days before' },
               { key: 'lead1' as const, label: '1 day before' },
               { key: 'leadDue' as const, label: 'On due day' },
-            ]
-          ).map((row) => (
-            <View key={row.key} style={[styles.row, { marginTop: spacing.sm }]}>
-              <Text style={{ flex: 1, fontWeight: '600', color: colors.text }}>{row.label}</Text>
+            ]).map((row) => (
+              <View key={row.key} style={[styles.inlineRow, { marginTop: spacing.md }]}>
+                <Text style={{ flex: 1, fontWeight: '600', color: colors.text }}>{row.label}</Text>
+                <Switch
+                  value={reminders.prefs[row.key]}
+                  onValueChange={(v) => void reminders.updatePrefs({ [row.key]: v })}
+                  trackColor={{ false: colors.border, true: '#86efac' }}
+                  thumbColor={reminders.prefs[row.key] ? colors.primary : '#f4f4f5'}
+                />
+              </View>
+            ))}
+            <Pressable
+              style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, opacity: testBusy ? 0.55 : 1 }]}
+              disabled={testBusy}
+              onPress={() => {
+                void (async () => {
+                  setTestBusy(true)
+                  setTestMsg('')
+                  const ok = await reminders.sendTest()
+                  setTestMsg(ok ? 'Test sent.' : 'Allow notifications first.')
+                  setTestBusy(false)
+                })()
+              }}
+            >
+              <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
+                {testBusy ? 'Sending…' : 'Send test'}
+              </Text>
+            </Pressable>
+            {testMsg ? <Text style={[styles.meta, { color: colors.textMuted }]}>{testMsg}</Text> : null}
+          </View>
+        ) : null}
+
+        {panel === 'advanced' ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.inlineRow}>
+              <Text style={[styles.rowTitle, { color: colors.text, flex: 1 }]}>App news</Text>
               <Switch
-                value={reminders.prefs[row.key]}
-                onValueChange={(v) => void reminders.updatePrefs({ [row.key]: v })}
+                value={marketingEnabled}
+                disabled={marketingBusy}
+                onValueChange={(v) => {
+                  void (async () => {
+                    setMarketingBusy(true)
+                    try {
+                      if (v) {
+                        const ok = await requestReminderPermission()
+                        if (ok) await registerDeviceTokenDetailed()
+                      }
+                      await api.patch('/notification-preferences/', { marketing_enabled: v })
+                      setMarketingEnabled(v)
+                    } catch {
+                      /* keep previous */
+                    } finally {
+                      setMarketingBusy(false)
+                    }
+                  })()
+                }}
                 trackColor={{ false: colors.border, true: '#86efac' }}
-                thumbColor={reminders.prefs[row.key] ? colors.primary : '#f4f4f5'}
+                thumbColor={marketingEnabled ? colors.primary : '#f4f4f5'}
               />
             </View>
-          ))}
-
-          <Pressable
-            style={[
-              styles.lockBtn,
-              { backgroundColor: colors.surfaceMuted, opacity: testBusy ? 0.55 : 1, marginTop: spacing.lg },
-            ]}
-            disabled={testBusy}
-            onPress={() => {
-              void (async () => {
-                setTestBusy(true)
-                setTestMsg('')
-                const ok = await reminders.sendTest()
-                setTestMsg(
-                  ok
-                    ? 'Test notification coming in ~3 seconds. You can leave this screen.'
-                    : 'Could not send — allow notifications for WalletTrails first.',
-                )
-                setTestBusy(false)
-              })()
-            }}
-          >
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
-              {testBusy ? 'Sending…' : 'Send test notification'}
-            </Text>
-          </Pressable>
-          {testMsg ? <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{testMsg}</Text> : null}
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Product updates</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.row}>
-            <View style={{ flex: 1, paddingRight: spacing.md }}>
-              <Text style={[styles.rowTitle, { color: colors.text }]}>App news & tips</Text>
-              <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-                Occasional WalletTrails updates. Separate from due-date reminders.
-              </Text>
-            </View>
-            <Switch
-              value={marketingEnabled}
-              disabled={marketingBusy}
-              onValueChange={(v) => {
+            <Pressable
+              style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted }]}
+              onPress={() => {
                 void (async () => {
                   setMarketingBusy(true)
+                  setPushSyncMsg('Linking…')
                   try {
-                    if (v) {
-                      const ok = await requestReminderPermission()
-                      if (ok) await registerDeviceTokenDetailed()
+                    const ok = await requestReminderPermission()
+                    if (!ok) {
+                      setPushSyncMsg('Allow notifications first.')
+                      return
                     }
-                    await api.patch('/notification-preferences/', { marketing_enabled: v })
-                    setMarketingEnabled(v)
-                  } catch {
-                    /* keep previous */
+                    const result = await registerDeviceTokenDetailed()
+                    if (!result.ok) {
+                      setPushSyncMsg(result.error || 'Could not link push.')
+                      return
+                    }
+                    await api.patch('/notification-preferences/', { marketing_enabled: true })
+                    setMarketingEnabled(true)
+                    setPushSyncMsg('Push linked.')
+                  } catch (err) {
+                    setPushSyncMsg(apiErrorMessage(err, 'Could not sync push.'))
                   } finally {
                     setMarketingBusy(false)
                   }
                 })()
               }}
-              trackColor={{ false: colors.border, true: '#86efac' }}
-              thumbColor={marketingEnabled ? colors.primary : '#f4f4f5'}
+            >
+              <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Link this device</Text>
+            </Pressable>
+            {pushSyncMsg ? <Text style={[styles.meta, { color: colors.textMuted }]}>{pushSyncMsg}</Text> : null}
+
+            <Text style={[styles.meta, { color: colors.textMuted, marginTop: spacing.lg }]}>
+              {online ? 'Online' : 'Offline'}{pending > 0 ? ` · ${pending} pending` : ''}
+            </Text>
+            <Pressable
+              style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, opacity: !online || syncing || pending === 0 ? 0.5 : 1 }]}
+              onPress={() => void syncNow()}
+              disabled={!online || syncing || pending === 0}
+            >
+              <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>{syncing ? 'Syncing…' : 'Sync now'}</Text>
+            </Pressable>
+
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceMuted, marginTop: spacing.lg, letterSpacing: 0 }]}
+              placeholder="Promo code"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="characters"
+              value={promoCode}
+              onChangeText={setPromoCode}
             />
+            <Pressable
+              style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, opacity: promoBusy ? 0.55 : 1 }]}
+              disabled={promoBusy}
+              onPress={() => {
+                void (async () => {
+                  if (!promoCode.trim()) {
+                    setPromoMsg('Enter a code.')
+                    return
+                  }
+                  setPromoBusy(true)
+                  setPromoMsg('')
+                  try {
+                    await api.post('/premium/redeem/', { code: promoCode.trim() })
+                    setPromoMsg('Promo applied.')
+                    setPromoCode('')
+                    await refreshConfig()
+                  } catch (err: unknown) {
+                    setPromoMsg(apiErrorMessage(err, 'Could not redeem code.'))
+                  } finally {
+                    setPromoBusy(false)
+                  }
+                })()
+              }}
+            >
+              <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>{promoBusy ? 'Redeeming…' : 'Redeem'}</Text>
+            </Pressable>
+            {promoMsg ? <Text style={[styles.meta, { color: colors.textMuted }]}>{promoMsg}</Text> : null}
+
+            <Pressable
+              style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted }]}
+              onPress={() => DeviceEventEmitter.emit(FORCE_RATING_EVENT)}
+            >
+              <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Preview rating</Text>
+            </Pressable>
+
+            <Pressable
+              style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, opacity: connBusy ? 0.55 : 1 }]}
+              disabled={connBusy}
+              onPress={() => {
+                void (async () => {
+                  setConnBusy(true)
+                  setConnMsg('Testing…')
+                  const result = await probeApiConnection()
+                  setConnMsg(result.ok ? `OK — ${result.detail}` : `Failed — ${result.detail}`)
+                  setConnBusy(false)
+                })()
+              }}
+            >
+              <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
+                {connBusy ? 'Testing…' : 'Test server'}
+              </Text>
+            </Pressable>
+            {connMsg ? <Text style={[styles.meta, { color: colors.textMuted }]}>{connMsg}</Text> : null}
+            <Text style={[styles.meta, { color: colors.textMuted }]}>{API_ROOT || ''}</Text>
           </View>
-          <Pressable
-            style={[
-              styles.lockBtn,
-              { backgroundColor: colors.surfaceMuted, opacity: marketingBusy ? 0.55 : 1, marginTop: spacing.md },
-            ]}
-            disabled={marketingBusy}
-            onPress={() => {
-              void (async () => {
-                setMarketingBusy(true)
-                setPushSyncMsg('Waking server & linking device…')
-                try {
-                  const ok = await requestReminderPermission()
-                  if (!ok) {
-                    setPushSyncMsg('Allow notifications in system settings first.')
-                    return
-                  }
-                  const result = await registerDeviceTokenDetailed()
-                  if (!result.ok) {
-                    setPushSyncMsg(result.error || 'Could not link push.')
-                    return
-                  }
-                  await api.patch('/notification-preferences/', { marketing_enabled: true })
-                  setMarketingEnabled(true)
-                  setPushSyncMsg(
-                    'Push linked to your account. Ops can reach this device now — reopen Users in admin.',
-                  )
-                } catch (err) {
-                  setPushSyncMsg(apiErrorMessage(err, 'Could not sync push. Try again.'))
-                } finally {
-                  setMarketingBusy(false)
-                }
-              })()
-            }}
-          >
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
-              {marketingBusy ? 'Syncing…' : 'Link this device for push'}
-            </Text>
-          </Pressable>
-          <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>
-            Needs a native EAS APK with Firebase FCM (not Expo Go). See mobile/PUSH_SETUP.md.
-          </Text>
-          {pushSyncMsg ? (
-            <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{pushSyncMsg}</Text>
-          ) : null}
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Premium</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.rowLabel, { color: colors.text }]}>
-            {premium.is_premium ? 'WalletTrails Premium' : 'Free plan'}
-          </Text>
-          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            {premium.is_premium
-              ? `Active${premium.product_id ? ` · ${premium.product_id}` : ''}${
-                  premium.expires_at ? ` · until ${new Date(premium.expires_at).toLocaleDateString()}` : ' · lifetime'
-                }`
-              : shouldShowAds
-                ? 'Ads may appear per remote config. Upgrade via Play Store when billing is live.'
-                : config.ads.ads_enabled
-                  ? 'Ads are currently off for your account or via Ops kill switch.'
-                  : 'Ads are disabled by Ops.'}
-          </Text>
-          <Pressable
-            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, marginTop: spacing.md }]}
-            onPress={() => {
-              void refreshConfig()
-            }}
-          >
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Refresh premium & ads config</Text>
-          </Pressable>
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Connection</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            Server: {API_ROOT || '(missing)'}
-          </Text>
-          <Pressable
-            style={[
-              styles.lockBtn,
-              { backgroundColor: colors.surfaceMuted, opacity: connBusy ? 0.55 : 1, marginTop: spacing.md },
-            ]}
-            disabled={connBusy}
-            onPress={() => {
-              void (async () => {
-                setConnBusy(true)
-                setConnMsg('Testing…')
-                const result = await probeApiConnection()
-                setConnMsg(result.ok ? `OK — ${result.detail}` : `Failed — ${result.detail}`)
-                setConnBusy(false)
-              })()
-            }}
-          >
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
-              {connBusy ? 'Testing…' : 'Test server connection'}
-            </Text>
-          </Pressable>
-          {connMsg ? (
-            <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{connMsg}</Text>
-          ) : null}
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Promo code</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            Have a WalletTrails promo? Redeem for a Premium trial.
-          </Text>
-          <TextInput
-            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}
-            placeholder="PREMIUM30"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="characters"
-            value={promoCode}
-            onChangeText={setPromoCode}
-          />
-          <Pressable
-            style={[
-              styles.lockBtn,
-              { backgroundColor: colors.surfaceMuted, opacity: promoBusy ? 0.55 : 1, marginTop: spacing.sm },
-            ]}
-            disabled={promoBusy}
-            onPress={() => {
-              void (async () => {
-                if (!promoCode.trim()) {
-                  setPromoMsg('Enter a code.')
-                  return
-                }
-                setPromoBusy(true)
-                setPromoMsg('')
-                try {
-                  await api.post('/premium/redeem/', { code: promoCode.trim() })
-                  setPromoMsg('Promo applied — enjoy Premium!')
-                  setPromoCode('')
-                  await refreshConfig()
-                } catch (err: unknown) {
-                  setPromoMsg(apiErrorMessage(err, 'Could not redeem code.'))
-                } finally {
-                  setPromoBusy(false)
-                }
-              })()
-            }}
-          >
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>
-              {promoBusy ? 'Redeeming…' : 'Redeem'}
-            </Text>
-          </Pressable>
-          {promoMsg ? (
-            <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>{promoMsg}</Text>
-          ) : null}
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Help & Support</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            Message us about bugs, account issues, or billing — we reply in-app.
-          </Text>
-          <Pressable
-            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, marginTop: spacing.md }]}
-            onPress={() => router.push('/support' as never)}
-          >
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Open support</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, marginTop: spacing.sm }]}
-            onPress={() => DeviceEventEmitter.emit(FORCE_RATING_EVENT)}
-          >
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Preview rating form</Text>
-          </Pressable>
-          <Text style={[styles.rowHint, { color: colors.textMuted, marginTop: spacing.sm }]}>
-            Skips the 4-day streak so you can test stars, feedback, and share.
-          </Text>
-        </View>
-
-        <Text style={[styles.section, { color: colors.primaryDark }]}>Offline</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.rowHint, { color: colors.textMuted }]}>
-            Status: {online ? 'Online' : 'Offline'}
-            {pending > 0 ? ` · ${pending} pending` : ''}
-          </Text>
-          <Pressable
-            style={[styles.lockBtn, { backgroundColor: colors.surfaceMuted, opacity: !online || syncing || pending === 0 ? 0.5 : 1 }]}
-            onPress={() => void syncNow()}
-            disabled={!online || syncing || pending === 0}
-          >
-            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>{syncing ? 'Syncing…' : 'Sync now'}</Text>
-          </Pressable>
-        </View>
-
-        <PrimaryButton
-          title="Log out"
-          onPress={() => {
-            void (async () => {
-              await clearLocal()
-              await logout()
-            })()
-          }}
-        />
+        ) : null}
       </ScrollView>
 
       <Modal visible={currencyOpen} transparent animationType="fade" onRequestClose={() => setCurrencyOpen(false)}>
@@ -714,10 +600,7 @@ export default function SettingsScreen() {
             onPress={() => !currencyBusy && setCurrencyOpen(false)}
           />
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, zIndex: 2, marginBottom: 0 }]}>
-            <Text style={[styles.rowTitle, { color: colors.primaryDark }]}>Home currency</Text>
-            <Text style={[styles.rowHint, { color: colors.textMuted, marginBottom: spacing.sm }]}>
-              Changes the symbol on amounts. Existing numbers are not converted.
-            </Text>
+            <Text style={[styles.rowTitle, { color: colors.primaryDark }]}>Currency</Text>
             <ScrollView style={{ maxHeight: 360 }}>
               {HOME_CURRENCIES.map((c) => {
                 const active = c.code === homeMeta.code
@@ -736,15 +619,10 @@ export default function SettingsScreen() {
                       opacity: currencyBusy ? 0.55 : 1,
                     }}
                   >
-                    <View>
-                      <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>
-                        {c.symbol}  {c.code}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{c.name}</Text>
-                    </View>
-                    {active ? (
-                      <Text style={{ color: colors.primary, fontWeight: '800' }}>Selected</Text>
-                    ) : null}
+                    <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>
+                      {c.symbol}  {c.code}
+                    </Text>
+                    {active ? <Text style={{ color: colors.primary, fontWeight: '800' }}>Selected</Text> : null}
                   </Pressable>
                 )
               })}
@@ -758,26 +636,17 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   pad: { padding: spacing.lg, paddingBottom: spacing.xxl + 80 },
-  title: { fontSize: typography.title, fontWeight: '800', marginBottom: spacing.lg, color: '#122a20' },
-  section: {
-    fontSize: typography.subtitle,
-    fontWeight: '800',
-    marginBottom: spacing.sm,
-    marginTop: spacing.sm,
-    color: '#047857',
-  },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md },
+  backText: { fontSize: 18, fontWeight: '800' },
   card: {
-    backgroundColor: '#ffffff',
-    borderColor: '#e5e7eb',
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },
   swatchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.md,
   },
   swatchWrap: { alignItems: 'center', flex: 1 },
   swatch: {
@@ -790,29 +659,10 @@ const styles = StyleSheet.create({
   },
   swatchCheck: { color: '#fff', fontWeight: '900', fontSize: 14 },
   swatchLabel: { fontSize: 10, fontWeight: '700', marginTop: 6 },
-  label: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', color: '#5f7569' },
-  value: { fontSize: typography.subtitle, fontWeight: '800', marginTop: 4, color: '#122a20' },
-  premiumBadge: {
-    backgroundColor: '#fef3c7',
-    borderColor: '#f59e0b',
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    marginTop: 4,
-  },
-  premiumBadgeText: {
-    color: '#92400e',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  meta: { marginTop: 4, fontSize: typography.caption, color: '#3f6153' },
-  row: { flexDirection: 'row', alignItems: 'center' },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  rowTitle: { fontWeight: '800', fontSize: typography.body, color: '#122a20' },
-  rowLabel: { fontWeight: '800', fontSize: typography.body },
-  rowHint: { fontSize: typography.caption, marginTop: 4, lineHeight: 18, color: '#5f7569' },
-  tip: { marginTop: spacing.sm, fontSize: typography.caption, lineHeight: 18, color: '#c2410c' },
+  rowTitle: { fontWeight: '700', fontSize: typography.body },
+  inlineRow: { flexDirection: 'row', alignItems: 'center' },
+  meta: { marginTop: 8, fontSize: typography.caption },
+  tip: { marginTop: spacing.sm, fontSize: typography.caption, color: '#c2410c' },
   ok: { fontWeight: '700', marginVertical: spacing.sm, color: '#059669' },
   seg: { flexDirection: 'row', gap: 8, marginTop: spacing.sm },
   segBtn: {
@@ -821,10 +671,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.sm,
     borderWidth: 1,
     alignItems: 'center',
-    borderColor: '#e5e7eb',
   },
-  segBtnOn: { backgroundColor: '#047857', borderColor: '#047857' },
-  segText: { fontWeight: '700', fontSize: 12, color: '#3f6153' },
+  segText: { fontWeight: '700', fontSize: 12 },
   segTextOn: { color: '#fff' },
   lockBtn: {
     marginTop: spacing.md,
@@ -832,17 +680,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: radii.sm,
-    backgroundColor: '#f3f4f6',
   },
-  lockBtnText: { fontWeight: '800', color: '#047857' },
-  fieldLabel: {
-    fontSize: typography.label,
-    fontWeight: '700',
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-    color: '#3f6153',
-  },
+  lockBtnText: { fontWeight: '800' },
   input: {
     borderWidth: 1,
     borderRadius: radii.sm,
@@ -850,8 +689,5 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: typography.body,
     letterSpacing: 4,
-    backgroundColor: '#f9fafb',
-    borderColor: '#e5e7eb',
-    color: '#122a20',
   },
 })

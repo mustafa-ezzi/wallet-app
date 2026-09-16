@@ -117,7 +117,8 @@
       ],
       "expo-sharing",
       "expo-sms-listener",
-      "expo-localization"
+      "expo-localization",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true
@@ -127,7 +128,8 @@
       "apiUrl": "https://tranquil-radiance-production.up.railway.app",
       "eas": {
         "projectId": "c7895bac-9652-44e9-a80a-a779737f7f69"
-      }
+      },
+      "googleWebClientId": "583266955603-jtf9eggrbcl612u3mkl20m9122ngqopv.apps.googleusercontent.com"
     },
     "owner": "mustafaezzi"
   }
