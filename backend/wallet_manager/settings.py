@@ -226,6 +226,8 @@ RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '').strip()
 # Google Sign-In — comma-separated OAuth client IDs (Web + Android) allowed as ID-token audience.
 _google_oauth_env = os.environ.get('GOOGLE_OAUTH_CLIENT_IDS', '').strip()
 _google_oauth_default = (
+    '85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com,'
+    '85845263961-ehanc5qjtka9sc0ec3i7h5uiemup6mpe.apps.googleusercontent.com,'
     '583266955603-jtf9eggrbcl612u3mkl20m9122ngqopv.apps.googleusercontent.com,'
     '583266955603-rkaqs7huknvoiqql7efdo0es64nq2i8c.apps.googleusercontent.com'
 )

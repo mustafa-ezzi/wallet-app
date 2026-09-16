@@ -1,11 +1,16 @@
 const fs = require('fs')
 const path = require('path')
 
-function hasWalletTrailsPackage(filePath) {
+function googleServicesScore(filePath) {
   try {
-    return fs.readFileSync(filePath, 'utf8').includes('com.wallettrails.app')
+    const raw = fs.readFileSync(filePath, 'utf8')
+    if (!raw.includes('com.wallettrails.app')) return 0
+    let score = 1
+    if (raw.includes('"client_type": 3')) score += 1
+    if (raw.includes('"client_type": 1')) score += 2
+    return score
   } catch {
-    return false
+    return 0
   }
 }
 
@@ -28,10 +33,10 @@ module.exports = ({ config }) => {
     (p) => p && fs.existsSync(p),
   )
 
-  // Prefer any file that already lists com.wallettrails.app
-  const preferred =
-    candidates.find((p) => hasWalletTrailsPackage(p))
-    || candidates[0]
+  const preferred = candidates.reduce((best, current) => {
+    if (!best) return current
+    return googleServicesScore(current) > googleServicesScore(best) ? current : best
+  }, null)
 
   if (preferred) {
     try {
