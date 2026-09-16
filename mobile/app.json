@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.wallettrails.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#04333b",
         "foregroundImage": "./assets/images/wallettrail-logo.png"
@@ -129,7 +130,8 @@
       "eas": {
         "projectId": "c7895bac-9652-44e9-a80a-a779737f7f69"
       },
-      "googleWebClientId": "85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com"
+      "googleWebClientId": "85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com",
+      "googleAndroidClientId": "85845263961-ehanc5qjtka9sc0ec3i7h5uiemup6mpe.apps.googleusercontent.com"
     },
     "owner": "mustafaezzi"
   }

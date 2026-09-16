@@ -12,6 +12,7 @@
     "expo": "~57.0.8",
     "expo-android-notification-listener-service": "^1.1.0",
     "expo-application": "~57.0.2",
+    "expo-auth-session": "~57.0.12",
     "expo-blur": "^57.0.2",
     "expo-constants": "~57.0.7",
     "expo-device": "~57.0.1",
