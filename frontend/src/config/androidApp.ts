@@ -5,7 +5,7 @@
  */
 export const ANDROID_APK_URL =
   (import.meta.env.VITE_ANDROID_APK_URL as string | undefined)?.trim()
-  || 'https://expo.dev/accounts/mustafaezzi/projects/cashtrail/builds/5dd4a503-1b6e-4659-afee-ccf32cd5c7dc'
+  || 'https://expo.dev/accounts/mustafaezzi/projects/cashtrail/builds/0e04d2e8-dd6a-4d9e-b7f9-e7ed8bc8e830'
 
 export const ANDROID_APP_LABEL =
   (import.meta.env.VITE_ANDROID_APP_LABEL as string | undefined)?.trim()
