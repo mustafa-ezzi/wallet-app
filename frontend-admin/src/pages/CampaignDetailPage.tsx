@@ -70,8 +70,13 @@ export function CampaignDetailPage() {
   }
 
   const canRetry =
-    campaign && (campaign.status === 'failed' || campaign.status === 'draft' || campaign.status === 'scheduled')
-  const canDelete = campaign && campaign.status !== 'sending'
+    campaign && (
+      campaign.status === 'failed'
+      || campaign.status === 'draft'
+      || campaign.status === 'scheduled'
+      || campaign.status === 'sending'
+    )
+  const canDelete = Boolean(campaign)
 
   return (
     <div>
@@ -86,7 +91,7 @@ export function CampaignDetailPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {canRetry ? (
             <button className="btn primary" type="button" disabled={busy} onClick={() => void onRetry()}>
-              {campaign?.status === 'failed' ? 'Retry send' : 'Send now'}
+              {campaign?.status === 'failed' || campaign?.status === 'sending' ? 'Retry send' : 'Send now'}
             </button>
           ) : null}
           {canDelete ? (

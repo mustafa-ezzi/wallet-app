@@ -94,7 +94,6 @@ def send_campaign(campaign: PushCampaign, *, dry_run: bool = False) -> dict:
     """
     if campaign.status in {
         PushCampaign.STATUS_SENT,
-        PushCampaign.STATUS_SENDING,
         PushCampaign.STATUS_CANCELLED,
     }:
         return {
@@ -103,7 +102,7 @@ def send_campaign(campaign: PushCampaign, *, dry_run: bool = False) -> dict:
             'sent_ok': campaign.sent_ok,
             'sent_failed': campaign.sent_failed,
         }
-    # STATUS_FAILED and STATUS_DRAFT / STATUS_SCHEDULED can be (re)sent.
+    # draft / scheduled / failed / stuck "sending" can be (re)sent.
 
     if not dry_run and campaigns_sent_today() >= MAX_CAMPAIGNS_PER_DAY:
         return {
@@ -160,76 +159,89 @@ def send_campaign(campaign: PushCampaign, *, dry_run: bool = False) -> dict:
     campaign.last_error = ''
     campaign.save(update_fields=['status', 'last_error', 'updated_at'])
 
-    # Clear prior pending deliveries if re-sending a failed draft path
-    PushCampaignDelivery.objects.filter(campaign=campaign).delete()
+    try:
+        # Clear prior pending deliveries if re-sending a failed draft path
+        PushCampaignDelivery.objects.filter(campaign=campaign).delete()
 
-    delivery_rows: list[PushCampaignDelivery] = []
-    for device in devices:
-        delivery_rows.append(
-            PushCampaignDelivery(
-                campaign=campaign,
-                user_id=device.user_id,
-                device_token=device,
-                token_snapshot=device.token[:255],
-                status=PushCampaignDelivery.STATUS_PENDING,
+        delivery_rows: list[PushCampaignDelivery] = []
+        for device in devices:
+            delivery_rows.append(
+                PushCampaignDelivery(
+                    campaign=campaign,
+                    user_id=device.user_id,
+                    device_token=device,
+                    token_snapshot=device.token[:255],
+                    status=PushCampaignDelivery.STATUS_PENDING,
+                )
             )
+        if delivery_rows:
+            PushCampaignDelivery.objects.bulk_create(delivery_rows, batch_size=500)
+
+        deliveries = list(
+            PushCampaignDelivery.objects.filter(campaign=campaign).select_related('device_token')
         )
-    if delivery_rows:
-        PushCampaignDelivery.objects.bulk_create(delivery_rows, batch_size=500)
+        ok_total = 0
+        fail_total = 0
+        errors: list[str] = []
 
-    deliveries = list(
-        PushCampaignDelivery.objects.filter(campaign=campaign).select_related('device_token')
-    )
-    ok_total = 0
-    fail_total = 0
-    errors: list[str] = []
+        for i in range(0, len(deliveries), EXPO_BATCH):
+            batch = deliveries[i:i + EXPO_BATCH]
+            tokens = [d.token_snapshot for d in batch]
+            result = send_expo_push(
+                tokens,
+                title=campaign.title,
+                body=campaign.body,
+                data=_campaign_data(campaign),
+                channel_id=CHANNEL_ID,
+            )
+            tickets = result.get('tickets') or []
+            ticket_by_token = {t.get('token'): t for t in tickets if isinstance(t, dict)}
 
-    for i in range(0, len(deliveries), EXPO_BATCH):
-        batch = deliveries[i:i + EXPO_BATCH]
-        tokens = [d.token_snapshot for d in batch]
-        result = send_expo_push(
-            tokens,
-            title=campaign.title,
-            body=campaign.body,
-            data=_campaign_data(campaign),
-            channel_id=CHANNEL_ID,
-        )
-        tickets = result.get('tickets') or []
-        # Map by index into valid messages; invalid tokens are skipped in helper
-        ticket_by_token = {t.get('token'): t for t in tickets if isinstance(t, dict)}
+            for delivery in batch:
+                ticket = ticket_by_token.get(delivery.token_snapshot)
+                if ticket and ticket.get('status') == 'ok':
+                    delivery.status = PushCampaignDelivery.STATUS_OK
+                    delivery.expo_ticket_id = str(ticket.get('id') or '')[:128]
+                    delivery.error = ''
+                    ok_total += 1
+                elif ticket:
+                    delivery.status = PushCampaignDelivery.STATUS_FAILED
+                    delivery.error = str(ticket.get('message') or 'expo error')[:255]
+                    fail_total += 1
+                else:
+                    delivery.status = PushCampaignDelivery.STATUS_SKIPPED
+                    delivery.error = 'invalid or unmatched token'
+                    fail_total += 1
+                delivery.save(update_fields=['status', 'expo_ticket_id', 'error'])
 
-        for delivery in batch:
-            ticket = ticket_by_token.get(delivery.token_snapshot)
-            if ticket and ticket.get('status') == 'ok':
-                delivery.status = PushCampaignDelivery.STATUS_OK
-                delivery.expo_ticket_id = str(ticket.get('id') or '')[:128]
-                delivery.error = ''
-                ok_total += 1
-            elif ticket:
-                delivery.status = PushCampaignDelivery.STATUS_FAILED
-                delivery.error = str(ticket.get('message') or 'expo error')[:255]
-                fail_total += 1
-            else:
-                # Token skipped as non-Expo or missing from response
-                delivery.status = PushCampaignDelivery.STATUS_SKIPPED
-                delivery.error = 'invalid or unmatched token'
-                fail_total += 1
-            delivery.save(update_fields=['status', 'expo_ticket_id', 'error'])
+            for err in result.get('errors') or []:
+                if err and err not in errors:
+                    errors.append(str(err)[:200])
+                if len(errors) >= 5:
+                    break
 
-        for err in result.get('errors') or []:
-            if err and err not in errors:
-                errors.append(str(err)[:200])
-            if len(errors) >= 5:
-                break
-
-    campaign.sent_ok = ok_total
-    campaign.sent_failed = fail_total
-    campaign.sent_at = timezone.now()
-    campaign.status = PushCampaign.STATUS_SENT if ok_total > 0 else PushCampaign.STATUS_FAILED
-    campaign.last_error = '; '.join(errors)[:1000]
-    campaign.save(update_fields=[
-        'sent_ok', 'sent_failed', 'sent_at', 'status', 'last_error', 'updated_at',
-    ])
+        campaign.sent_ok = ok_total
+        campaign.sent_failed = fail_total
+        campaign.sent_at = timezone.now()
+        campaign.status = PushCampaign.STATUS_SENT if ok_total > 0 else PushCampaign.STATUS_FAILED
+        campaign.last_error = '; '.join(errors)[:1000]
+        campaign.save(update_fields=[
+            'sent_ok', 'sent_failed', 'sent_at', 'status', 'last_error', 'updated_at',
+        ])
+    except Exception as exc:  # noqa: BLE001
+        campaign.status = PushCampaign.STATUS_FAILED
+        campaign.last_error = str(exc)[:1000]
+        campaign.sent_at = timezone.now()
+        campaign.save(update_fields=['status', 'last_error', 'sent_at', 'updated_at'])
+        return {
+            'ok': False,
+            'dry_run': False,
+            'users': estimate['users'],
+            'tokens': len(devices),
+            'sent_ok': 0,
+            'sent_failed': 0,
+            'detail': campaign.last_error,
+        }
 
     # Touch re-engagement timestamp for inactive audiences
     if campaign.audience in {

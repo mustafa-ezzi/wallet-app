@@ -147,10 +147,13 @@ class OpsCampaignDetailView(APIView):
         except PushCampaign.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
         if campaign.status == PushCampaign.STATUS_SENDING:
-            return Response(
-                {'detail': 'Cannot delete a campaign while it is sending.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            # Stuck sends (crash mid-flight) can be deleted after a minute
+            age = timezone.now() - (campaign.updated_at or campaign.created_at)
+            if age.total_seconds() < 90:
+                return Response(
+                    {'detail': 'Cannot delete a campaign while it is sending.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         cid = campaign.id
         meta = {
             'title': campaign.title,

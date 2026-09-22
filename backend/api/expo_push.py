@@ -8,6 +8,11 @@ import urllib.request
 
 logger = logging.getLogger(__name__)
 
+EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send'
+MIXED_PROJECT_CODE = 'PUSH_TOO_MANY_EXPERIENCE_IDS'
+DEAD_TOKEN_MARKERS = ('DeviceNotRegistered', 'InvalidCredentials')
+
+
 def prune_stale_device_tokens(*, user=None) -> int:
     """Keep the newest token per user+platform. Old APK / Expo Go tokens poison Expo batches."""
     from .models import DeviceToken
@@ -28,8 +33,6 @@ def prune_stale_device_tokens(*, user=None) -> int:
     stale = qs.exclude(id__in=keep_ids)
     deleted, _ = stale.delete()
     return deleted
-MIXED_PROJECT_CODE = 'PUSH_TOO_MANY_EXPERIENCE_IDS'
-DEAD_TOKEN_MARKERS = ('DeviceNotRegistered', 'InvalidCredentials')
 
 
 def _is_mixed_experience_error(body: str) -> bool:

@@ -156,7 +156,7 @@ export function CampaignsPage() {
 
   async function onSend(id: number) {
     const row = rows.find((c) => c.id === id)
-    const retry = row?.status === 'failed'
+    const retry = row?.status === 'failed' || row?.status === 'sending'
     const ok = window.confirm(
       retry
         ? 'Retry this failed push now? This cannot be undone.'
@@ -360,7 +360,7 @@ export function CampaignsPage() {
                       >
                         Duplicate
                       </button>
-                      {(c.status === 'draft' || c.status === 'scheduled' || c.status === 'failed') && (
+                      {(c.status === 'draft' || c.status === 'scheduled' || c.status === 'failed' || c.status === 'sending') && (
                         <>
                           <button className="btn" type="button" disabled={busy} onClick={() => void onDryRun(c.id)}>
                             Dry run
@@ -371,7 +371,7 @@ export function CampaignsPage() {
                             disabled={busy}
                             onClick={() => void onSend(c.id)}
                           >
-                            {c.status === 'failed' ? 'Retry' : 'Send'}
+                            {c.status === 'failed' || c.status === 'sending' ? 'Retry' : 'Send'}
                           </button>
                         </>
                       )}
