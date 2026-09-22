@@ -156,6 +156,61 @@ export function CampaignDetailPage() {
           ) : null}
         </div>
       )}
+      {campaign?.deliveries && campaign.deliveries.length > 0 ? (
+        <div style={{ marginTop: 24 }}>
+          <h2 style={{ fontSize: '1.05rem', marginBottom: 10 }}>Who got it</h2>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Platform</th>
+                  <th>Status</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaign.deliveries.map((d) => (
+                  <tr key={d.id}>
+                    <td>
+                      <strong>{d.username || d.email || `user #${d.user_id}`}</strong>
+                      {d.email && d.username !== d.email ? (
+                        <div className="muted" style={{ fontSize: '0.8rem' }}>{d.email}</div>
+                      ) : null}
+                    </td>
+                    <td>{d.platform}</td>
+                    <td>
+                      <span
+                        className={
+                          d.status === 'ok'
+                            ? 'badge ok'
+                            : d.status === 'failed'
+                              ? 'badge danger'
+                              : 'badge'
+                        }
+                      >
+                        {d.status}
+                      </span>
+                    </td>
+                    <td style={{ maxWidth: 360, whiteSpace: 'normal', fontSize: '0.82rem' }}>
+                      {d.error || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {(campaign.deliveries.filter((d) => d.status === 'failed').length > 0) ? (
+            <p className="muted" style={{ marginTop: 10 }}>
+              Failed:{' '}
+              {campaign.deliveries
+                .filter((d) => d.status === 'failed')
+                .map((d) => d.username || d.email || `#${d.user_id}`)
+                .join(', ')}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

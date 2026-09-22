@@ -214,6 +214,15 @@ export type OpsCampaign = {
     skipped: number
     pending: number
   }
+  deliveries?: {
+    id: number
+    user_id: number
+    username: string
+    email: string
+    platform: string
+    status: string
+    error: string
+  }[]
 }
 
 export type CampaignEstimate = {

@@ -139,6 +139,25 @@ class OpsCampaignDetailView(APIView):
             'skipped': c.deliveries.filter(status='skipped').count(),
             'pending': c.deliveries.filter(status='pending').count(),
         }
+        deliveries = (
+            c.deliveries.select_related('user', 'device_token')
+            .order_by('status', 'user__username')[:200]
+        )
+        data['deliveries'] = [
+            {
+                'id': d.id,
+                'user_id': d.user_id,
+                'username': d.user.username if d.user_id else '',
+                'email': (d.user.email or '') if d.user_id else '',
+                'platform': (
+                    d.device_token.platform
+                    if d.device_token_id else 'unknown'
+                ),
+                'status': d.status,
+                'error': d.error or '',
+            }
+            for d in deliveries
+        ]
         return Response(data)
 
     def delete(self, request, campaign_id: int):
