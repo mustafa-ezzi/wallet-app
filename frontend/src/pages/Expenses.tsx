@@ -45,6 +45,7 @@ interface Receivable {
   id: number; linked_project: number; project_name: string
   total_amount: number; monthly_amount: number; total_installments: number
   installments_received: number; remaining_amount: number
+  received_amount?: number
   start_date: string; status: string; received_this_month: boolean
 }
 
