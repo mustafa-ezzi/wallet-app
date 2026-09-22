@@ -290,8 +290,15 @@ class OpsUsersExportView(APIView):
             for row in Transaction.objects.filter(user_id__in=ids).values('user_id').annotate(m=Max('created_at'))
         }
         platform_map: dict[int, list[str]] = {uid: [] for uid in ids}
-        for row in DeviceToken.objects.filter(user_id__in=ids).values('user_id', 'platform').distinct():
-            platform_map.setdefault(row['user_id'], []).append(row['platform'])
+        for row in (
+            DeviceToken.objects.filter(user_id__in=ids)
+            .order_by('user_id', 'platform')
+            .values('user_id', 'platform')
+            .distinct()
+        ):
+            plats = platform_map.setdefault(row['user_id'], [])
+            if row['platform'] not in plats:
+                plats.append(row['platform'])
 
         buf = io.StringIO()
         writer = csv.writer(buf)

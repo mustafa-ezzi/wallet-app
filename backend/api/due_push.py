@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError
 from django.utils import timezone
 
-from .expo_push import send_expo_push
+from .expo_push import prune_stale_device_tokens, send_expo_push
 from .models import (
     DeviceToken,
     NotificationPreference,
@@ -159,6 +159,7 @@ def collect_due_events(today: date | None = None) -> list[dict]:
 
 def send_due_reminders(*, dry_run: bool = False, today: date | None = None) -> dict:
     today = today or karachi_today()
+    prune_stale_device_tokens()
     events = collect_due_events(today)
     sent = 0
     skipped = 0

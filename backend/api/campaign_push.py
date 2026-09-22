@@ -14,7 +14,7 @@ from __future__ import annotations
 from django.db.models import Q, QuerySet
 from django.utils import timezone
 
-from .expo_push import send_expo_push
+from .expo_push import prune_stale_device_tokens, send_expo_push
 from .models import (
     DeviceToken,
     PushCampaign,
@@ -113,6 +113,7 @@ def send_campaign(campaign: PushCampaign, *, dry_run: bool = False) -> dict:
             'sent_failed': 0,
         }
 
+    prune_stale_device_tokens()
     devices = list(audience_device_queryset(campaign.audience))
     # Prefer latest token per user when multiple — still notify all devices
     estimate = estimate_recipients(campaign.audience)

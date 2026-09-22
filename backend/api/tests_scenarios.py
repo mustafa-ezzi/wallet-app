@@ -939,6 +939,17 @@ class DevicePushPhase6Tests(ScenarioBase):
         self.assertIn(res.status_code, (200, 201), res.data)
         self.assertEqual(DeviceToken.objects.filter(user=self.user).count(), 1)
 
+        newer = self.client.post('/api/devices/', {
+            'token': 'ExponentPushToken[test-token-bbb]',
+            'platform': 'android',
+        }, format='json')
+        self.assertIn(newer.status_code, (200, 201), newer.data)
+        self.assertEqual(DeviceToken.objects.filter(user=self.user, platform='android').count(), 1)
+        self.assertEqual(
+            DeviceToken.objects.get(user=self.user, platform='android').token,
+            'ExponentPushToken[test-token-bbb]',
+        )
+
         other = User.objects.create_user(
             username='other@example.com', email='other@example.com', password='testpass123',
         )
@@ -947,23 +958,34 @@ class DevicePushPhase6Tests(ScenarioBase):
         other_client.credentials(
             HTTP_AUTHORIZATION=f'Bearer {RefreshToken.for_user(other).access_token}'
         )
-        # Same token moves to other user
+        # Same live token moves to other user
         res2 = other_client.post('/api/devices/', {
-            'token': 'ExponentPushToken[test-token-aaa]',
+            'token': 'ExponentPushToken[test-token-bbb]',
             'platform': 'android',
         }, format='json')
         self.assertIn(res2.status_code, (200, 201), res2.data)
-        self.assertEqual(DeviceToken.objects.filter(token='ExponentPushToken[test-token-aaa]').count(), 1)
+        self.assertEqual(DeviceToken.objects.filter(token='ExponentPushToken[test-token-bbb]').count(), 1)
         self.assertEqual(
-            DeviceToken.objects.get(token='ExponentPushToken[test-token-aaa]').user_id,
+            DeviceToken.objects.get(token='ExponentPushToken[test-token-bbb]').user_id,
             other.id,
         )
 
         revoke = other_client.post('/api/devices/revoke/', {
-            'token': 'ExponentPushToken[test-token-aaa]',
+            'token': 'ExponentPushToken[test-token-bbb]',
         }, format='json')
         self.assertEqual(revoke.status_code, 204)
         self.assertEqual(DeviceToken.objects.count(), 0)
+
+    def test_ops_platforms_are_unique(self):
+        from api.models import DeviceToken
+        from api.ops_api import _serialize_user
+
+        DeviceToken.objects.create(user=self.user, token='ExponentPushToken[a1]', platform='android')
+        DeviceToken.objects.create(user=self.user, token='ExponentPushToken[a2]', platform='android')
+        DeviceToken.objects.create(user=self.user, token='ExponentPushToken[a3]', platform='android')
+        row = _serialize_user(self.user)
+        self.assertEqual(row['platforms'], ['android'])
+        self.assertEqual(row['device_count'], 3)
 
     def test_due_job_dry_run_and_idempotent(self):
         from datetime import timedelta

@@ -52,6 +52,9 @@ class DeviceTokenViewSet(viewsets.ViewSet):
             token=token,
             defaults={'user': request.user, 'platform': platform},
         )
+        DeviceToken.objects.filter(
+            user=request.user, platform=platform,
+        ).exclude(pk=obj.pk).delete()
         return Response(
             DeviceTokenSerializer(obj).data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,

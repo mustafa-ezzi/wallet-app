@@ -108,9 +108,9 @@ def _serialize_user(
         device_count = user.device_tokens.count()
     if platforms is None:
         platforms = list(
-            user.device_tokens.order_by('platform')
-            .values_list('platform', flat=True)
-            .distinct()
+            dict.fromkeys(
+                user.device_tokens.order_by('platform').values_list('platform', flat=True)
+            )
         )
 
     return {
@@ -239,6 +239,8 @@ class OpsUserListView(APIView):
     permission_classes = [IsOpsStaff]
 
     def get(self, request):
+        from .expo_push import prune_stale_device_tokens
+        prune_stale_device_tokens()
         qs = (
             User.objects.all()
             .select_related('ops_meta')
@@ -311,10 +313,13 @@ class OpsUserListView(APIView):
         platform_map: dict[int, list[str]] = {uid: [] for uid in page_ids}
         for row in (
             DeviceToken.objects.filter(user_id__in=page_ids)
+            .order_by('user_id', 'platform')
             .values('user_id', 'platform')
             .distinct()
         ):
-            platform_map.setdefault(row['user_id'], []).append(row['platform'])
+            plats = platform_map.setdefault(row['user_id'], [])
+            if row['platform'] not in plats:
+                plats.append(row['platform'])
 
         tx_counts = {
             row['user_id']: row['c']
