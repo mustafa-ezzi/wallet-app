@@ -33,7 +33,7 @@ function dueBadgeClass(days: number): string {
 interface RecurringExpense {
   id: number; name: string; amount: number; frequency: string
   due_day: number | null; account: number | null; account_name: string | null
-  active: boolean; paid_this_month: boolean
+  active: boolean; paid_this_month: boolean; remaining_amount?: number; paid_amount?: number
 }
 interface Payable {
   id: number; name: string; total_amount: number; monthly_amount: number
@@ -330,7 +330,7 @@ export default function Expenses() {
         payload.category = 'One-time Income'
         payload.notes = `One-time payment: ${recordPayModal.name}`
       } else {
-        // recurring_expense — just a regular expense transaction tagged by name
+        payload.linked_recurring_expense = recordPayModal.id
         payload.category = recordPayModal.name
         payload.notes = `Recurring expense payment: ${recordPayModal.name}`
       }
@@ -487,13 +487,30 @@ export default function Expenses() {
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.72rem' }}>
                           {exp.frequency === 'monthly' ? '/ month' : 'one-time'}
+                          {Number(exp.remaining_amount) > 0.01 && Number(exp.remaining_amount) < Number(exp.amount) - 0.01
+                            ? ` · ${fmt(exp.remaining_amount)} still due`
+                            : ''}
                         </div>
                       </div>
                     </div>
                     <div className="divider" style={{ margin: '0.65rem 0 0.5rem' }} />
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                       {exp.active && (
-                        exp.paid_this_month ? (
+                        Number(exp.remaining_amount ?? exp.amount) > 0.01 ? (
+                          <button
+                            className="btn-primary"
+                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
+                            onClick={() => {
+                              const due = Number(exp.remaining_amount ?? exp.amount)
+                              setRecordPayModal({ type: 'recurring_expense', id: exp.id, name: exp.name, amount: due, defaultAccount: exp.account ? String(exp.account) : '' })
+                              setRecordAmount(String(due))
+                              setRecordAccount(exp.account ? String(exp.account) : '')
+                              setError('')
+                            }}
+                          >
+                            Record Payment
+                          </button>
+                        ) : (
                           <button
                             className="btn-glass"
                             disabled
@@ -501,19 +518,6 @@ export default function Expenses() {
                             title="Already recorded this month"
                           >
                             ✓ Paid this month
-                          </button>
-                        ) : (
-                          <button
-                            className="btn-primary"
-                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
-                            onClick={() => {
-                              setRecordPayModal({ type: 'recurring_expense', id: exp.id, name: exp.name, amount: exp.amount, defaultAccount: exp.account ? String(exp.account) : '' })
-                              setRecordAmount(String(exp.amount))
-                              setRecordAccount(exp.account ? String(exp.account) : '')
-                              setError('')
-                            }}
-                          >
-                            Record Payment
                           </button>
                         )
                       )}
@@ -560,21 +564,23 @@ export default function Expenses() {
           ) : (
             <div className="list">
               {payables.map(p => {
-                const prog = p.total_installments > 0 ? (p.installments_paid / p.total_installments) * 100 : 0
+                const paidSoFar = Math.max(0, Number(p.total_amount) - Number(p.remaining_amount))
+                const prog = Number(p.total_amount) > 0 ? (paidSoFar / Number(p.total_amount)) * 100 : 0
                 const days = daysUntil(p.due_day)
-                const amtPaid = p.installments_paid * p.monthly_amount
+                const amtPaid = paidSoFar
+                const cashDone = Number(p.remaining_amount) <= 0.01
                 return (
-                  <div key={p.id} className="glass" style={{ padding: '0.9rem 1rem', borderRadius: 'var(--radius-md)', opacity: p.status === 'completed' ? 0.6 : 1 }}>
+                  <div key={p.id} className="glass" style={{ padding: '0.9rem 1rem', borderRadius: 'var(--radius-md)', opacity: cashDone ? 0.6 : 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.6rem' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
                           <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{p.name}</span>
                           <span className={
-                            p.status === 'completed' ? 'badge badge-green' :
+                            cashDone ? 'badge badge-green' :
                             p.status === 'stuck' ? 'badge badge-red' :
                             'badge badge-blue'
                           }>
-                            {p.status}
+                            {cashDone ? 'completed' : p.status}
                           </span>
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>
@@ -610,7 +616,7 @@ export default function Expenses() {
                           {Math.round(prog)}% complete · Total: {fmt(p.total_amount)}
                         </span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          {p.total_installments - p.installments_paid} left
+                          {fmt(p.remaining_amount)} still due
                         </span>
                       </div>
                       <div className="progress-bar">
@@ -621,22 +627,27 @@ export default function Expenses() {
                     <div className="divider" style={{ margin: '0.55rem 0 0.45rem' }} />
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                       {p.status === 'ongoing' && (
-                        p.paid_this_month ? (
+                        Number(p.remaining_amount) > 0.01 ? (
+                          <button
+                            className="btn-primary"
+                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
+                            onClick={() => {
+                              const due = Math.min(Number(p.monthly_amount), Number(p.remaining_amount))
+                              setRecordPayModal({ type: 'payable', id: p.id, name: p.name, amount: due })
+                              setRecordAmount(String(due))
+                              setRecordAccount(p.account ? String(p.account) : '')
+                              setError('')
+                            }}
+                          >
+                            Record Payment
+                          </button>
+                        ) : (
                           <button
                             className="btn-glass"
                             disabled
                             style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem', opacity: 0.65, cursor: 'not-allowed', color: 'var(--success)', borderColor: 'rgba(52,211,153,0.35)' }}
-                            title="This month's installment is already recorded"
                           >
-                            ✓ Paid this month
-                          </button>
-                        ) : (
-                          <button
-                            className="btn-primary"
-                            style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
-                            onClick={() => { setRecordPayModal({ type: 'payable', id: p.id, name: p.name, amount: p.monthly_amount }); setRecordAmount(String(p.monthly_amount)); setRecordAccount(p.account ? String(p.account) : ''); setError('') }}
-                          >
-                            Record Payment
+                            ✓ Paid in full
                           </button>
                         )
                       )}
@@ -790,25 +801,28 @@ export default function Expenses() {
 
               {/* Installment receivables */}
               {receivables.map(r => {
-                const prog = r.total_installments > 0 ? (r.installments_received / r.total_installments) * 100 : 0
-                const amtReceived = r.installments_received * r.monthly_amount
+                const receivedSoFar = Math.max(0, Number(r.received_amount ?? (Number(r.total_amount) - Number(r.remaining_amount))))
+                const rem = Number(r.remaining_amount)
+                const prog = Number(r.total_amount) > 0 ? (receivedSoFar / Number(r.total_amount)) * 100 : 0
+                const amtReceived = receivedSoFar
+                const cashDone = rem <= 0.01
                 return (
-                  <div key={r.id} className="glass" style={{ padding: '0.9rem 1rem', borderRadius: 'var(--radius-md)', opacity: r.status === 'completed' ? 0.6 : 1 }}>
+                  <div key={r.id} className="glass" style={{ padding: '0.9rem 1rem', borderRadius: 'var(--radius-md)', opacity: cashDone ? 0.6 : 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.6rem' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
                           <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.project_name}</span>
                           <span className={
-                            r.status === 'completed' ? 'badge badge-green' :
+                            cashDone ? 'badge badge-green' :
                             r.status === 'stuck' ? 'badge badge-red' :
                             'badge badge-blue'
                           }>
-                            {r.status}
+                            {cashDone ? 'completed' : r.status}
                           </span>
                           <span className="badge badge-blue" style={{ fontSize: '0.62rem' }}>Installments</span>
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>
-                          {r.installments_received} of {r.total_installments} received · PKR {fmtNum(amtReceived)} received so far
+                          {fmt(amtReceived)} of {fmt(r.total_amount)} received so far
                         </div>
                         {r.status === 'stuck' && (
                           <div style={{ marginTop: '0.3rem', fontSize: '0.78rem', color: '#fb7185' }}>
@@ -833,7 +847,7 @@ export default function Expenses() {
                           {Math.round(prog)}% received · Total: {fmt(r.total_amount)}
                         </span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          {r.total_installments - r.installments_received} remaining
+                          {fmt(r.remaining_amount)} still due
                         </span>
                       </div>
                       <div className="progress-bar">
@@ -843,14 +857,15 @@ export default function Expenses() {
 
                     <div className="divider" style={{ margin: '0.55rem 0 0.45rem' }} />
                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap', alignItems: 'center' }}>
-                      {r.status !== 'completed' && (
+                      {!cashDone && (
                         <>
                           <button
                             className="btn-primary"
                             style={{ fontSize: '0.75rem', padding: '0.3rem 0.8rem' }}
                             onClick={() => {
-                              setRecordPayModal({ type: 'receivable', id: r.id, name: r.project_name, amount: r.monthly_amount })
-                              setRecordAmount(String(r.monthly_amount))
+                              const due = Math.min(Number(r.monthly_amount), Number(r.remaining_amount) || Number(r.monthly_amount))
+                              setRecordPayModal({ type: 'receivable', id: r.id, name: r.project_name, amount: due })
+                              setRecordAmount(String(due))
                               setRecordAccount('')
                               setError('')
                             }}
@@ -865,7 +880,7 @@ export default function Expenses() {
                         </>
                       )}
                       <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }} onClick={() => openEditRec(r)}>Edit</button>
-                      {r.status !== 'completed' && (
+                      {!cashDone && (
                         <button
                           className="btn-glass"
                           style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: r.status === 'stuck' ? '#34d399' : '#fb7185', borderColor: r.status === 'stuck' ? 'rgba(52,211,153,0.3)' : 'rgba(251,113,133,0.3)' }}

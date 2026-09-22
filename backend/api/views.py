@@ -339,11 +339,14 @@ class ForecastView(APIView):
         for project in Project.objects.filter(user=user, status='active'):
             if project.income_type in ('recurring_monthly', 'contract_monthly'):
                 if _ym_index(project.start_date.year, project.start_date.month) <= _ym_index(year, month):
-                    forecast_income.append({
-                        'label': project.name,
-                        'amount': float(project.amount),
-                        'type': project.income_type,
-                    })
+                    is_this_month = (year == date.today().year and month == date.today().month)
+                    amt = float(project.remaining_amount) if is_this_month else float(project.amount)
+                    if amt > 0.01:
+                        forecast_income.append({
+                            'label': project.name,
+                            'amount': amt,
+                            'type': project.income_type,
+                        })
             elif project.income_type == 'one_time':
                 # Pending one-time: show remaining from start month until paid/completed
                 rem = float(project.remaining_amount)
@@ -356,7 +359,8 @@ class ForecastView(APIView):
 
         # Receivables (standalone + paid-in-parts): only within tenure months
         for rec in ReceivableInstallment.objects.filter(user=user, status='ongoing'):
-            if rec.installments_received >= rec.total_installments:
+            rem = float(rec.remaining_amount)
+            if rem <= 0.01:
                 continue
             if month_in_installment_window(rec.start_date, rec.total_installments, year, month):
                 label = (
@@ -365,28 +369,33 @@ class ForecastView(APIView):
                 )
                 forecast_income.append({
                     'label': label,
-                    'amount': float(rec.monthly_amount),
+                    'amount': min(float(rec.monthly_amount), rem),
                     'type': 'one_time_installments',
                 })
 
         for expense in RecurringExpense.objects.filter(user=user, active=True):
+            rem = float(expense.remaining_amount)
             if expense.frequency == 'monthly':
-                forecast_outgoing.append({
-                    'label': expense.name,
-                    'amount': float(expense.amount),
-                    'type': 'recurring',
-                    'due_day': expense.due_day,
-                })
+                is_this_month = (year == date.today().year and month == date.today().month)
+                amt = rem if is_this_month else float(expense.amount)
+                if amt > 0.01:
+                    forecast_outgoing.append({
+                        'label': expense.name,
+                        'amount': amt,
+                        'type': 'recurring',
+                        'due_day': expense.due_day,
+                    })
 
         # Loans: only within tenure (start = created month, length = total_installments)
         for payable in PayableInstallment.objects.filter(user=user, status='ongoing'):
-            if payable.installments_paid >= payable.total_installments:
+            rem = float(payable.remaining_amount)
+            if rem <= 0.01:
                 continue
             start = payable.created_at.date()
             if month_in_installment_window(start, payable.total_installments, year, month):
                 forecast_outgoing.append({
                     'label': payable.name,
-                    'amount': float(payable.monthly_amount),
+                    'amount': min(float(payable.monthly_amount), rem),
                     'type': 'payable_installment',
                     'due_day': payable.due_day,
                 })

@@ -214,6 +214,7 @@ export default function BillsScreen() {
           ? {
               ...base,
               type: 'expense' as const,
+              linked_recurring_expense: recordModal.id,
               category: recordModal.name,
               notes: `Recurring expense payment: ${recordModal.name}`,
             }
@@ -799,25 +800,30 @@ export default function BillsScreen() {
                               <Text style={[styles.remainingLabel, { color: colors.textMuted }]}>
                                 {item.frequency === 'monthly' ? '/ month' : 'one-time'}
                               </Text>
+                              {toMoney(item.remaining_amount) > 0.01 && toMoney(item.remaining_amount) < toMoney(item.amount) - 0.01 ? (
+                                <Text style={[styles.remainingLabel, { color: colors.warning }]}>
+                                  {money.fmt(item.remaining_amount)} still due
+                                </Text>
+                              ) : null}
                             </View>
                           </View>
 
                           <View style={[styles.divider, { backgroundColor: colors.border }]} />
                           <View style={styles.actionsRow}>
                             {item.active ? (
-                              item.paid_this_month ? (
+                              toMoney(item.remaining_amount ?? item.amount) > 0.01 ? (
+                                <BouncyPressable
+                                  style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                                  onPress={() => openRecord('expense', item.id, item.name, item.remaining_amount ?? item.amount, item.account)}
+                                >
+                                  <Text style={styles.actionBtnText}>Record Payment</Text>
+                                </BouncyPressable>
+                              ) : (
                                 <View style={[styles.actionBtnMuted, { borderColor: colors.border }]}>
                                   <Text style={[styles.actionBtnMutedText, { color: colors.success }]}>
                                     ✓ Paid this month
                                   </Text>
                                 </View>
-                              ) : (
-                                <BouncyPressable
-                                  style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                                  onPress={() => openRecord('expense', item.id, item.name, item.amount, item.account)}
-                                >
-                                  <Text style={styles.actionBtnText}>Record Payment</Text>
-                                </BouncyPressable>
                               )
                             ) : null}
                             <BouncyPressable
@@ -863,10 +869,11 @@ export default function BillsScreen() {
                   <Text style={{ color: colors.textMuted }}>No payables.</Text>
                 ) : (
                   payables.map((item, i) => {
-                    const prog = item.total_installments > 0 ? (item.installments_paid / item.total_installments) * 100 : 0
+                    const paidSoFar = Math.max(0, toMoney(item.total_amount) - toMoney(item.remaining_amount))
+                    const prog = toMoney(item.total_amount) > 0 ? (paidSoFar / toMoney(item.total_amount)) * 100 : 0
                     const days = daysUntilDue(item.due_day)
                     const isStuck = item.status === 'stuck'
-                    const isDone = item.status === 'completed'
+                    const isDone = toMoney(item.remaining_amount) <= 0.01
                     const isBusy = busyId === `p-${item.id}`
                     return (
                       <Reveal index={i} key={item.id}>
@@ -886,7 +893,7 @@ export default function BillsScreen() {
                               </View>
                               <Text style={[styles.richMeta, money.amountStyle, { color: colors.textMuted }]}>
                                 {item.installments_paid} of {item.total_installments} paid ·{' '}
-                                {money.fmt(item.installments_paid * toMoney(item.monthly_amount))} paid so far
+                                {money.fmt(paidSoFar)} paid so far
                               </Text>
                               {isStuck ? (
                                 <Text style={[styles.stuckWarning, { color: colors.danger }]}>
@@ -919,7 +926,7 @@ export default function BillsScreen() {
                                 {Math.round(prog)}% complete · Total: {money.fmt(item.total_amount)}
                               </Text>
                               <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
-                                {item.total_installments - item.installments_paid} left
+                                {money.fmt(item.remaining_amount)} still due
                               </Text>
                             </View>
                             <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
@@ -935,19 +942,25 @@ export default function BillsScreen() {
                           <View style={[styles.divider, { backgroundColor: colors.border }]} />
                           <View style={styles.actionsRow}>
                             {item.status === 'ongoing' ? (
-                              item.paid_this_month ? (
-                                <View style={[styles.actionBtnMuted, { borderColor: colors.border }]}>
-                                  <Text style={[styles.actionBtnMutedText, { color: colors.success }]}>
-                                    ✓ Paid this month
-                                  </Text>
-                                </View>
-                              ) : (
+                              toMoney(item.remaining_amount) > 0.01 ? (
                                 <BouncyPressable
                                   style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                                  onPress={() => openRecord('payable', item.id, item.name, item.monthly_amount, item.account)}
+                                  onPress={() => openRecord(
+                                    'payable',
+                                    item.id,
+                                    item.name,
+                                    Math.min(toMoney(item.monthly_amount), toMoney(item.remaining_amount)) || item.monthly_amount,
+                                    item.account,
+                                  )}
                                 >
                                   <Text style={styles.actionBtnText}>Record Payment</Text>
                                 </BouncyPressable>
+                              ) : (
+                                <View style={[styles.actionBtnMuted, { borderColor: colors.border }]}>
+                                  <Text style={[styles.actionBtnMutedText, { color: colors.success }]}>
+                                    ✓ Paid in full
+                                  </Text>
+                                </View>
                               )
                             ) : null}
                             <BouncyPressable
@@ -1086,9 +1099,10 @@ export default function BillsScreen() {
                     })}
 
                     {receivables.map((item, i) => {
-                      const prog = item.total_installments > 0 ? (item.installments_received / item.total_installments) * 100 : 0
+                      const receivedSoFar = Math.max(0, toMoney(item.received_amount ?? (toMoney(item.total_amount) - toMoney(item.remaining_amount))))
+                      const prog = toMoney(item.total_amount) > 0 ? (receivedSoFar / toMoney(item.total_amount)) * 100 : 0
                       const stuck = item.status === 'stuck'
-                      const done = item.status === 'completed'
+                      const done = toMoney(item.remaining_amount) <= 0.01
                       const isBusy = busyId === `r-${item.id}`
                       return (
                         <Reveal index={oneTimeProjects.length + i} key={item.id}>
@@ -1110,8 +1124,7 @@ export default function BillsScreen() {
                                   <StatusPill label="Installments" tone="neutral" />
                                 </View>
                                 <Text style={[styles.richMeta, money.amountStyle, { color: colors.textMuted }]}>
-                                  {item.installments_received} of {item.total_installments} received ·{' '}
-                                  {money.fmt(item.installments_received * toMoney(item.monthly_amount))} received so far
+                                  {money.fmt(receivedSoFar)} of {money.fmt(item.total_amount)} received so far
                                 </Text>
                                 {stuck ? (
                                   <Text style={[styles.stuckWarning, { color: colors.danger }]}>
@@ -1136,7 +1149,7 @@ export default function BillsScreen() {
                                   {Math.round(prog)}% received · Total: {money.fmt(item.total_amount)}
                                 </Text>
                                 <Text style={[styles.progressLabel, { color: colors.textMuted }]}>
-                                  {item.total_installments - item.installments_received} remaining
+                                  {money.fmt(item.remaining_amount)} still due
                                 </Text>
                               </View>
                               <View style={[styles.progressTrack, { backgroundColor: colors.surfaceMuted }]}>
@@ -1154,7 +1167,13 @@ export default function BillsScreen() {
                               {!done ? (
                                 <BouncyPressable
                                   style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                                  onPress={() => openRecord('receivable', item.id, item.project_name || 'Receivable', item.monthly_amount, null)}
+                                  onPress={() => openRecord(
+                                    'receivable',
+                                    item.id,
+                                    item.project_name || 'Receivable',
+                                    Math.min(toMoney(item.monthly_amount), toMoney(item.remaining_amount)) || item.monthly_amount,
+                                    null,
+                                  )}
                                 >
                                   <Text style={styles.actionBtnText}>Record Receipt</Text>
                                 </BouncyPressable>

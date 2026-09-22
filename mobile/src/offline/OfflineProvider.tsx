@@ -19,6 +19,7 @@ import { pendingCount, syncOutbox } from './syncEngine'
 import type { OfflineAccount, OfflineTransaction } from './types'
 import { updateAllWidgets } from '@/src/widgets/updateWidgets'
 import { emitBooksChanged } from '@/src/context/MoneyUiContext'
+import { isNativeSqliteError } from './sqliteStore'
 
 interface OfflineContextValue {
   ready: boolean
@@ -104,14 +105,41 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     const store = await getOfflineStore()
     const net = await NetInfo.fetch()
     const onlineNow = net.isConnected !== false
-    const result = await queuePersonalTransaction(store, input, { online: onlineNow })
-    if (!onlineNow) track('transaction_queued_offline', { tx_type: input.type })
-    await refreshStatus()
-    void updateAllWidgets()
-    // Sync in the background — never fail the UI after a successful local write
-    // (that caused "error then double entry" when users tapped Save again).
-    if (onlineNow) void syncNow()
-    return { queuedOffline: !onlineNow, localId: result.transaction.localId }
+    try {
+      const result = await queuePersonalTransaction(store, input, { online: onlineNow })
+      if (!onlineNow) track('transaction_queued_offline', { tx_type: input.type })
+      await refreshStatus()
+      void updateAllWidgets()
+      // Sync in the background — never fail the UI after a successful local write
+      // (that caused "error then double entry" when users tapped Save again).
+      if (onlineNow) void syncNow()
+      return { queuedOffline: !onlineNow, localId: result.transaction.localId }
+    } catch (err) {
+      // Local SQLite can NPE on Android; if we are online, still save via API.
+      if (onlineNow && isNativeSqliteError(err)) {
+        const res = await transactionsApi.create({
+          type: input.type,
+          amount: input.amount,
+          date: input.date,
+          account: input.accountServerId,
+          category: input.category || '',
+          notes: input.notes || '',
+          ...(input.originalAmount != null && input.originalCurrency && input.fxRate != null
+            ? {
+                original_amount: input.originalAmount,
+                original_currency: input.originalCurrency,
+                fx_rate: input.fxRate,
+                fx_source: input.fxSource || 'offline',
+              }
+            : {}),
+        })
+        await refreshStatus()
+        void updateAllWidgets()
+        emitBooksChanged()
+        return { queuedOffline: false, localId: `srv-${(res.data as { id?: number }).id ?? 'ok'}` }
+      }
+      throw err
+    }
   }, [refreshStatus, syncNow])
 
   const clearLocal = useCallback(async () => {

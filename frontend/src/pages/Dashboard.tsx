@@ -220,12 +220,13 @@ export default function Dashboard() {
       <Reveal index={1}>
         <section className="home-card">
           <div className="home-card-head">
-            <h3>{monthName} spending</h3>
-            <button type="button" className="section-link" onClick={() => navigate('/budgets')}>
-              Budgets →
-            </button>
+            <h3>Your monthly expense</h3>
           </div>
-          <CategoryDonut data={breakdown} />
+          <CategoryDonut
+            data={breakdown}
+            detailsLabel="Expense details"
+            onDetailsPress={() => navigate('/reports')}
+          />
         </section>
       </Reveal>
 

@@ -31,9 +31,14 @@ import {
   apiErrorMessage,
   asList,
   bankSmsApi,
+  expensesApi,
+  payablesApi,
   peopleApi,
+  projectsApi,
+  receivablesApi,
   type BankSmsImportRow,
 } from '@/src/api/client'
+import type { Payable, Project, Receivable, RecurringExpense } from '@/src/api/types'
 import { useCategories } from '@/src/context/CategoriesContext'
 import { useOffline } from '@/src/offline'
 import { useBankSms } from '@/src/bankSms'
@@ -109,6 +114,11 @@ export default function BankSmsScreen() {
   const [typeConfirmed, setTypeConfirmed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [peopleHint, setPeopleHint] = useState<string | null>(null)
+  const [associateKey, setAssociateKey] = useState('')
+  const [incomeSources, setIncomeSources] = useState<Project[]>([])
+  const [receivables, setReceivables] = useState<Receivable[]>([])
+  const [monthlyCosts, setMonthlyCosts] = useState<RecurringExpense[]>([])
+  const [payables, setPayables] = useState<Payable[]>([])
   const [aliasMask, setAliasMask] = useState('')
   const [aliasHint, setAliasHint] = useState('')
   const [aliasWalletId, setAliasWalletId] = useState('')
@@ -167,15 +177,95 @@ export default function BankSmsScreen() {
     }
   }, [])
 
+  const loadBooks = useCallback(async () => {
+    try {
+      const [pRes, rRes, eRes, payRes] = await Promise.all([
+        projectsApi.list({ status: 'active' }).catch(() => ({ data: [] })),
+        receivablesApi.list().catch(() => ({ data: [] })),
+        expensesApi.list().catch(() => ({ data: [] })),
+        payablesApi.list().catch(() => ({ data: [] })),
+      ])
+      setIncomeSources(asList<Project>(pRes.data).filter((p) => p.status === 'active'))
+      setReceivables(asList<Receivable>(rRes.data).filter((r) => r.status === 'ongoing'))
+      setMonthlyCosts(asList<RecurringExpense>(eRes.data).filter((e) => e.active))
+      setPayables(asList<Payable>(payRes.data).filter((p) => p.status === 'ongoing'))
+    } catch {
+      /* offline */
+    }
+  }, [])
+
   useEffect(() => {
     void loadWallets()
     void loadPending()
     void loadSettings()
-  }, [loadWallets, loadPending, loadSettings])
+    void loadBooks()
+  }, [loadWallets, loadPending, loadSettings, loadBooks])
 
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
   const cashWallets = useMemo(() => wallets.filter((w) => w.type === 'cash'), [wallets])
   const mustPickType = parsed ? needsManualTypePick(parsed) && !typeConfirmed : false
+
+  const incomeAssociateOptions = useMemo(() => {
+    const opts: { value: string; label: string; remaining: number }[] = [
+      { value: '', label: 'None — just a wallet entry', remaining: 0 },
+    ]
+    for (const p of incomeSources) {
+      const rem = toMoney(p.remaining_amount ?? p.amount)
+      if (p.income_type === 'one_time_installments') continue
+      if (rem <= 0.01) continue
+      opts.push({
+        value: `project:${p.id}`,
+        label: `${p.name} · ${fmt(rem)} left${p.income_type.includes('monthly') || p.income_type === 'contract_monthly' ? ' this month' : ''}`,
+        remaining: rem,
+      })
+    }
+    for (const r of receivables) {
+      const rem = toMoney(r.remaining_amount)
+      if (rem <= 0.01) continue
+      opts.push({
+        value: `receivable:${r.id}`,
+        label: `${r.project_name || 'Installment plan'} · ${fmt(rem)} remaining`,
+        remaining: rem,
+      })
+    }
+    return opts
+  }, [incomeSources, receivables])
+
+  const expenseAssociateOptions = useMemo(() => {
+    const opts: { value: string; label: string; remaining: number }[] = [
+      { value: '', label: 'None — just a wallet entry', remaining: 0 },
+    ]
+    for (const e of monthlyCosts) {
+      const rem = toMoney(e.remaining_amount ?? e.amount)
+      if (rem <= 0.01) continue
+      opts.push({
+        value: `expense:${e.id}`,
+        label: `${e.name} · ${fmt(rem)} left${e.frequency === 'monthly' ? ' this month' : ''}`,
+        remaining: rem,
+      })
+    }
+    for (const p of payables) {
+      const rem = toMoney(p.remaining_amount)
+      if (rem <= 0.01) continue
+      opts.push({
+        value: `payable:${p.id}`,
+        label: `${p.name} · ${fmt(rem)} remaining`,
+        remaining: rem,
+      })
+    }
+    return opts
+  }, [monthlyCosts, payables])
+
+  const associateOptions = draft?.kind === 'income' || draft?.kind === 'reversal'
+    ? incomeAssociateOptions
+    : draft?.kind === 'expense' || (draft?.kind === 'atm' && draft.recordAtmAsExpense)
+      ? expenseAssociateOptions
+      : []
+
+  const selectedAssociate = associateOptions.find((o) => o.value === associateKey)
+  const leftoverAfterApprove = selectedAssociate && draft && associateKey
+    ? Math.max(0, selectedAssociate.remaining - toMoney(draft.amount))
+    : null
 
   const onDetect = async () => {
     setError('')
@@ -284,6 +374,7 @@ export default function BankSmsScreen() {
       await loadPending()
       await loadWallets()
       await loadSettings()
+      void loadBooks()
       // Full books hydrate in background — don't block the approve UI.
       void hydrateNow()
     } catch {
@@ -291,7 +382,7 @@ export default function BankSmsScreen() {
     }
     void bankSms.refreshPending()
     bumpRefresh()
-  }, [hydrateNow, loadWallets, loadPending, loadSettings, bankSms, bumpRefresh])
+  }, [hydrateNow, loadWallets, loadPending, loadSettings, loadBooks, bankSms, bumpRefresh])
 
   const clearReviewForm = () => {
     setPaste('')
@@ -301,6 +392,7 @@ export default function BankSmsScreen() {
     setTypeConfirmed(false)
     setRememberKind(false)
     setPeopleHint(null)
+    setAssociateKey('')
   }
 
   const isAlreadyHandledError = (err: unknown) => {
@@ -326,6 +418,7 @@ export default function BankSmsScreen() {
     const snapshot = draft
     const rememberW = rememberWallet
     const rememberK = rememberKind
+    const link = associateKey
     setBusy(true)
     setError('')
     setOkMsg('')
@@ -347,6 +440,10 @@ export default function BankSmsScreen() {
         create_cash_name: snapshot.createCashNamed || 'Cash',
         remember_wallet: rememberW,
         remember_kind: rememberK,
+        ...(link.startsWith('project:') ? { linked_project_id: Number(link.split(':')[1]) } : {}),
+        ...(link.startsWith('receivable:') ? { linked_receivable_id: Number(link.split(':')[1]) } : {}),
+        ...(link.startsWith('payable:') ? { linked_payable_id: Number(link.split(':')[1]) } : {}),
+        ...(link.startsWith('expense:') ? { linked_recurring_expense_id: Number(link.split(':')[1]) } : {}),
       })
       setOkMsg(
         `Approved #${res.data.id}`
@@ -720,6 +817,7 @@ export default function BankSmsScreen() {
               value={draft.kind}
               options={KIND_OPTIONS}
               onChange={(kind) => {
+                setAssociateKey('')
                 patchDraft({
                   kind,
                   category:
@@ -788,6 +886,31 @@ export default function BankSmsScreen() {
                 options={categoryOptions.map((c) => ({ value: c.key, label: c.label }))}
                 onChange={(category) => patchDraft({ category })}
               />
+            ) : null}
+
+            {associateOptions.length > 1 ? (
+              <>
+                <SelectField
+                  label={
+                    draft.kind === 'income' || draft.kind === 'reversal'
+                      ? 'Link to income'
+                      : 'Link to monthly cost / loan'
+                  }
+                  value={associateKey}
+                  options={associateOptions.map((o) => ({ value: o.value, label: o.label }))}
+                  onChange={setAssociateKey}
+                  placeholder="Optional"
+                />
+                {leftoverAfterApprove != null && associateKey ? (
+                  <View style={[styles.infoBox, { backgroundColor: colors.infoBg, marginBottom: 10 }]}>
+                    <Text style={{ color: colors.infoText, fontSize: 12, fontWeight: '600' }}>
+                      {leftoverAfterApprove > 0.01
+                        ? `After this, ${fmt(leftoverAfterApprove)} still expected`
+                        : 'This covers the remaining amount'}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
             ) : null}
 
             <Text style={[styles.label, { color: colors.textMuted }]}>Notes</Text>

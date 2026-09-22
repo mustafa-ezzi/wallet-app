@@ -8,3 +8,11 @@ import { createMemoryStore } from './memoryStore'
 export async function createSqliteStore(): Promise<OfflineStore> {
   return createMemoryStore()
 }
+
+export function closeSqliteStore() {
+  /* web / tests: nothing to close */
+}
+
+export function isNativeSqliteError(_err: unknown): boolean {
+  return false
+}

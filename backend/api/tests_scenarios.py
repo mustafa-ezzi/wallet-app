@@ -1002,3 +1002,132 @@ class DevicePushPhase6Tests(ScenarioBase):
             )
             self.assertEqual(ok.status_code, 200)
             self.assertTrue(ok.data['dry_run'])
+
+
+class PartialPaymentRemainingTests(ScenarioBase):
+    """Remaining = total minus actual money received/paid, including partials."""
+
+    def test_monthly_salary_partial_leaves_this_month_remaining(self):
+        create = self.client.post('/api/projects/', {
+            'name': 'Salary',
+            'income_type': 'recurring_monthly',
+            'amount': '30000',
+            'status': 'active',
+            'start_date': date.today().replace(day=1).isoformat(),
+            'default_account': self.account.id,
+        }, format='json')
+        self.assertEqual(create.status_code, 201, create.data)
+        pid = create.data['id']
+        self.assertEqual(float(create.data['remaining_amount']), 30000.0)
+
+        tx = self.client.post('/api/transactions/', {
+            'type': 'income',
+            'amount': '11000',
+            'date': date.today().isoformat(),
+            'account': self.account.id,
+            'linked_project': pid,
+            'category': 'Salary',
+        }, format='json')
+        self.assertEqual(tx.status_code, 201, tx.data)
+
+        proj = self.client.get(f'/api/projects/{pid}/')
+        self.assertEqual(float(proj.data['remaining_amount']), 19000.0)
+        self.assertEqual(float(proj.data['received_amount']), 11000.0)
+        self.assertTrue(proj.data['received_this_month'])
+
+    def test_installment_income_uses_actual_receipts_not_monthly_times_count(self):
+        create = self.client.post('/api/projects/', {
+            'name': 'Client job',
+            'income_type': 'one_time_installments',
+            'amount': '30000',
+            'installment_amount': '5000',
+            'advance_amount': '0',
+            'status': 'active',
+            'start_date': '2026-01-01',
+            'default_account': self.account.id,
+        }, format='json')
+        self.assertEqual(create.status_code, 201, create.data)
+        pid = create.data['id']
+        rec = ReceivableInstallment.objects.get(linked_project_id=pid)
+
+        self.client.post('/api/transactions/', {
+            'type': 'income',
+            'amount': '3000',
+            'date': '2026-01-10',
+            'account': self.account.id,
+            'linked_receivable': rec.id,
+            'linked_project': pid,
+        }, format='json')
+        rec.refresh_from_db()
+        self.assertEqual(rec.remaining_amount, 27000.0)
+
+        self.client.post('/api/transactions/', {
+            'type': 'income',
+            'amount': '7000',
+            'date': '2026-02-10',
+            'account': self.account.id,
+            'linked_receivable': rec.id,
+            'linked_project': pid,
+        }, format='json')
+        rec.refresh_from_db()
+        self.assertEqual(rec.remaining_amount, 20000.0)
+        proj = Project.objects.get(id=pid)
+        self.assertEqual(proj.remaining_amount, 20000.0)
+
+    def test_partial_receipt_does_not_count_as_full_installment(self):
+        create = self.client.post('/api/projects/', {
+            'name': 'Client C',
+            'income_type': 'one_time_installments',
+            'amount': '80000',
+            'installment_amount': '20000',
+            'advance_amount': '0',
+            'status': 'active',
+            'start_date': '2026-01-01',
+            'default_account': self.account.id,
+        }, format='json')
+        self.assertEqual(create.status_code, 201, create.data)
+        rec = ReceivableInstallment.objects.get(linked_project_id=create.data['id'])
+        for i, amt in enumerate(('20000', '20000', '20000')):
+            self.client.post('/api/transactions/', {
+                'type': 'income',
+                'amount': amt,
+                'date': f'2026-0{i + 1}-10',
+                'account': self.account.id,
+                'linked_receivable': rec.id,
+            }, format='json')
+        rec.refresh_from_db()
+        self.assertEqual(rec.remaining_amount, 20000.0)
+        self.assertEqual(rec.installments_received, 3)
+
+        self.client.post('/api/transactions/', {
+            'type': 'income',
+            'amount': '5000',
+            'date': '2026-04-10',
+            'account': self.account.id,
+            'linked_receivable': rec.id,
+        }, format='json')
+        rec.refresh_from_db()
+        self.assertEqual(rec.remaining_amount, 15000.0)
+        self.assertEqual(rec.status, 'ongoing')
+        data = self.client.get(f'/api/receivables/{rec.id}/').data
+        self.assertEqual(float(data['remaining_amount']), 15000.0)
+        self.assertEqual(float(data['received_amount']), 65000.0)
+        self.assertEqual(data['status'], 'ongoing')
+        self.assertEqual(data['installments_received'], 3)
+
+    def test_recurring_expense_partial_this_month(self):
+        exp = RecurringExpense.objects.create(
+            user=self.user, name='Rent', amount=Decimal('3000'),
+            frequency='monthly', due_day=5, account=self.account, active=True,
+        )
+        self.client.post('/api/transactions/', {
+            'type': 'expense',
+            'amount': '1000',
+            'date': date.today().isoformat(),
+            'account': self.account.id,
+            'linked_recurring_expense': exp.id,
+            'category': 'Rent',
+        }, format='json')
+        data = self.client.get(f'/api/expenses/{exp.id}/').data
+        self.assertEqual(float(data['remaining_amount']), 2000.0)
+        self.assertFalse(data['paid_this_month'])

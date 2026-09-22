@@ -2,6 +2,7 @@
 Bank SMS Import Phase 2 — pending queue + approve/reject.
 Run:  python manage.py test api.tests_bank_sms -v 2
 """
+from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -247,3 +248,28 @@ class BankSmsImportTests(TestCase):
         }, format='json')
         self.assertEqual(rej.status_code, 200)
         self.assertEqual(rej.data['rejected_count'], 1)
+
+    def test_approve_income_links_project_and_updates_remaining(self):
+        from api.models import Project
+        proj = Project.objects.create(
+            user=self.user, name='Salary', income_type='recurring_monthly',
+            amount=Decimal('30000'), status='active', start_date=date.today(),
+            default_account=self.bank,
+        )
+        created = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'income',
+            'amount': '11000',
+            'fingerprint': 'fp_salary_sms',
+            'suggested_account_id': self.bank.id,
+        }, format='json')
+        pk = created.data['id']
+        res = self.client.post(f'/api/bank-sms-imports/{pk}/approve/', {
+            'kind': 'income',
+            'resolved_account_id': self.bank.id,
+            'linked_project_id': proj.id,
+        }, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        tx = Transaction.objects.get(id=res.data['created_transaction_ids'][0])
+        self.assertEqual(tx.linked_project_id, proj.id)
+        self.assertEqual(proj.remaining_amount, 19000.0)
+

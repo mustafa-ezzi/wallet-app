@@ -12,6 +12,7 @@ interface Project {
   installment_amount: number | null
   advance_amount: number
   remaining_amount: number
+  received_amount?: number
   months_to_complete: number | null
   installments_received: number | null
   received_this_month: boolean
@@ -78,10 +79,7 @@ export default function Projects() {
   const [receiptError, setReceiptError]   = useState('')
 
   const openReceiptModal = (p: Project) => {
-    const isOneTime = p.income_type === 'one_time'
-    const defaultAmt = isOneTime
-      ? (p.remaining_amount ?? Math.max(0, p.amount - (Number(p.advance_amount) || 0)))
-      : p.amount
+    const defaultAmt = p.remaining_amount ?? Math.max(0, p.amount - (Number(p.advance_amount) || 0))
     setReceiptModal({
       projectId: p.id,
       projectName: p.name,
@@ -454,8 +452,8 @@ function ProjectCard({
   const remaining = total - received
   const advance = Number(p.advance_amount) || 0
   const remainingAmt = p.remaining_amount ?? Math.max(0, p.amount - advance)
-  const amtReceived = received * (p.installment_amount ?? 0) + advance
-  const amtRemaining = Math.max(0, p.amount - amtReceived)
+  const amtReceived = Math.max(0, p.amount - remainingAmt)
+  const amtRemaining = remainingAmt
 
   return (
     <div className="glass glass-hover" style={{ padding: '0.95rem 1rem', borderRadius: 'var(--radius-md)' }}>
@@ -468,6 +466,13 @@ function ProjectCard({
           </div>
           {p.default_account_name && (
             <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '0.15rem' }}>→ {p.default_account_name}</div>
+          )}
+          {MONTHLY_TYPES.includes(p.income_type) && (
+            <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: '0.35rem' }}>
+              {remainingAmt > 0.01
+                ? <>You'll still receive <strong>{fmt(remainingAmt)}</strong> this month</>
+                : <span style={{ color: 'var(--success)', fontWeight: 600 }}>Fully received this month</span>}
+            </div>
           )}
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -533,13 +538,13 @@ function ProjectCard({
 
       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
         {p.status === 'active' && MONTHLY_TYPES.includes(p.income_type) && (
-          p.received_this_month ? (
-            <button className="btn-glass" disabled style={{ fontSize: '0.75rem', padding: '0.3rem 0.85rem', opacity: 0.65, cursor: 'not-allowed', color: 'var(--success)' }}>
-              Received this month
-            </button>
-          ) : (
+          Number(p.remaining_amount) > 0.01 ? (
             <button className="btn-primary" style={{ fontSize: '0.75rem', padding: '0.3rem 0.85rem' }} onClick={() => onRecordReceipt(p)}>
               Got paid
+            </button>
+          ) : (
+            <button className="btn-glass" disabled style={{ fontSize: '0.75rem', padding: '0.3rem 0.85rem', opacity: 0.65, cursor: 'not-allowed', color: 'var(--success)' }}>
+              Received this month
             </button>
           )
         )}

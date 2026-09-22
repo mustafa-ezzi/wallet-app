@@ -1,4 +1,5 @@
 export type { OfflineAccount, OfflineTransaction, OfflineStore, SyncStatus } from './types'
+export { isNativeSqliteError } from './sqliteStore'
 export { getOfflineStore, __setOfflineStoreForTests, __resetOfflineStore } from './store'
 export { createMemoryStore } from './memoryStore'
 export { queuePersonalTransaction } from './queueTransaction'

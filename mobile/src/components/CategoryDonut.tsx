@@ -1,43 +1,36 @@
-import { useEffect, useMemo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { useMemo } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg'
-import Animated, {
-  Easing,
-  FadeIn,
-  useAnimatedProps,
-  useSharedValue,
-  withTiming,
-  type SharedValue,
-} from 'react-native-reanimated'
+import Svg, { Circle, G, Line } from 'react-native-svg'
+import Animated, { FadeIn } from 'react-native-reanimated'
 import { getCategoryMeta } from '@/src/constants/categories'
 import { useColors } from '@/src/theme/ThemeContext'
 import { spacing, typography } from '@/src/theme/colors'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
 
-const AnimatedPath = Animated.createAnimatedComponent(Path)
-
 export type DonutDatum = { category: string; amount: number }
 
-type Petal = {
+type Slice = {
   category: string
   amount: number
   color: string
-  colorLight: string
+  colorSoft: string
   icon: React.ComponentProps<typeof FontAwesome>['name']
   fraction: number
-  a0: number
-  a1: number
-  rTarget: number
+  midDeg: number
+  dashLen: number
+  dashOffset: number
 }
 
-const SIZE = 220
+const SIZE = 268
 const CX = SIZE / 2
 const CY = SIZE / 2
-const R0 = 46 // inner hole radius (keeps room for the centre label)
-const R_BASE = 62 // smallest petal reaches this
-const R_MAX = 106 // biggest petal reaches this
-const GAP_DEG = 2 // gap between petals
+const R = 68
+const STROKE = 30
+const CIRC = 2 * Math.PI * R
+const LINE_R0 = R + STROKE / 2 + 3
+const LINE_R1 = R + STROKE / 2 + 22
+const LABEL_R = R + STROKE / 2 + 40
 
 function lighten(hex: string, amt: number): string {
   const h = hex.replace('#', '')
@@ -48,62 +41,32 @@ function lighten(hex: string, amt: number): string {
   return `#${[mix(r), mix(g), mix(b)].map((x) => x.toString(16).padStart(2, '0')).join('')}`
 }
 
-function PetalArc({
-  petal,
-  gradId,
-  progress,
-}: {
-  petal: Petal
-  gradId: string
-  progress: SharedValue<number>
-}) {
-  const { a0, a1, rTarget } = petal
-  const animatedProps = useAnimatedProps(() => {
-    'worklet'
-    const p = progress.value
-    const r1 = R0 + (rTarget - R0) * p
-    const s = a0 + GAP_DEG
-    const e = a1 - GAP_DEG
-    const toRad = (deg: number) => ((deg - 90) * Math.PI) / 180
-    const as = toRad(s)
-    const ae = toRad(e)
-    const x0o = CX + r1 * Math.cos(as)
-    const y0o = CY + r1 * Math.sin(as)
-    const x1o = CX + r1 * Math.cos(ae)
-    const y1o = CY + r1 * Math.sin(ae)
-    const x1i = CX + R0 * Math.cos(ae)
-    const y1i = CY + R0 * Math.sin(ae)
-    const x0i = CX + R0 * Math.cos(as)
-    const y0i = CY + R0 * Math.sin(as)
-    const large = e - s > 180 ? 1 : 0
-    const d = `M ${x0o} ${y0o} A ${r1} ${r1} 0 ${large} 1 ${x1o} ${y1o} L ${x1i} ${y1i} A ${R0} ${R0} 0 ${large} 0 ${x0i} ${y0i} Z`
-    return { d, opacity: 0.35 + 0.65 * p }
-  })
-  return (
-    <AnimatedPath
-      animatedProps={animatedProps}
-      fill={`url(#${gradId})`}
-      stroke={petal.colorLight}
-      strokeWidth={0.5}
-      strokeLinejoin="round"
-    />
-  )
+function polar(r: number, deg: number) {
+  const rad = ((deg - 90) * Math.PI) / 180
+  return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) }
+}
+
+function dist(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(a.x - b.x, a.y - b.y)
 }
 
 export function CategoryDonut({
   data,
   title = 'This month you spent',
   emptyText = 'No spending recorded this month yet.',
+  detailsLabel,
+  onDetailsPress,
 }: {
   data: DonutDatum[]
   title?: string
   emptyText?: string
+  detailsLabel?: string
+  onDetailsPress?: () => void
 }) {
   const colors = useColors()
   const money = useMaskedMoney()
-  const progress = useSharedValue(0)
 
-  const { petals, total } = useMemo(() => {
+  const { slices, total, labels } = useMemo(() => {
     const merged = new Map<string, number>()
     for (const d of data) {
       if (!d.amount) continue
@@ -114,151 +77,178 @@ export function CategoryDonut({
       .sort((a, b) => b.amount - a.amount)
     const totalAmt = rows.reduce((s, r) => s + r.amount, 0)
 
-    const MAX = 7
+    const MAX = 6
     let display = rows
     if (rows.length > MAX) {
       const head = rows.slice(0, MAX - 1)
       const tail = rows.slice(MAX - 1)
-      const otherAmt = tail.reduce((s, r) => s + r.amount, 0)
-      display = [...head, { category: 'Other', amount: otherAmt }]
+      display = [...head, { category: 'Other', amount: tail.reduce((s, r) => s + r.amount, 0) }]
     }
 
-    const maxAmt = display.reduce((m, r) => Math.max(m, r.amount), 0) || 1
+    const gapFrac = display.length > 1 ? 2.4 / 360 : 0
     let acc = 0
-    const built: Petal[] = display.map((r) => {
+    const built: Slice[] = display.map((r) => {
       const meta = getCategoryMeta(r.category)
       const fraction = totalAmt ? r.amount / totalAmt : 0
-      const norm = r.amount / maxAmt
-      const a0 = acc * 360
+      const midDeg = (acc + fraction / 2) * 360
+      const dashLen = Math.max(0, (fraction - gapFrac) * CIRC)
+      const dashOffset = -acc * CIRC
       acc += fraction
-      const a1 = acc * 360
       return {
         category: r.category,
         amount: r.amount,
         color: meta.color,
-        colorLight: lighten(meta.color, 0.35),
+        colorSoft: lighten(meta.color, 0.28),
         icon: meta.icon,
         fraction,
-        a0,
-        a1,
-        rTarget: R_BASE + norm * (R_MAX - R_BASE),
+        midDeg,
+        dashLen,
+        dashOffset,
       }
     })
-    return { petals: built, total: totalAmt }
-  }, [data])
 
-  useEffect(() => {
-    progress.value = 0
-    progress.value = withTiming(1, { duration: 1100, easing: Easing.out(Easing.cubic) })
-  }, [progress, petals])
+    const pts = built.map((s) => ({ ...polar(LABEL_R, s.midDeg), slice: s }))
+    const show = built.map((s) => s.fraction >= 0.045)
+    for (let i = 0; i < pts.length; i++) {
+      for (let j = i + 1; j < pts.length; j++) {
+        if (!show[i] || !show[j]) continue
+        if (dist(pts[i], pts[j]) < 42) {
+          if (built[i].fraction <= built[j].fraction) show[i] = false
+          else show[j] = false
+        }
+      }
+    }
+
+    const labs = built.flatMap((s, i) => {
+      if (!show[i]) return []
+      const a = polar(LINE_R0, s.midDeg)
+      const b = polar(LINE_R1, s.midDeg)
+      const c = polar(LABEL_R, s.midDeg)
+      const pct = Math.round(s.fraction * 100)
+      if (pct < 1) return []
+      return [{ key: s.category, a, b, c, pct, icon: s.icon, color: s.color }]
+    })
+
+    return { slices: built, total: totalAmt, labels: labs }
+  }, [data])
 
   if (total <= 0) {
     return (
       <View style={styles.emptyWrap}>
-        <View style={[styles.emptyRing, { borderColor: colors.surfaceMuted }]}>
+        <View style={[styles.emptyRing, { borderColor: colors.border }]}>
           <FontAwesome name="pie-chart" size={22} color={colors.textMuted} />
         </View>
-        <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-          {emptyText}
-        </Text>
+        <Text style={[styles.emptyText, { color: colors.textMuted }]}>{emptyText}</Text>
       </View>
     )
   }
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.totalBanner}>
-        <Text style={[styles.totalLabel, { color: colors.textMuted }]}>{title}</Text>
-        <Text style={[styles.totalValue, money.amountStyle, { color: colors.primaryDark }]}>
-          {money.fmt(total)}
-        </Text>
-      </View>
-
-      <Animated.View entering={FadeIn.duration(300)} style={{ width: SIZE, height: SIZE }}>
+      <Animated.View entering={FadeIn.duration(280)} style={{ width: SIZE, height: SIZE }}>
         <Svg width={SIZE} height={SIZE}>
-          <Defs>
-            {petals.map((p, i) => (
-              <LinearGradient key={p.category} id={`petal-${i}`} x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0" stopColor={p.colorLight} />
-                <Stop offset="1" stopColor={p.color} />
-              </LinearGradient>
+          <Circle
+            cx={CX}
+            cy={CY}
+            r={R}
+            fill="none"
+            stroke={colors.surfaceMuted}
+            strokeWidth={STROKE}
+          />
+          <G rotation={-90} originX={CX} originY={CY}>
+            {slices.map((s) => (
+              <Circle
+                key={s.category}
+                cx={CX}
+                cy={CY}
+                r={R}
+                fill="none"
+                stroke={s.colorSoft}
+                strokeWidth={STROKE}
+                strokeDasharray={`${s.dashLen} ${CIRC}`}
+                strokeDashoffset={s.dashOffset}
+                strokeLinecap="butt"
+              />
             ))}
-          </Defs>
-          <Circle cx={CX} cy={CY} r={R0 - 4} fill={colors.surfaceMuted} opacity={0.5} />
-          {petals.map((p, i) => (
-            <PetalArc key={p.category} petal={p} gradId={`petal-${i}`} progress={progress} />
+          </G>
+          {labels.map((l) => (
+            <Line
+              key={`ln-${l.key}`}
+              x1={l.a.x}
+              y1={l.a.y}
+              x2={l.b.x}
+              y2={l.b.y}
+              stroke={colors.border}
+              strokeWidth={1}
+            />
           ))}
         </Svg>
+        {labels.map((l) => (
+          <View
+            key={`lb-${l.key}`}
+            pointerEvents="none"
+            style={[
+              styles.labelCluster,
+              { left: l.c.x - 22, top: l.c.y - 20 },
+            ]}
+          >
+            <Text style={[styles.pct, { color: colors.textMuted }]}>{l.pct}%</Text>
+            <View style={[styles.iconDot, { borderColor: colors.surface, backgroundColor: colors.surface }]}>
+              <FontAwesome name={l.icon} size={11} color={l.color} />
+            </View>
+          </View>
+        ))}
       </Animated.View>
 
-      <View style={styles.legend}>
-        {petals.map((p) => {
-          const pctVal = Math.round(p.fraction * 100)
-          return (
-            <View key={p.category} style={styles.legendRow}>
-              <View style={[styles.legendIcon, { backgroundColor: p.color }]}>
-                <FontAwesome name={p.icon} size={12} color="#fff" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.legendTopLine}>
-                  <Text style={[styles.legendLabel, { color: colors.text }]} numberOfLines={1}>
-                    {p.category}
-                  </Text>
-                  <Text style={[styles.legendAmt, money.amountStyle, { color: colors.textSecondary }]}>
-                    {money.fmt(p.amount)}
-                  </Text>
-                </View>
-                <View style={[styles.legendTrack, { backgroundColor: colors.surfaceMuted }]}>
-                  <View
-                    style={[
-                      styles.legendFill,
-                      { width: `${Math.max(pctVal, 3)}%`, backgroundColor: p.color },
-                    ]}
-                  />
-                </View>
-              </View>
-              <View style={[styles.legendPctPill, { backgroundColor: `${p.color}1f` }]}>
-                <Text style={[styles.legendPct, { color: p.color }]}>{pctVal}%</Text>
-              </View>
-            </View>
-          )
-        })}
-      </View>
+      <Text style={[styles.spentLine, { color: colors.text }]}>
+        {title}{' '}
+        <Text style={[styles.spentAmt, money.amountStyle, { color: colors.text }]}>
+          {money.fmt(total)}
+        </Text>
+      </Text>
+      {detailsLabel && onDetailsPress ? (
+        <Pressable onPress={onDetailsPress} hitSlop={8} style={styles.detailsBtn}>
+          <Text style={[styles.details, { color: colors.textMuted }]}>{detailsLabel}</Text>
+        </Pressable>
+      ) : null}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  wrap: { alignItems: 'center' },
-  totalBanner: {
-    width: '100%',
+  wrap: { alignItems: 'center', paddingTop: 4 },
+  labelCluster: {
+    position: 'absolute',
+    width: 44,
     alignItems: 'center',
-    marginBottom: spacing.md,
-    gap: 2,
+    gap: 3,
   },
-  totalLabel: {
-    fontSize: typography.caption,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  totalValue: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
-  legend: { width: '100%', marginTop: spacing.md, gap: spacing.md },
-  legendRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  legendIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 9,
+  pct: { fontSize: 10, fontWeight: '700' },
+  iconDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    ...({
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 3,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 1,
+    } as const),
   },
-  legendTopLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 },
-  legendLabel: { flex: 1, fontWeight: '700', fontSize: typography.body },
-  legendAmt: { fontWeight: '800', fontSize: typography.caption, marginLeft: 8 },
-  legendTrack: { height: 6, borderRadius: 999, overflow: 'hidden' },
-  legendFill: { height: '100%', borderRadius: 999 },
-  legendPctPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3, minWidth: 42, alignItems: 'center' },
-  legendPct: { fontSize: 11, fontWeight: '800' },
+  spentLine: {
+    marginTop: 6,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  spentAmt: { fontWeight: '800' },
+  detailsBtn: { marginTop: 6, paddingVertical: 2 },
+  details: { fontSize: 13, fontWeight: '600' },
   emptyWrap: { paddingVertical: spacing.xl, alignItems: 'center', gap: spacing.md },
   emptyRing: {
     width: 64,

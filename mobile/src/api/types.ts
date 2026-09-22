@@ -148,6 +148,8 @@ export type RecurringExpense = {
   account_name?: string | null
   active: boolean
   paid_this_month: boolean
+  remaining_amount?: number | string
+  paid_amount?: number | string
 }
 
 export type Payable = {
@@ -158,6 +160,7 @@ export type Payable = {
   total_installments: number
   installments_paid: number
   remaining_amount: number | string
+  paid_amount?: number | string
   due_day: number
   account: number
   account_name?: string | null
@@ -174,6 +177,7 @@ export type Receivable = {
   total_installments: number
   installments_received: number
   remaining_amount: number | string
+  received_amount?: number | string
   start_date: string
   status: string
   received_this_month: boolean
@@ -187,6 +191,7 @@ export type Project = {
   installment_amount?: number | string | null
   advance_amount?: number | string | null
   remaining_amount?: number | string
+  received_amount?: number | string
   months_to_complete?: number | null
   installments_received?: number | null
   received_this_month?: boolean

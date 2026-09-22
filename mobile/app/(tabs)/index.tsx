@@ -365,12 +365,13 @@ export default function HomeScreen() {
             <Reveal index={1}>
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.cardHead}>
-                  <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>{monthName} spending</Text>
-                  <Pressable onPress={() => router.push('/(tabs)/budgets' as '/(tabs)/reports')} hitSlop={8}>
-                    <Text style={[styles.link, { color: colors.primary }]}>Budgets →</Text>
-                  </Pressable>
+                  <Text style={[styles.cardTitle, { color: colors.primaryDark }]}>Your monthly expense</Text>
                 </View>
-                <CategoryDonut data={breakdown} />
+                <CategoryDonut
+                  data={breakdown}
+                  detailsLabel="Expense details"
+                  onDetailsPress={() => router.push('/(tabs)/reports')}
+                />
               </View>
             </Reveal>
 

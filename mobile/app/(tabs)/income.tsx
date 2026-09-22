@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -33,9 +34,18 @@ import { mutationId, todayISO, toMoney } from '@/src/utils/format'
 const TYPE_LABEL: Record<string, string> = {
   recurring_monthly: 'Every month',
   contract_monthly: 'Salary / contract',
+  one_time: 'One-time payment',
+  one_time_installments: 'Paid in parts',
 }
 
-/** Income tab only shows recurring sources — one-time / installments live under Bills. */
+const TYPE_HINT: Record<string, string> = {
+  recurring_monthly: 'Salary, retainer, or anything that lands each month',
+  contract_monthly: 'A fixed monthly amount from a client or deal',
+  one_time: 'A single payment still owed to you — saved under Bills → Owed to you',
+  one_time_installments: 'Total due in smaller payments — saved under Bills → Owed to you',
+}
+
+/** Recurring sources stay on this tab. One-time & installments are created here, listed under Bills. */
 const INCOME_TYPES = Object.keys(TYPE_LABEL) as Project['income_type'][]
 const OWED_TYPES = new Set(['one_time', 'one_time_installments'])
 
@@ -99,6 +109,10 @@ export default function IncomeScreen() {
       setError('Name and amount are required.')
       return
     }
+    if (form.income_type === 'one_time_installments' && toMoney(form.installment_amount) <= 0) {
+      setError('Enter how much you expect in each payment.')
+      return
+    }
     busyRef.current = true
     setBusy(true)
     setError('')
@@ -107,13 +121,17 @@ export default function IncomeScreen() {
         name: form.name.trim(),
         income_type: form.income_type,
         amount: toMoney(form.amount),
-        advance_amount: toMoney(form.advance_amount),
+        advance_amount: OWED_TYPES.has(form.income_type) ? toMoney(form.advance_amount) : 0,
         start_date: form.start_date || todayISO(),
         status: 'active',
         notes: form.notes.trim(),
       }
+      if (form.income_type === 'one_time_installments') {
+        payload.installment_amount = toMoney(form.installment_amount)
+      }
       if (form.default_account) payload.default_account = Number(form.default_account)
       await projectsApi.create(payload)
+      const createdType = form.income_type
       setCreateOpen(false)
       setForm({
         name: '',
@@ -127,6 +145,14 @@ export default function IncomeScreen() {
       })
       bumpRefresh()
       await load(true)
+      if (OWED_TYPES.has(createdType)) {
+        Alert.alert(
+          'Saved',
+          createdType === 'one_time'
+            ? 'This one-time amount is under Bills → Owed to you.'
+            : 'This installment plan is under Bills → Owed to you.',
+        )
+      }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not create income source.'))
     } finally {
@@ -228,22 +254,26 @@ export default function IncomeScreen() {
       ) : null}
       {p.remaining_amount != null ? (
         <Text style={[styles.meta, { color: colors.textMuted }]}>
-          Remaining {money.fmt(p.remaining_amount)}
+          {toMoney(p.remaining_amount) > 0.01
+            ? `You'll still receive ${money.fmt(p.remaining_amount)}${p.income_type === 'recurring_monthly' || p.income_type === 'contract_monthly' ? ' this month' : ''}`
+            : p.income_type === 'recurring_monthly' || p.income_type === 'contract_monthly'
+              ? 'Fully received this month'
+              : 'Fully received'}
         </Text>
       ) : null}
 
       <View style={styles.cardActions}>
-        {p.status === 'active' && !p.received_this_month ? (
+        {p.status === 'active' && toMoney(p.remaining_amount ?? p.amount) > 0.01 ? (
           <BouncyPressable
             style={[styles.actionBtn, { backgroundColor: colors.primary }]}
             onPress={() => {
-              setReceiveAmount(String(p.installment_amount || p.amount || ''))
+              setReceiveAmount(String(p.remaining_amount || p.installment_amount || p.amount || ''))
               setReceiveOpen(p)
             }}
           >
             <Text style={styles.actionBtnText}>Got paid</Text>
           </BouncyPressable>
-        ) : p.received_this_month ? (
+        ) : p.status === 'active' ? (
           <View style={[styles.actionBtn, styles.actionBtnMuted, { borderColor: colors.border }]}>
             <Text style={[styles.actionBtnMutedText, { color: colors.success }]}>Received this month</Text>
           </View>
@@ -340,15 +370,38 @@ export default function IncomeScreen() {
             <ErrorBanner message={error} />
             <Field label="Name" value={form.name} onChangeText={(t) => setForm((f) => ({ ...f, name: t }))} placeholder="Client / Salary" autoCapitalize="words" />
             <SelectField
-              label="Type"
+              label="How do you get paid?"
               value={form.income_type}
               options={INCOME_TYPES.map((t) => ({
                 value: t,
                 label: TYPE_LABEL[t],
               }))}
-              onChange={(t) => setForm((f) => ({ ...f, income_type: t }))}
+              onChange={(t) => setForm((f) => ({ ...f, income_type: t as Project['income_type'] }))}
             />
-            <Field label="Amount" value={form.amount} onChangeText={(t) => setForm((f) => ({ ...f, amount: t }))} keyboardType="decimal-pad" />
+            <Text style={[styles.hint, { color: colors.textMuted }]}>{TYPE_HINT[form.income_type]}</Text>
+            <Field
+              label={form.income_type === 'recurring_monthly' || form.income_type === 'contract_monthly' ? 'Amount each month' : 'Total amount'}
+              value={form.amount}
+              onChangeText={(t) => setForm((f) => ({ ...f, amount: t }))}
+              keyboardType="decimal-pad"
+            />
+            {form.income_type === 'one_time_installments' ? (
+              <Field
+                label="Each payment"
+                value={form.installment_amount}
+                onChangeText={(t) => setForm((f) => ({ ...f, installment_amount: t }))}
+                keyboardType="decimal-pad"
+                placeholder="e.g. 20000"
+              />
+            ) : null}
+            {OWED_TYPES.has(form.income_type) ? (
+              <Field
+                label="Advance already received (optional)"
+                value={form.advance_amount}
+                onChangeText={(t) => setForm((f) => ({ ...f, advance_amount: t }))}
+                keyboardType="decimal-pad"
+              />
+            ) : null}
             <DateField
               label="Start date"
               value={form.start_date}
@@ -434,6 +487,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   sheetTitle: { fontSize: typography.subtitle, fontWeight: '800', marginBottom: spacing.md },
+  hint: { fontSize: 12, marginTop: -6, marginBottom: spacing.md, lineHeight: 16 },
   label: { fontSize: 12, fontWeight: '700', marginBottom: 6 },
   seg: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.md },
   segBtn: {

@@ -1,7 +1,20 @@
+from datetime import date
 from django.db import models
 from django.contrib.auth.models import User
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
+
+
+def _sum_amounts(qs) -> float:
+    return float(qs.aggregate(total=Sum('amount'))['total'] or 0)
+
+
+def _month_bounds(today=None):
+    today = today or timezone.localdate()
+    start = date(today.year, today.month, 1)
+    if today.month == 12:
+        return start, date(today.year + 1, 1, 1)
+    return start, date(today.year, today.month + 1, 1)
 
 
 
@@ -133,20 +146,31 @@ class Project(models.Model):
     def months_to_complete(self):
         if self.income_type == 'one_time_installments' and self.installment_amount:
             import math
-            remaining = max(0.0, float(self.amount) - float(self.advance_amount or 0))
+            remaining = self.remaining_amount
             if float(self.installment_amount) <= 0:
                 return None
-            return math.ceil(remaining / float(self.installment_amount))
+            return math.ceil(remaining / float(self.installment_amount)) if remaining > 0 else 0
         return None
+
+    def _linked_income_qs(self):
+        return Transaction.objects.filter(type='income').filter(
+            Q(linked_project=self) | Q(linked_receivable__linked_project=self)
+        ).distinct()
+
+    def income_received_total(self) -> float:
+        return _sum_amounts(self._linked_income_qs())
+
+    def income_received_this_month(self) -> float:
+        start, end = _month_bounds()
+        return _sum_amounts(self._linked_income_qs().filter(date__gte=start, date__lt=end))
 
     @property
     def remaining_amount(self):
+        """Money still expected. Monthly types are this calendar month; others are the full total."""
+        if self.income_type in ('recurring_monthly', 'contract_monthly'):
+            return max(0.0, float(self.amount) - self.income_received_this_month())
         base = max(0.0, float(self.amount) - float(self.advance_amount or 0))
-        if self.income_type == 'one_time':
-            received = self.transactions.filter(type='income').aggregate(
-                total=Sum('amount'))['total'] or 0
-            return max(0.0, base - float(received))
-        return base
+        return max(0.0, base - self.income_received_total())
 
 
 class Transaction(models.Model):
@@ -176,6 +200,9 @@ class Transaction(models.Model):
         related_name='transactions')
     linked_payable = models.ForeignKey(
         'PayableInstallment', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='transactions')
+    linked_recurring_expense = models.ForeignKey(
+        'RecurringExpense', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='transactions')
     category = models.CharField(max_length=100, blank=True)
     notes = models.TextField(blank=True)
@@ -210,30 +237,50 @@ class Transaction(models.Model):
         self._update_installments()
 
     def _update_installments(self):
-        if self.linked_receivable and self.type == 'income':
-            rec = self.linked_receivable
-            paid_count = rec.transactions.filter(type='income').count()
-            rec.installments_received = paid_count
-            if paid_count >= rec.total_installments:
-                rec.status = 'completed'
-                if rec.linked_project_id:
-                    Project.objects.filter(
-                        id=rec.linked_project_id, status='active'
-                    ).update(status='completed')
+        rec = self.linked_receivable
+        if self.type == 'income' and rec is None and self.linked_project_id:
+            rec = ReceivableInstallment.objects.filter(linked_project_id=self.linked_project_id).first()
+            if rec and not self.linked_receivable_id:
+                Transaction.objects.filter(pk=self.pk).update(linked_receivable_id=rec.id)
+
+        if rec and self.type == 'income':
+            received = rec.amount_received
+            monthly = float(rec.monthly_amount or 0)
+            rec.installments_received = (
+                int(received / monthly) if monthly > 0 else rec.transactions.filter(type='income').count()
+            )
+            if rec.status != 'stuck':
+                if received + 0.01 >= float(rec.total_amount):
+                    rec.status = 'completed'
+                    if rec.linked_project_id:
+                        proj = rec.linked_project
+                        if proj and proj.status == 'active' and proj.remaining_amount <= 0.01:
+                            Project.objects.filter(id=proj.id, status='active').update(status='completed')
+                else:
+                    rec.status = 'ongoing'
+                    if rec.linked_project_id:
+                        Project.objects.filter(
+                            id=rec.linked_project_id, status='completed',
+                        ).update(status='active')
             rec.save(update_fields=['installments_received', 'status'])
 
         if self.linked_payable and self.type == 'expense':
             pay = self.linked_payable
-            paid_count = pay.transactions.filter(type='expense').count()
-            pay.installments_paid = paid_count
-            if paid_count >= pay.total_installments:
-                pay.status = 'completed'
+            paid = pay.amount_paid
+            monthly = float(pay.monthly_amount or 0)
+            pay.installments_paid = (
+                int(paid / monthly) if monthly > 0 else pay.transactions.filter(type='expense').count()
+            )
+            if pay.status != 'stuck':
+                pay.status = 'completed' if paid + 0.01 >= float(pay.total_amount) else 'ongoing'
             pay.save(update_fields=['installments_paid', 'status'])
 
-        # One-time income: mark project completed when remaining is fully received
+        # Income source fully received → complete
         if self.linked_project_id and self.type == 'income':
             proj = self.linked_project
-            if proj and proj.income_type == 'one_time' and proj.status == 'active':
+            if proj and proj.status == 'active' and proj.income_type in (
+                'one_time', 'one_time_installments',
+            ):
                 if proj.remaining_amount <= 0.01:
                     proj.status = 'completed'
                     proj.save(update_fields=['status'])
@@ -311,6 +358,24 @@ class RecurringExpense(models.Model):
     def __str__(self):
         return f"{self.name} ({self.user.username})"
 
+    def _paid_qs(self):
+        return Transaction.objects.filter(user=self.user, type='expense').filter(
+            Q(linked_recurring_expense=self) | Q(category=self.name)
+        ).distinct()
+
+    def amount_paid_this_month(self) -> float:
+        start, end = _month_bounds()
+        return _sum_amounts(self._paid_qs().filter(date__gte=start, date__lt=end))
+
+    def amount_paid_total(self) -> float:
+        return _sum_amounts(self._paid_qs())
+
+    @property
+    def remaining_amount(self):
+        if self.frequency == 'one_time':
+            return max(0.0, float(self.amount) - self.amount_paid_total())
+        return max(0.0, float(self.amount) - self.amount_paid_this_month())
+
 
 class ReceivableInstallment(models.Model):
     STATUS = [('ongoing', 'Ongoing'), ('completed', 'Completed'), ('stuck', 'Stuck')]
@@ -330,11 +395,20 @@ class ReceivableInstallment(models.Model):
         ordering = ['-created_at']
 
     @property
+    def amount_received(self) -> float:
+        qs = self.transactions.filter(type='income')
+        if self.linked_project_id:
+            qs = Transaction.objects.filter(type='income').filter(
+                Q(pk__in=qs.values('pk')) | Q(linked_project_id=self.linked_project_id)
+            ).distinct()
+        return _sum_amounts(qs)
+
+    @property
     def remaining_amount(self):
-        return float(self.total_amount) - (self.installments_received * float(self.monthly_amount))
+        return max(0.0, float(self.total_amount) - self.amount_received)
 
     def __str__(self):
-        return f"Receivable: {self.linked_project.name}"
+        return f"Receivable: {self.linked_project.name}" if self.linked_project_id else 'Receivable'
 
 
 class PayableInstallment(models.Model):
@@ -356,8 +430,12 @@ class PayableInstallment(models.Model):
         ordering = ['-created_at']
 
     @property
+    def amount_paid(self) -> float:
+        return _sum_amounts(self.transactions.filter(type='expense'))
+
+    @property
     def remaining_amount(self):
-        return float(self.total_amount) - (self.installments_paid * float(self.monthly_amount))
+        return max(0.0, float(self.total_amount) - self.amount_paid)
 
     def __str__(self):
         return f"Payable: {self.name}"

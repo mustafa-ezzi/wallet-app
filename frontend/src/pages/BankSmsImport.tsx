@@ -29,7 +29,11 @@ import {
   asList,
   apiErrorMessage,
   bankSmsApi,
+  expensesApi,
+  payablesApi,
   peopleApi,
+  projectsApi,
+  receivablesApi,
   type BankSmsImportRow,
 } from '../api/client'
 import { useCategories } from '../context/CategoriesContext'
@@ -91,6 +95,9 @@ export default function BankSmsImportPage() {
   const [typeConfirmed, setTypeConfirmed] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [peopleHint, setPeopleHint] = useState<string | null>(null)
+  const [associateKey, setAssociateKey] = useState('')
+  const [incomeOpts, setIncomeOpts] = useState<{ value: string; label: string; remaining: number }[]>([])
+  const [expenseOpts, setExpenseOpts] = useState<{ value: string; label: string; remaining: number }[]>([])
   const [aliasMask, setAliasMask] = useState('')
   const [aliasHint, setAliasHint] = useState('')
   const [aliasWalletId, setAliasWalletId] = useState('')
@@ -148,11 +155,55 @@ export default function BankSmsImportPage() {
     }
   }, [])
 
+  const loadBooks = useCallback(async () => {
+    try {
+      const [pRes, rRes, eRes, payRes] = await Promise.all([
+        projectsApi.list({ status: 'active' }).catch(() => ({ data: [] })),
+        receivablesApi.list().catch(() => ({ data: [] })),
+        expensesApi.list().catch(() => ({ data: [] })),
+        payablesApi.list().catch(() => ({ data: [] })),
+      ])
+      const inc: { value: string; label: string; remaining: number }[] = []
+      for (const p of asList<{ id: number; name: string; income_type: string; remaining_amount?: number; amount: number; status: string }>(pRes.data)) {
+        if (p.status && p.status !== 'active') continue
+        if (p.income_type === 'one_time_installments') continue
+        const rem = toMoney(p.remaining_amount ?? p.amount)
+        if (rem <= 0.01) continue
+        const monthly = p.income_type === 'recurring_monthly' || p.income_type === 'contract_monthly'
+        inc.push({ value: `project:${p.id}`, label: `${p.name} · ${fmt(rem)} left${monthly ? ' this month' : ''}`, remaining: rem })
+      }
+      for (const r of asList<{ id: number; project_name?: string; remaining_amount: number; status: string }>(rRes.data)) {
+        if (r.status && r.status !== 'ongoing') continue
+        const rem = toMoney(r.remaining_amount)
+        if (rem <= 0.01) continue
+        inc.push({ value: `receivable:${r.id}`, label: `${r.project_name || 'Installment plan'} · ${fmt(rem)} remaining`, remaining: rem })
+      }
+      const exp: { value: string; label: string; remaining: number }[] = []
+      for (const e of asList<{ id: number; name: string; remaining_amount?: number; amount: number; frequency?: string; active?: boolean }>(eRes.data)) {
+        if (e.active === false) continue
+        const rem = toMoney(e.remaining_amount ?? e.amount)
+        if (rem <= 0.01) continue
+        exp.push({ value: `expense:${e.id}`, label: `${e.name} · ${fmt(rem)} left${e.frequency === 'monthly' ? ' this month' : ''}`, remaining: rem })
+      }
+      for (const p of asList<{ id: number; name: string; remaining_amount: number; status: string }>(payRes.data)) {
+        if (p.status && p.status !== 'ongoing') continue
+        const rem = toMoney(p.remaining_amount)
+        if (rem <= 0.01) continue
+        exp.push({ value: `payable:${p.id}`, label: `${p.name} · ${fmt(rem)} remaining`, remaining: rem })
+      }
+      setIncomeOpts(inc)
+      setExpenseOpts(exp)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
   useEffect(() => {
     void loadWallets()
     void loadPending()
     void loadSettings()
-  }, [loadWallets, loadPending, loadSettings])
+    void loadBooks()
+  }, [loadWallets, loadPending, loadSettings, loadBooks])
 
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
   const cashWallets = useMemo(() => wallets.filter((w) => w.type === 'cash'), [wallets])
@@ -161,6 +212,7 @@ export default function BankSmsImportPage() {
   const onDetect = async () => {
     setError('')
     setOkMsg('')
+    setAssociateKey('')
     setTypeConfirmed(false)
     const p = parseBankSms(paste, { kindOverrides })
     setParsed(p)
@@ -291,11 +343,16 @@ export default function BankSmsImportPage() {
         create_cash_name: draft.createCashNamed || 'Cash',
         remember_wallet: rememberWallet,
         remember_kind: rememberKind,
+        ...(associateKey.startsWith('project:') ? { linked_project_id: Number(associateKey.split(':')[1]) } : {}),
+        ...(associateKey.startsWith('receivable:') ? { linked_receivable_id: Number(associateKey.split(':')[1]) } : {}),
+        ...(associateKey.startsWith('payable:') ? { linked_payable_id: Number(associateKey.split(':')[1]) } : {}),
+        ...(associateKey.startsWith('expense:') ? { linked_recurring_expense_id: Number(associateKey.split(':')[1]) } : {}),
       })
       await hydrateNow()
       await loadWallets()
       await loadPending()
       await loadSettings()
+      await loadBooks()
       setOkMsg(
         `Approved #${res.data.id}`
         + (res.data.created_transaction_ids?.length
@@ -640,6 +697,7 @@ export default function BankSmsImportPage() {
                 value={draft.kind}
                 onChange={(e) => {
                   const kind = e.target.value as BankSmsKind
+                  setAssociateKey('')
                   patchDraft({
                     kind,
                     category: kind === 'atm' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous',
@@ -727,6 +785,39 @@ export default function BankSmsImportPage() {
                     <option key={c.key} value={c.key}>{c.label}</option>
                   ))}
                 </select>
+              </div>
+            ) : null}
+
+            {((draft.kind === 'income' || draft.kind === 'reversal') && incomeOpts.length > 0)
+              || ((draft.kind === 'expense' || (draft.kind === 'atm' && draft.recordAtmAsExpense)) && expenseOpts.length > 0) ? (
+              <div className="form-group">
+                <label>
+                  {draft.kind === 'income' || draft.kind === 'reversal'
+                    ? 'Link to income'
+                    : 'Link to monthly cost / loan'}
+                </label>
+                <select
+                  value={associateKey}
+                  onChange={(e) => setAssociateKey(e.target.value)}
+                >
+                  <option value="">None — just a wallet entry</option>
+                  {(draft.kind === 'income' || draft.kind === 'reversal' ? incomeOpts : expenseOpts).map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                {associateKey ? (() => {
+                  const opt = (draft.kind === 'income' || draft.kind === 'reversal' ? incomeOpts : expenseOpts)
+                    .find((o) => o.value === associateKey)
+                  if (!opt) return null
+                  const left = Math.max(0, opt.remaining - toMoney(draft.amount))
+                  return (
+                    <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '0.35rem' }}>
+                      {left > 0.01
+                        ? `After this, ${fmt(left)} still expected`
+                        : 'This covers the remaining amount'}
+                    </p>
+                  )
+                })() : null}
               </div>
             ) : null}
 

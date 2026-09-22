@@ -140,12 +140,14 @@ class ProjectSerializer(serializers.ModelSerializer):
     remaining_amount      = serializers.ReadOnlyField()
     installments_received = serializers.SerializerMethodField()
     received_this_month   = serializers.SerializerMethodField()
+    received_amount       = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
         fields = (
             'id', 'name', 'income_type', 'amount', 'installment_amount', 'advance_amount',
-            'remaining_amount', 'months_to_complete', 'installments_received', 'received_this_month',
+            'remaining_amount', 'received_amount', 'months_to_complete', 'installments_received',
+            'received_this_month',
             'status', 'start_date', 'default_account', 'default_account_name',
             'notes', 'created_at'
         )
@@ -162,10 +164,12 @@ class ProjectSerializer(serializers.ModelSerializer):
         return None
 
     def get_received_this_month(self, obj):
-        start, end = _month_range()
-        return obj.transactions.filter(
-            type='income', date__gte=start, date__lt=end
-        ).exists()
+        return obj.income_received_this_month() > 0.01
+
+    def get_received_amount(self, obj):
+        if obj.income_type in ('recurring_monthly', 'contract_monthly'):
+            return obj.income_received_this_month()
+        return obj.income_received_total()
 
 
 class TransactionSerializer(serializers.ModelSerializer):
@@ -185,6 +189,7 @@ class TransactionSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'type', 'amount', 'date', 'account', 'account_name',
             'linked_project', 'project_name', 'linked_receivable', 'linked_payable',
+            'linked_recurring_expense',
             'category', 'notes', 'client_mutation_id', 'created_at',
             'household_ledger', 'household_expense_id', 'household_ledger_name',
             'original_amount', 'original_currency', 'fx_rate', 'fx_source',
@@ -322,12 +327,15 @@ class TransactionSerializer(serializers.ModelSerializer):
 class RecurringExpenseSerializer(serializers.ModelSerializer):
     account_name = serializers.SerializerMethodField()
     paid_this_month = serializers.SerializerMethodField()
+    remaining_amount = serializers.ReadOnlyField()
+    paid_amount = serializers.SerializerMethodField()
 
     class Meta:
         model = RecurringExpense
         fields = (
             'id', 'name', 'amount', 'frequency', 'due_day', 'account',
-            'account_name', 'active', 'paid_this_month', 'created_at'
+            'account_name', 'active', 'paid_this_month', 'remaining_amount',
+            'paid_amount', 'created_at'
         )
         read_only_fields = ('created_at',)
 
@@ -335,32 +343,48 @@ class RecurringExpenseSerializer(serializers.ModelSerializer):
         return obj.account.name if obj.account else None
 
     def get_paid_this_month(self, obj):
-        start, end = _month_range()
-        # Recorded via "Record Payment" with category = expense name
-        qs = Transaction.objects.filter(
-            user=obj.user, type='expense',
-            date__gte=start, date__lt=end,
-            category=obj.name,
-        )
-        return qs.exists()
+        return obj.remaining_amount <= 0.01
+
+    def get_paid_amount(self, obj):
+        if obj.frequency == 'one_time':
+            return obj.amount_paid_total()
+        return obj.amount_paid_this_month()
 
 
 class ReceivableInstallmentSerializer(serializers.ModelSerializer):
     remaining_amount = serializers.ReadOnlyField()
+    received_amount = serializers.ReadOnlyField(source='amount_received')
     project_name = serializers.SerializerMethodField()
     received_this_month = serializers.SerializerMethodField()
+    installments_received = serializers.SerializerMethodField()
 
     class Meta:
         model = ReceivableInstallment
         fields = (
             'id', 'linked_project', 'project_name', 'total_amount', 'monthly_amount',
             'total_installments', 'installments_received', 'remaining_amount',
-            'start_date', 'status', 'received_this_month', 'created_at'
+            'received_amount', 'start_date', 'status', 'received_this_month', 'created_at'
         )
         read_only_fields = ('installments_received', 'created_at')
 
     def get_project_name(self, obj):
         return obj.linked_project.name if obj.linked_project else None
+
+    def get_installments_received(self, obj):
+        monthly = float(obj.monthly_amount or 0)
+        received = obj.amount_received
+        if monthly <= 0:
+            return obj.transactions.filter(type='income').count()
+        return min(int(obj.total_installments or 0), int(received / monthly))
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        rem = float(instance.remaining_amount)
+        data['remaining_amount'] = rem
+        data['received_amount'] = instance.amount_received
+        if instance.status != 'stuck':
+            data['status'] = 'completed' if rem <= 0.01 else 'ongoing'
+        return data
 
     def get_received_this_month(self, obj):
         start, end = _month_range()
@@ -371,20 +395,38 @@ class ReceivableInstallmentSerializer(serializers.ModelSerializer):
 
 class PayableInstallmentSerializer(serializers.ModelSerializer):
     remaining_amount = serializers.ReadOnlyField()
+    paid_amount = serializers.ReadOnlyField(source='amount_paid')
     account_name = serializers.SerializerMethodField()
     paid_this_month = serializers.SerializerMethodField()
+    installments_paid = serializers.SerializerMethodField()
 
     class Meta:
         model = PayableInstallment
         fields = (
             'id', 'name', 'total_amount', 'monthly_amount', 'total_installments',
-            'installments_paid', 'remaining_amount', 'due_day', 'account',
+            'installments_paid', 'remaining_amount', 'paid_amount', 'due_day', 'account',
             'account_name', 'status', 'paid_this_month', 'created_at'
         )
         read_only_fields = ('installments_paid', 'created_at')
 
     def get_account_name(self, obj):
         return obj.account.name if obj.account else None
+
+    def get_installments_paid(self, obj):
+        monthly = float(obj.monthly_amount or 0)
+        paid = obj.amount_paid
+        if monthly <= 0:
+            return obj.transactions.filter(type='expense').count()
+        return min(int(obj.total_installments or 0), int(paid / monthly))
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        rem = float(instance.remaining_amount)
+        data['remaining_amount'] = rem
+        data['paid_amount'] = instance.amount_paid
+        if instance.status != 'stuck':
+            data['status'] = 'completed' if rem <= 0.01 else 'ongoing'
+        return data
 
     def get_paid_this_month(self, obj):
         start, end = _month_range()

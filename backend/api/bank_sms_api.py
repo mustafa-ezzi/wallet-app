@@ -14,7 +14,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Account, BankSmsImport, BankSmsImportSettings, Transaction
+from .models import (
+    Account, BankSmsImport, BankSmsImportSettings, Transaction,
+    Project, ReceivableInstallment, PayableInstallment, RecurringExpense,
+)
 
 
 def _to_decimal(value, default=None):
@@ -130,6 +133,10 @@ class BankSmsImportApproveSerializer(serializers.Serializer):
     remember_wallet = serializers.BooleanField(required=False, default=False)
     # Remember kind correction (Phase 5)
     remember_kind = serializers.BooleanField(required=False, default=False)
+    linked_project_id = serializers.IntegerField(required=False, allow_null=True)
+    linked_receivable_id = serializers.IntegerField(required=False, allow_null=True)
+    linked_payable_id = serializers.IntegerField(required=False, allow_null=True)
+    linked_recurring_expense_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class BankSmsBatchSerializer(serializers.Serializer):
@@ -337,6 +344,32 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
         if not bank:
             raise ValueError('Pick a bank wallet.')
 
+    def _income_links():
+        project = None
+        receivable = None
+        rec_id = overrides.get('linked_receivable_id')
+        proj_id = overrides.get('linked_project_id')
+        if rec_id:
+            receivable = ReceivableInstallment.objects.filter(user=user, pk=rec_id).first()
+            if receivable and receivable.linked_project_id:
+                project = receivable.linked_project
+        elif proj_id:
+            project = Project.objects.filter(user=user, pk=proj_id).first()
+            if project and project.income_type == 'one_time_installments':
+                receivable = project.receivable_installments.filter(status='ongoing').first()
+        return project, receivable
+
+    def _expense_links():
+        payable = None
+        recurring = None
+        pay_id = overrides.get('linked_payable_id')
+        exp_id = overrides.get('linked_recurring_expense_id')
+        if pay_id:
+            payable = PayableInstallment.objects.filter(user=user, pk=pay_id).first()
+        if exp_id:
+            recurring = RecurringExpense.objects.filter(user=user, pk=exp_id).first()
+        return payable, recurring
+
     cash = None
     created_ids: list[int] = []
 
@@ -384,6 +417,9 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
     elif kind in (BankSmsImport.KIND_INCOME, BankSmsImport.KIND_REVERSAL):
         cat = category or 'Other'
         note = f'{notes} (reversal)' if kind == BankSmsImport.KIND_REVERSAL else notes
+        project, receivable = _income_links()
+        if project and (not category or category in ('Other', 'Miscellaneous')):
+            cat = project.name
         tx = Transaction.objects.create(
             user=user,
             type='income',
@@ -392,11 +428,18 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
             account=bank,
             category=cat,
             notes=note,
+            linked_project=project,
+            linked_receivable=receivable,
         )
         created_ids = [tx.id]
     else:
         # expense (including ATM-as-expense)
         cat = category or 'Miscellaneous'
+        payable, recurring = _expense_links()
+        if recurring and (not category or category in ('Other', 'Miscellaneous')):
+            cat = recurring.name
+        elif payable and (not category or category in ('Other', 'Miscellaneous')):
+            cat = 'Loan Repayment'
         tx = Transaction.objects.create(
             user=user,
             type='expense',
@@ -405,6 +448,8 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
             account=bank,
             category=cat,
             notes=notes,
+            linked_payable=payable,
+            linked_recurring_expense=recurring,
         )
         created_ids = [tx.id]
 
@@ -497,8 +542,10 @@ class BankSmsImportViewSet(viewsets.ModelViewSet):
             return Response(BankSmsImportSerializer(existing).data, status=status.HTTP_200_OK)
 
         # Cross-source / SMS+push dedupe: same TID already pending or recently approved.
+        # Reversals share the original TID/amount/mask — they are a second event, not a duplicate.
+        skip_cross_dedupe = data['kind'] == BankSmsImport.KIND_REVERSAL
         tid = (data.get('tid') or '').strip()
-        if tid:
+        if tid and not skip_cross_dedupe:
             recent_cut = timezone.now() - timedelta(days=14)
             twin = (
                 BankSmsImport.objects.filter(user=request.user, tid=tid)
@@ -516,7 +563,7 @@ class BankSmsImportViewSet(viewsets.ModelViewSet):
         amount = data.get('amount')
         mask = (data.get('account_mask') or '').strip()
         tx_date = data.get('tx_date') or date.today()
-        if amount is not None and mask:
+        if amount is not None and mask and not skip_cross_dedupe:
             soft_cut = timezone.now() - timedelta(days=2)
             soft = (
                 BankSmsImport.objects.filter(

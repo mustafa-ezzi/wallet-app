@@ -1,6 +1,6 @@
 import type { OfflineStore } from './types'
 import { createMemoryStore } from './memoryStore'
-import { createSqliteStore } from './sqliteStore'
+import { closeSqliteStore, createSqliteStore } from './sqliteStore'
 
 let storePromise: Promise<OfflineStore> | null = null
 let testOverride: OfflineStore | null = null
@@ -29,4 +29,5 @@ export function __setOfflineStoreForTests(store: OfflineStore | null) {
 
 export function __resetOfflineStore() {
   storePromise = null
+  closeSqliteStore()
 }

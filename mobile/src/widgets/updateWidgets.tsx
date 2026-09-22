@@ -132,7 +132,7 @@ export async function loadQuickGlanceWidgetData(): Promise<QuickGlanceWidgetData
   try {
     await hydrateHomeCurrency()
     const store = await getOfflineStore()
-    const [allAccounts, txs] = await Promise.all([store.listAccounts(), store.listTransactions()])
+    const [allAccounts, txs] = [await store.listAccounts(), await store.listTransactions()]
     const accounts = bankCashAccounts(allAccounts)
     const total = accounts.reduce((s, a) => s + (Number(a.currentBalance) || 0), 0)
     const prefix = todayMonthPrefix()
@@ -162,24 +162,20 @@ async function safeRequest(
 export async function updateAllWidgets() {
   if (Platform.OS !== 'android') return
   try {
+    const balance = await loadBalanceWidgetData()
+    const month = await loadMonthFlowWidgetData()
+    const wallets = await loadWalletsWidgetData()
+    const glance = await loadQuickGlanceWidgetData()
     const [
       { BalanceWidget },
       { MonthFlowWidget },
       { WalletsWidget },
       { QuickGlanceWidget },
-      balance,
-      month,
-      wallets,
-      glance,
     ] = await Promise.all([
       import('./BalanceWidget'),
       import('./MonthFlowWidget'),
       import('./WalletsWidget'),
       import('./QuickGlanceWidget'),
-      loadBalanceWidgetData(),
-      loadMonthFlowWidgetData(),
-      loadWalletsWidgetData(),
-      loadQuickGlanceWidgetData(),
     ])
 
     await Promise.all([
