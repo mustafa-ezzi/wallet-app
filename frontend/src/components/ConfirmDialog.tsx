@@ -24,8 +24,19 @@ export default function ConfirmDialog({
   if (!open) return null
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1200 }} onClick={e => e.target === e.currentTarget && onCancel()}>
-      <div className="modal-sheet" style={{ maxWidth: 400 }} role="alertdialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div
+      className="modal-overlay"
+      style={{ zIndex: 1200, background: 'rgba(15, 23, 42, 0.55)' }}
+      onClick={(e) => e.target === e.currentTarget && onCancel()}
+    >
+      <div
+        className="modal-sheet"
+        style={{ maxWidth: 400, background: '#ffffff' }}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2 id="confirm-title">{title}</h2>
           <button type="button" className="modal-close" onClick={onCancel} aria-label="Close">

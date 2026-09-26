@@ -1153,3 +1153,23 @@ class PartialPaymentRemainingTests(ScenarioBase):
         data = self.client.get(f'/api/expenses/{exp.id}/').data
         self.assertEqual(float(data['remaining_amount']), 2000.0)
         self.assertFalse(data['paid_this_month'])
+
+
+class DeleteMyAccountTests(ScenarioBase):
+    def test_delete_requires_exact_username(self):
+        bad = self.client.delete('/api/me/', {'confirm_username': 'wrong'}, format='json')
+        self.assertEqual(bad.status_code, 400)
+        self.assertTrue(User.objects.filter(id=self.user.id).exists())
+
+    def test_delete_account_with_confirm_username(self):
+        Account.objects.create(
+            user=self.user, name='Cash', type='cash', opening_balance=Decimal('100'),
+        )
+        ok = self.client.delete(
+            '/api/me/',
+            {'confirm_username': self.user.username},
+            format='json',
+        )
+        self.assertEqual(ok.status_code, 204)
+        self.assertFalse(User.objects.filter(id=self.user.id).exists())
+        self.assertFalse(Account.objects.filter(user_id=self.user.id).exists())

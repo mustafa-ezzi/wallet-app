@@ -117,6 +117,35 @@ class MeView(APIView):
             )
         return Response(UserSerializer(user).data)
 
+    def delete(self, request):
+        """Permanently delete the signed-in account after username confirmation."""
+        from django.db.models import ProtectedError
+        from .ops_api import purge_user_completely
+
+        user = request.user
+        confirm = str(request.data.get('confirm_username') or '').strip()
+        if not confirm or confirm != user.username:
+            return Response(
+                {
+                    'detail': f'Type your username exactly to delete: {user.username}',
+                    'username': user.username,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if user.is_superuser:
+            return Response(
+                {'detail': 'Superuser accounts cannot be self-deleted. Ask another admin.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            purge_user_completely(user)
+        except ProtectedError as exc:
+            return Response(
+                {'detail': f'Could not delete account: {exc}'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class AccountViewSet(viewsets.ModelViewSet):
     serializer_class = AccountSerializer

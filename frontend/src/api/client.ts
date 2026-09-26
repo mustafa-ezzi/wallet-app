@@ -149,6 +149,8 @@ export const authApi = {
     api.post('/auth/register/', { ...data, username: data.email }),
   me: () => api.get('/me/'),
   updateMe: (data: object) => api.patch('/me/', data),
+  deleteAccount: (confirm_username: string) =>
+    api.delete('/me/', { data: { confirm_username } }),
   forgotPassword: (email: string) =>
     api.post('/auth/forgot-password/', { email }),
   verifyResetOtp: (email: string, code: string) =>

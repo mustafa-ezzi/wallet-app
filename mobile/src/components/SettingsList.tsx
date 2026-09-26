@@ -91,6 +91,26 @@ export function SettingsLogoutRow({ onPress }: { onPress: () => void }) {
   )
 }
 
+export function SettingsDeleteAccountRow({ onPress }: { onPress: () => void }) {
+  const colors = useColors()
+  return (
+    <SettingsGroup>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.row,
+          pressed ? { backgroundColor: colors.surfaceMuted } : null,
+        ]}
+      >
+        <View style={[styles.iconWell, { backgroundColor: 'rgba(220,38,38,0.12)' }]}>
+          <FontAwesome name="trash" size={15} color={colors.danger} />
+        </View>
+        <Text style={[styles.title, { color: colors.danger }]}>Delete my account</Text>
+      </Pressable>
+    </SettingsGroup>
+  )
+}
+
 const styles = StyleSheet.create({
   group: {
     borderRadius: 16,

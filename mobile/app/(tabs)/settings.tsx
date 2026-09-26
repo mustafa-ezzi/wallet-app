@@ -15,7 +15,7 @@ import {
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useRouter } from 'expo-router'
 import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
-import { SettingsGroup, SettingsLogoutRow, SettingsRow } from '@/src/components/SettingsList'
+import { SettingsDeleteAccountRow, SettingsGroup, SettingsLogoutRow, SettingsRow } from '@/src/components/SettingsList'
 import { useAuth } from '@/src/context/AuthContext'
 import { useCategories } from '@/src/context/CategoriesContext'
 import { getHomeCurrency, HOME_CURRENCIES, setHomeCurrency } from '@/src/currency/homeCurrency'
@@ -82,6 +82,11 @@ export default function SettingsScreen() {
   const [catName, setCatName] = useState('')
   const [catError, setCatError] = useState('')
   const [catBusy, setCatBusy] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const username = user?.username || user?.email || ''
 
   useEffect(() => {
     if (!user) return
@@ -335,6 +340,13 @@ export default function SettingsScreen() {
                   await clearLocal()
                   await logout()
                 })()
+              }}
+            />
+            <SettingsDeleteAccountRow
+              onPress={() => {
+                setDeleteConfirm('')
+                setDeleteError('')
+                setDeleteOpen(true)
               }}
             />
             {enableError ? <Text style={styles.tip}>{enableError}</Text> : null}
@@ -698,10 +710,10 @@ export default function SettingsScreen() {
       <Modal visible={currencyOpen} transparent animationType="fade" onRequestClose={() => setCurrencyOpen(false)}>
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
           <Pressable
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.45)' }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)' }}
             onPress={() => !currencyBusy && setCurrencyOpen(false)}
           />
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, zIndex: 2, marginBottom: 0 }]}>
+          <View style={[styles.card, { backgroundColor: '#ffffff', borderColor: colors.border, zIndex: 2, marginBottom: 0 }]}>
             <Text style={[styles.rowTitle, { color: colors.primaryDark }]}>Currency</Text>
             <ScrollView style={{ maxHeight: 360 }}>
               {HOME_CURRENCIES.map((c) => {
@@ -729,6 +741,87 @@ export default function SettingsScreen() {
                 )
               })}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={deleteOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !deleteBusy && setDeleteOpen(false)}
+      >
+        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+          <Pressable
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)' }}
+            onPress={() => !deleteBusy && setDeleteOpen(false)}
+          />
+          <View style={[styles.card, { backgroundColor: '#ffffff', borderColor: colors.border, zIndex: 2, marginBottom: 0 }]}>
+            <Text style={[styles.rowTitle, { color: colors.danger }]}>Delete my account</Text>
+            <Text style={[styles.meta, { color: colors.textMuted, marginTop: 8, marginBottom: spacing.md }]}>
+              This permanently deletes your WalletTrails account and all data. Type{'\n'}
+              <Text style={{ fontWeight: '800', color: colors.text }}>{username}</Text>
+              {'\n'}to confirm.
+            </Text>
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: '#f8fafc' }]}
+              placeholder={username}
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={deleteConfirm}
+              editable={!deleteBusy}
+              onChangeText={(t) => {
+                setDeleteConfirm(t)
+                setDeleteError('')
+              }}
+            />
+            {deleteError ? <Text style={[styles.tip, { marginTop: 8 }]}>{deleteError}</Text> : null}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md }}>
+              <Pressable
+                style={[styles.lockBtn, { flex: 1, backgroundColor: colors.surfaceMuted, marginTop: 0 }]}
+                disabled={deleteBusy}
+                onPress={() => setDeleteOpen(false)}
+              >
+                <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.lockBtn,
+                  {
+                    flex: 1,
+                    marginTop: 0,
+                    backgroundColor: colors.danger,
+                    opacity: deleteBusy || deleteConfirm !== username ? 0.5 : 1,
+                  },
+                ]}
+                disabled={deleteBusy || deleteConfirm !== username}
+                onPress={() => {
+                  void (async () => {
+                    if (!username || deleteConfirm !== username) {
+                      setDeleteError(`Type ${username} exactly.`)
+                      return
+                    }
+                    setDeleteBusy(true)
+                    setDeleteError('')
+                    try {
+                      await authApi.deleteAccount(deleteConfirm)
+                      setDeleteOpen(false)
+                      await clearLocal()
+                      await logout()
+                    } catch (err) {
+                      setDeleteError(apiErrorMessage(err, 'Could not delete account.'))
+                    } finally {
+                      setDeleteBusy(false)
+                    }
+                  })()
+                }}
+              >
+                <Text style={[styles.lockBtnText, { color: '#fff' }]}>
+                  {deleteBusy ? 'Deleting…' : 'Delete forever'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>

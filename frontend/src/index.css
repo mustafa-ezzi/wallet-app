@@ -833,7 +833,7 @@ select option { background: var(--surface); color: var(--text-primary); }
 @media (min-width: 640px) { .modal-overlay { align-items: center; } }
 
 .modal-sheet {
-  background: var(--surface);
+  background: #ffffff;
   border: 1px solid var(--border-2);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   width: 100%;

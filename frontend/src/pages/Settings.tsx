@@ -14,6 +14,7 @@ import {
   Receipt,
   Smartphone,
   Tags,
+  Trash2,
   UserRound,
   Wallet,
   X,
@@ -86,6 +87,12 @@ export default function Settings() {
   const [catName, setCatName] = useState('')
   const [catError, setCatError] = useState('')
   const [catBusy, setCatBusy] = useState(false)
+
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const username = user?.username || user?.email || ''
 
   useEffect(() => {
     let cancelled = false
@@ -201,6 +208,31 @@ export default function Settings() {
       await removeCategory(id)
     } catch (err: unknown) {
       setCatError(apiErrorMessage(err, 'Could not delete category.'))
+    }
+  }
+
+  const openDeleteAccount = () => {
+    setDeleteConfirm('')
+    setDeleteError('')
+    setDeleteOpen(true)
+  }
+
+  const submitDeleteAccount = async () => {
+    if (!username || deleteConfirm !== username) {
+      setDeleteError(`Type ${username} exactly.`)
+      return
+    }
+    setDeleteBusy(true)
+    setDeleteError('')
+    try {
+      await authApi.deleteAccount(deleteConfirm)
+      setDeleteOpen(false)
+      logout()
+      navigate('/login', { replace: true })
+    } catch (err: unknown) {
+      setDeleteError(apiErrorMessage(err, 'Could not delete account.'))
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -393,8 +425,73 @@ export default function Settings() {
 
         <div className="settings-group">
           <Row icon={<LogOut {...icon} />} title="Logout" danger onClick={() => void handleLogout()} />
+          <Row icon={<Trash2 {...icon} />} title="Delete my account" danger onClick={openDeleteAccount} />
         </div>
       </div>
+
+      {deleteOpen ? (
+        <div
+          className="modal-overlay"
+          style={{ zIndex: 1300, background: 'rgba(15, 23, 42, 0.55)' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !deleteBusy) setDeleteOpen(false)
+          }}
+        >
+          <div
+            className="modal-sheet"
+            style={{ maxWidth: 420, background: '#ffffff' }}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 id="delete-account-title">Delete my account</h2>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => !deleteBusy && setDeleteOpen(false)}
+                aria-label="Close"
+              >
+                <X size={18} strokeWidth={2} />
+              </button>
+            </div>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              This permanently deletes your WalletTrails account and all data.
+              To confirm, type <strong>{username}</strong> below.
+            </p>
+            {deleteError ? <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{deleteError}</div> : null}
+            <div className="form-group">
+              <label>Type your username</label>
+              <input
+                value={deleteConfirm}
+                onChange={(e) => {
+                  setDeleteConfirm(e.target.value)
+                  setDeleteError('')
+                }}
+                placeholder={username}
+                autoCapitalize="off"
+                autoCorrect="off"
+                disabled={deleteBusy}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <button type="button" className="btn-glass" disabled={deleteBusy} onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-glass"
+                disabled={deleteBusy || deleteConfirm !== username}
+                style={{ color: 'var(--red-600)', borderColor: '#f5c4c0', background: '#fef2f2' }}
+                onClick={() => void submitDeleteAccount()}
+              >
+                {deleteBusy ? <span className="spinner" /> : 'Delete forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
