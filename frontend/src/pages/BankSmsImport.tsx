@@ -14,6 +14,7 @@ import {
 import {
   BANK_SMS_UX,
   buildApproveDraft,
+  detectInstrument,
   needsManualTypePick,
   parseBankSms,
   suggestPeopleMatch,
@@ -289,6 +290,7 @@ export default function BankSmsImportPage() {
     setParsed({
       ok: true,
       kind: row.kind,
+      instrument: detectInstrument(row.raw_snippet || ''),
       amount: toMoney(row.amount),
       occurredAt: row.occurred_at,
       date: row.tx_date,
