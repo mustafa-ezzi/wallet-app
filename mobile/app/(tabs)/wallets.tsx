@@ -60,7 +60,7 @@ export default function WalletsScreen() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editing, setEditing] = useState<Account | null>(null)
   const [name, setName] = useState('')
-  const [type, setType] = useState<'bank' | 'cash'>('bank')
+  const [type, setType] = useState<'bank' | 'cash' | 'credit_card'>('bank')
   const [opening, setOpening] = useState('0')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -170,7 +170,7 @@ export default function WalletsScreen() {
   const openEdit = (a: Account) => {
     setEditing(a)
     setName(a.name)
-    setType(a.type === 'cash' ? 'cash' : 'bank')
+    setType((a.type === 'cash' || a.type === 'credit_card' ? a.type : 'bank') as 'bank' | 'cash' | 'credit_card')
     setOpening(String(a.opening_balance ?? 0))
     setFormError('')
     setCreateOpen(true)
@@ -274,10 +274,13 @@ export default function WalletsScreen() {
   const total = sumBalances(walletAccounts)
   const banks = accounts.filter((a) => a.type === 'bank')
   const cash = accounts.filter((a) => a.type === 'cash')
+  const cards = accounts.filter((a) => a.type === 'credit_card')
+  const cardDebt = cards.reduce((s, a) => s + Math.max(0, toMoney(a.current_balance)), 0)
   const people = accounts.filter((a) => a.type === 'person')
   const maxAbsBalance = Math.max(
     1,
     ...walletAccounts.map((a) => Math.abs(toMoney(a.current_balance))),
+    ...cards.map((a) => Math.abs(toMoney(a.current_balance))),
     ...people.map((a) => Math.abs(toMoney(a.current_balance))),
   )
 
@@ -285,20 +288,32 @@ export default function WalletsScreen() {
     const bal = toMoney(a.current_balance)
     const pct = Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / maxAbsBalance) * 100)))
     const isCash = a.type === 'cash'
+    const isCard = a.type === 'credit_card'
     return (
       <Reveal index={index} key={a.id}>
         <View style={styles.card}>
           <View style={styles.cardTop}>
-            <View style={[styles.icon, isCash ? styles.iconCash : styles.iconBank]}>
-              <FontAwesome name={isCash ? 'money' : 'university'} size={16} color={isCash ? colors.success : colors.primary} />
+            <View style={[styles.icon, isCard ? styles.iconCard : isCash ? styles.iconCash : styles.iconBank]}>
+              <FontAwesome
+                name={isCard ? 'credit-card' : isCash ? 'money' : 'university'}
+                size={16}
+                color={isCard ? colors.danger : isCash ? colors.success : colors.primary}
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardName}>{a.name}</Text>
-              <Text style={styles.cardType}>Opening: {money.fmtBalance(a.opening_balance ?? 0)}</Text>
+              <Text style={styles.cardType}>
+                {isCard ? 'Opening outstanding: ' : 'Opening: '}
+                {money.fmtBalance(a.opening_balance ?? 0)}
+              </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[styles.cardBal, money.amountStyle]}>{money.fmtBalance(bal)}</Text>
-              <Text style={styles.cardType}>{isCash ? 'Cash / Wallet' : 'Bank Account'}</Text>
+              <Text style={[styles.cardBal, money.amountStyle, (isCard || bal < 0) && { color: colors.danger }]}>
+                {money.fmtBalance(bal)}
+              </Text>
+              <Text style={styles.cardType}>
+                {isCard ? 'You owe' : isCash ? 'Cash / Wallet' : 'Bank Account'}
+              </Text>
             </View>
           </View>
 
@@ -306,7 +321,10 @@ export default function WalletsScreen() {
             <View
               style={[
                 styles.progressFill,
-                { width: `${pct}%`, backgroundColor: isCash ? colors.success : colors.primary },
+                {
+                  width: `${pct}%`,
+                  backgroundColor: isCard ? colors.danger : isCash ? colors.success : colors.primary,
+                },
               ]}
             />
           </View>
@@ -448,7 +466,7 @@ export default function WalletsScreen() {
               <Text style={styles.title}>Wallets</Text>
               <AmountEyeToggle />
             </View>
-            <Text style={styles.sub}>Manage bank, cash, and people balances.</Text>
+            <Text style={styles.sub}>Manage bank, cash, credit cards, and people balances.</Text>
           </View>
           <BouncyPressable style={styles.addBtn} onPress={openCreate}>
             <Text style={styles.addBtnText}>+ Create Wallet</Text>
@@ -468,10 +486,20 @@ export default function WalletsScreen() {
           <>
             <Reveal index={0}>
               <View style={styles.combinedCard}>
-                <Text style={styles.combinedLabel}>Combined Balance</Text>
+                <Text style={styles.combinedLabel}>What you have</Text>
                 <Text style={[styles.combinedValue, money.amountStyle]}>{money.fmtBalance(total)}</Text>
               </View>
             </Reveal>
+            {cardDebt > 0 ? (
+              <Reveal index={1}>
+                <View style={[styles.combinedCard, { marginTop: spacing.sm }]}>
+                  <Text style={styles.combinedLabel}>Card debt</Text>
+                  <Text style={[styles.combinedValue, money.amountStyle, { color: colors.danger }]}>
+                    {money.fmtBalance(cardDebt)}
+                  </Text>
+                </View>
+              </Reveal>
+            ) : null}
 
             {banks.length > 0 ? (
               <>
@@ -490,6 +518,16 @@ export default function WalletsScreen() {
                   <Text style={styles.sectionTitle}>Cash & Wallets</Text>
                 </View>
                 {cash.map((a, i) => renderWallet(a, banks.length + i))}
+              </>
+            ) : null}
+
+            {cards.length > 0 ? (
+              <>
+                <View style={styles.sectionHead}>
+                  <FontAwesome name="credit-card" size={13} color={colors.text} />
+                  <Text style={styles.sectionTitle}>Credit cards</Text>
+                </View>
+                {cards.map((a, i) => renderWallet(a, banks.length + cash.length + i))}
               </>
             ) : null}
 
@@ -618,7 +656,7 @@ export default function WalletsScreen() {
                 </Text>
               </View>
             ) : (
-              people.map((a, i) => renderPerson(a, banks.length + cash.length + i))
+              people.map((a, i) => renderPerson(a, banks.length + cash.length + cards.length + i))
             )}
           </>
         )}
@@ -639,17 +677,21 @@ export default function WalletsScreen() {
           <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
             <Text style={styles.sheetTitle}>{editing ? 'Edit wallet' : 'New wallet'}</Text>
             <ErrorBanner message={formError} />
-            <Field label="Name" value={name} onChangeText={setName} placeholder="Meezan / Cash" autoCapitalize="words" />
+            <Field label="Name" value={name} onChangeText={setName} placeholder="Meezan / HBL Visa / Cash" autoCapitalize="words" />
             <Text style={styles.label}>Type</Text>
             <View style={styles.seg}>
-              {(['bank', 'cash'] as const).map((t) => (
+              {([
+                { key: 'bank' as const, label: 'Bank' },
+                { key: 'cash' as const, label: 'Cash' },
+                { key: 'credit_card' as const, label: 'Card' },
+              ]).map((t) => (
                 <Pressable
-                  key={t}
-                  onPress={() => setType(t)}
-                  style={[styles.segBtn, type === t && styles.segBtnOn]}
+                  key={t.key}
+                  onPress={() => setType(t.key)}
+                  style={[styles.segBtn, type === t.key && styles.segBtnOn]}
                   disabled={Boolean(editing)}
                 >
-                  <Text style={[styles.segText, type === t && styles.segTextOn]}>{t === 'bank' ? 'Bank' : 'Cash'}</Text>
+                  <Text style={[styles.segText, type === t.key && styles.segTextOn]}>{t.label}</Text>
                 </Pressable>
               ))}
             </View>
@@ -657,9 +699,13 @@ export default function WalletsScreen() {
               <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
                 Type can’t be changed after create. Opening balance is the ledger starting point.
               </Text>
+            ) : type === 'credit_card' ? (
+              <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
+                Enter what you currently owe. Purchases raise it; pay bill via transfer bank → card.
+              </Text>
             ) : null}
             <Field
-              label="Opening balance"
+              label={type === 'credit_card' ? 'Outstanding (you owe)' : 'Opening balance'}
               value={opening}
               onChangeText={setOpening}
               keyboardType="decimal-pad"
@@ -785,6 +831,7 @@ function makeStyles(colors: ColorTokens) {
     },
     iconBank: { backgroundColor: colors.primarySoft + '26' },
     iconCash: { backgroundColor: '#dcfce7' },
+    iconCard: { backgroundColor: '#fee2e2' },
     iconPerson: { backgroundColor: '#8b5cf618' },
     emptyPeople: {
       backgroundColor: colors.surface,

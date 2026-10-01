@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownRight,
   ArrowUpRight,
+  CreditCard,
   FileText,
   Landmark,
   Trash2,
@@ -331,10 +332,13 @@ export default function Accounts() {
   const totalBalance = wallets.reduce((s, a) => s + toMoney(a.current_balance), 0)
   const banks = accounts.filter(a => a.type === 'bank')
   const cash  = accounts.filter(a => a.type === 'cash')
+  const cards = accounts.filter(a => a.type === 'credit_card')
+  const cardDebt = cards.reduce((s, a) => s + Math.max(0, toMoney(a.current_balance)), 0)
   const people = accounts.filter(a => a.type === 'person')
   const maxAbsBalance = Math.max(
     1,
     ...wallets.map(a => Math.abs(toMoney(a.current_balance))),
+    ...cards.map(a => Math.abs(toMoney(a.current_balance))),
     ...people.map(a => Math.abs(toMoney(a.current_balance))),
   )
 
@@ -347,7 +351,7 @@ export default function Accounts() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Wallets</h1>
-          <p className="page-subtitle">Manage bank, cash, and people balances.</p>
+          <p className="page-subtitle">Manage bank, cash, credit cards, and people balances.</p>
         </div>
         <button className="btn-primary" onClick={openAddAcc}>+ Create Wallet</button>
       </div>
@@ -355,12 +359,22 @@ export default function Accounts() {
       {/* Combined balance strip */}
       <Reveal index={0}>
         <div className="glass wallet-combined">
-          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Combined Balance</span>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>What you have</span>
           <span style={{ fontWeight: 800, fontSize: '1.2rem', color: totalBalance < 0 ? 'var(--danger)' : 'var(--primary)' }}>
             <CountUp value={totalBalance} />
           </span>
         </div>
       </Reveal>
+      {cardDebt > 0 ? (
+        <Reveal index={1}>
+          <div className="glass wallet-combined" style={{ marginTop: '0.55rem' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Card debt</span>
+            <span style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--danger)' }}>
+              <CountUp value={cardDebt} />
+            </span>
+          </div>
+        </Reveal>
+      ) : null}
 
       {!showAccModal && accError && (
         <div className="auth-error" style={{ marginBottom: '1rem' }}>{accError}</div>
@@ -401,6 +415,22 @@ export default function Accounts() {
               <div className="list">
                 {cash.map((acc, i) => (
                   <Reveal key={acc.id} index={banks.length + i} stepMs={40}>
+                    <AccountCard acc={acc} maxAbs={maxAbsBalance}
+                      onEdit={openEditAcc} onDelete={deleteAcc} onView={viewTxs} />
+                  </Reveal>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {cards.length > 0 && (
+            <div style={{ marginTop: '1.1rem' }}>
+              <div className="wallet-section-head">
+                <CreditCard size={15} strokeWidth={1.75} /><h3>Credit cards</h3>
+              </div>
+              <div className="list">
+                {cards.map((acc, i) => (
+                  <Reveal key={acc.id} index={banks.length + cash.length + i} stepMs={40}>
                     <AccountCard acc={acc} maxAbs={maxAbsBalance}
                       onEdit={openEditAcc} onDelete={deleteAcc} onView={viewTxs} />
                   </Reveal>
@@ -599,21 +629,27 @@ export default function Accounts() {
             <form onSubmit={submitAcc} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div className="form-group">
                 <label>Account Name</label>
-                <input type="text" placeholder="e.g. Meezan Bank, NayaPay, Cash" value={accForm.name} onChange={setA('name')} required />
+                <input type="text" placeholder="e.g. Meezan Bank, HBL Visa, Cash" value={accForm.name} onChange={setA('name')} required />
               </div>
               <div className="grid-2">
                 <div className="form-group">
                   <label>Type</label>
-                  <select value={accForm.type} onChange={setA('type')}>
+                  <select value={accForm.type} onChange={setA('type')} disabled={Boolean(editingAcc)}>
                     <option value="bank">Bank</option>
                     <option value="cash">Cash / Wallet</option>
+                    <option value="credit_card">Credit card</option>
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Opening Balance (PKR)</label>
+                  <label>{accForm.type === 'credit_card' ? 'Outstanding (you owe)' : 'Opening Balance (PKR)'}</label>
                   <input type="number" min="0" step="any" placeholder="0.00" value={accForm.opening_balance} onChange={setA('opening_balance')} required />
                 </div>
               </div>
+              {accForm.type === 'credit_card' ? (
+                <p className="text-muted" style={{ fontSize: '0.78rem', margin: 0 }}>
+                  Enter what you currently owe on this card. Purchases raise it; paying the bill (transfer from bank → card) lowers it.
+                </p>
+              ) : null}
               <button type="submit" className="btn-primary" style={{ width: '100%', padding: '0.75rem' }} disabled={accSaving}>
                 {accSaving ? <span className="spinner" /> : editingAcc ? 'Save Changes' : 'Create Wallet'}
               </button>
@@ -632,8 +668,10 @@ export default function Accounts() {
             </div>
 
             <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.75rem', background: 'var(--green-50)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-2)' }}>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Current Balance: </span>
-              <span style={{ fontWeight: 700, color: selectedAccount.current_balance < 0 ? 'var(--danger)' : 'var(--primary)' }}>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                {selectedAccount.type === 'credit_card' ? 'You owe: ' : 'Current Balance: '}
+              </span>
+              <span style={{ fontWeight: 700, color: selectedAccount.current_balance < 0 ? 'var(--danger)' : selectedAccount.type === 'credit_card' ? 'var(--danger)' : 'var(--primary)' }}>
                 {fmtBalance(selectedAccount.current_balance)}
               </span>
             </div>
@@ -786,27 +824,32 @@ function AccountCard({ acc, maxAbs, onEdit, onDelete, onView }: {
   const bal = toMoney(acc.current_balance)
   const prog = Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / maxAbs) * 100)))
   const isCash = acc.type === 'cash'
+  const isCard = acc.type === 'credit_card'
   return (
     <div className="glass glass-hover" style={{ padding: '1rem', borderRadius: 'var(--radius-md)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.65rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className={`account-icon ${isCash ? 'account-icon-cash' : 'account-icon-bank'}`}
+          <div className={`account-icon ${isCard ? 'account-icon-card' : isCash ? 'account-icon-cash' : 'account-icon-bank'}`}
             style={{ width: '2.5rem', height: '2.5rem' }}>
-            {isCash
-              ? <Wallet size={18} strokeWidth={1.75} />
-              : <Landmark size={18} strokeWidth={1.75} />}
+            {isCard
+              ? <CreditCard size={18} strokeWidth={1.75} />
+              : isCash
+                ? <Wallet size={18} strokeWidth={1.75} />
+                : <Landmark size={18} strokeWidth={1.75} />}
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{acc.name}</div>
-            <div className="text-muted" style={{ fontSize: '0.72rem' }}>Opening: {fmt(acc.opening_balance)}</div>
+            <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+              {isCard ? 'Opening outstanding: ' : 'Opening: '}{fmt(acc.opening_balance)}
+            </div>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontWeight: 800, fontSize: '1.15rem', color: bal >= 0 ? 'var(--text-primary)' : 'var(--danger)' }}>
+          <div style={{ fontWeight: 800, fontSize: '1.15rem', color: isCard || bal < 0 ? 'var(--danger)' : 'var(--text-primary)' }}>
             {fmtBalance(bal)}
           </div>
           <div className="text-muted" style={{ fontSize: '0.7rem' }}>
-            {isCash ? 'Cash / Wallet' : 'Bank Account'}
+            {isCard ? 'You owe' : isCash ? 'Cash / Wallet' : 'Bank Account'}
           </div>
         </div>
       </div>
@@ -816,9 +859,11 @@ function AccountCard({ acc, maxAbs, onEdit, onDelete, onView }: {
           className="progress-bar-fill"
           style={{
             width: `${prog}%`,
-            background: isCash
-              ? 'linear-gradient(90deg, var(--success), #34d399)'
-              : undefined,
+            background: isCard
+              ? 'linear-gradient(90deg, #f87171, #ef4444)'
+              : isCash
+                ? 'linear-gradient(90deg, var(--success), #34d399)'
+                : undefined,
           }}
         />
       </div>

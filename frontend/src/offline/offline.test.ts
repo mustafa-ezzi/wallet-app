@@ -38,6 +38,36 @@ describe('offline L0+L1', () => {
     expect(acc?.currentBalance).toBe(9500)
   })
 
+  it('credit card expense raises debt; income lowers it', async () => {
+    await store.upsertAccounts([{
+      localId: accountLocalId(2),
+      serverId: 2,
+      name: 'HBL Visa',
+      type: 'credit_card',
+      openingBalance: 45000,
+      currentBalance: 45000,
+      updatedAt: new Date().toISOString(),
+    }])
+
+    await queuePersonalTransaction(store, {
+      type: 'expense',
+      amount: 2041,
+      date: '2026-07-20',
+      accountServerId: 2,
+      category: 'Shopping',
+    }, { online: false })
+    expect((await store.getAccountByServerId(2))?.currentBalance).toBe(47041)
+
+    await queuePersonalTransaction(store, {
+      type: 'income',
+      amount: 10000,
+      date: '2026-07-21',
+      accountServerId: 2,
+      category: 'Bank Transfer',
+    }, { online: false })
+    expect((await store.getAccountByServerId(2))?.currentBalance).toBe(37041)
+  })
+
   it('rejects queue when wallet is missing offline', async () => {
     await expect(queuePersonalTransaction(store, {
       type: 'income',

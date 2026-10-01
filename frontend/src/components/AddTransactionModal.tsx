@@ -5,6 +5,7 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
+  CreditCard,
   Landmark,
   Plus,
   UserRound,
@@ -81,6 +82,10 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
   const [peopleAction, setPeopleAction] = useState<PeopleAction>('lend')
 
   const wallets = useMemo(
+    () => accounts.filter((a) => a.type === 'bank' || a.type === 'cash' || a.type === 'credit_card'),
+    [accounts],
+  )
+  const cashBankWallets = useMemo(
     () => accounts.filter((a) => a.type === 'bank' || a.type === 'cash'),
     [accounts],
   )
@@ -99,7 +104,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
   const applyAccountDefaults = (list: WalletAccount[]) => {
     setAccounts(list)
-    const walletList = list.filter((a) => a.type === 'bank' || a.type === 'cash')
+    const walletList = list.filter((a) => a.type === 'bank' || a.type === 'cash' || a.type === 'credit_card')
     const peopleList = list.filter((a) => a.type === 'person')
     if (walletList[0]) {
       setAccountId((prev) => (prev && walletList.some((w) => String(w.id) === prev) ? prev : String(walletList[0].id)))
@@ -394,7 +399,9 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 <select value={fromAccountId} onChange={e => setFromAccountId(e.target.value)} required>
                   <option value="">Select source…</option>
                   {wallets.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
+                    <option key={a.id} value={a.id}>
+                      {a.name} — {a.type === 'credit_card' ? `owe ${fmtBalance(a.current_balance)}` : fmtBalance(a.current_balance)}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -404,12 +411,14 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 <select value={toAccountId} onChange={e => setToAccountId(e.target.value)} required>
                   <option value="">Select destination…</option>
                   {wallets.filter(a => String(a.id) !== fromAccountId).map((a) => (
-                    <option key={a.id} value={a.id}>{a.name} — {fmtBalance(a.current_balance)}</option>
+                    <option key={a.id} value={a.id}>
+                      {a.name} — {a.type === 'credit_card' ? `owe ${fmtBalance(a.current_balance)}` : fmtBalance(a.current_balance)}
+                    </option>
                   ))}
                 </select>
               </div>
               <p className="add-tx-hint">
-                Moves money between your wallets. Transfers don’t count as income or expense.
+                Moves money between your wallets. Paying a credit card: bank → card. Transfers don’t count as income or expense.
               </p>
             </div>
           ) : type === 'people' ? (
@@ -446,7 +455,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
 
               <h3 className="add-tx-section">{peopleAction === 'lend' ? 'From wallet' : 'Into wallet'}</h3>
               <div className="add-tx-chip-row">
-                {wallets.map((a) => {
+                {cashBankWallets.map((a) => {
                   const active = accountId === String(a.id)
                   const isCash = a.type === 'cash'
                   return (
@@ -531,6 +540,7 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                 {wallets.map((a) => {
                   const active = accountId === String(a.id)
                   const isCash = a.type === 'cash'
+                  const isCard = a.type === 'credit_card'
                   return (
                     <button
                       key={a.id}
@@ -539,9 +549,11 @@ export default function AddTransactionModal({ onClose, onAdded }: Props) {
                       onClick={() => setAccountId(String(a.id))}
                     >
                       <span className={`add-tx-acct-icon ${active ? 'on' : ''}`}>
-                        {isCash
-                          ? <Wallet size={18} strokeWidth={2} />
-                          : <Landmark size={18} strokeWidth={2} />}
+                        {isCard
+                          ? <CreditCard size={18} strokeWidth={2} />
+                          : isCash
+                            ? <Wallet size={18} strokeWidth={2} />
+                            : <Landmark size={18} strokeWidth={2} />}
                       </span>
                       <span className="add-tx-chip-label">{a.name}</span>
                     </button>

@@ -84,10 +84,14 @@ export default function HomeScreen() {
   const name = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || user?.email || 'there'
   const monthName = MONTH_NAMES[new Date().getMonth()]
   const walletCount = data?.accounts?.length ?? 0
+  const cardDebt = toMoney(data?.card_debt ?? 0)
 
   const loadFromCache = useCallback(async () => {
     const [accounts, txs] = await Promise.all([getCachedAccounts(), getCachedTransactions()])
-    const total = accounts.reduce((s, a) => s + a.currentBalance, 0)
+    const own = accounts.filter((a) => a.type === 'bank' || a.type === 'cash')
+    const cards = accounts.filter((a) => a.type === 'credit_card')
+    const total = own.reduce((s, a) => s + a.currentBalance, 0)
+    const cardDebt = cards.reduce((s, a) => s + Math.max(0, a.currentBalance), 0)
     const monthPrefix = todayMonthPrefix()
     let monthIncome = 0
     let monthExpense = 0
@@ -110,7 +114,8 @@ export default function HomeScreen() {
     setBreakdown(breakdownFromTxs(txs))
     setData({
       total_balance: total,
-      accounts: accounts.map((a) => ({
+      card_debt: cardDebt,
+      accounts: own.map((a) => ({
         id: a.serverId,
         name: a.name,
         type: a.type,
@@ -136,7 +141,10 @@ export default function HomeScreen() {
           dashboardApi.get(),
           transactionsApi.list().catch(() => ({ data: [] })),
         ])
-        setData(dash)
+        setData({
+          ...dash,
+          accounts: (dash.accounts || []).filter((a) => a.type === 'bank' || a.type === 'cash'),
+        })
         setBreakdown(breakdownFromTxs(asList<Transaction>(txRes.data)))
       } else {
         await loadFromCache()
@@ -318,6 +326,11 @@ export default function HomeScreen() {
               <Text style={[styles.combinedHint, { color: colors.textMuted }]}>
                 Across {walletCount} wallet{walletCount === 1 ? '' : 's'} · {monthName} in {money.fmt(data?.month_income ?? 0)} · out {money.fmt(data?.month_expense ?? 0)}
               </Text>
+              {cardDebt > 0 ? (
+                <Text style={[styles.combinedHint, { color: colors.danger, fontWeight: '700', marginTop: 4 }]}>
+                  Card debt {money.fmt(cardDebt)}
+                </Text>
+              ) : null}
 
               <View style={styles.acctGrid}>
                 {accounts.slice(0, 6).map((a) => {
@@ -331,9 +344,9 @@ export default function HomeScreen() {
                       <View style={styles.acctTop}>
                         <View style={[styles.acctIcon, { backgroundColor: colors.surface }]}>
                           <FontAwesome
-                            name={a.type === 'cash' ? 'money' : 'university'}
+                            name={a.type === 'cash' ? 'money' : a.type === 'credit_card' ? 'credit-card' : 'university'}
                             size={13}
-                            color={colors.primary}
+                            color={a.type === 'credit_card' ? colors.danger : colors.primary}
                           />
                         </View>
                         <Text style={[styles.acctName, { color: colors.text }]} numberOfLines={1}>{a.name}</Text>

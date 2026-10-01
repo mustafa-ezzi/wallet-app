@@ -148,6 +148,35 @@ class PeopleDoubleEntryTests(TravelPeopleBase):
         # People legs excluded from month expense
         self.assertEqual(Decimal(str(res.data['month_expense'])), Decimal('0'))
 
+    def test_dashboard_excludes_credit_card_from_total(self):
+        card = Account.objects.create(
+            user=self.user, name='HBL Visa', type='credit_card', opening_balance=Decimal('45000'),
+        )
+        # Card purchase raises debt
+        self.client.post('/api/transactions/', {
+            'type': 'expense', 'amount': '2041', 'date': '2026-09-01',
+            'account': card.id, 'category': 'Shopping', 'notes': 'POS',
+        }, format='json')
+        # Pay bill from bank → card (income on card lowers debt)
+        self.client.post('/api/transactions/', {
+            'type': 'expense', 'amount': '10000', 'date': '2026-09-02',
+            'account': self.bank.id, 'category': 'Bank Transfer', 'notes': 'Card payment',
+        }, format='json')
+        self.client.post('/api/transactions/', {
+            'type': 'income', 'amount': '10000', 'date': '2026-09-02',
+            'account': card.id, 'category': 'Bank Transfer', 'notes': 'Card payment',
+        }, format='json')
+
+        card.refresh_from_db()
+        self.assertEqual(Decimal(str(card.current_balance)), Decimal('37041'))
+
+        res = self.client.get('/api/dashboard/')
+        self.assertEqual(res.status_code, 200)
+        # bank 10000-10000 + cash 2000 = 2000; card debt excluded from what-you-have
+        self.assertEqual(Decimal(str(res.data['total_balance'])), Decimal('2000'))
+        self.assertEqual(Decimal(str(res.data['card_debt'])), Decimal('37041'))
+        self.assertTrue(any(a['type'] == 'credit_card' and a['name'] == 'HBL Visa' for a in res.data['accounts']))
+
     def test_people_action_idempotent(self):
         person = Account.objects.create(user=self.user, name='Idem', type='person', opening_balance=0)
         payload = {

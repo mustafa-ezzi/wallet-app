@@ -1967,6 +1967,7 @@ select option { background: var(--surface); color: var(--text-primary); }
 }
 .account-icon-bank { background: var(--green-100); color: var(--green-800); }
 .account-icon-cash { background: #dcfce7; color: #166534; }
+.account-icon-card { background: #fee2e2; color: #b91c1c; }
 
 /* ── Tx icon ──────────────────────────────────────────────────────── */
 .tx-icon {

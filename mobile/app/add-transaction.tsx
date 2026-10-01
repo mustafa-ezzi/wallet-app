@@ -129,7 +129,7 @@ export default function AddTransactionScreen() {
         if (online) {
           try {
             const [{ data }, ledgersRes] = await Promise.all([
-              accountsApi.list({ type: 'bank,cash' }),
+              accountsApi.list({ type: 'bank,cash,credit_card' }),
               householdsApi.openLedgers().catch(() => ({ data: [] })),
             ])
             const list = asList<Account>(data).filter((a) => a.type !== 'person')
@@ -151,7 +151,7 @@ export default function AddTransactionScreen() {
           .map((a) => ({
             id: a.serverId,
             name: a.name,
-            type: a.type === 'cash' ? 'cash' : 'bank',
+            type: (a.type === 'cash' || a.type === 'credit_card' ? a.type : 'bank') as Account['type'],
             opening_balance: a.openingBalance,
             current_balance: a.currentBalance,
           }))
@@ -211,7 +211,16 @@ export default function AddTransactionScreen() {
   )
 
   const walletOptions = useMemo(
-    () => accounts.map((a) => ({ value: String(a.id), label: a.name, hint: fmtBalance(a.current_balance) })),
+    () =>
+      accounts.map((a) => ({
+        value: String(a.id),
+        label: a.name,
+        hint: a.type === 'credit_card' ? `owe ${fmtBalance(a.current_balance)}` : fmtBalance(a.current_balance),
+      })),
+    [accounts],
+  )
+  const cashBankAccounts = useMemo(
+    () => accounts.filter((a) => a.type === 'bank' || a.type === 'cash'),
     [accounts],
   )
   const toWalletOptions = useMemo(
@@ -220,7 +229,7 @@ export default function AddTransactionScreen() {
   )
 
   const accountIcon = (a: Account): React.ComponentProps<typeof FontAwesome>['name'] =>
-    a.type === 'cash' ? 'money' : 'university'
+    a.type === 'cash' ? 'money' : a.type === 'credit_card' ? 'credit-card' : 'university'
 
   const submit = async () => {
     if (submittingRef.current) return
@@ -514,7 +523,7 @@ export default function AddTransactionScreen() {
                 placeholder="Select destination…"
               />
               <Text style={styles.hint}>
-                Moves money between your wallets. Transfers don’t count as income or expense.
+                Moves money between your wallets. Paying a credit card: bank → card. Transfers don’t count as income or expense.
               </Text>
             </View>
           ) : kind === 'people' ? (
@@ -555,7 +564,7 @@ export default function AddTransactionScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.catRow}
               >
-                {accounts.map((a) => {
+                {cashBankAccounts.map((a) => {
                   const active = accountId === String(a.id)
                   return (
                     <Pressable key={a.id} style={styles.catItem} onPress={() => setAccountId(String(a.id))}>

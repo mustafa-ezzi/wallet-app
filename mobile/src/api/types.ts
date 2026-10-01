@@ -1,7 +1,7 @@
 export type Account = {
   id: number
   name: string
-  type: 'bank' | 'cash' | 'person'
+  type: 'bank' | 'cash' | 'credit_card' | 'person'
   opening_balance: number | string
   current_balance: number | string
   created_at?: string
@@ -108,6 +108,7 @@ export type PeopleProposal = {
 
 export type Dashboard = {
   total_balance: number | string
+  card_debt?: number | string
   accounts: { id: number; name: string; type: string; balance: number | string }[]
   people?: { id: number; name: string; type: string; balance: number | string }[]
   month_income: number | string

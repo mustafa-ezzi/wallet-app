@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownRight,
   ArrowUpRight,
+  CreditCard,
   Landmark,
   Plus,
   Wallet,
@@ -20,6 +21,7 @@ import { fmt } from '../utils/format'
 
 interface DashboardData {
   total_balance: number
+  card_debt?: number
   accounts: { id: number; name: string; type: string; balance: number }[]
   month_income: number
   month_expense: number
@@ -76,7 +78,10 @@ export default function Dashboard() {
         setBreakdown([])
         return
       }
-      const total = accounts.reduce((s, a) => s + a.currentBalance, 0)
+      const own = accounts.filter((a) => a.type === 'bank' || a.type === 'cash')
+      const cards = accounts.filter((a) => a.type === 'credit_card')
+      const total = own.reduce((s, a) => s + a.currentBalance, 0)
+      const cardDebt = cards.reduce((s, a) => s + Math.max(0, a.currentBalance), 0)
       const month = monthPrefix(now)
       const monthTxs = txs.filter((t) => t.date.startsWith(month) && t.category !== 'Bank Transfer')
       const monthIncome = monthTxs.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
@@ -85,7 +90,8 @@ export default function Dashboard() {
       setBreakdown(breakdownFromTxs(txs))
       setData({
         total_balance: total,
-        accounts: accounts.map((a) => ({
+        card_debt: cardDebt,
+        accounts: own.map((a) => ({
           id: a.serverId, name: a.name, type: a.type, balance: a.currentBalance,
         })),
         month_income: monthIncome,
@@ -121,7 +127,9 @@ export default function Dashboard() {
           : []
       setData({
         ...d,
-        accounts: Array.isArray(d.accounts) ? d.accounts : [],
+        accounts: Array.isArray(d.accounts)
+          ? d.accounts.filter((a: { type: string }) => a.type === 'bank' || a.type === 'cash')
+          : [],
         recent_transactions: Array.isArray(d.recent_transactions) ? d.recent_transactions : [],
       })
       setBreakdown(breakdownFromTxs(txs as { type: string; category: string; amount: number; date: string }[]))
@@ -136,6 +144,7 @@ export default function Dashboard() {
   const accounts = data?.accounts ?? []
   const walletCount = accounts.length
   const balanceNeg = (data?.total_balance ?? 0) < 0
+  const cardDebt = Number(data?.card_debt) || 0
 
   const recent = useMemo(() => data?.recent_transactions ?? [], [data])
 
@@ -180,6 +189,11 @@ export default function Dashboard() {
           <p className="home-balance-hint">
             Across {walletCount} wallet{walletCount === 1 ? '' : 's'} · {monthName} in {fmt(data?.month_income ?? 0)} · out {fmt(data?.month_expense ?? 0)}
           </p>
+          {cardDebt > 0 ? (
+            <p className="home-balance-hint" style={{ marginTop: '0.35rem', color: 'var(--danger)', fontWeight: 600 }}>
+              Card debt {fmt(cardDebt)}
+            </p>
+          ) : null}
 
           <div className="wallet-grid">
             {accounts.slice(0, 6).map((acc, i) => {
@@ -192,10 +206,12 @@ export default function Dashboard() {
                     onClick={() => navigate('/accounts')}
                   >
                     <div className="wallet-tile-top">
-                      <span className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : 'account-icon-bank'}`}>
+                      <span className={`account-icon ${acc.type === 'cash' ? 'account-icon-cash' : acc.type === 'credit_card' ? 'account-icon-card' : 'account-icon-bank'}`}>
                         {acc.type === 'cash'
                           ? <Wallet size={14} strokeWidth={1.75} />
-                          : <Landmark size={14} strokeWidth={1.75} />}
+                          : acc.type === 'credit_card'
+                            ? <CreditCard size={14} strokeWidth={1.75} />
+                            : <Landmark size={14} strokeWidth={1.75} />}
                       </span>
                       <span className="wallet-tile-name">{acc.name}</span>
                     </div>

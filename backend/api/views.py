@@ -295,19 +295,25 @@ class DashboardView(APIView):
 
     def get(self, request):
         user = request.user
+        # Include bank/cash/credit_card in accounts list; "What you have" is bank+cash only.
         wallets = Account.objects.filter(user=user).exclude(type='person')
         people = Account.objects.filter(user=user, type='person')
         account_data = []
         total_balance = Decimal('0')
+        card_debt = Decimal('0')
         for acc in wallets:
             bal = Decimal(str(acc.current_balance))
-            total_balance += bal
             account_data.append({
                 'id': acc.id,
                 'name': acc.name,
                 'type': acc.type,
                 'balance': float(bal),
             })
+            if acc.type == 'credit_card':
+                if bal > 0:
+                    card_debt += bal
+            else:
+                total_balance += bal
 
         people_data = []
         for p in people:
@@ -346,6 +352,7 @@ class DashboardView(APIView):
 
         return Response({
             'total_balance': float(total_balance),
+            'card_debt': float(card_debt),
             'accounts': account_data,
             'people': people_data,
             'month_income': float(month_income),

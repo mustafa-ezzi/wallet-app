@@ -75,12 +75,13 @@ class Account(models.Model):
     ACCOUNT_TYPES = [
         ('bank', 'Bank'),
         ('cash', 'Cash'),
+        ('credit_card', 'Credit Card'),
         ('person', 'Person'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='accounts')
     name = models.CharField(max_length=100)
-    type = models.CharField(max_length=10, choices=ACCOUNT_TYPES, default='bank')
+    type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='bank')
     opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -95,11 +96,19 @@ class Account(models.Model):
         return self.type == 'person'
 
     @property
+    def is_credit_card(self):
+        return self.type == 'credit_card'
+
+    @property
     def current_balance(self):
         income = self.transactions.filter(type='income').aggregate(
             total=Sum('amount'))['total'] or 0
         expense = self.transactions.filter(type='expense').aggregate(
             total=Sum('amount'))['total'] or 0
+        # Credit cards store outstanding debt: purchases (expense) raise it,
+        # payments / refunds (income, e.g. bank→card transfer) lower it.
+        if self.type == 'credit_card':
+            return float(self.opening_balance) - float(income) + float(expense)
         return float(self.opening_balance) + float(income) - float(expense)
 
 

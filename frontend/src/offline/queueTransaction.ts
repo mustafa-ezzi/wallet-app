@@ -33,7 +33,9 @@ export async function queuePersonalTransaction(
   const localId = newId()
   const clientMutationId = newId()
   const createdAt = new Date().toISOString()
-  const delta = input.type === 'income' ? input.amount : -input.amount
+  // Credit cards: expense raises debt, income (e.g. bill payment) lowers it.
+  const signed = input.type === 'income' ? input.amount : -input.amount
+  const delta = account.type === 'credit_card' ? -signed : signed
 
   const transaction: OfflineTransaction = {
     localId,
