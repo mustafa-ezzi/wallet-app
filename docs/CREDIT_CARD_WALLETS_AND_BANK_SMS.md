@@ -211,15 +211,15 @@ Do **not** skip Phase A: SMS matching without a real card wallet type will keep 
 
 ## 8. Checklist — “credit cards work end-to-end”
 
-- [ ] User can create a **Credit card** wallet with optional last-4  
-- [ ] Card debt excluded from “What you have”; shown separately  
-- [ ] Manual card spend + pay-from-bank transfer work  
-- [ ] Parser sets `instrument: credit_card` on card-like SMS  
-- [ ] Matcher suggests credit card wallets (mask/hint)  
-- [ ] Approve posts to card wallet, not bank  
+- [x] User can create a **Credit card** wallet with optional last-4  
+- [x] Card debt excluded from “What you have”; shown separately  
+- [x] Manual card spend + pay-from-bank transfer work  
+- [x] Parser sets `instrument: credit_card` on card-like SMS  
+- [x] Matcher suggests credit card wallets (mask/hint)  
+- [x] Approve posts to card wallet, not bank  
 - [ ] Card payment SMS reduces debt (transfer preferred)  
-- [ ] Aliases remembered after first approve  
-- [ ] Tests with sample HBL/Meezan/UBL-style card SMS  
+- [x] Aliases remembered after first approve  
+- [x] Tests with sample HBL/Meezan/UBL-style card SMS  
 
 ---
 

@@ -53,10 +53,14 @@ Both ATM and many card spends say **“debited”**. Distinction must use **stru
 **Important nuance:** Some bank “sent” messages also include `TID` (your RAAST sample). So order of classification matters:
 
 1. **Reversed** (keyword `reversed`)  
-2. **Received** (`received from` / `credited` / `deposited`)  
-3. **Sent / RAAST out** (`sent to` / `RAAST payment from your`)  
-4. **ATM** (`ATM` / `Cash Withdraw` / `(debited + TID)` and not matched above)  
-5. **Expense** (`debited` / `purchase` / remaining debit)
+2. **Card payment received** (`payment received` / thank-you toward **credit card**) → income on card wallet (debt ↓)  
+3. **Received** (`received from` / `credited` / `deposited`)  
+4. **Sent / RAAST out** (`sent to` / `RAAST payment from your`)  
+5. **ATM** (`ATM` / `Cash Withdraw` / `(debited + TID)` and not matched above)  
+6. **Credit card purchase** (`instrument: credit_card` — card ending / Visa / POS purchase / online purchase) → expense on card wallet  
+7. **Expense** (generic `debited` / remaining debit on bank account)
+
+Parser also sets **`instrument`**: `credit_card` | `account` | `unknown`. Plain “debited” with no card words stays `account` / bank matching. Card SMS match **`type === 'credit_card'`** wallets (alias last-4 → hint → name → sole card).
 
 User can always **override type** on the approval screen (ATM ↔ Expense ↔ Income).
 

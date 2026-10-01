@@ -9,6 +9,8 @@ export type FixtureSms = {
   bank?: string
   expectedKind: 'expense' | 'atm' | 'income' | 'reversal' | 'unknown' | 'ignore'
   expectedAmount?: number
+  expectedInstrument?: 'account' | 'credit_card' | 'unknown'
+  expectedMask?: string
   text: string
 }
 
@@ -162,6 +164,8 @@ export const FIXTURE_SMS: FixtureSms[] = [
     bank: 'meezan',
     expectedKind: 'expense',
     expectedAmount: 890.5,
+    expectedInstrument: 'credit_card',
+    expectedMask: '1234',
     text: 'Meezan: PKR 890.50 Purchase at POS AL-FATAH on 12-May-2026 19:40 from Card ending 1234.',
   },
   {
@@ -170,6 +174,8 @@ export const FIXTURE_SMS: FixtureSms[] = [
     bank: 'mcb',
     expectedKind: 'expense',
     expectedAmount: 3200,
+    expectedInstrument: 'credit_card',
+    expectedMask: 'xx7788',
     text: 'MCB: PKR 3,200.00 debited for online purchase on 03-Apr-2026. Card xx7788.',
   },
   {
@@ -221,7 +227,51 @@ export const FIXTURE_SMS: FixtureSms[] = [
     label: 'Account mask only',
     expectedKind: 'expense',
     expectedAmount: 99,
+    expectedInstrument: 'account',
+    expectedMask: 'xxx2554',
     text: 'PKR 99.00 has been debited at 10:00 on 01-Aug-2026 from AC# xxx2554.',
+  },
+
+  // ── Credit card (Phase B) ────────────────────────────────────────────────
+  {
+    id: 'cc-hbl-purchase',
+    label: 'HBL credit card purchase',
+    bank: 'hbl',
+    expectedKind: 'expense',
+    expectedAmount: 2041,
+    expectedInstrument: 'credit_card',
+    expectedMask: 'xx1234',
+    text: 'Purchase of PKR 2,041 on your HBL Credit Card xx1234 on 01-Sep-2026 at 14:20.',
+  },
+  {
+    id: 'cc-payment-received',
+    label: 'Credit card payment received',
+    bank: 'hbl',
+    expectedKind: 'income',
+    expectedAmount: 50000,
+    expectedInstrument: 'credit_card',
+    expectedMask: 'xx1234',
+    text: 'PKR 50,000 payment received on Credit Card xx1234. Thank you. HBL',
+  },
+  {
+    id: 'cc-pos-ending',
+    label: 'POS with card ending (existing pattern)',
+    bank: 'meezan',
+    expectedKind: 'expense',
+    expectedAmount: 890.5,
+    expectedInstrument: 'credit_card',
+    expectedMask: '1234',
+    text: 'Meezan: PKR 890.50 Purchase at POS AL-FATAH on 12-May-2026 19:40 from Card ending 1234.',
+  },
+  {
+    id: 'cc-online-card-mask',
+    label: 'Online purchase with card mask',
+    bank: 'mcb',
+    expectedKind: 'expense',
+    expectedAmount: 3200,
+    expectedInstrument: 'credit_card',
+    expectedMask: 'xx7788',
+    text: 'MCB: PKR 3,200.00 debited for online purchase on 03-Apr-2026. Card xx7788.',
   },
 
   // ── Edge: Rs instead of PKR ──────────────────────────────────────────────

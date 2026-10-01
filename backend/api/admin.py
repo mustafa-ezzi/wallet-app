@@ -77,7 +77,7 @@ class UserProfileAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
 
 @admin.register(Account)
 class AccountAdmin(SuperuserOnlyMixin, admin.ModelAdmin):
-    list_display = ('id', 'name', 'type', 'user', 'created_at')
+    list_display = ('id', 'name', 'type', 'credit_limit', 'user', 'created_at')
     search_fields = ('name', 'user__username')
 
 

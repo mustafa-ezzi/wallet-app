@@ -107,14 +107,16 @@ export default function BankSmsImportPage() {
 
   const loadWallets = useCallback(async () => {
     try {
-      const res = await accountsApi.list({ type: 'bank,cash' })
-      const list = asList<Acc>(res.data).filter((a) => a.type === 'bank' || a.type === 'cash')
+      const res = await accountsApi.list({ type: 'bank,cash,credit_card' })
+      const list = asList<Acc>(res.data).filter(
+        (a) => a.type === 'bank' || a.type === 'cash' || a.type === 'credit_card',
+      )
       setWallets(list.map((a) => ({ id: a.id, name: a.name, type: a.type })))
     } catch {
       const cached = await getCachedAccounts()
       setWallets(
         cached
-          .filter((a) => a.type === 'bank' || a.type === 'cash')
+          .filter((a) => a.type === 'bank' || a.type === 'cash' || a.type === 'credit_card')
           .map((a) => ({ id: a.serverId, name: a.name, type: a.type })),
       )
     }
@@ -206,7 +208,13 @@ export default function BankSmsImportPage() {
   }, [loadWallets, loadPending, loadSettings, loadBooks])
 
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
+  const cards = useMemo(() => wallets.filter((w) => w.type === 'credit_card'), [wallets])
   const cashWallets = useMemo(() => wallets.filter((w) => w.type === 'cash'), [wallets])
+  const primaryWallets = useMemo(() => {
+    const atmOnly = draft?.kind === 'atm' && !draft.recordAtmAsExpense
+    if (atmOnly) return banks
+    return [...banks, ...cards]
+  }, [banks, cards, draft?.kind, draft?.recordAtmAsExpense])
   const mustPickType = parsed ? needsManualTypePick(parsed) && !typeConfirmed : false
 
   const onDetect = async () => {
@@ -729,14 +737,16 @@ export default function BankSmsImportPage() {
             </div>
 
             <div className="form-group">
-              <label>Bank wallet</label>
+              <label>{parsed?.instrument === 'credit_card' ? 'Wallet (credit card)' : 'Wallet'}</label>
               <select
                 value={draft.bankAccountId ?? ''}
                 onChange={(e) => patchDraft({ bankAccountId: e.target.value ? Number(e.target.value) : null })}
               >
                 <option value="">Select wallet…</option>
-                {banks.map((w) => (
-                  <option key={w.id} value={w.id}>{w.name}</option>
+                {primaryWallets.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.type === 'credit_card' ? `${w.name} (card)` : w.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -883,8 +893,10 @@ export default function BankSmsImportPage() {
             <label>Wallet</label>
             <select value={aliasWalletId} onChange={(e) => setAliasWalletId(e.target.value)}>
               <option value="">Select…</option>
-              {banks.map((w) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
+              {[...banks, ...cards].map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.type === 'credit_card' ? `${w.name} (card)` : w.name}
+                </option>
               ))}
             </select>
           </div>

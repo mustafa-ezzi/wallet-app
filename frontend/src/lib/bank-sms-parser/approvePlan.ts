@@ -9,7 +9,7 @@ export type ApprovePlanStep = {
   date: string
   /** Resolved before post; null means create cash first. */
   accountId: number | null
-  accountRole: 'bank' | 'cash'
+  accountRole: 'bank' | 'cash' | 'credit_card'
   category: string
   notes: string
 }
@@ -27,7 +27,7 @@ export function buildApproveDraft(
   overrides?: Partial<ApproveDraft>,
   opts?: { aliases?: WalletAlias[]; defaultCashId?: number | null },
 ): ApproveDraft {
-  const bank = suggestBankWallet(wallets, parsed, opts?.aliases ?? [])
+  const primary = suggestBankWallet(wallets, parsed, opts?.aliases ?? [])
   const cash = preferCashWallet(wallets, opts?.defaultCashId)
   const kind = (overrides?.kind ?? parsed.kind) as BankSmsKind
   const amount = overrides?.amount ?? parsed.amount ?? 0
@@ -36,6 +36,7 @@ export function buildApproveDraft(
   const noteBits = [
     parsed.counterparty ? `To/From: ${parsed.counterparty}` : null,
     parsed.tid ? `TID:${parsed.tid}` : null,
+    parsed.instrument === 'credit_card' ? 'credit card' : null,
     'via bank SMS',
   ].filter(Boolean)
 
@@ -43,7 +44,7 @@ export function buildApproveDraft(
     kind: kind === 'unknown' ? 'expense' : kind,
     amount,
     date,
-    bankAccountId: overrides?.bankAccountId ?? bank?.id ?? null,
+    bankAccountId: overrides?.bankAccountId ?? primary?.id ?? null,
     cashAccountId: overrides?.cashAccountId ?? cash?.id ?? null,
     category: overrides?.category ?? defaultCategoryForKind(kind === 'unknown' ? 'expense' : kind),
     notes: overrides?.notes ?? noteBits.join(' · '),

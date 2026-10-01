@@ -177,6 +177,22 @@ class PeopleDoubleEntryTests(TravelPeopleBase):
         self.assertEqual(Decimal(str(res.data['card_debt'])), Decimal('37041'))
         self.assertTrue(any(a['type'] == 'credit_card' and a['name'] == 'HBL Visa' for a in res.data['accounts']))
 
+    def test_credit_card_available_credit(self):
+        card = Account.objects.create(
+            user=self.user,
+            name='Faisal Visa',
+            type='credit_card',
+            opening_balance=Decimal('12000'),
+            credit_limit=Decimal('50000'),
+        )
+        self.assertEqual(Decimal(str(card.current_balance)), Decimal('12000'))
+        self.assertEqual(Decimal(str(card.available_credit)), Decimal('38000'))
+        res = self.client.get(f'/api/accounts/{card.id}/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(Decimal(str(res.data['credit_limit'])), Decimal('50000'))
+        self.assertEqual(Decimal(str(res.data['available_credit'])), Decimal('38000'))
+        self.assertEqual(Decimal(str(res.data['current_balance'])), Decimal('12000'))
+
     def test_people_action_idempotent(self):
         person = Account.objects.create(user=self.user, name='Idem', type='person', opening_balance=0)
         payload = {

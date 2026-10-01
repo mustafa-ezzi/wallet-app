@@ -44,14 +44,15 @@ def _parse_tx_date(raw) -> Optional[date]:
     return dt.date() if dt else None
 
 
-def _user_wallet(user, account_id) -> Optional[Account]:
+def _user_wallet(user, account_id, *, types=None) -> Optional[Account]:
     if not account_id:
         return None
     try:
         aid = int(account_id)
     except (TypeError, ValueError):
         return None
-    return Account.objects.filter(user=user, id=aid, type__in=['bank', 'cash']).first()
+    allowed = types or ['bank', 'cash', 'credit_card']
+    return Account.objects.filter(user=user, id=aid, type__in=allowed).first()
 
 
 class BankSmsImportSerializer(serializers.ModelSerializer):
@@ -337,12 +338,11 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
     if bank_id is None:
         bank_id = item.resolved_account_id or item.suggested_account_id
     bank = _user_wallet(user, bank_id)
-    if not bank or bank.type != 'bank':
-        # Allow cash-as-source only for non-ATM expense edge cases; ATM needs bank
-        if kind == BankSmsImport.KIND_ATM and not record_atm_as_expense:
+    if kind == BankSmsImport.KIND_ATM and not record_atm_as_expense:
+        if not bank or bank.type != 'bank':
             raise ValueError('Pick a bank wallet.')
-        if not bank:
-            raise ValueError('Pick a bank wallet.')
+    elif not bank or bank.type not in ('bank', 'cash', 'credit_card'):
+        raise ValueError('Pick a wallet.')
 
     def _income_links():
         project = None
@@ -477,7 +477,7 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
 
     settings_obj, _ = BankSmsImportSettings.objects.get_or_create(user=user)
     dirty = False
-    if overrides.get('remember_wallet') and bank and bank.type == 'bank':
+    if overrides.get('remember_wallet') and bank and bank.type in ('bank', 'credit_card'):
         settings_obj.wallet_aliases = _upsert_wallet_alias(
             list(settings_obj.wallet_aliases or []),
             account_id=bank.id,
@@ -762,7 +762,7 @@ class BankSmsImportSettingsView(APIView):
             obj.wallet_aliases = _sanitize_aliases(request.data.get('wallet_aliases'))
             # Drop aliases pointing at wallets the user no longer owns
             owned = set(
-                Account.objects.filter(user=request.user, type__in=['bank', 'cash'])
+                Account.objects.filter(user=request.user, type__in=['bank', 'cash', 'credit_card'])
                 .values_list('id', flat=True)
             )
             obj.wallet_aliases = [

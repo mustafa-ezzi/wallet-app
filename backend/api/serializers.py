@@ -113,10 +113,14 @@ class UserSerializer(serializers.ModelSerializer):
 
 class AccountSerializer(serializers.ModelSerializer):
     current_balance = serializers.ReadOnlyField()
+    available_credit = serializers.ReadOnlyField()
 
     class Meta:
         model = Account
-        fields = ('id', 'name', 'type', 'opening_balance', 'current_balance', 'created_at')
+        fields = (
+            'id', 'name', 'type', 'opening_balance', 'credit_limit',
+            'current_balance', 'available_credit', 'created_at',
+        )
         read_only_fields = ('created_at',)
 
     def validate_type(self, value):
@@ -125,12 +129,24 @@ class AccountSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Invalid account type.')
         return value
 
+    def validate_credit_limit(self, value):
+        if value is None:
+            return 0
+        if value < 0:
+            raise serializers.ValidationError('Credit limit cannot be negative.')
+        return value
+
     def validate(self, attrs):
         # People are created via /api/people/ with opening 0; allow type=person here too.
         acc_type = attrs.get('type', getattr(self.instance, 'type', 'bank'))
         if acc_type == 'person' and 'opening_balance' in attrs:
             # Keep person opening at 0 unless staff/migration needs otherwise
             pass
+        # Only credit cards keep a limit; clear for other types
+        if acc_type != 'credit_card' and 'credit_limit' in attrs:
+            attrs['credit_limit'] = 0
+        if acc_type != 'credit_card' and self.instance is None:
+            attrs.setdefault('credit_limit', 0)
         return attrs
 
 

@@ -62,6 +62,7 @@ export default function WalletsScreen() {
   const [name, setName] = useState('')
   const [type, setType] = useState<'bank' | 'cash' | 'credit_card'>('bank')
   const [opening, setOpening] = useState('0')
+  const [creditLimit, setCreditLimit] = useState('0')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const [formError, setFormError] = useState('')
@@ -163,6 +164,7 @@ export default function WalletsScreen() {
     setName('')
     setType('bank')
     setOpening('0')
+    setCreditLimit('0')
     setFormError('')
     setCreateOpen(true)
   }
@@ -172,6 +174,7 @@ export default function WalletsScreen() {
     setName(a.name)
     setType((a.type === 'cash' || a.type === 'credit_card' ? a.type : 'bank') as 'bank' | 'cash' | 'credit_card')
     setOpening(String(a.opening_balance ?? 0))
+    setCreditLimit(String(a.credit_limit ?? 0))
     setFormError('')
     setCreateOpen(true)
   }
@@ -181,6 +184,7 @@ export default function WalletsScreen() {
     setEditing(null)
     setName('')
     setOpening('0')
+    setCreditLimit('0')
     setFormError('')
   }
 
@@ -236,6 +240,7 @@ export default function WalletsScreen() {
         name: name.trim(),
         type,
         opening_balance: toMoney(opening),
+        credit_limit: type === 'credit_card' ? toMoney(creditLimit) : 0,
       }
       if (editing) {
         await accountsApi.update(editing.id, payload)
@@ -286,7 +291,13 @@ export default function WalletsScreen() {
 
   const renderWallet = (a: Account, index: number) => {
     const bal = toMoney(a.current_balance)
-    const pct = Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / maxAbsBalance) * 100)))
+    const limit = toMoney(a.credit_limit)
+    const available = a.available_credit != null
+      ? toMoney(a.available_credit)
+      : (limit > 0 ? Math.max(0, limit - bal) : null)
+    const pct = a.type === 'credit_card' && limit > 0
+      ? Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / limit) * 100)))
+      : Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / maxAbsBalance) * 100)))
     const isCash = a.type === 'cash'
     const isCard = a.type === 'credit_card'
     return (
@@ -303,8 +314,11 @@ export default function WalletsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.cardName}>{a.name}</Text>
               <Text style={styles.cardType}>
-                {isCard ? 'Opening outstanding: ' : 'Opening: '}
-                {money.fmtBalance(a.opening_balance ?? 0)}
+                {isCard && limit > 0
+                  ? `Limit ${money.fmt(limit)}`
+                  : isCard
+                    ? `Opening outstanding: ${money.fmtBalance(a.opening_balance ?? 0)}`
+                    : `Opening: ${money.fmtBalance(a.opening_balance ?? 0)}`}
               </Text>
             </View>
             <View style={{ alignItems: 'flex-end' }}>
@@ -316,6 +330,13 @@ export default function WalletsScreen() {
               </Text>
             </View>
           </View>
+
+          {isCard && limit > 0 ? (
+            <Text style={[styles.cardType, { marginBottom: 6 }]}>
+              Used {money.fmt(bal)} of {money.fmt(limit)}
+              {available != null ? ` · Available ${money.fmtBalance(available)}` : ''}
+            </Text>
+          ) : null}
 
           <View style={styles.progressTrack}>
             <View
@@ -701,7 +722,7 @@ export default function WalletsScreen() {
               </Text>
             ) : type === 'credit_card' ? (
               <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
-                Enter what you currently owe. Purchases raise it; pay bill via transfer bank → card.
+                Enter what you currently owe and your card limit. Available = limit − you owe.
               </Text>
             ) : null}
             <Field
@@ -711,6 +732,15 @@ export default function WalletsScreen() {
               keyboardType="decimal-pad"
               placeholder="0"
             />
+            {type === 'credit_card' ? (
+              <Field
+                label="Credit limit"
+                value={creditLimit}
+                onChangeText={setCreditLimit}
+                keyboardType="decimal-pad"
+                placeholder="50000"
+              />
+            ) : null}
             <PrimaryButton
               title={editing ? 'Save changes' : 'Create wallet'}
               onPress={() => void create()}

@@ -83,6 +83,36 @@ class BankSmsImportTests(TestCase):
         self.assertEqual(tx.amount, Decimal('2041'))
         self.assertEqual(tx.account_id, self.bank.id)
 
+    def test_approve_expense_on_credit_card(self):
+        card = Account.objects.create(
+            user=self.user, name='HBL Visa', type='credit_card', opening_balance=Decimal('10000'),
+        )
+        created = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'expense',
+            'amount': '2041',
+            'tx_date': '2026-09-01',
+            'fingerprint': 'fp_cc_exp',
+            'suggested_account_id': card.id,
+            'account_mask': '1234',
+            'bank_hint': 'hbl',
+            'category': 'Shopping',
+            'notes': 'credit card purchase',
+        }, format='json')
+        pk = created.data['id']
+        res = self.client.post(f'/api/bank-sms-imports/{pk}/approve/', {
+            'remember_wallet': True,
+        }, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        tx = Transaction.objects.get(id=res.data['created_transaction_ids'][0])
+        self.assertEqual(tx.account_id, card.id)
+        self.assertEqual(tx.type, 'expense')
+        card.refresh_from_db()
+        self.assertEqual(Decimal(str(card.current_balance)), Decimal('12041'))
+        settings = self.client.get('/api/bank-sms-import-settings/')
+        self.assertEqual(settings.status_code, 200)
+        aliases = settings.data['wallet_aliases']
+        self.assertTrue(any(int(a.get('account_id')) == card.id for a in aliases))
+
     def test_approve_atm_transfer(self):
         created = self.client.post('/api/bank-sms-imports/', {
             'kind': 'atm',

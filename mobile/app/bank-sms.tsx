@@ -129,14 +129,16 @@ export default function BankSmsScreen() {
 
   const loadWallets = useCallback(async () => {
     try {
-      const res = await accountsApi.list({ type: 'bank,cash' })
-      const list = asList<Acc>(res.data).filter((a) => a.type === 'bank' || a.type === 'cash')
+      const res = await accountsApi.list({ type: 'bank,cash,credit_card' })
+      const list = asList<Acc>(res.data).filter(
+        (a) => a.type === 'bank' || a.type === 'cash' || a.type === 'credit_card',
+      )
       setWallets(list.map((a) => ({ id: a.id, name: a.name, type: a.type })))
     } catch {
       const cached = await getCachedAccounts()
       setWallets(
         cached
-          .filter((a) => a.type === 'bank' || a.type === 'cash')
+          .filter((a) => a.type === 'bank' || a.type === 'cash' || a.type === 'credit_card')
           .map((a) => ({ id: a.serverId, name: a.name, type: a.type })),
       )
     }
@@ -202,7 +204,21 @@ export default function BankSmsScreen() {
   }, [loadWallets, loadPending, loadSettings, loadBooks])
 
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
+  const cards = useMemo(() => wallets.filter((w) => w.type === 'credit_card'), [wallets])
   const cashWallets = useMemo(() => wallets.filter((w) => w.type === 'cash'), [wallets])
+  const primaryWallets = useMemo(() => {
+    const atmOnly = draft?.kind === 'atm' && !draft.recordAtmAsExpense
+    if (atmOnly) return banks
+    return [...banks, ...cards]
+  }, [banks, cards, draft?.kind, draft?.recordAtmAsExpense])
+  const walletOptions = useMemo(
+    () =>
+      primaryWallets.map((w) => ({
+        value: String(w.id),
+        label: w.type === 'credit_card' ? `${w.name} (card)` : w.name,
+      })),
+    [primaryWallets],
+  )
   const mustPickType = parsed ? needsManualTypePick(parsed) && !typeConfirmed : false
 
   const incomeAssociateOptions = useMemo(() => {
@@ -842,9 +858,9 @@ export default function BankSmsScreen() {
             <DateField label="Date" value={draft.date} onChange={(date) => patchDraft({ date })} />
 
             <SelectField
-              label="Wallet"
+              label={parsed?.instrument === 'credit_card' ? 'Wallet (credit card)' : 'Wallet'}
               value={draft.bankAccountId != null ? String(draft.bankAccountId) : ''}
-              options={banks.map((w) => ({ value: String(w.id), label: w.name }))}
+              options={walletOptions}
               onChange={(v) => patchDraft({ bankAccountId: Number(v) })}
               placeholder="Select…"
             />
@@ -989,7 +1005,10 @@ export default function BankSmsScreen() {
               <SelectField
                 label="Wallet"
                 value={aliasWalletId}
-                options={banks.map((w) => ({ value: String(w.id), label: w.name }))}
+                options={[...banks, ...cards].map((w) => ({
+                  value: String(w.id),
+                  label: w.type === 'credit_card' ? `${w.name} (card)` : w.name,
+                }))}
                 onChange={setAliasWalletId}
                 placeholder="Select…"
               />

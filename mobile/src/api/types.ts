@@ -4,6 +4,8 @@ export type Account = {
   type: 'bank' | 'cash' | 'credit_card' | 'person'
   opening_balance: number | string
   current_balance: number | string
+  credit_limit?: number | string
+  available_credit?: number | string | null
   created_at?: string
 }
 

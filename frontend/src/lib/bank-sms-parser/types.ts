@@ -7,12 +7,17 @@ export type BankSmsKind =
   | 'reversal'
   | 'unknown'
 
+/** Payment instrument: bank account vs credit card (Phase B). */
+export type BankSmsInstrument = 'account' | 'credit_card' | 'unknown'
+
 /** UI buckets shown on approve screen. */
 export type BankSmsUiBucket = 'expense' | 'atm' | 'received' | 'reversed'
 
 export type ParsedBankSms = {
   ok: boolean
   kind: BankSmsKind
+  /** Whether SMS is about a credit card vs bank account. */
+  instrument: BankSmsInstrument
   amount: number | null
   occurredAt: string | null
   /** ISO date YYYY-MM-DD when parseable */
@@ -34,13 +39,14 @@ export type ParsedBankSms = {
 export type WalletLike = {
   id: number
   name: string
-  type: 'bank' | 'cash' | string
+  type: 'bank' | 'cash' | 'credit_card' | string
 }
 
 export type ApproveDraft = {
   kind: BankSmsKind
   amount: number
   date: string
+  /** Primary wallet (bank or credit card). */
   bankAccountId: number | null
   cashAccountId: number | null
   category: string

@@ -7,6 +7,8 @@ export function mapServerAccount(raw: {
   type: string
   opening_balance: number | string
   current_balance: number | string
+  credit_limit?: number | string | null
+  available_credit?: number | string | null
 }): OfflineAccount {
   return {
     localId: accountLocalId(raw.id),
@@ -15,6 +17,8 @@ export function mapServerAccount(raw: {
     type: raw.type,
     openingBalance: Number(raw.opening_balance) || 0,
     currentBalance: Number(raw.current_balance) || 0,
+    creditLimit: Number(raw.credit_limit) || 0,
+    availableCredit: raw.available_credit == null ? null : Number(raw.available_credit),
     updatedAt: new Date().toISOString(),
   }
 }

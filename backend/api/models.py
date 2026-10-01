@@ -83,6 +83,8 @@ class Account(models.Model):
     name = models.CharField(max_length=100)
     type = models.CharField(max_length=20, choices=ACCOUNT_TYPES, default='bank')
     opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    # Credit cards only: total limit (e.g. 50000). 0 = not set.
+    credit_limit = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -110,6 +112,16 @@ class Account(models.Model):
         if self.type == 'credit_card':
             return float(self.opening_balance) - float(income) + float(expense)
         return float(self.opening_balance) + float(income) - float(expense)
+
+    @property
+    def available_credit(self):
+        """Limit minus what you owe. None when not a card or limit unset."""
+        if self.type != 'credit_card':
+            return None
+        limit = float(self.credit_limit or 0)
+        if limit <= 0:
+            return None
+        return max(0.0, limit - float(self.current_balance))
 
 
 class Project(models.Model):

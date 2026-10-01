@@ -17,9 +17,9 @@ type Acc = { id: number; name: string; type: string }
 
 async function loadWallets(): Promise<WalletLike[]> {
   try {
-    const res = await accountsApi.list({ type: 'bank,cash' })
+    const res = await accountsApi.list({ type: 'bank,cash,credit_card' })
     return asList<Acc>(res.data)
-      .filter((a) => a.type === 'bank' || a.type === 'cash')
+      .filter((a) => a.type === 'bank' || a.type === 'cash' || a.type === 'credit_card')
       .map((a) => ({ id: a.id, name: a.name, type: a.type }))
   } catch {
     return []

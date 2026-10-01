@@ -1,7 +1,7 @@
 import type { ParsedBankSms, WalletLike } from './types'
 
 export type WalletAlias = {
-  /** Bank wallet id */
+  /** Wallet id (bank or credit card) */
   account_id: number
   /** Bank brand / keyword e.g. meezan, hbl */
   hint?: string
@@ -28,27 +28,18 @@ export type WalletSuggestResult = {
   confidence: number
 }
 
-/**
- * Suggest a bank wallet from SMS hints + user aliases.
- * Priority: alias mask → alias hint → name mask → name hint → sole bank wallet.
- */
-export function suggestBankWallet(
-  wallets: WalletLike[],
-  parsed: Pick<ParsedBankSms, 'bankHint' | 'accountMask'>,
-  aliases: WalletAlias[] = [],
-): WalletLike | null {
-  return suggestBankWalletDetailed(wallets, parsed, aliases).wallet
+type SuggestParsed = Pick<ParsedBankSms, 'bankHint' | 'accountMask'> & {
+  instrument?: ParsedBankSms['instrument']
 }
 
-export function suggestBankWalletDetailed(
-  wallets: WalletLike[],
-  parsed: Pick<ParsedBankSms, 'bankHint' | 'accountMask'>,
-  aliases: WalletAlias[] = [],
+function matchInPool(
+  pool: WalletLike[],
+  parsed: SuggestParsed,
+  aliases: WalletAlias[],
 ): WalletSuggestResult {
-  const banks = wallets.filter((w) => w.type === 'bank')
-  if (!banks.length) return { wallet: null, via: 'none', confidence: 0 }
+  if (!pool.length) return { wallet: null, via: 'none', confidence: 0 }
 
-  const byId = new Map(banks.map((w) => [w.id, w]))
+  const byId = new Map(pool.map((w) => [w.id, w]))
   const maskKey = normalizeMask(parsed.accountMask)
   const hintKey = parsed.bankHint ? norm(parsed.bankHint) : ''
 
@@ -71,7 +62,7 @@ export function suggestBankWalletDetailed(
   }
 
   if (maskKey) {
-    const byMask = banks.find(
+    const byMask = pool.find(
       (w) => norm(w.name).includes(maskKey) || normalizeMask(w.name) === maskKey
         || norm(w.name).endsWith(maskKey),
     )
@@ -79,15 +70,56 @@ export function suggestBankWalletDetailed(
   }
 
   if (hintKey) {
-    const byHint = banks.find((w) => norm(w.name).includes(hintKey))
+    const byHint = pool.find((w) => norm(w.name).includes(hintKey))
     if (byHint) return { wallet: byHint, via: 'name-hint', confidence: 0.8 }
   }
 
-  if (banks.length === 1) {
-    return { wallet: banks[0], via: 'single', confidence: 0.55 }
+  if (pool.length === 1) {
+    return { wallet: pool[0], via: 'single', confidence: 0.55 }
   }
 
   return { wallet: null, via: 'none', confidence: 0 }
+}
+
+/**
+ * Suggest a wallet from SMS hints + user aliases.
+ * Credit-card SMS → credit_card wallets first.
+ * Alias mask/hint can force a card even when instrument is ambiguous.
+ * Priority within a pool: alias mask → alias hint → name mask → name hint → sole wallet.
+ */
+export function suggestBankWallet(
+  wallets: WalletLike[],
+  parsed: SuggestParsed,
+  aliases: WalletAlias[] = [],
+): WalletLike | null {
+  return suggestBankWalletDetailed(wallets, parsed, aliases).wallet
+}
+
+export function suggestBankWalletDetailed(
+  wallets: WalletLike[],
+  parsed: SuggestParsed,
+  aliases: WalletAlias[] = [],
+): WalletSuggestResult {
+  const banks = wallets.filter((w) => w.type === 'bank')
+  const cards = wallets.filter((w) => w.type === 'credit_card')
+  const preferCards = parsed.instrument === 'credit_card'
+
+  // Alias can force a credit card even on ambiguous / account SMS
+  if (!preferCards && (banks.length || cards.length)) {
+    const aliasHit = matchInPool([...banks, ...cards], parsed, aliases)
+    if (aliasHit.via === 'alias-mask' || aliasHit.via === 'alias-hint') {
+      return aliasHit
+    }
+  }
+
+  if (preferCards) {
+    const cardHit = matchInPool(cards, parsed, aliases)
+    if (cardHit.wallet) return cardHit
+    // Do not fall back to bank when SMS is clearly a card message
+    return { wallet: null, via: 'none', confidence: 0 }
+  }
+
+  return matchInPool(banks, parsed, aliases)
 }
 
 export function preferCashWallet(

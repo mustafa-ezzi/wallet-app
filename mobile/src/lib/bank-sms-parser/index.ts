@@ -1,11 +1,5 @@
-/**
- * Vendored copy of packages/bank-sms-parser for EAS/Metro.
- * Keep in sync with packages/bank-sms-parser/src when changing the parser.
- * Source of truth for web: frontend/src/lib/bank-sms-parser
- * Source of truth for tests: packages/bank-sms-parser
- */
-export type { BankSmsKind, BankSmsUiBucket, ParsedBankSms, WalletLike, ApproveDraft } from './types'
-export { parseBankSms, kindToUiBucket, defaultCategoryForKind, todayIsoDate } from './parse'
+export type { BankSmsKind, BankSmsInstrument, BankSmsUiBucket, ParsedBankSms, WalletLike, ApproveDraft } from './types'
+export { parseBankSms, kindToUiBucket, defaultCategoryForKind, todayIsoDate, detectInstrument } from './parse'
 export {
   suggestBankWallet,
   suggestBankWalletDetailed,

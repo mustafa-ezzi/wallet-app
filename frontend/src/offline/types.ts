@@ -9,6 +9,8 @@ export interface OfflineAccount {
   type: string
   openingBalance: number
   currentBalance: number
+  creditLimit?: number
+  availableCredit?: number | null
   updatedAt: string
 }
 

@@ -25,6 +25,8 @@ import type { PeopleInvitation, PeopleLink, PeopleProposal } from '../people/typ
 interface Account {
   id: number; name: string; type: string
   opening_balance: number; current_balance: number
+  credit_limit?: number
+  available_credit?: number | null
 }
 
 interface Tx {
@@ -34,7 +36,7 @@ interface Tx {
   project_name: string | null
 }
 
-const EMPTY_ACCOUNT = { name: '', type: 'bank', opening_balance: '0' }
+const EMPTY_ACCOUNT = { name: '', type: 'bank', opening_balance: '0', credit_limit: '0' }
 
 const EMPTY_TX_FORM = {
   type: 'income', amount: '', date: new Date().toISOString().split('T')[0],
@@ -118,6 +120,8 @@ export default function Accounts() {
             type: a.type,
             opening_balance: a.openingBalance,
             current_balance: a.currentBalance,
+            credit_limit: a.creditLimit ?? 0,
+            available_credit: a.availableCredit ?? null,
           })))
           setAccError('')
         } else {
@@ -208,7 +212,12 @@ export default function Accounts() {
   }
   const openEditAcc = (a: Account) => {
     setEditingAcc(a)
-    setAccForm({ name: a.name, type: a.type, opening_balance: String(a.opening_balance) })
+    setAccForm({
+      name: a.name,
+      type: a.type,
+      opening_balance: String(a.opening_balance),
+      credit_limit: String(a.credit_limit ?? 0),
+    })
     setAccError(''); setShowAccModal(true)
   }
   const setA = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -225,7 +234,11 @@ export default function Accounts() {
       if (!ok) return
     }
     setAccSaving(true); setAccError('')
-    const payload = { ...accForm, opening_balance: parseFloat(accForm.opening_balance) }
+    const payload = {
+      ...accForm,
+      opening_balance: parseFloat(accForm.opening_balance) || 0,
+      credit_limit: accForm.type === 'credit_card' ? (parseFloat(accForm.credit_limit) || 0) : 0,
+    }
     try {
       if (editingAcc) await accountsApi.update(editingAcc.id, payload)
       else {
@@ -646,8 +659,21 @@ export default function Accounts() {
                 </div>
               </div>
               {accForm.type === 'credit_card' ? (
+                <div className="form-group">
+                  <label>Credit limit (PKR)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="e.g. 50000"
+                    value={accForm.credit_limit}
+                    onChange={setA('credit_limit')}
+                  />
+                </div>
+              ) : null}
+              {accForm.type === 'credit_card' ? (
                 <p className="text-muted" style={{ fontSize: '0.78rem', margin: 0 }}>
-                  Enter what you currently owe on this card. Purchases raise it; paying the bill (transfer from bank → card) lowers it.
+                  Enter what you currently owe and your card limit. Available credit = limit − you owe. Paying the bill (transfer bank → card) frees limit again.
                 </p>
               ) : null}
               <button type="submit" className="btn-primary" style={{ width: '100%', padding: '0.75rem' }} disabled={accSaving}>
@@ -674,6 +700,15 @@ export default function Accounts() {
               <span style={{ fontWeight: 700, color: selectedAccount.current_balance < 0 ? 'var(--danger)' : selectedAccount.type === 'credit_card' ? 'var(--danger)' : 'var(--primary)' }}>
                 {fmtBalance(selectedAccount.current_balance)}
               </span>
+              {selectedAccount.type === 'credit_card' && toMoney(selectedAccount.credit_limit) > 0 ? (
+                <div style={{ marginTop: '0.35rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                  Used {fmt(selectedAccount.current_balance)} of {fmt(selectedAccount.credit_limit)}
+                  {' · '}
+                  <span style={{ color: 'var(--success)', fontWeight: 700 }}>
+                    Available {fmtBalance(selectedAccount.available_credit ?? Math.max(0, toMoney(selectedAccount.credit_limit) - toMoney(selectedAccount.current_balance)))}
+                  </span>
+                </div>
+              ) : null}
             </div>
 
             {txLoading ? (
@@ -822,9 +857,15 @@ function AccountCard({ acc, maxAbs, onEdit, onDelete, onView }: {
   onView:   (a: Account) => void
 }) {
   const bal = toMoney(acc.current_balance)
-  const prog = Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / maxAbs) * 100)))
+  const limit = toMoney(acc.credit_limit)
+  const available = acc.available_credit != null
+    ? toMoney(acc.available_credit)
+    : (limit > 0 ? Math.max(0, limit - bal) : null)
   const isCash = acc.type === 'cash'
   const isCard = acc.type === 'credit_card'
+  const prog = isCard && limit > 0
+    ? Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / limit) * 100)))
+    : Math.max(bal > 0 ? 3 : 0, Math.min(100, Math.round((Math.abs(bal) / maxAbs) * 100)))
   return (
     <div className="glass glass-hover" style={{ padding: '1rem', borderRadius: 'var(--radius-md)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.65rem' }}>
@@ -840,7 +881,11 @@ function AccountCard({ acc, maxAbs, onEdit, onDelete, onView }: {
           <div>
             <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{acc.name}</div>
             <div className="text-muted" style={{ fontSize: '0.72rem' }}>
-              {isCard ? 'Opening outstanding: ' : 'Opening: '}{fmt(acc.opening_balance)}
+              {isCard && limit > 0
+                ? `Limit ${fmt(limit)}`
+                : isCard
+                  ? `Opening outstanding: ${fmt(acc.opening_balance)}`
+                  : `Opening: ${fmt(acc.opening_balance)}`}
             </div>
           </div>
         </div>
@@ -853,6 +898,18 @@ function AccountCard({ acc, maxAbs, onEdit, onDelete, onView }: {
           </div>
         </div>
       </div>
+
+      {isCard && limit > 0 ? (
+        <div style={{ marginBottom: '0.55rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+          Used {fmt(bal)} of {fmt(limit)}
+          {available != null ? (
+            <>
+              {' · '}
+              <span style={{ color: 'var(--success)', fontWeight: 700 }}>Available {fmtBalance(available)}</span>
+            </>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="progress-bar" style={{ marginBottom: '0.7rem' }}>
         <div

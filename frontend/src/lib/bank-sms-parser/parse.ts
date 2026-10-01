@@ -1,4 +1,4 @@
-import type { BankSmsKind, BankSmsUiBucket, ParsedBankSms } from './types'
+import type { BankSmsInstrument, BankSmsKind, BankSmsUiBucket, ParsedBankSms } from './types'
 import { applyBankTemplate } from './templates'
 import { applyKindOverrides, type KindOverride } from './corrections'
 
@@ -113,8 +113,53 @@ function parseTid(text: string): string | null {
 
 function parseAccountMask(text: string): string | null {
   const m = text.match(/(?:AC#|A\/C|account)\s*[#:]?\s*(x+\d{2,}|\*{2,}\d{2,}|\d{4,})/i)
+    || text.match(/\bcard\s+ending(?:\s+with)?\s+(\d{4})\b/i)
+    || text.match(/\bending\s+with\s+(\d{4})\b/i)
+    || text.match(/\bcard\s*(?:no\.?|number|#)?\s*:?\s*((?:x{2,}|\*{2,})?\d{3,})\b/i)
+    || text.match(/\bfrom\s+card\s+((?:x{2,}|\*{2,})?\d{3,})\b/i)
     || text.match(/\b(x{2,}\d{3,}|\*{2,}\d{3,})\b/i)
   return m ? m[1].toLowerCase() : null
+}
+
+/** Strong / channel signals that this SMS is about a credit card. */
+export function detectInstrument(text: string): BankSmsInstrument {
+  if (
+    /\bcredit\s*cards?\b/i.test(text)
+    || /\bcrd\b/i.test(text)
+    || /\bcard\s+ending\b/i.test(text)
+    || /\bending\s+with\s+\d{4}\b/i.test(text)
+    || /\bcard\s*(?:no\.?|number|#)\b/i.test(text)
+    || /\b(?:visa|mastercard|master\s*card)\b/i.test(text)
+    || /\bfrom\s+card\b/i.test(text)
+    || /\bon\s+your\s+(?:\w+\s+)?(?:credit\s+)?card\b/i.test(text)
+    || /\byour\s+(?:\w+\s+)?credit\s*card\b/i.test(text)
+  ) {
+    return 'credit_card'
+  }
+  // Channel wording often means card in PK SMS (still confirm on approve)
+  if (
+    /\bpos\s+purchase\b/i.test(text)
+    || /\bpurchase\s+at\s+pos\b/i.test(text)
+    || /\be-?commerce\b/i.test(text)
+    || /\bonline\s+purchase\b/i.test(text)
+    || /\bintl(?:ernational)?\s+purchase\b/i.test(text)
+  ) {
+    return 'credit_card'
+  }
+  // Explicit bank account phrasing
+  if (/(?:AC#|A\/C|account)\s*[#:]?\s*(?:x|\*|\d)/i.test(text)) {
+    return 'account'
+  }
+  return 'unknown'
+}
+
+function isCardPaymentReceived(text: string): boolean {
+  return (
+    /\bpayment\s+received\b[\s\S]{0,80}\b(?:credit\s*)?card\b/i.test(text)
+    || /\b(?:credit\s*)?card\b[\s\S]{0,80}\bpayment\s+received\b/i.test(text)
+    || /\bthank\s+you\s+for\s+(?:your\s+)?payment\b[\s\S]{0,60}\b(?:credit\s*)?card\b/i.test(text)
+    || /\bpayment\s+(?:received\s+)?(?:towards|on|to)\s+(?:your\s+)?(?:credit\s*)?card\b/i.test(text)
+  )
 }
 
 function parseCounterparty(text: string): string | null {
@@ -166,14 +211,18 @@ function fingerprint(parts: {
   mask: string | null
   raw: string
 }): string {
-  const base = [
-    parts.kind,
-    parts.amount ?? '',
-    parts.date ?? '',
-    parts.tid ?? '',
-    parts.mask ?? '',
-    parts.raw.slice(0, 120).toLowerCase().replace(/\s+/g, ' '),
-  ].join('|')
+  // Prefer TID — same payment via SMS vs bank-app notification must not double-post.
+  const tid = (parts.tid || '').trim().toLowerCase()
+  const base = tid
+    ? ['tid', tid, parts.amount ?? '', parts.date ?? '', parts.mask ?? ''].join('|')
+    : [
+        parts.kind,
+        parts.amount ?? '',
+        parts.date ?? '',
+        parts.mask ?? '',
+        // Normalize whitespace only — do NOT include full raw (SMS vs push text differs).
+        parts.raw.slice(0, 80).toLowerCase().replace(/\s+/g, ' ').replace(/[^\w. ]/g, ''),
+      ].join('|')
   let h = 0
   for (let i = 0; i < base.length; i += 1) {
     h = ((h << 5) - h) + base.charCodeAt(i)
@@ -187,6 +236,10 @@ function classify(text: string, tid: string | null): { kind: BankSmsKind; reason
 
   if (/\breversed?\b/i.test(t) || /\bis reversed into\b/i.test(t)) {
     return { kind: 'reversal', reason: 'keyword:reversed', confidence: 0.92 }
+  }
+  // Card bill payment received (debt ↓) — before generic received/payment
+  if (isCardPaymentReceived(t)) {
+    return { kind: 'income', reason: 'keyword:card-payment', confidence: 0.9 }
   }
   // Wallet push styles: "You received Rs…", "Money received", "Incoming payment"
   if (
@@ -223,7 +276,13 @@ function classify(text: string, tid: string | null): { kind: BankSmsKind; reason
   if (/\bdebited\b/i.test(t) && tid) {
     return { kind: 'atm', reason: 'debited+TID', confidence: 0.78 }
   }
-  if (/\bpurchase\b/i.test(t) || /\bpos\b/i.test(t) || /\bonline\b/i.test(t)) {
+  // Credit card purchase signals (instrument set separately)
+  if (
+    /\bpurchase\b/i.test(t)
+    || /\bpos\b/i.test(t)
+    || /\bonline\b/i.test(t)
+    || (detectInstrument(t) === 'credit_card' && /\bdebited\b/i.test(t))
+  ) {
     return { kind: 'expense', reason: 'keyword:purchase/pos', confidence: 0.85 }
   }
   if (/\bdebited\b/i.test(t)) {
@@ -270,6 +329,7 @@ export function parseBankSms(
   const empty: ParsedBankSms = {
     ok: false,
     kind: 'unknown',
+    instrument: 'unknown',
     amount: null,
     occurredAt: null,
     date: null,
@@ -306,6 +366,7 @@ export function parseBankSms(
   const accountMask = parseAccountMask(raw)
   const counterparty = parseCounterparty(raw)
   const bankHint = parseBankHint(raw)
+  const instrument = detectInstrument(raw)
   const { isoDate, occurredAt } = parseOccurred(raw)
   const base = classify(raw, tid)
   const { kind, reason, confidence } = applyBankTemplate(raw, bankHint, base)
@@ -327,6 +388,7 @@ export function parseBankSms(
       amount,
       date: isoDate,
       occurredAt,
+      instrument,
     }
   }
 
@@ -334,6 +396,7 @@ export function parseBankSms(
   const parsed: ParsedBankSms = {
     ok,
     kind,
+    instrument,
     amount,
     occurredAt,
     date: isoDate,
