@@ -119,6 +119,7 @@ class AccountSerializer(serializers.ModelSerializer):
         model = Account
         fields = (
             'id', 'name', 'type', 'opening_balance', 'credit_limit',
+            'statement_day', 'due_day',
             'current_balance', 'available_credit', 'created_at',
         )
         read_only_fields = ('created_at',)
@@ -136,15 +137,34 @@ class AccountSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Credit limit cannot be negative.')
         return value
 
+    def _validate_day(self, value, label):
+        if value in (None, ''):
+            return None
+        day = int(value)
+        if day < 1 or day > 31:
+            raise serializers.ValidationError(f'{label} must be between 1 and 31.')
+        return day
+
+    def validate_statement_day(self, value):
+        return self._validate_day(value, 'Statement day')
+
+    def validate_due_day(self, value):
+        return self._validate_day(value, 'Due day')
+
     def validate(self, attrs):
         # People are created via /api/people/ with opening 0; allow type=person here too.
         acc_type = attrs.get('type', getattr(self.instance, 'type', 'bank'))
         if acc_type == 'person' and 'opening_balance' in attrs:
             # Keep person opening at 0 unless staff/migration needs otherwise
             pass
-        # Only credit cards keep a limit; clear for other types
-        if acc_type != 'credit_card' and 'credit_limit' in attrs:
-            attrs['credit_limit'] = 0
+        # Only credit cards keep limit / billing days
+        if acc_type != 'credit_card':
+            if 'credit_limit' in attrs:
+                attrs['credit_limit'] = 0
+            if 'statement_day' in attrs:
+                attrs['statement_day'] = None
+            if 'due_day' in attrs:
+                attrs['due_day'] = None
         if acc_type != 'credit_card' and self.instance is None:
             attrs.setdefault('credit_limit', 0)
         return attrs

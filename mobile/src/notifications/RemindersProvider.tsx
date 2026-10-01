@@ -12,7 +12,7 @@ import * as Notifications from 'expo-notifications'
 import { useRouter } from 'expo-router'
 import { useAuth } from '@/src/context/AuthContext'
 import { track } from '@/src/lib/analytics'
-import type { Payable, Receivable, RecurringExpense } from '@/src/api/types'
+import type { Account, Payable, Receivable, RecurringExpense } from '@/src/api/types'
 import {
   getPermissionStatus,
   requestReminderPermission,
@@ -45,6 +45,7 @@ type RemindersValue = {
     payables: Payable[]
     receivables: Receivable[]
     expenses?: RecurringExpense[]
+    creditCards?: Account[]
   }) => Promise<number>
 }
 
@@ -68,6 +69,7 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
     payables: Payable[]
     receivables: Receivable[]
     expenses?: RecurringExpense[]
+    creditCards?: Account[]
   } | null>(null)
 
   const refreshPrefs = useCallback(async () => {
@@ -139,6 +141,11 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      if (data?.screen === 'wallets') {
+        router.push('/(tabs)/wallets' as never)
+        return
+      }
+
       if (data?.screen === 'bills') {
         const q = data.kind && data.id
           ? `?focus=${data.kind}&id=${data.id}`
@@ -177,6 +184,7 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
     payables: Payable[]
     receivables: Receivable[]
     expenses?: RecurringExpense[]
+    creditCards?: Account[]
   }) => {
     lastPayload.current = input
     const n = await rescheduleDueReminders(input)

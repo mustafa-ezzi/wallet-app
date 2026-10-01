@@ -1,6 +1,6 @@
 import { Platform } from 'react-native'
 import * as Notifications from 'expo-notifications'
-import type { Payable, Receivable, RecurringExpense } from '@/src/api/types'
+import type { Account, Payable, Receivable, RecurringExpense } from '@/src/api/types'
 import { fmt, toMoney } from '@/src/utils/format'
 import { track } from '@/src/lib/analytics'
 import { getPrivacyEnabled } from '@/src/privacy/storage'
@@ -10,9 +10,9 @@ const CHANNEL_ID = 'WalletTrails-due-reminders'
 export const REMINDER_CATEGORY = 'WalletTrails_due'
 
 export type ReminderData = {
-  kind: 'payable' | 'receivable' | 'expense'
+  kind: 'payable' | 'receivable' | 'expense' | 'credit_card'
   id: number
-  screen: 'bills'
+  screen: 'bills' | 'wallets'
 }
 
 Notifications.setNotificationHandler({
@@ -162,6 +162,9 @@ function bodyFor(
     if (kind === 'receivable') {
       return { title: 'Money owed reminder', body: `A receipt is ${when}. Open WalletTrails to review.` }
     }
+    if (kind === 'credit_card') {
+      return { title: 'Card payment due', body: `A credit card payment is ${when}. Open WalletTrails to review.` }
+    }
     return { title: 'Bill reminder', body: `A bill is ${when}. Open WalletTrails to review.` }
   }
   const money = fmt(toMoney(amount))
@@ -170,6 +173,14 @@ function bodyFor(
   }
   if (kind === 'receivable') {
     return { title: 'Money owed reminder', body: `${name} is ${when} — ${money}` }
+  }
+  if (kind === 'credit_card') {
+    return {
+      title: 'Card payment due',
+      body: amount && toMoney(amount) > 0
+        ? `${name} is ${when} — you owe ${money}`
+        : `${name} payment is ${when}`,
+    }
   }
   return { title: 'Bill reminder', body: `${name} is ${when} — ${money}` }
 }
@@ -184,7 +195,11 @@ async function scheduleOne(
   privacyOn: boolean,
 ): Promise<void> {
   const { title, body } = bodyFor(kind, name, amount, lead, privacyOn)
-  const data: ReminderData = { kind, id, screen: 'bills' }
+  const data: ReminderData = {
+    kind,
+    id,
+    screen: kind === 'credit_card' ? 'wallets' : 'bills',
+  }
   await Notifications.scheduleNotificationAsync({
     content: {
       title,
@@ -204,6 +219,7 @@ export type ScheduleInput = {
   payables: Payable[]
   receivables: Receivable[]
   expenses?: RecurringExpense[]
+  creditCards?: Account[]
 }
 
 export async function rescheduleDueReminders(input: ScheduleInput): Promise<number> {
@@ -258,6 +274,20 @@ export async function rescheduleDueReminders(input: ScheduleInput): Promise<numb
       const fires = upcomingFireDates(dueDay, [lead])
       for (const fire of fires.slice(0, 2)) {
         await scheduleOne(fire, lead, 'expense', e.id, e.name, e.amount, privacyOn)
+        scheduled += 1
+      }
+    }
+  }
+
+  for (const c of input.creditCards ?? []) {
+    if (c.type !== 'credit_card') continue
+    const dueDay = Number(c.due_day)
+    if (!Number.isFinite(dueDay) || dueDay < 1) continue
+    const owed = toMoney(c.current_balance)
+    for (const lead of leads) {
+      const fires = upcomingFireDates(dueDay, [lead])
+      for (const fire of fires.slice(0, 2)) {
+        await scheduleOne(fire, lead, 'credit_card', c.id, c.name, owed, privacyOn)
         scheduled += 1
       }
     }

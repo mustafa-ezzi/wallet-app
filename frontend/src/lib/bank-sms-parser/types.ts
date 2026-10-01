@@ -46,13 +46,20 @@ export type ApproveDraft = {
   kind: BankSmsKind
   amount: number
   date: string
-  /** Primary wallet (bank or credit card). */
+  /** Primary wallet (bank or credit card destination). */
   bankAccountId: number | null
   cashAccountId: number | null
+  /** Phase C: bank wallet money came from for card bill payment. */
+  sourceBankAccountId: number | null
   category: string
   notes: string
   /** When ATM and no cash wallet — create one named this on approve. */
   createCashNamed: string | null
   /** Force expense instead of ATM transfer. */
   recordAtmAsExpense: boolean
+  /**
+   * Phase C: card payment as income-only on the card (no bank→card transfer).
+   * Default false when a source bank is available.
+   */
+  recordCardPaymentAsIncomeOnly: boolean
 }

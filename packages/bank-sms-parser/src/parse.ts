@@ -162,6 +162,16 @@ function isCardPaymentReceived(text: string): boolean {
   )
 }
 
+/** True when this parse is a credit-card bill payment (prefer bank→card transfer). */
+export function isCardPayment(
+  parsed: Pick<ParsedBankSms, 'kind' | 'instrument' | 'reason' | 'raw'>,
+): boolean {
+  if (parsed.kind !== 'income') return false
+  if (parsed.reason === 'keyword:card-payment') return true
+  if (parsed.instrument === 'credit_card' && isCardPaymentReceived(parsed.raw || '')) return true
+  return false
+}
+
 function parseCounterparty(text: string): string | null {
   const sent = text.match(/\bsent to\s+([A-Z0-9 .'-]{2,40}?)(?:\s+PK|\s+as\s+|\s+on\s+)/i)
   if (sent) return sent[1].trim()

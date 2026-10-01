@@ -85,6 +85,9 @@ class Account(models.Model):
     opening_balance = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     # Credit cards only: total limit (e.g. 50000). 0 = not set.
     credit_limit = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    # Optional billing cycle (1–31). Used for statement / payment due reminders.
+    statement_day = models.PositiveSmallIntegerField(null=True, blank=True)
+    due_day = models.PositiveSmallIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

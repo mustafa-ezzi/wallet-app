@@ -27,6 +27,8 @@ interface Account {
   opening_balance: number; current_balance: number
   credit_limit?: number
   available_credit?: number | null
+  statement_day?: number | null
+  due_day?: number | null
 }
 
 interface Tx {
@@ -36,7 +38,10 @@ interface Tx {
   project_name: string | null
 }
 
-const EMPTY_ACCOUNT = { name: '', type: 'bank', opening_balance: '0', credit_limit: '0' }
+const EMPTY_ACCOUNT = {
+  name: '', type: 'bank', opening_balance: '0', credit_limit: '0',
+  statement_day: '', due_day: '',
+}
 
 const EMPTY_TX_FORM = {
   type: 'income', amount: '', date: new Date().toISOString().split('T')[0],
@@ -217,6 +222,8 @@ export default function Accounts() {
       type: a.type,
       opening_balance: String(a.opening_balance),
       credit_limit: String(a.credit_limit ?? 0),
+      statement_day: a.statement_day != null ? String(a.statement_day) : '',
+      due_day: a.due_day != null ? String(a.due_day) : '',
     })
     setAccError(''); setShowAccModal(true)
   }
@@ -235,9 +242,14 @@ export default function Accounts() {
     }
     setAccSaving(true); setAccError('')
     const payload = {
-      ...accForm,
+      name: accForm.name,
+      type: accForm.type,
       opening_balance: parseFloat(accForm.opening_balance) || 0,
       credit_limit: accForm.type === 'credit_card' ? (parseFloat(accForm.credit_limit) || 0) : 0,
+      statement_day: accForm.type === 'credit_card' && accForm.statement_day
+        ? parseInt(accForm.statement_day, 10) : null,
+      due_day: accForm.type === 'credit_card' && accForm.due_day
+        ? parseInt(accForm.due_day, 10) : null,
     }
     try {
       if (editingAcc) await accountsApi.update(editingAcc.id, payload)
@@ -672,8 +684,34 @@ export default function Accounts() {
                 </div>
               ) : null}
               {accForm.type === 'credit_card' ? (
+                <div className="grid-2">
+                  <div className="form-group">
+                    <label>Statement day (optional)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      placeholder="e.g. 1"
+                      value={accForm.statement_day}
+                      onChange={setA('statement_day')}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Payment due day (optional)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="31"
+                      placeholder="e.g. 15"
+                      value={accForm.due_day}
+                      onChange={setA('due_day')}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              {accForm.type === 'credit_card' ? (
                 <p className="text-muted" style={{ fontSize: '0.78rem', margin: 0 }}>
-                  Enter what you currently owe and your card limit. Available credit = limit − you owe. Paying the bill (transfer bank → card) frees limit again.
+                  Enter what you currently owe and your card limit. Available credit = limit − you owe. Due day enables payment reminders.
                 </p>
               ) : null}
               <button type="submit" className="btn-primary" style={{ width: '100%', padding: '0.75rem' }} disabled={accSaving}>
@@ -882,9 +920,9 @@ function AccountCard({ acc, maxAbs, onEdit, onDelete, onView }: {
             <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{acc.name}</div>
             <div className="text-muted" style={{ fontSize: '0.72rem' }}>
               {isCard && limit > 0
-                ? `Limit ${fmt(limit)}`
+                ? `Limit ${fmt(limit)}${acc.due_day ? ` · due day ${acc.due_day}` : ''}`
                 : isCard
-                  ? `Opening outstanding: ${fmt(acc.opening_balance)}`
+                  ? `Opening outstanding: ${fmt(acc.opening_balance)}${acc.due_day ? ` · due day ${acc.due_day}` : ''}`
                   : `Opening: ${fmt(acc.opening_balance)}`}
             </div>
           </div>

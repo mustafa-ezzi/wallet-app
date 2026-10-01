@@ -6,6 +6,8 @@ export type Account = {
   current_balance: number | string
   credit_limit?: number | string
   available_credit?: number | string | null
+  statement_day?: number | null
+  due_day?: number | null
   created_at?: string
 }
 

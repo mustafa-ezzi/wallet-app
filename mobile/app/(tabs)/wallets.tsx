@@ -63,6 +63,8 @@ export default function WalletsScreen() {
   const [type, setType] = useState<'bank' | 'cash' | 'credit_card'>('bank')
   const [opening, setOpening] = useState('0')
   const [creditLimit, setCreditLimit] = useState('0')
+  const [statementDay, setStatementDay] = useState('')
+  const [dueDay, setDueDay] = useState('')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
   const [formError, setFormError] = useState('')
@@ -165,6 +167,8 @@ export default function WalletsScreen() {
     setType('bank')
     setOpening('0')
     setCreditLimit('0')
+    setStatementDay('')
+    setDueDay('')
     setFormError('')
     setCreateOpen(true)
   }
@@ -175,6 +179,8 @@ export default function WalletsScreen() {
     setType((a.type === 'cash' || a.type === 'credit_card' ? a.type : 'bank') as 'bank' | 'cash' | 'credit_card')
     setOpening(String(a.opening_balance ?? 0))
     setCreditLimit(String(a.credit_limit ?? 0))
+    setStatementDay(a.statement_day != null ? String(a.statement_day) : '')
+    setDueDay(a.due_day != null ? String(a.due_day) : '')
     setFormError('')
     setCreateOpen(true)
   }
@@ -185,6 +191,8 @@ export default function WalletsScreen() {
     setName('')
     setOpening('0')
     setCreditLimit('0')
+    setStatementDay('')
+    setDueDay('')
     setFormError('')
   }
 
@@ -241,6 +249,10 @@ export default function WalletsScreen() {
         type,
         opening_balance: toMoney(opening),
         credit_limit: type === 'credit_card' ? toMoney(creditLimit) : 0,
+        statement_day: type === 'credit_card' && statementDay.trim()
+          ? Number.parseInt(statementDay, 10) : null,
+        due_day: type === 'credit_card' && dueDay.trim()
+          ? Number.parseInt(dueDay, 10) : null,
       }
       if (editing) {
         await accountsApi.update(editing.id, payload)
@@ -315,9 +327,9 @@ export default function WalletsScreen() {
               <Text style={styles.cardName}>{a.name}</Text>
               <Text style={styles.cardType}>
                 {isCard && limit > 0
-                  ? `Limit ${money.fmt(limit)}`
+                  ? `Limit ${money.fmt(limit)}${a.due_day ? ` · due day ${a.due_day}` : ''}`
                   : isCard
-                    ? `Opening outstanding: ${money.fmtBalance(a.opening_balance ?? 0)}`
+                    ? `Opening outstanding: ${money.fmtBalance(a.opening_balance ?? 0)}${a.due_day ? ` · due day ${a.due_day}` : ''}`
                     : `Opening: ${money.fmtBalance(a.opening_balance ?? 0)}`}
               </Text>
             </View>
@@ -740,6 +752,24 @@ export default function WalletsScreen() {
                 keyboardType="decimal-pad"
                 placeholder="50000"
               />
+            ) : null}
+            {type === 'credit_card' ? (
+              <>
+                <Field
+                  label="Statement day (1–31, optional)"
+                  value={statementDay}
+                  onChangeText={setStatementDay}
+                  keyboardType="number-pad"
+                  placeholder="1"
+                />
+                <Field
+                  label="Payment due day (1–31, optional)"
+                  value={dueDay}
+                  onChangeText={setDueDay}
+                  keyboardType="number-pad"
+                  placeholder="15"
+                />
+              </>
             ) : null}
             <PrimaryButton
               title={editing ? 'Save changes' : 'Create wallet'}

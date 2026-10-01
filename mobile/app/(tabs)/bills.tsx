@@ -152,7 +152,12 @@ export default function BillsScreen() {
       setReceivables(rec)
       setProjects(asList<Project>(pr.data))
       setAccounts(asList<Account>(a.data))
-      void reschedule({ payables: pay, receivables: rec, expenses: exp })
+      void reschedule({
+        payables: pay,
+        receivables: rec,
+        expenses: exp,
+        creditCards: asList<Account>(a.data).filter((x) => x.type === 'credit_card' && x.due_day),
+      })
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not load bills.'))
     } finally {

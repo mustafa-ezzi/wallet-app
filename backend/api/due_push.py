@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from .expo_push import prune_stale_device_tokens, send_expo_push
 from .models import (
+    Account,
     DeviceToken,
     NotificationPreference,
     PayableInstallment,
@@ -151,6 +152,33 @@ def collect_due_events(today: date | None = None) -> list[dict]:
                     'screen': 'bills',
                     'kind': 'receivable',
                     'id': r.id,
+                },
+            })
+
+    cards = Account.objects.filter(type='credit_card', due_day__isnull=False).select_related('user')
+    for card in cards:
+        pref = prefs_for(card.user)
+        if not pref.enabled:
+            continue
+        leads = pref.lead_days() or list(DEFAULT_LEADS)
+        due = next_due_on_or_after(today, int(card.due_day))
+        for lead in leads:
+            fire = due - timedelta(days=lead)
+            if fire != today:
+                continue
+            if _already_sent(card.user_id, 'credit_card', card.id, lead, today):
+                continue
+            events.append({
+                'user_id': card.user_id,
+                'kind': 'credit_card',
+                'object_id': card.id,
+                'lead_days': lead,
+                'title': 'Card payment due',
+                'body': f'{card.name} payment is {lead_label(lead)}. Open WalletTrails to review.',
+                'data': {
+                    'screen': 'wallets',
+                    'kind': 'credit_card',
+                    'id': card.id,
                 },
             })
 

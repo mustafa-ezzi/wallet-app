@@ -15,6 +15,7 @@ import {
   BANK_SMS_UX,
   buildApproveDraft,
   detectInstrument,
+  isCardPayment,
   needsManualTypePick,
   parseBankSms,
   suggestPeopleMatch,
@@ -84,10 +85,12 @@ function draftFromRow(row: BankSmsImportRow): ApproveDraft {
     date: row.tx_date || new Date().toISOString().slice(0, 10),
     bankAccountId: row.resolved_account ?? row.suggested_account,
     cashAccountId: row.cash_account,
+    sourceBankAccountId: null,
     category: row.category || (kind === 'atm' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous'),
     notes: row.notes || '',
     createCashNamed: row.cash_account ? null : 'Cash',
     recordAtmAsExpense: row.record_atm_as_expense,
+    recordCardPaymentAsIncomeOnly: false,
   }
 }
 
@@ -350,8 +353,7 @@ export default function BankSmsScreen() {
     setOkMsg('')
     setTypeConfirmed(false)
     setPendingId(row.id)
-    setDraft(draftFromRow(row))
-    setParsed({
+    const p: ParsedBankSms = {
       ok: true,
       kind: row.kind,
       instrument: detectInstrument(row.raw_snippet || ''),
@@ -367,7 +369,19 @@ export default function BankSmsScreen() {
       fingerprint: row.fingerprint,
       raw: row.raw_snippet || '',
       ignore: false,
-    })
+    }
+    setParsed(p)
+    const base = draftFromRow(row)
+    setDraft(
+      buildApproveDraft(p, wallets, {
+        ...base,
+        bankAccountId: base.bankAccountId,
+        cashAccountId: base.cashAccountId,
+        notes: base.notes,
+        category: base.category,
+        recordAtmAsExpense: base.recordAtmAsExpense,
+      }, { aliases, defaultCashId }),
+    )
     if (row.account_mask) setAliasMask(String(row.account_mask).replace(/\D/g, '').slice(-4))
     if (row.bank_hint) setAliasHint(row.bank_hint)
     const acct = row.resolved_account ?? row.suggested_account
@@ -425,7 +439,11 @@ export default function BankSmsScreen() {
       return
     }
     if (!draft.bankAccountId) {
-      setError('Pick a bank wallet.')
+      setError('Pick a wallet.')
+      return
+    }
+    if (parsed && isCardPayment(parsed) && draft.kind === 'income' && !draft.recordCardPaymentAsIncomeOnly && !draft.sourceBankAccountId) {
+      setError('Pick the bank you paid from, or enable “adjust card only”.')
       return
     }
     if (mustPickType) {
@@ -453,7 +471,9 @@ export default function BankSmsScreen() {
         notes: snapshot.notes,
         resolved_account_id: snapshot.bankAccountId,
         cash_account_id: snapshot.cashAccountId,
+        source_bank_account_id: snapshot.sourceBankAccountId,
         record_atm_as_expense: snapshot.recordAtmAsExpense,
+        record_card_payment_as_income_only: snapshot.recordCardPaymentAsIncomeOnly,
         create_cash: snapshot.kind === 'atm' && !snapshot.recordAtmAsExpense && !snapshot.cashAccountId,
         create_cash_name: snapshot.createCashNamed || 'Cash',
         remember_wallet: rememberW,
@@ -860,12 +880,43 @@ export default function BankSmsScreen() {
             <DateField label="Date" value={draft.date} onChange={(date) => patchDraft({ date })} />
 
             <SelectField
-              label={parsed?.instrument === 'credit_card' ? 'Wallet (credit card)' : 'Wallet'}
+              label={parsed && isCardPayment(parsed) ? 'Credit card wallet' : parsed?.instrument === 'credit_card' ? 'Wallet (credit card)' : 'Wallet'}
               value={draft.bankAccountId != null ? String(draft.bankAccountId) : ''}
-              options={walletOptions}
+              options={(parsed && isCardPayment(parsed) ? cards : primaryWallets).map((w) => ({
+                value: String(w.id),
+                label: w.type === 'credit_card' ? `${w.name} (card)` : w.name,
+              }))}
               onChange={(v) => patchDraft({ bankAccountId: Number(v) })}
               placeholder="Select…"
             />
+
+            {parsed && isCardPayment(parsed) && draft.kind === 'income' ? (
+              <View style={{ marginBottom: 12 }}>
+                <View style={[styles.toggleCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                  <Text style={{ flex: 1, color: colors.text, fontWeight: '600', fontSize: 13 }}>
+                    Adjust card only (no bank transfer)
+                  </Text>
+                  <Switch
+                    value={draft.recordCardPaymentAsIncomeOnly}
+                    onValueChange={(v) => patchDraft({ recordCardPaymentAsIncomeOnly: v })}
+                  />
+                </View>
+                {!draft.recordCardPaymentAsIncomeOnly ? (
+                  <>
+                    <SelectField
+                      label="Paid from (bank)"
+                      value={draft.sourceBankAccountId != null ? String(draft.sourceBankAccountId) : ''}
+                      options={banks.map((w) => ({ value: String(w.id), label: w.name }))}
+                      onChange={(v) => patchDraft({ sourceBankAccountId: Number(v) })}
+                      placeholder="Select bank…"
+                    />
+                    <Text style={[styles.hint, { color: colors.textMuted }]}>
+                      Posts bank → card so both balances update.
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+            ) : null}
 
             {draft.kind === 'atm' ? (
               <View style={{ marginBottom: 12 }}>

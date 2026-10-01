@@ -113,6 +113,41 @@ class BankSmsImportTests(TestCase):
         aliases = settings.data['wallet_aliases']
         self.assertTrue(any(int(a.get('account_id')) == card.id for a in aliases))
 
+    def test_approve_card_payment_as_bank_to_card_transfer(self):
+        card = Account.objects.create(
+            user=self.user, name='HBL Visa', type='credit_card', opening_balance=Decimal('45000'),
+        )
+        created = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'income',
+            'amount': '10000',
+            'tx_date': '2026-09-10',
+            'fingerprint': 'fp_cc_pay',
+            'suggested_account_id': card.id,
+            'account_mask': '1234',
+            'bank_hint': 'hbl',
+            'notes': 'card payment · via bank SMS',
+            'parse_reason': 'keyword:card-payment',
+        }, format='json')
+        pk = created.data['id']
+        res = self.client.post(f'/api/bank-sms-imports/{pk}/approve/', {
+            'resolved_account_id': card.id,
+            'source_bank_account_id': self.bank.id,
+            'record_card_payment_as_income_only': False,
+        }, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(len(res.data['created_transaction_ids']), 2)
+        txs = list(Transaction.objects.filter(id__in=res.data['created_transaction_ids']).order_by('id'))
+        self.assertEqual(txs[0].type, 'expense')
+        self.assertEqual(txs[0].account_id, self.bank.id)
+        self.assertEqual(txs[0].category, 'Bank Transfer')
+        self.assertEqual(txs[1].type, 'income')
+        self.assertEqual(txs[1].account_id, card.id)
+        self.assertEqual(txs[1].category, 'Bank Transfer')
+        card.refresh_from_db()
+        self.bank.refresh_from_db()
+        self.assertEqual(Decimal(str(card.current_balance)), Decimal('35000'))
+        self.assertEqual(Decimal(str(self.bank.current_balance)), Decimal('90000'))
+
     def test_approve_atm_transfer(self):
         created = self.client.post('/api/bank-sms-imports/', {
             'kind': 'atm',

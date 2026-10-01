@@ -127,7 +127,9 @@ class BankSmsImportApproveSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)
     resolved_account_id = serializers.IntegerField(required=False, allow_null=True)
     cash_account_id = serializers.IntegerField(required=False, allow_null=True)
+    source_bank_account_id = serializers.IntegerField(required=False, allow_null=True)
     record_atm_as_expense = serializers.BooleanField(required=False)
+    record_card_payment_as_income_only = serializers.BooleanField(required=False, default=False)
     create_cash = serializers.BooleanField(required=False, default=False)
     create_cash_name = serializers.CharField(max_length=100, required=False, allow_blank=True, default='Cash')
     # Remember this wallet for mask/hint (Phase 4)
@@ -373,7 +375,42 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
     cash = None
     created_ids: list[int] = []
 
-    if kind == BankSmsImport.KIND_ATM and not record_atm_as_expense:
+    # Phase C: card bill payment → transfer from bank → credit card (preferred)
+    source_bank_id = overrides.get('source_bank_account_id')
+    income_only = bool(overrides.get('record_card_payment_as_income_only'))
+    card_payment_transfer = (
+        kind == BankSmsImport.KIND_INCOME
+        and bank
+        and bank.type == 'credit_card'
+        and not income_only
+        and source_bank_id
+    )
+    if card_payment_transfer:
+        source = _user_wallet(user, source_bank_id, types=['bank'])
+        if not source or source.type != 'bank':
+            raise ValueError('Pick the bank wallet you paid from.')
+        if source.id == bank.id:
+            raise ValueError('Source bank and card wallet must be different.')
+        out_tx = Transaction.objects.create(
+            user=user,
+            type='expense',
+            amount=amount,
+            date=tx_date,
+            account=source,
+            category='Bank Transfer',
+            notes=f'{notes} (card pay out)',
+        )
+        in_tx = Transaction.objects.create(
+            user=user,
+            type='income',
+            amount=amount,
+            date=tx_date,
+            account=bank,
+            category='Bank Transfer',
+            notes=f'{notes} (card pay in)',
+        )
+        created_ids = [out_tx.id, in_tx.id]
+    elif kind == BankSmsImport.KIND_ATM and not record_atm_as_expense:
         cash_id = overrides.get('cash_account_id')
         if cash_id is None:
             cash_id = item.cash_account_id

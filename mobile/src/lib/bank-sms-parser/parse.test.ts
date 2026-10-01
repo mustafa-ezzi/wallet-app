@@ -3,7 +3,7 @@ import { buildApproveDraft, buildApprovePlan } from './approvePlan'
 import { applyKindOverrides } from './corrections'
 import { FIXTURE_SMS } from './fixtures'
 import { needsManualTypePick, preferCashWallet, suggestBankWallet } from './matchWallet'
-import { parseBankSms } from './parse'
+import { isCardPayment, parseBankSms } from './parse'
 import { suggestPeopleMatch } from './suggestPeople'
 
 describe('parseBankSms — product samples', () => {
@@ -99,6 +99,7 @@ describe('credit card instrument + match', () => {
     const p = parseBankSms(FIXTURE_SMS.find((x) => x.id === 'cc-payment-received')!.text)
     expect(p.kind).toBe('income')
     expect(p.instrument).toBe('credit_card')
+    expect(isCardPayment(p)).toBe(true)
     expect(suggestBankWallet(wallets, p)?.id).toBe(4)
   })
 
@@ -120,6 +121,38 @@ describe('credit card instrument + match', () => {
     const draft = buildApproveDraft(p, wallets)
     expect(draft.bankAccountId).toBe(5)
     expect(draft.kind).toBe('expense')
+  })
+
+  it('card payment draft prefers bank→card transfer plan', () => {
+    const p = parseBankSms(FIXTURE_SMS.find((x) => x.id === 'cc-payment-received')!.text)
+    const draft = buildApproveDraft(p, wallets)
+    expect(draft.kind).toBe('income')
+    expect(draft.bankAccountId).toBe(4) // card
+    expect(draft.sourceBankAccountId).toBe(3) // HBL bank by hint
+    expect(draft.recordCardPaymentAsIncomeOnly).toBe(false)
+    const plan = buildApprovePlan(draft, { isCardPayment: true })
+    expect(plan.steps).toHaveLength(2)
+    expect(plan.steps[0]).toMatchObject({
+      type: 'expense',
+      accountId: 3,
+      accountRole: 'bank',
+      category: 'Bank Transfer',
+    })
+    expect(plan.steps[1]).toMatchObject({
+      type: 'income',
+      accountId: 4,
+      accountRole: 'credit_card',
+      category: 'Bank Transfer',
+    })
+  })
+
+  it('card payment income-only skips bank transfer', () => {
+    const p = parseBankSms(FIXTURE_SMS.find((x) => x.id === 'cc-payment-received')!.text)
+    const draft = buildApproveDraft(p, wallets, { recordCardPaymentAsIncomeOnly: true })
+    const plan = buildApprovePlan(draft, { isCardPayment: true })
+    expect(plan.steps).toHaveLength(1)
+    expect(plan.steps[0].type).toBe('income')
+    expect(plan.steps[0].accountId).toBe(4)
   })
 })
 

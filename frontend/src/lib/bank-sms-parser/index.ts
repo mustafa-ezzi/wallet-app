@@ -1,5 +1,5 @@
 export type { BankSmsKind, BankSmsInstrument, BankSmsUiBucket, ParsedBankSms, WalletLike, ApproveDraft } from './types'
-export { parseBankSms, kindToUiBucket, defaultCategoryForKind, todayIsoDate, detectInstrument } from './parse'
+export { parseBankSms, kindToUiBucket, defaultCategoryForKind, todayIsoDate, detectInstrument, isCardPayment } from './parse'
 export {
   suggestBankWallet,
   suggestBankWalletDetailed,

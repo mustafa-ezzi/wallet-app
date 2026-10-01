@@ -217,7 +217,7 @@ Do **not** skip Phase A: SMS matching without a real card wallet type will keep 
 - [x] Parser sets `instrument: credit_card` on card-like SMS  
 - [x] Matcher suggests credit card wallets (mask/hint)  
 - [x] Approve posts to card wallet, not bank  
-- [ ] Card payment SMS reduces debt (transfer preferred)  
+- [x] Card payment SMS reduces debt (transfer preferred)  
 - [x] Aliases remembered after first approve  
 - [x] Tests with sample HBL/Meezan/UBL-style card SMS  
 

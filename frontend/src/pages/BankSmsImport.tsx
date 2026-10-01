@@ -15,6 +15,7 @@ import {
   BANK_SMS_UX,
   buildApproveDraft,
   detectInstrument,
+  isCardPayment,
   needsManualTypePick,
   parseBankSms,
   suggestPeopleMatch,
@@ -70,10 +71,12 @@ function draftFromRow(row: BankSmsImportRow): ApproveDraft {
     date: row.tx_date || new Date().toISOString().slice(0, 10),
     bankAccountId: row.resolved_account ?? row.suggested_account,
     cashAccountId: row.cash_account,
+    sourceBankAccountId: null,
     category: row.category || (kind === 'atm' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous'),
     notes: row.notes || '',
     createCashNamed: row.cash_account ? null : 'Cash',
     recordAtmAsExpense: row.record_atm_as_expense,
+    recordCardPaymentAsIncomeOnly: false,
   }
 }
 
@@ -286,8 +289,7 @@ export default function BankSmsImportPage() {
     setOkMsg('')
     setTypeConfirmed(false)
     setPendingId(row.id)
-    setDraft(draftFromRow(row))
-    setParsed({
+    const p: ParsedBankSms = {
       ok: true,
       kind: row.kind,
       instrument: detectInstrument(row.raw_snippet || ''),
@@ -303,7 +305,19 @@ export default function BankSmsImportPage() {
       fingerprint: row.fingerprint,
       raw: row.raw_snippet || '',
       ignore: false,
-    })
+    }
+    setParsed(p)
+    const base = draftFromRow(row)
+    setDraft(
+      buildApproveDraft(p, wallets, {
+        ...base,
+        bankAccountId: base.bankAccountId,
+        cashAccountId: base.cashAccountId,
+        notes: base.notes,
+        category: base.category,
+        recordAtmAsExpense: base.recordAtmAsExpense,
+      }, { aliases, defaultCashId }),
+    )
     if (row.account_mask) setAliasMask(String(row.account_mask).replace(/\D/g, '').slice(-4))
     if (row.bank_hint) setAliasHint(row.bank_hint)
     const acct = row.resolved_account ?? row.suggested_account
@@ -329,7 +343,11 @@ export default function BankSmsImportPage() {
       return
     }
     if (!draft.bankAccountId) {
-      setError('Pick a bank wallet.')
+      setError('Pick a wallet.')
+      return
+    }
+    if (parsed && isCardPayment(parsed) && draft.kind === 'income' && !draft.recordCardPaymentAsIncomeOnly && !draft.sourceBankAccountId) {
+      setError('Pick the bank wallet you paid from, or choose “adjust card only”.')
       return
     }
     if (mustPickType) {
@@ -348,7 +366,9 @@ export default function BankSmsImportPage() {
         notes: draft.notes,
         resolved_account_id: draft.bankAccountId,
         cash_account_id: draft.cashAccountId,
+        source_bank_account_id: draft.sourceBankAccountId,
         record_atm_as_expense: draft.recordAtmAsExpense,
+        record_card_payment_as_income_only: draft.recordCardPaymentAsIncomeOnly,
         create_cash: draft.kind === 'atm' && !draft.recordAtmAsExpense && !draft.cashAccountId,
         create_cash_name: draft.createCashNamed || 'Cash',
         remember_wallet: rememberWallet,
@@ -739,19 +759,51 @@ export default function BankSmsImportPage() {
             </div>
 
             <div className="form-group">
-              <label>{parsed?.instrument === 'credit_card' ? 'Wallet (credit card)' : 'Wallet'}</label>
+              <label>
+                {parsed && isCardPayment(parsed) ? 'Credit card wallet' : parsed?.instrument === 'credit_card' ? 'Wallet (credit card)' : 'Wallet'}
+              </label>
               <select
                 value={draft.bankAccountId ?? ''}
                 onChange={(e) => patchDraft({ bankAccountId: e.target.value ? Number(e.target.value) : null })}
               >
                 <option value="">Select wallet…</option>
-                {primaryWallets.map((w) => (
+                {(parsed && isCardPayment(parsed) ? cards : primaryWallets).map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.type === 'credit_card' ? `${w.name} (card)` : w.name}
                   </option>
                 ))}
               </select>
             </div>
+
+            {parsed && isCardPayment(parsed) && draft.kind === 'income' ? (
+              <div style={{ marginBottom: '0.85rem' }}>
+                <label className="bsms-toggle">
+                  <input
+                    type="checkbox"
+                    checked={draft.recordCardPaymentAsIncomeOnly}
+                    onChange={(e) => patchDraft({ recordCardPaymentAsIncomeOnly: e.target.checked })}
+                  />
+                  <span>Don’t transfer from bank (adjust card debt only)</span>
+                </label>
+                {!draft.recordCardPaymentAsIncomeOnly ? (
+                  <div className="form-group">
+                    <label>Paid from (bank)</label>
+                    <select
+                      value={draft.sourceBankAccountId ?? ''}
+                      onChange={(e) => patchDraft({ sourceBankAccountId: e.target.value ? Number(e.target.value) : null })}
+                    >
+                      <option value="">Select bank…</option>
+                      {banks.map((w) => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                    <p className="add-tx-hint" style={{ marginTop: '0.35rem' }}>
+                      Posts a bank → card transfer so your bank balance and card debt both update.
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {draft.kind === 'atm' ? (
               <div style={{ marginBottom: '0.85rem' }}>
