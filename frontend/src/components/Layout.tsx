@@ -24,6 +24,7 @@ import AndroidInstallTour from './AndroidInstallTour'
 import { ANDROID_APK_URL } from '../config/androidApp'
 import { usePwaInstall } from '../hooks/usePwaInstall'
 import { useTravelMode } from '../travel/TravelModeContext'
+import { getAccessToken } from '../auth/sessionStore'
 
 const NAV: { path: string; label: string; short: string; tour: string; icon: ReactNode }[] = [
   { path: '/',          label: 'Home',     icon: <LayoutDashboard size={18} strokeWidth={1.75} />, short: 'Home', tour: 'nav-overview' },
@@ -40,7 +41,7 @@ const SIDE_EXTRA: { path: string; label: string; icon: ReactNode }[] = [
 ]
 
 export default function Layout() {
-  const { user, logout } = useAuth()
+  const { user, logout, logoutAll, beginAddAccount, savedAccounts } = useAuth()
   const { online, pending, syncing, syncNow } = useOffline()
   const {
     isActive: travelOn,
@@ -221,7 +222,13 @@ export default function Layout() {
             <span className="nav-icon"><Settings size={18} strokeWidth={1.75} /></span>
             Settings
           </button>
-          <div className="sidebar-user">
+          <button
+            type="button"
+            className="sidebar-user"
+            onClick={() => navigate('/settings')}
+            title="Manage accounts"
+            style={{ width: '100%', textAlign: 'left', cursor: 'pointer', border: 0, background: 'transparent' }}
+          >
             <div className="sidebar-avatar">{initials}</div>
             <div>
               <div className="sidebar-user-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -229,12 +236,57 @@ export default function Layout() {
                 {user?.is_premium ? <span className="badge badge-premium">Premium</span> : null}
               </div>
               <div className="sidebar-user-email">{user?.email}</div>
+              {savedAccounts.length > 1 ? (
+                <div className="sidebar-user-email" style={{ fontWeight: 700, marginTop: 2 }}>
+                  {savedAccounts.length} accounts · tap to switch
+                </div>
+              ) : (
+                <div className="sidebar-user-email" style={{ fontWeight: 700, marginTop: 2 }}>
+                  Add / switch account
+                </div>
+              )}
             </div>
-          </div>
-          <button className="sidebar-nav-item" onClick={logout} style={{ color: 'var(--red-600)' }}>
-            <span className="nav-icon"><LogOut size={18} strokeWidth={1.75} /></span>
-            Sign Out
           </button>
+          <button
+            className="sidebar-nav-item"
+            onClick={() => {
+              void (async () => {
+                await beginAddAccount()
+                navigate('/login', { replace: true })
+              })()
+            }}
+          >
+            <span className="nav-icon"><Users size={18} strokeWidth={1.75} /></span>
+            Add account
+          </button>
+          <button
+            className="sidebar-nav-item"
+            onClick={() => {
+              void (async () => {
+                await logout()
+                if (!getAccessToken()) navigate('/login', { replace: true })
+              })()
+            }}
+            style={{ color: 'var(--red-600)' }}
+          >
+            <span className="nav-icon"><LogOut size={18} strokeWidth={1.75} /></span>
+            {savedAccounts.length > 1 ? 'Log out of this account' : 'Sign Out'}
+          </button>
+          {savedAccounts.length > 1 ? (
+            <button
+              className="sidebar-nav-item"
+              onClick={() => {
+                void (async () => {
+                  await logoutAll()
+                  navigate('/login', { replace: true })
+                })()
+              }}
+              style={{ color: 'var(--red-600)' }}
+            >
+              <span className="nav-icon"><LogOut size={18} strokeWidth={1.75} /></span>
+              Log out all
+            </button>
+          ) : null}
         </div>
       </aside>
 

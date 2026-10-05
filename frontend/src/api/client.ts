@@ -1,4 +1,5 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
+import { clearSession as clearAuthSession, patchActiveAccessToken, USER_CACHE_KEY } from '../auth/sessionStore'
 
 /** Ensure API root is an absolute URL (Railway vars are often pasted without https://). */
 function normalizeApiRoot(raw: string | undefined): string {
@@ -88,7 +89,7 @@ api.interceptors.response.use(
       if (refresh) {
         try {
           const { data } = await axios.post(`${API_BASE}/auth/refresh/`, { refresh })
-          localStorage.setItem('access_token', data.access)
+          patchActiveAccessToken(data.access)
           original.headers = original.headers ?? {}
           original.headers.Authorization = `Bearer ${data.access}`
           return api(original)
@@ -97,9 +98,8 @@ api.interceptors.response.use(
           if (!(refreshErr as { response?: unknown })?.response) {
             return Promise.reject(err)
           }
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          try { localStorage.removeItem('wallettrails_user') } catch { /* ignore */ }
+          clearAuthSession()
+          try { localStorage.removeItem(USER_CACHE_KEY) } catch { /* ignore */ }
           window.location.href = '/login'
         }
       } else {

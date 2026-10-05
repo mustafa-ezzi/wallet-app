@@ -15,17 +15,24 @@ import {
   Smartphone,
   Tags,
   Trash2,
+  Users,
   UserRound,
   Wallet,
   X,
 } from 'lucide-react'
 import { authApi, accountsApi, asList, apiErrorMessage } from '../api/client'
+import { getAccessToken } from '../auth/sessionStore'
 import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../context/CategoriesContext'
 import { useConfirm } from '../hooks/useConfirm'
 import { useTheme } from '../theme/ThemeProvider'
 
-type ExpandId = 'profile' | 'password' | 'appearance' | 'categories' | null
+type ExpandId = 'profile' | 'password' | 'appearance' | 'categories' | 'accounts' | null
+
+function accountLabel(u: { first_name?: string; last_name?: string; username?: string; email?: string }) {
+  const name = [u.first_name, u.last_name].filter(Boolean).join(' ').trim()
+  return name || u.username || u.email || 'Account'
+}
 
 function Row({
   icon,
@@ -53,16 +60,28 @@ function Row({
 }
 
 export default function Settings() {
-  const { user, refreshUser, logout } = useAuth()
+  const {
+    user,
+    refreshUser,
+    logout,
+    logoutAll,
+    savedAccounts,
+    switchAccount,
+    beginAddAccount,
+    removeAccount,
+  } = useAuth()
   const { themeId, themes, setTheme, transitioning } = useTheme()
   const { custom, create: createCategory, remove: removeCategory } = useCategories()
   const navigate = useNavigate()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const themeName = themes.find((t) => t.id === themeId)?.name ?? 'System'
+  const otherAccounts = savedAccounts.filter((a) => a.id !== user?.id)
 
   const [expand, setExpand] = useState<ExpandId>(null)
   const [walletCount, setWalletCount] = useState<number | null>(null)
   const [bankCount, setBankCount] = useState<number | null>(null)
+  const [switchBusy, setSwitchBusy] = useState(false)
+  const [switchError, setSwitchError] = useState('')
 
   const [firstName, setFirstName] = useState(user?.first_name ?? '')
   const [lastName, setLastName] = useState(user?.last_name ?? '')
@@ -106,20 +125,75 @@ export default function Settings() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [user?.id])
 
   const toggle = (id: ExpandId) => setExpand((cur) => (cur === id ? null : id))
 
   const handleLogout = async () => {
     const ok = await confirm({
-      title: 'Sign out?',
-      message: 'You will need to sign in again to access your WalletTrails.',
-      confirmLabel: 'Sign out',
+      title: otherAccounts.length ? 'Log out of this account?' : 'Sign out?',
+      message: otherAccounts.length
+        ? 'This account will be removed from this browser. Other saved accounts stay available.'
+        : 'You will need to sign in again to access your WalletTrails.',
+      confirmLabel: otherAccounts.length ? 'Log out' : 'Sign out',
       danger: true,
     })
     if (!ok) return
-    logout()
+    await logout()
+    if (!getAccessToken()) navigate('/login', { replace: true })
+  }
+
+  const handleLogoutAll = async () => {
+    const ok = await confirm({
+      title: 'Log out of all accounts?',
+      message: 'Removes every saved account from this browser. You’ll need to sign in again.',
+      confirmLabel: 'Log out all',
+      danger: true,
+    })
+    if (!ok) return
+    await logoutAll()
     navigate('/login', { replace: true })
+  }
+
+  const handleSwitch = async (targetId: number, label: string) => {
+    const ok = await confirm({
+      title: 'Switch account?',
+      message: `Open “${label}” without signing in again.`,
+      confirmLabel: 'Switch',
+    })
+    if (!ok) return
+    setSwitchBusy(true)
+    setSwitchError('')
+    try {
+      await switchAccount(targetId)
+      setExpand(null)
+    } catch (err) {
+      setSwitchError(apiErrorMessage(err, 'Could not switch account.'))
+    } finally {
+      setSwitchBusy(false)
+    }
+  }
+
+  const handleAddAccount = async () => {
+    const ok = await confirm({
+      title: 'Add another account?',
+      message: 'Sign in to another WalletTrails account. Your current account stays saved here.',
+      confirmLabel: 'Continue',
+    })
+    if (!ok) return
+    await beginAddAccount()
+    navigate('/login', { replace: true })
+  }
+
+  const handleRemoveSaved = async (accountId: number, label: string) => {
+    const ok = await confirm({
+      title: 'Remove account?',
+      message: `Remove “${label}” from this browser? You can sign in again later.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    })
+    if (!ok) return
+    await removeAccount(accountId)
   }
 
   const saveName = async (e: React.FormEvent) => {
@@ -227,8 +301,8 @@ export default function Settings() {
     try {
       await authApi.deleteAccount(deleteConfirm)
       setDeleteOpen(false)
-      logout()
-      navigate('/login', { replace: true })
+      await logout()
+      if (!getAccessToken()) navigate('/login', { replace: true })
     } catch (err: unknown) {
       setDeleteError(apiErrorMessage(err, 'Could not delete account.'))
     } finally {
@@ -251,6 +325,92 @@ export default function Settings() {
 
       <div className="settings-stack">
         <div className="settings-group">
+          <Row
+            icon={<Users {...icon} />}
+            title="Accounts"
+            value={otherAccounts.length ? `${otherAccounts.length} saved` : 'Add'}
+            onClick={() => {
+              setSwitchError('')
+              toggle('accounts')
+            }}
+          />
+          {expand === 'accounts' ? (
+            <div className="settings-expand">
+              <p className="text-muted" style={{ marginBottom: '0.85rem', fontSize: '0.85rem' }}>
+                Switch without signing in again, or add another account.
+              </p>
+              {switchError ? <div className="auth-error" style={{ marginBottom: '0.75rem' }}>{switchError}</div> : null}
+
+              {user ? (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '0.75rem',
+                    borderRadius: 12,
+                    background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 800 }}>{accountLabel(user)}</div>
+                    <div className="text-muted" style={{ fontSize: '0.8rem' }}>{user.email || user.username} · Active</div>
+                  </div>
+                  <span style={{ fontWeight: 800, fontSize: '0.75rem', color: 'var(--primary)' }}>Current</span>
+                </div>
+              ) : null}
+
+              {otherAccounts.map((a) => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '0.65rem 0.75rem',
+                    borderRadius: 12,
+                    border: '1px solid var(--border)',
+                    marginBottom: 8,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700 }}>{accountLabel(a)}</div>
+                    <div className="text-muted" style={{ fontSize: '0.8rem' }}>{a.email || a.username}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-glass"
+                    style={{ padding: '0.35rem 0.55rem', color: 'var(--red-600)' }}
+                    onClick={() => void handleRemoveSaved(a.id, accountLabel(a))}
+                    aria-label={`Remove ${accountLabel(a)}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ padding: '0.4rem 0.75rem' }}
+                    disabled={switchBusy}
+                    onClick={() => void handleSwitch(a.id, accountLabel(a))}
+                  >
+                    {switchBusy ? '…' : 'Switch'}
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                className="btn-primary"
+                style={{ width: '100%', marginTop: 4 }}
+                disabled={switchBusy}
+                onClick={() => void handleAddAccount()}
+              >
+                Add account
+              </button>
+            </div>
+          ) : null}
+
           <Row icon={<Wallet {...icon} />} title="Wallets" value={walletCount == null ? undefined : String(walletCount)} onClick={() => navigate('/accounts')} />
           <Row icon={<Landmark {...icon} />} title="Bank Accounts" value={bankCount ? String(bankCount) : 'Add'} onClick={() => navigate('/accounts')} />
           <Row icon={<Receipt {...icon} />} title="Scheduled Transactions" value="Add" onClick={() => navigate('/expenses')} />
@@ -424,7 +584,15 @@ export default function Settings() {
         </div>
 
         <div className="settings-group">
-          <Row icon={<LogOut {...icon} />} title="Logout" danger onClick={() => void handleLogout()} />
+          <Row
+            icon={<LogOut {...icon} />}
+            title={otherAccounts.length ? 'Log out of this account' : 'Logout'}
+            danger
+            onClick={() => void handleLogout()}
+          />
+          {otherAccounts.length > 0 || savedAccounts.length > 1 ? (
+            <Row icon={<LogOut {...icon} />} title="Log out all accounts" danger onClick={() => void handleLogoutAll()} />
+          ) : null}
           <Row icon={<Trash2 {...icon} />} title="Delete my account" danger onClick={openDeleteAccount} />
         </div>
       </div>

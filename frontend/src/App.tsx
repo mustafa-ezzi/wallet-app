@@ -40,8 +40,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, addingAccount } = useAuth()
   if (loading) return null
+  // Allow login while adding another saved account
+  if (addingAccount) return <>{children}</>
   if (user && user.onboarding_complete === false) return <Navigate to="/onboarding" replace />
   if (user) return <Navigate to="/" replace />
   return <>{children}</>

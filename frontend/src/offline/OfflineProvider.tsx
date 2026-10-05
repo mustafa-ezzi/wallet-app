@@ -106,6 +106,11 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     if (!isBrowserOnline()) return
     void (async () => {
       try {
+        const store = getOfflineStore()
+        const prev = await store.getMeta('user_id')
+        if (prev && prev !== String(user.id)) {
+          await store.clearAll()
+        }
         await hydrateNow()
         await syncNow()
       } catch {
