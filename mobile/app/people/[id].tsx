@@ -2,9 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps 
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -30,6 +27,7 @@ import type {
   PeopleProposal,
   Transaction,
 } from '@/src/api/types'
+import { AppSheet } from '@/src/components/AppSheet'
 import { DateField } from '@/src/components/SelectFields'
 import { ErrorBanner, Field, PrimaryButton } from '@/src/components/ui'
 import { InvitePersonSheet } from '@/src/people/InvitePersonSheet'
@@ -652,112 +650,101 @@ export default function PersonHistoryScreen() {
         ) : null}
       </ScrollView>
 
-      <Modal visible={!!sheetAction} transparent animationType="fade" onRequestClose={closeSheet}>
-        <KeyboardAvoidingView
-          style={styles.modalRoot}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        >
-          <Pressable style={styles.backdrop} onPress={closeSheet} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <View style={styles.sheetHead}>
-              <Text style={styles.sheetTitle}>
-                {editingPairId ? 'Edit' : ''}{editingPairId ? ' · ' : ''}{sheetMeta?.label} · {personName}
-              </Text>
-              <Pressable onPress={closeSheet} hitSlop={10}>
-                <FontAwesome name="close" size={18} color={colors.textMuted} />
-              </Pressable>
-            </View>
-            <ErrorBanner message={formError} />
+      <AppSheet
+        visible={!!sheetAction}
+        onClose={closeSheet}
+        title={`${editingPairId ? 'Edit · ' : ''}${sheetMeta?.label || 'Entry'} · ${personName}`}
+        scroll
+      >
+        <ErrorBanner message={formError} />
 
-            {travelOn ? (
-              <View style={[styles.travelBanner, { backgroundColor: `${colors.primary}18`, borderColor: colors.primary }]}>
-                <FontAwesome name="plane" size={13} color={colors.primaryDark} />
-                <Text style={[styles.travelBannerText, { color: colors.primaryDark }]}>
-                  Amounts in {travelCurrency} · {rateLine || formatRateLine(travelCurrency, travelRate)}
-                </Text>
-              </View>
-            ) : null}
-
-            <Text style={styles.fieldLabel}>
-              {sheetAction === 'lend' || sheetAction === 'pay' ? 'From wallet' : 'Into wallet'}
+        {travelOn ? (
+          <View style={[styles.travelBanner, { backgroundColor: `${colors.primary}18`, borderColor: colors.primary }]}>
+            <FontAwesome name="plane" size={13} color={colors.primaryDark} />
+            <Text style={[styles.travelBannerText, { color: colors.primaryDark }]}>
+              Amounts in {travelCurrency} · {rateLine || formatRateLine(travelCurrency, travelRate)}
             </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.walletRow}
-            >
-              {wallets.map((w) => {
-                const active = walletId === String(w.id)
-                return (
-                  <Pressable
-                    key={w.id}
-                    onPress={() => setWalletId(String(w.id))}
-                    style={[
-                      styles.walletChip,
-                      {
-                        backgroundColor: active ? colors.primary : colors.surfaceMuted,
-                        borderColor: active ? colors.primary : colors.border,
-                      },
-                    ]}
-                  >
-                    <Text style={{ color: active ? '#fff' : colors.text, fontWeight: '700', fontSize: 13 }}>
-                      {w.name}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-
-            <Field
-              label={travelOn ? `Amount (${travelCurrency})` : `Amount (${getHomeCurrencyCode()})`}
-              value={amount}
-              onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ''))}
-              keyboardType="decimal-pad"
-              placeholder="0"
-            />
-            {travelOn && amount && Number(amount) > 0 ? (
-              <Text style={styles.pkrHint}>
-                ≈ {fmtBalance(foreignToPkr(Number(amount), travelRate))}
-              </Text>
-            ) : null}
-
-            <DateField label="Date" value={date} onChange={setDate} />
-            <Field
-              label="Notes (optional)"
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Optional"
-              autoCapitalize="sentences"
-            />
-
-            {isLinked && !editingPairId ? (
-              <Text style={[styles.hintLine, { color: colors.textMuted, marginBottom: spacing.md }]}>
-                Posts on your books now. {link?.other_user?.name || personName} gets a request to accept.
-              </Text>
-            ) : null}
-            {editingPairId && isLinked ? (
-              <Text style={[styles.hintLine, { color: colors.textMuted, marginBottom: spacing.md }]}>
-                Saves on your books only. Their side is not changed.
-              </Text>
-            ) : null}
-
-            <PrimaryButton
-              title={
-                sheetMeta
-                  ? editingPairId
-                    ? `Save ${sheetMeta.label}`
-                    : isLinked
-                      ? `Send ${sheetMeta.label} request`
-                      : `Record ${sheetMeta.label}`
-                  : 'Save'
-              }
-              onPress={() => void submitAction()}
-              loading={saving}
-              color={sheetMeta?.color}
-            />
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        ) : null}
+
+        <Text style={styles.fieldLabel}>
+          {sheetAction === 'lend' || sheetAction === 'pay' ? 'From wallet' : 'Into wallet'}
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.walletRow}
+        >
+          {wallets.map((w) => {
+            const active = walletId === String(w.id)
+            return (
+              <Pressable
+                key={w.id}
+                onPress={() => setWalletId(String(w.id))}
+                style={[
+                  styles.walletChip,
+                  {
+                    backgroundColor: active ? colors.primary : colors.surfaceMuted,
+                    borderColor: active ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text style={{ color: active ? '#fff' : colors.text, fontWeight: '700', fontSize: 13 }}>
+                  {w.name}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+
+        <Field
+          label={travelOn ? `Amount (${travelCurrency})` : `Amount (${getHomeCurrencyCode()})`}
+          value={amount}
+          onChangeText={(t) => setAmount(t.replace(/[^0-9.]/g, ''))}
+          keyboardType="decimal-pad"
+          placeholder="0"
+        />
+        {travelOn && amount && Number(amount) > 0 ? (
+          <Text style={styles.pkrHint}>
+            ≈ {fmtBalance(foreignToPkr(Number(amount), travelRate))}
+          </Text>
+        ) : null}
+
+        <DateField label="Date" value={date} onChange={setDate} />
+        <Field
+          label="Notes (optional)"
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Optional"
+          autoCapitalize="sentences"
+        />
+
+        {isLinked && !editingPairId ? (
+          <Text style={[styles.hintLine, { color: colors.textMuted, marginBottom: spacing.md }]}>
+            Posts on your books now. {link?.other_user?.name || personName} gets a request to accept.
+          </Text>
+        ) : null}
+        {editingPairId && isLinked ? (
+          <Text style={[styles.hintLine, { color: colors.textMuted, marginBottom: spacing.md }]}>
+            Saves on your books only. Their side is not changed.
+          </Text>
+        ) : null}
+
+        <PrimaryButton
+          title={
+            sheetMeta
+              ? editingPairId
+                ? `Save ${sheetMeta.label}`
+                : isLinked
+                  ? `Send ${sheetMeta.label} request`
+                  : `Record ${sheetMeta.label}`
+              : 'Save'
+          }
+          onPress={() => void submitAction()}
+          loading={saving}
+          color={sheetMeta?.color}
+        />
+      </AppSheet>
 
       <InvitePersonSheet
         visible={convertOpen}

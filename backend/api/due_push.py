@@ -17,6 +17,7 @@ from .models import (
     PayableInstallment,
     PushDeliveryLog,
     ReceivableInstallment,
+    RecurringExpense,
 )
 
 KARACHI = ZoneInfo('Asia/Karachi')
@@ -52,6 +53,13 @@ def lead_label(lead: int) -> str:
     if lead == 1:
         return 'due tomorrow'
     return f'due in {lead} days'
+
+
+def _named_body(name: str, lead: int, *, action: str = 'Please pay.') -> tuple[str, str]:
+    """Title + body that always include the bill/loan/card name."""
+    label = (name or '').strip() or 'Bill'
+    when = lead_label(lead)
+    return label, f'{label} is {when}. {action}'
 
 
 def prefs_for(user: User) -> NotificationPreference:
@@ -110,13 +118,14 @@ def collect_due_events(today: date | None = None) -> list[dict]:
                 continue
             if _already_sent(p.user_id, 'payable', p.id, lead, today):
                 continue
+            title, body = _named_body(p.name, lead, action='Please pay.')
             events.append({
                 'user_id': p.user_id,
                 'kind': 'payable',
                 'object_id': p.id,
                 'lead_days': lead,
-                'title': 'Loan reminder',
-                'body': f'{p.name} is {lead_label(lead)}. Open WalletTrails to review.',
+                'title': title,
+                'body': body,
                 'data': {
                     'screen': 'bills',
                     'kind': 'payable',
@@ -141,13 +150,14 @@ def collect_due_events(today: date | None = None) -> list[dict]:
             if _already_sent(r.user_id, 'receivable', r.id, lead, today):
                 continue
             name = r.linked_project.name if r.linked_project_id else 'Money owed'
+            title, body = _named_body(name, lead, action='Please check.')
             events.append({
                 'user_id': r.user_id,
                 'kind': 'receivable',
                 'object_id': r.id,
                 'lead_days': lead,
-                'title': 'Money owed reminder',
-                'body': f'{name} is {lead_label(lead)}. Open WalletTrails to review.',
+                'title': title,
+                'body': body,
                 'data': {
                     'screen': 'bills',
                     'kind': 'receivable',
@@ -168,17 +178,49 @@ def collect_due_events(today: date | None = None) -> list[dict]:
                 continue
             if _already_sent(card.user_id, 'credit_card', card.id, lead, today):
                 continue
+            label = (card.name or '').strip() or 'Credit card'
+            when = lead_label(lead)
             events.append({
                 'user_id': card.user_id,
                 'kind': 'credit_card',
                 'object_id': card.id,
                 'lead_days': lead,
-                'title': 'Card payment due',
-                'body': f'{card.name} payment is {lead_label(lead)}. Open WalletTrails to review.',
+                'title': f'{label} payment',
+                'body': f'{label} payment is {when}. Please pay.',
                 'data': {
                     'screen': 'wallets',
                     'kind': 'credit_card',
                     'id': card.id,
+                },
+            })
+
+    # Monthly / recurring bills (e.g. house rent)
+    expenses = RecurringExpense.objects.filter(active=True).select_related('user')
+    for e in expenses:
+        pref = prefs_for(e.user)
+        if not pref.enabled:
+            continue
+        leads = pref.lead_days() or list(DEFAULT_LEADS)
+        due_day = int(e.due_day or 1)
+        due = next_due_on_or_after(today, due_day)
+        for lead in leads:
+            fire = due - timedelta(days=lead)
+            if fire != today:
+                continue
+            if _already_sent(e.user_id, 'expense', e.id, lead, today):
+                continue
+            title, body = _named_body(e.name, lead, action='Please pay.')
+            events.append({
+                'user_id': e.user_id,
+                'kind': 'expense',
+                'object_id': e.id,
+                'lead_days': lead,
+                'title': title,
+                'body': body,
+                'data': {
+                    'screen': 'bills',
+                    'kind': 'expense',
+                    'id': e.id,
                 },
             })
 

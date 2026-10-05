@@ -2,9 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -26,6 +23,7 @@ import {
 } from '@/src/api/client'
 import type { Account, Payable, Project, Receivable, RecurringExpense } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
+import { AppSheet } from '@/src/components/AppSheet'
 import { BouncyPressable, Reveal } from '@/src/components/motion'
 import { SelectField } from '@/src/components/SelectFields'
 import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
@@ -1223,118 +1221,110 @@ export default function BillsScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={expenseOpen} transparent animationType="fade" onRequestClose={() => setExpenseOpen(false)}>
-        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
-          <Pressable style={styles.backdrop} onPress={() => setExpenseOpen(false)} />
-          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
-              {editingExpenseId ? 'Edit monthly cost' : 'Add monthly cost'}
-            </Text>
-            <ErrorBanner message={error} />
-            <Field label="Name" value={expForm.name} onChangeText={(t) => setExpForm((f) => ({ ...f, name: t }))} autoCapitalize="words" />
-            <SelectField
-              label="Frequency"
-              value={expForm.frequency}
-              options={[
-                { value: 'monthly', label: 'Every month' },
-                { value: 'one_time', label: 'One-time' },
-              ]}
-              onChange={(f) => setExpForm((form) => ({ ...form, frequency: f }))}
-            />
-            <Field label="Amount" value={expForm.amount} onChangeText={(t) => setExpForm((f) => ({ ...f, amount: t }))} keyboardType="decimal-pad" />
-            <Field label="Due day (1–28)" value={expForm.due_day} onChangeText={(t) => setExpForm((f) => ({ ...f, due_day: t }))} keyboardType="number-pad" />
-            <PrimaryButton title="Save" onPress={() => void saveExpense()} loading={saving} />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <AppSheet
+        visible={expenseOpen}
+        onClose={() => setExpenseOpen(false)}
+        title={editingExpenseId ? 'Edit monthly cost' : 'Add monthly cost'}
+        scroll
+      >
+        <ErrorBanner message={error} />
+        <Field label="Name" value={expForm.name} onChangeText={(t) => setExpForm((f) => ({ ...f, name: t }))} autoCapitalize="words" />
+        <SelectField
+          label="Frequency"
+          value={expForm.frequency}
+          options={[
+            { value: 'monthly', label: 'Every month' },
+            { value: 'one_time', label: 'One-time' },
+          ]}
+          onChange={(f) => setExpForm((form) => ({ ...form, frequency: f }))}
+        />
+        <Field label="Amount" value={expForm.amount} onChangeText={(t) => setExpForm((f) => ({ ...f, amount: t }))} keyboardType="decimal-pad" />
+        <Field label="Due day (1–28)" value={expForm.due_day} onChangeText={(t) => setExpForm((f) => ({ ...f, due_day: t }))} keyboardType="number-pad" />
+        <PrimaryButton title="Save" onPress={() => void saveExpense()} loading={saving} />
+      </AppSheet>
 
-      <Modal visible={payableOpen} transparent animationType="fade" onRequestClose={() => setPayableOpen(false)}>
-        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
-          <Pressable style={styles.backdrop} onPress={() => setPayableOpen(false)} />
-          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
-              {editingPayableId ? 'Edit loan / payable' : 'Add loan / payable'}
-            </Text>
-            <ErrorBanner message={error} />
-            <Field label="Name" value={payForm.name} onChangeText={(t) => setPayForm((f) => ({ ...f, name: t }))} autoCapitalize="words" />
-            <Field label="Monthly amount" value={payForm.monthly_amount} onChangeText={(t) => setPayForm((f) => ({ ...f, monthly_amount: t }))} keyboardType="decimal-pad" />
-            <Field label="Total installments" value={payForm.total_installments} onChangeText={(t) => setPayForm((f) => ({ ...f, total_installments: t }))} keyboardType="number-pad" />
-            <Field label="Due day" value={payForm.due_day} onChangeText={(t) => setPayForm((f) => ({ ...f, due_day: t }))} keyboardType="number-pad" />
-            <PrimaryButton title="Save" onPress={() => void savePayable()} loading={saving} />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <AppSheet
+        visible={payableOpen}
+        onClose={() => setPayableOpen(false)}
+        title={editingPayableId ? 'Edit loan / payable' : 'Add loan / payable'}
+        scroll
+      >
+        <ErrorBanner message={error} />
+        <Field label="Name" value={payForm.name} onChangeText={(t) => setPayForm((f) => ({ ...f, name: t }))} autoCapitalize="words" />
+        <Field label="Monthly amount" value={payForm.monthly_amount} onChangeText={(t) => setPayForm((f) => ({ ...f, monthly_amount: t }))} keyboardType="decimal-pad" />
+        <Field label="Total installments" value={payForm.total_installments} onChangeText={(t) => setPayForm((f) => ({ ...f, total_installments: t }))} keyboardType="number-pad" />
+        <Field label="Due day" value={payForm.due_day} onChangeText={(t) => setPayForm((f) => ({ ...f, due_day: t }))} keyboardType="number-pad" />
+        <PrimaryButton title="Save" onPress={() => void savePayable()} loading={saving} />
+      </AppSheet>
 
-      <Modal visible={receivableOpen} transparent animationType="fade" onRequestClose={() => setReceivableOpen(false)}>
-        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
-          <Pressable style={styles.backdrop} onPress={() => setReceivableOpen(false)} />
-          <ScrollView style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
-              {editingReceivableId ? 'Edit installment plan' : 'Add installment plan'}
-            </Text>
-            <ErrorBanner message={error} />
-            {!editingReceivableId ? (
-              <>
-                {projects.length === 0 ? (
-                  <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>
-                    Add an income source under Income first.
-                  </Text>
-                ) : (
-                  <SelectField
-                    label="Project"
-                    value={recForm.linked_project}
-                    options={projects.map((p) => ({ value: String(p.id), label: p.name }))}
-                    onChange={(v) => setRecForm((f) => ({ ...f, linked_project: v }))}
-                    placeholder="Select project…"
-                  />
-                )}
-              </>
-            ) : null}
-            <Field
-              label="Monthly / installment amount"
-              value={recForm.monthly_amount}
-              onChangeText={(t) => setRecForm((f) => ({ ...f, monthly_amount: t }))}
-              keyboardType="decimal-pad"
-            />
-            <Field
-              label="Total installments"
-              value={recForm.total_installments}
-              onChangeText={(t) => setRecForm((f) => ({ ...f, total_installments: t }))}
-              keyboardType="number-pad"
-            />
-            <PrimaryButton title="Save" onPress={() => void saveReceivable()} loading={saving} />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <Modal visible={!!recordModal} transparent animationType="fade" onRequestClose={() => setRecordModal(null)}>
-        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
-          <Pressable style={styles.backdrop} onPress={() => setRecordModal(null)} />
-          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
-              {recordModal?.kind === 'payable' ? 'Record Payment' : 'Record Receipt'} — {recordModal?.name}
-            </Text>
-            <ErrorBanner message={error} />
-            <Field label="Amount" value={recordAmount} onChangeText={setRecordAmount} keyboardType="decimal-pad" />
-            {accounts.length === 0 ? (
-              <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>Create a wallet first.</Text>
+      <AppSheet
+        visible={receivableOpen}
+        onClose={() => setReceivableOpen(false)}
+        title={editingReceivableId ? 'Edit installment plan' : 'Add installment plan'}
+        scroll
+      >
+        <ErrorBanner message={error} />
+        {!editingReceivableId ? (
+          <>
+            {projects.length === 0 ? (
+              <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>
+                Add an income source under Income first.
+              </Text>
             ) : (
               <SelectField
-                label="Wallet"
-                value={recordAccount}
-                options={accounts.map((a) => ({ value: String(a.id), label: a.name }))}
-                onChange={setRecordAccount}
-                placeholder="Select wallet…"
+                label="Project"
+                value={recForm.linked_project}
+                options={projects.map((p) => ({ value: String(p.id), label: p.name }))}
+                onChange={(v) => setRecForm((f) => ({ ...f, linked_project: v }))}
+                placeholder="Select project…"
               />
             )}
-            <PrimaryButton
-              title={recordModal?.kind === 'payable' ? 'Save payment' : 'Save receipt'}
-              onPress={() => void submitRecord()}
-              loading={saving}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          </>
+        ) : null}
+        <Field
+          label="Monthly / installment amount"
+          value={recForm.monthly_amount}
+          onChangeText={(t) => setRecForm((f) => ({ ...f, monthly_amount: t }))}
+          keyboardType="decimal-pad"
+        />
+        <Field
+          label="Total installments"
+          value={recForm.total_installments}
+          onChangeText={(t) => setRecForm((f) => ({ ...f, total_installments: t }))}
+          keyboardType="number-pad"
+        />
+        <PrimaryButton title="Save" onPress={() => void saveReceivable()} loading={saving} />
+      </AppSheet>
+
+      <AppSheet
+        visible={!!recordModal}
+        onClose={() => setRecordModal(null)}
+        title={
+          recordModal
+            ? `${recordModal.kind === 'payable' ? 'Record payment' : 'Record receipt'} — ${recordModal.name}`
+            : 'Record'
+        }
+        scroll
+      >
+        <ErrorBanner message={error} />
+        <Field label="Amount" value={recordAmount} onChangeText={setRecordAmount} keyboardType="decimal-pad" />
+        {accounts.length === 0 ? (
+          <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>Create a wallet first.</Text>
+        ) : (
+          <SelectField
+            label="Wallet"
+            value={recordAccount}
+            options={accounts.map((a) => ({ value: String(a.id), label: a.name }))}
+            onChange={setRecordAccount}
+            placeholder="Select wallet…"
+          />
+        )}
+        <PrimaryButton
+          title={recordModal?.kind === 'payable' ? 'Save payment' : 'Save receipt'}
+          onPress={() => void submitRecord()}
+          loading={saving}
+        />
+      </AppSheet>
     </Screen>
   )
 }

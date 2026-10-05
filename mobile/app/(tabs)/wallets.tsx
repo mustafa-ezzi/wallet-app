@@ -2,9 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -18,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { accountsApi, apiErrorMessage, asList, peopleApi } from '@/src/api/client'
 import type { Account, PeopleInvitation, PeopleLink, PeopleProposal } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
+import { AppSheet } from '@/src/components/AppSheet'
 import { BouncyPressable, Reveal } from '@/src/components/motion'
 import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
@@ -704,81 +702,81 @@ export default function WalletsScreen() {
         }}
       />
 
-      <Modal visible={createOpen} animationType="fade" transparent onRequestClose={closeWalletForm}>
-        <KeyboardAvoidingView style={styles.modalRoot} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
-          <Pressable style={styles.backdrop} onPress={closeWalletForm} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>{editing ? 'Edit wallet' : 'New wallet'}</Text>
-            <ErrorBanner message={formError} />
-            <Field label="Name" value={name} onChangeText={setName} placeholder="Meezan / HBL Visa / Cash" autoCapitalize="words" />
-            <Text style={styles.label}>Type</Text>
-            <View style={styles.seg}>
-              {([
-                { key: 'bank' as const, label: 'Bank' },
-                { key: 'cash' as const, label: 'Cash' },
-                { key: 'credit_card' as const, label: 'Card' },
-              ]).map((t) => (
-                <Pressable
-                  key={t.key}
-                  onPress={() => setType(t.key)}
-                  style={[styles.segBtn, type === t.key && styles.segBtnOn]}
-                  disabled={Boolean(editing)}
-                >
-                  <Text style={[styles.segText, type === t.key && styles.segTextOn]}>{t.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            {editing ? (
-              <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
-                Type can’t be changed after create. Opening balance is the ledger starting point.
-              </Text>
-            ) : type === 'credit_card' ? (
-              <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
-                Enter what you currently owe and your card limit. Available = limit − you owe.
-              </Text>
-            ) : null}
+      <AppSheet
+        visible={createOpen}
+        onClose={closeWalletForm}
+        title={editing ? 'Edit wallet' : 'New wallet'}
+        subtitle={
+          type === 'credit_card'
+            ? 'Outstanding balance and limit. Available = limit − you owe.'
+            : undefined
+        }
+        scroll
+      >
+        <ErrorBanner message={formError} />
+        <Field label="Name" value={name} onChangeText={setName} placeholder="Meezan / HBL Visa / Cash" autoCapitalize="words" />
+        <Text style={styles.label}>Type</Text>
+        <View style={styles.seg}>
+          {([
+            { key: 'bank' as const, label: 'Bank' },
+            { key: 'cash' as const, label: 'Cash' },
+            { key: 'credit_card' as const, label: 'Card' },
+          ]).map((t) => (
+            <Pressable
+              key={t.key}
+              onPress={() => setType(t.key)}
+              style={[styles.segBtn, type === t.key && styles.segBtnOn]}
+              disabled={Boolean(editing)}
+            >
+              <Text style={[styles.segText, type === t.key && styles.segTextOn]}>{t.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {editing ? (
+          <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: 8 }}>
+            Type can’t be changed after create. Opening balance is the ledger starting point.
+          </Text>
+        ) : null}
+        <Field
+          label={type === 'credit_card' ? 'Outstanding (you owe)' : 'Opening balance'}
+          value={opening}
+          onChangeText={setOpening}
+          keyboardType="decimal-pad"
+          placeholder="0"
+        />
+        {type === 'credit_card' ? (
+          <Field
+            label="Credit limit"
+            value={creditLimit}
+            onChangeText={setCreditLimit}
+            keyboardType="decimal-pad"
+            placeholder="50000"
+          />
+        ) : null}
+        {type === 'credit_card' ? (
+          <>
             <Field
-              label={type === 'credit_card' ? 'Outstanding (you owe)' : 'Opening balance'}
-              value={opening}
-              onChangeText={setOpening}
-              keyboardType="decimal-pad"
-              placeholder="0"
+              label="Statement day (1–31, optional)"
+              value={statementDay}
+              onChangeText={setStatementDay}
+              keyboardType="number-pad"
+              placeholder="1"
             />
-            {type === 'credit_card' ? (
-              <Field
-                label="Credit limit"
-                value={creditLimit}
-                onChangeText={setCreditLimit}
-                keyboardType="decimal-pad"
-                placeholder="50000"
-              />
-            ) : null}
-            {type === 'credit_card' ? (
-              <>
-                <Field
-                  label="Statement day (1–31, optional)"
-                  value={statementDay}
-                  onChangeText={setStatementDay}
-                  keyboardType="number-pad"
-                  placeholder="1"
-                />
-                <Field
-                  label="Payment due day (1–31, optional)"
-                  value={dueDay}
-                  onChangeText={setDueDay}
-                  keyboardType="number-pad"
-                  placeholder="15"
-                />
-              </>
-            ) : null}
-            <PrimaryButton
-              title={editing ? 'Save changes' : 'Create wallet'}
-              onPress={() => void create()}
-              loading={saving}
+            <Field
+              label="Payment due day (1–31, optional)"
+              value={dueDay}
+              onChangeText={setDueDay}
+              keyboardType="number-pad"
+              placeholder="15"
             />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          </>
+        ) : null}
+        <PrimaryButton
+          title={editing ? 'Save changes' : 'Create wallet'}
+          onPress={() => void create()}
+          loading={saving}
+        />
+      </AppSheet>
     </Screen>
   )
 }
@@ -924,16 +922,6 @@ function makeStyles(colors: ColorTokens) {
     actionText: { fontWeight: '700', fontSize: 12, color: colors.textSecondary },
     actionBtnDanger: { borderColor: '#fecaca' },
     actionTextDanger: { fontWeight: '700', fontSize: 12, color: colors.danger },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.45)' },
-    modalRoot: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
-    sheet: {
-      backgroundColor: colors.surface,
-      borderRadius: radii.lg,
-      padding: spacing.lg,
-      maxHeight: '88%',
-      zIndex: 2,
-    },
-    sheetTitle: { fontSize: typography.title, fontWeight: '800', color: colors.primaryDark, marginBottom: spacing.md },
     label: {
       fontSize: typography.label,
       fontWeight: '700',

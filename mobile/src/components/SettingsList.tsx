@@ -71,7 +71,13 @@ export function SettingsRow({
   )
 }
 
-export function SettingsLogoutRow({ onPress }: { onPress: () => void }) {
+export function SettingsLogoutRow({
+  onPress,
+  title = 'Logout',
+}: {
+  onPress: () => void
+  title?: string
+}) {
   const colors = useColors()
   return (
     <SettingsGroup>
@@ -85,7 +91,7 @@ export function SettingsLogoutRow({ onPress }: { onPress: () => void }) {
         <View style={[styles.iconWell, { backgroundColor: colors.surfaceMuted }]}>
           <FontAwesome name="sign-out" size={15} color={colors.danger} />
         </View>
-        <Text style={[styles.title, { color: colors.danger }]}>Logout</Text>
+        <Text style={[styles.title, { color: colors.danger }]}>{title}</Text>
       </Pressable>
     </SettingsGroup>
   )

@@ -11,11 +11,17 @@ import { setHomeCurrency } from '../currency/homeCurrency'
 import { apiErrorMessage, authApi } from '../api/client'
 import { track } from '../lib/analytics'
 import {
+  activateSession,
+  clearActiveSession,
+  clearAllSessions,
   clearSession,
   getAccessToken,
   getCachedUser,
+  listSavedUsers,
+  removeSession,
   setCachedUser,
   setTokens,
+  upsertActiveSession,
   type CachedUser,
 } from '../api/authStorage'
 
@@ -24,6 +30,8 @@ export type User = CachedUser
 type AuthContextValue = {
   user: User | null
   loading: boolean
+  /** Other saved accounts (excludes the active user). */
+  savedAccounts: User[]
   login: (email: string, password: string) => Promise<void>
   loginWithGoogle: (idToken: string, currency?: string) => Promise<{ created: boolean }>
   register: (data: {
@@ -33,8 +41,22 @@ type AuthContextValue = {
     password: string
     currency?: string
   }) => Promise<void>
+  /** Log out of the active account; switches to another saved account if any remain. */
   logout: () => Promise<void>
+  /** Remove every saved session and return to login. */
+  logoutAll: () => Promise<void>
   refreshUser: () => Promise<void>
+  /** Switch to a previously saved account without re-entering the password. */
+  switchAccount: (userId: number) => Promise<void>
+  /** Save current session, clear active slot, go to login to add another account. */
+  beginAddAccount: () => Promise<void>
+  /** Cancel add-account flow and restore the previous account. */
+  cancelAddAccount: () => Promise<void>
+  /** True while login is being used to add another account. */
+  addingAccount: boolean
+  /** Remove a saved account from the device (logs out if it is active). */
+  removeAccount: (userId: number) => Promise<void>
+  reloadSavedAccounts: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -66,13 +88,23 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [savedAccounts, setSavedAccounts] = useState<User[]>([])
+  const [addingAccount, setAddingAccount] = useState(false)
   const booted = useRef(false)
+  const addReturnUserId = useRef<number | null>(null)
+
+  const reloadSavedAccounts = useCallback(async () => {
+    const users = await listSavedUsers()
+    setSavedAccounts(users)
+  }, [])
 
   const applyUser = useCallback(async (data: User) => {
     setHomeCurrency(data.currency)
     setUser(data)
     await setCachedUser(data)
-  }, [])
+    await upsertActiveSession()
+    await reloadSavedAccounts()
+  }, [reloadSavedAccounts])
 
   const refreshUser = useCallback(async () => {
     try {
@@ -84,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (isUnauthorized(err)) {
         await clearSession()
         setUser(null)
+        await reloadSavedAccounts()
         return
       }
 
@@ -98,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setUser(null)
     }
-  }, [applyUser])
+  }, [applyUser, reloadSavedAccounts])
 
   useEffect(() => {
     if (booted.current) return
@@ -108,13 +141,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ;(async () => {
       try {
         const token = await withTimeout(getAccessToken(), 1500, null)
-        if (!token) return
+        if (!token) {
+          await reloadSavedAccounts()
+          return
+        }
 
         const cached = await withTimeout(getCachedUser(), 1500, null)
         if (cached && !cancelled) {
           setHomeCurrency(cached.currency)
           setUser(cached)
+          await upsertActiveSession()
         }
+        await reloadSavedAccounts()
 
         // Do not await network — UI must leave the spinner immediately
         void refreshUser()
@@ -141,6 +179,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await authApi.login(email.trim(), password)
     await setTokens(data.access, data.refresh)
     await refreshUser()
+    setAddingAccount(false)
+    addReturnUserId.current = null
     track('user_logged_in')
   }, [refreshUser])
 
@@ -158,6 +198,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await authApi.google(idToken, currency)
     await setTokens(data.access, data.refresh)
     await refreshUser()
+    setAddingAccount(false)
+    addReturnUserId.current = null
     if (data.created) {
       track('user_signed_up', { source: 'google', currency: currency || 'PKR' })
     } else {
@@ -166,16 +208,163 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { created: Boolean(data.created) }
   }, [refreshUser])
 
+  const switchAccount = useCallback(async (userId: number) => {
+    if (user?.id === userId) return
+    // Keep the current account on the device before leaving it
+    await upsertActiveSession()
+    const session = await activateSession(userId)
+    if (!session) {
+      throw new Error('That account is no longer saved on this device.')
+    }
+    setHomeCurrency(session.user.currency)
+    setUser(session.user)
+    setAddingAccount(false)
+    addReturnUserId.current = null
+    await reloadSavedAccounts()
+    track('account_switched')
+    void refreshUser()
+  }, [user?.id, refreshUser, reloadSavedAccounts])
+
+  const beginAddAccount = useCallback(async () => {
+    if (user?.id) {
+      await upsertActiveSession()
+      addReturnUserId.current = user.id
+    }
+    await clearActiveSession()
+    setUser(null)
+    setHomeCurrency(null)
+    setAddingAccount(true)
+    await reloadSavedAccounts()
+    track('add_account_started')
+  }, [user, reloadSavedAccounts])
+
+  const cancelAddAccount = useCallback(async () => {
+    const returnId = addReturnUserId.current
+    addReturnUserId.current = null
+    setAddingAccount(false)
+    if (returnId) {
+      const session = await activateSession(returnId)
+      if (session) {
+        setHomeCurrency(session.user.currency)
+        setUser(session.user)
+        await reloadSavedAccounts()
+        void refreshUser()
+        return
+      }
+    }
+    const users = await listSavedUsers()
+    if (users[0]) {
+      const session = await activateSession(users[0].id)
+      if (session) {
+        setHomeCurrency(session.user.currency)
+        setUser(session.user)
+        await reloadSavedAccounts()
+        void refreshUser()
+        return
+      }
+    }
+    setUser(null)
+    await reloadSavedAccounts()
+  }, [refreshUser, reloadSavedAccounts])
+
+  const removeAccount = useCallback(async (userId: number) => {
+    if (user?.id === userId) {
+      await clearSession()
+      const remaining = await listSavedUsers()
+      if (remaining[0]) {
+        const session = await activateSession(remaining[0].id)
+        if (session) {
+          setHomeCurrency(session.user.currency)
+          setUser(session.user)
+          await reloadSavedAccounts()
+          void refreshUser()
+          return
+        }
+      }
+      setHomeCurrency(null)
+      setUser(null)
+      await reloadSavedAccounts()
+      return
+    }
+    await removeSession(userId)
+    await reloadSavedAccounts()
+  }, [user?.id, refreshUser, reloadSavedAccounts])
+
   const logout = useCallback(async () => {
-    await clearSession()
+    const currentId = user?.id
+    if (currentId) {
+      await removeSession(currentId)
+    }
+    await clearActiveSession()
+
+    const remaining = await listSavedUsers()
+    if (remaining[0]) {
+      const session = await activateSession(remaining[0].id)
+      if (session) {
+        setHomeCurrency(session.user.currency)
+        setUser(session.user)
+        setAddingAccount(false)
+        addReturnUserId.current = null
+        await reloadSavedAccounts()
+        track('user_logged_out')
+        void refreshUser()
+        return
+      }
+    }
+
     setHomeCurrency(null)
     setUser(null)
+    setAddingAccount(false)
+    addReturnUserId.current = null
+    await reloadSavedAccounts()
     track('user_logged_out')
+  }, [user?.id, refreshUser, reloadSavedAccounts])
+
+  const logoutAll = useCallback(async () => {
+    await clearAllSessions()
+    setHomeCurrency(null)
+    setUser(null)
+    setAddingAccount(false)
+    addReturnUserId.current = null
+    setSavedAccounts([])
+    track('user_logged_out_all')
   }, [])
 
   const value = useMemo(
-    () => ({ user, loading, login, loginWithGoogle, register, logout, refreshUser }),
-    [user, loading, login, loginWithGoogle, register, logout, refreshUser],
+    () => ({
+      user,
+      loading,
+      savedAccounts,
+      login,
+      loginWithGoogle,
+      register,
+      logout,
+      logoutAll,
+      refreshUser,
+      switchAccount,
+      beginAddAccount,
+      cancelAddAccount,
+      addingAccount,
+      removeAccount,
+      reloadSavedAccounts,
+    }),
+    [
+      user,
+      loading,
+      savedAccounts,
+      login,
+      loginWithGoogle,
+      register,
+      logout,
+      logoutAll,
+      refreshUser,
+      switchAccount,
+      beginAddAccount,
+      cancelAddAccount,
+      addingAccount,
+      removeAccount,
+      reloadSavedAccounts,
+    ],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

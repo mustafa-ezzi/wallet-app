@@ -1,7 +1,6 @@
 import { createElement, useMemo, useState } from 'react'
 import {
   FlatList,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -13,6 +12,7 @@ import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker'
+import { AppSheet } from '@/src/components/AppSheet'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography } from '@/src/theme/colors'
 
@@ -69,51 +69,51 @@ export function SelectField<T extends string = string>({
         <FontAwesome name="chevron-down" size={12} color={colors.textMuted} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
-          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>{label}</Text>
-            <FlatList
-              data={options}
-              keyExtractor={(item) => String(item.value)}
-              keyboardShouldPersistTaps="handled"
-              style={{ maxHeight: 360 }}
-              renderItem={({ item }) => {
-                const active = item.value === value
-                return (
-                  <Pressable
-                    onPress={() => {
-                      onChange(item.value)
-                      setOpen(false)
-                    }}
-                    style={[
-                      styles.option,
-                      { borderBottomColor: colors.border },
-                      active && { backgroundColor: colors.primarySoft + '22' },
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.optionLabel, { color: active ? colors.primaryDark : colors.text }]}>
-                        {item.label}
-                      </Text>
-                      {item.hint ? (
-                        <Text style={[styles.optionHint, { color: colors.textMuted }]}>{item.hint}</Text>
-                      ) : null}
-                    </View>
-                    {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
-                  </Pressable>
-                )
-              }}
-              ListEmptyComponent={
-                <Text style={{ color: colors.textMuted, padding: spacing.lg, textAlign: 'center' }}>
-                  No options available.
-                </Text>
-              }
-            />
-          </View>
-        </View>
-      </Modal>
+      <AppSheet
+        visible={open}
+        onClose={() => setOpen(false)}
+        title={label || 'Select'}
+        maxHeightRatio={0.7}
+        contentStyle={styles.pickerBody}
+      >
+        <FlatList
+          data={options}
+          keyExtractor={(item) => String(item.value)}
+          keyboardShouldPersistTaps="handled"
+          style={{ maxHeight: 360 }}
+          renderItem={({ item }) => {
+            const active = item.value === value
+            return (
+              <Pressable
+                onPress={() => {
+                  onChange(item.value)
+                  setOpen(false)
+                }}
+                style={[
+                  styles.option,
+                  { borderBottomColor: colors.border },
+                  active && { backgroundColor: colors.primarySoft + '22' },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionLabel, { color: active ? colors.primaryDark : colors.text }]}>
+                    {item.label}
+                  </Text>
+                  {item.hint ? (
+                    <Text style={[styles.optionHint, { color: colors.textMuted }]}>{item.hint}</Text>
+                  ) : null}
+                </View>
+                {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
+              </Pressable>
+            )
+          }}
+          ListEmptyComponent={
+            <Text style={{ color: colors.textMuted, padding: spacing.lg, textAlign: 'center' }}>
+              No options available.
+            </Text>
+          }
+        />
+      </AppSheet>
     </View>
   )
 }
@@ -206,61 +206,62 @@ export function DateField({
 
       {/* iOS: spinner sheet. Web: native <input type="date"> (community picker is blank on web). */}
       {Platform.OS === 'ios' || Platform.OS === 'web' ? (
-        <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-          <View style={styles.modalRoot}>
-            <Pressable style={styles.backdrop} onPress={() => setOpen(false)} />
-            <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-              <View style={styles.iosHeader}>
-                <Text style={[styles.sheetTitle, { color: colors.primaryDark, marginBottom: 0 }]}>{label}</Text>
-                <Pressable onPress={() => setOpen(false)} hitSlop={10}>
-                  <Text style={{ color: colors.primary, fontWeight: '800' }}>Done</Text>
-                </Pressable>
-              </View>
-
-              {Platform.OS === 'web' ? (
-                <View style={styles.webDateWrap}>
-                  {createElement('input', {
-                    type: 'date',
-                    value: value || toISODate(new Date()),
-                    onChange: (e: { target: { value: string } }) => {
-                      if (e.target.value) onChange(e.target.value)
-                    },
-                    style: {
-                      width: '100%',
-                      padding: 12,
-                      fontSize: 18,
-                      fontWeight: '600',
-                      borderWidth: 1,
-                      borderStyle: 'solid',
-                      borderColor: colors.border,
-                      borderRadius: 10,
-                      color: colors.text,
-                      backgroundColor: colors.surfaceMuted,
-                      boxSizing: 'border-box',
-                    },
-                  })}
-                </View>
-              ) : (
-                <DateTimePicker
-                  value={date}
-                  mode="date"
-                  display="spinner"
-                  onChange={onPick}
-                  style={styles.iosSpinner}
-                />
-              )}
-
-              {Platform.OS === 'web' ? (
-                <Pressable
-                  onPress={() => setOpen(false)}
-                  style={[styles.doneBtn, { backgroundColor: colors.primary }]}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '800' }}>Done</Text>
-                </Pressable>
-              ) : null}
+        <AppSheet
+          visible={open}
+          onClose={() => setOpen(false)}
+          title={label || 'Date'}
+          placement={Platform.OS === 'web' ? 'center' : 'bottom'}
+          maxHeightRatio={0.55}
+        >
+          {Platform.OS === 'web' ? (
+            <View style={styles.webDateWrap}>
+              {createElement('input', {
+                type: 'date',
+                value: value || toISODate(new Date()),
+                onChange: (e: { target: { value: string } }) => {
+                  if (e.target.value) onChange(e.target.value)
+                },
+                style: {
+                  width: '100%',
+                  padding: 12,
+                  fontSize: 18,
+                  fontWeight: '600',
+                  borderWidth: 1,
+                  borderStyle: 'solid',
+                  borderColor: colors.border,
+                  borderRadius: 10,
+                  color: colors.text,
+                  backgroundColor: colors.surfaceMuted,
+                  boxSizing: 'border-box',
+                },
+              })}
             </View>
-          </View>
-        </Modal>
+          ) : (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display="spinner"
+              onChange={onPick}
+              style={styles.iosSpinner}
+            />
+          )}
+
+          {Platform.OS === 'web' ? (
+            <Pressable
+              onPress={() => setOpen(false)}
+              style={[styles.doneBtn, { backgroundColor: colors.primary }]}
+            >
+              <Text style={{ color: '#fff', fontWeight: '800' }}>Done</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => setOpen(false)}
+              style={[styles.doneBtn, { backgroundColor: colors.primary }]}
+            >
+              <Text style={{ color: '#fff', fontWeight: '800' }}>Done</Text>
+            </Pressable>
+          )}
+        </AppSheet>
       ) : null}
     </View>
   )
@@ -290,27 +291,9 @@ const styles = StyleSheet.create({
     fontSize: typography.body,
     fontWeight: '600',
   },
-  modalRoot: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15,23,42,0.45)',
-  },
-  sheet: {
-    borderRadius: radii.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-    maxHeight: '70%',
-    zIndex: 2,
-  },
-  sheetTitle: {
-    fontSize: typography.subtitle,
-    fontWeight: '800',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
+  pickerBody: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
   },
   option: {
     flexDirection: 'row',
@@ -322,24 +305,15 @@ const styles = StyleSheet.create({
   },
   optionLabel: { fontWeight: '700', fontSize: typography.body },
   optionHint: { marginTop: 2, fontSize: typography.caption },
-  iosHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-  },
   iosSpinner: {
     alignSelf: 'stretch',
     height: 216,
     width: '100%',
   },
   webDateWrap: {
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
   doneBtn: {
-    marginHorizontal: spacing.lg,
     marginTop: spacing.md,
     paddingVertical: 12,
     borderRadius: radii.sm,

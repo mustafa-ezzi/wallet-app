@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
+import { AppSheet } from '@/src/components/AppSheet'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing } from '@/src/theme/colors'
 
@@ -118,87 +119,73 @@ export function CalculatorSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdropWrap}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.card, { backgroundColor: colors.surface }]}>
-          <View style={[styles.display, { backgroundColor: colors.primary }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.exprText} numberOfLines={1}>
-                {expr || '0'}
-              </Text>
-              {hasOp && preview != null ? (
-                <Text style={styles.previewText} numberOfLines={1}>
-                  = {preview.toLocaleString()}
-                </Text>
-              ) : null}
-            </View>
-            <Pressable onPress={backspace} hitSlop={10} style={styles.backspace}>
-              <FontAwesome name="long-arrow-left" size={18} color="#fff" />
-            </Pressable>
-          </View>
-
-          <View style={styles.pad}>
-            {KEYS.map((row, ri) => (
-              <View key={ri} style={styles.padRow}>
-                {row.map((k) => {
-                  const isOp = /[+\-*/=]/.test(k)
-                  return (
-                    <Pressable
-                      key={k}
-                      onPress={() => press(k)}
-                      style={({ pressed }) => [
-                        styles.key,
-                        { backgroundColor: pressed ? colors.surfaceMuted : 'transparent' },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.keyText,
-                          { color: isOp ? colors.primary : colors.text },
-                          k === '=' && { color: colors.primary, fontWeight: '900' },
-                        ]}
-                      >
-                        {opGlyph(k)}
-                      </Text>
-                    </Pressable>
-                  )
-                })}
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.actions}>
-            <Pressable onPress={onClose} style={styles.actionBtn} hitSlop={8}>
-              <Text style={[styles.actionText, { color: colors.danger }]}>CANCEL</Text>
-            </Pressable>
-            <Pressable onPress={apply} style={styles.actionBtn} hitSlop={8}>
-              <Text style={[styles.actionText, { color: colors.primary }]}>APPLY</Text>
-            </Pressable>
-          </View>
+    <AppSheet
+      visible={visible}
+      onClose={onClose}
+      title="Calculator"
+      maxHeightRatio={0.85}
+      contentStyle={styles.body}
+    >
+      <View style={[styles.display, { backgroundColor: colors.primary }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.exprText} numberOfLines={1}>
+            {expr || '0'}
+          </Text>
+          {hasOp && preview != null ? (
+            <Text style={styles.previewText} numberOfLines={1}>
+              = {preview.toLocaleString()}
+            </Text>
+          ) : null}
         </View>
+        <Pressable onPress={backspace} hitSlop={10} style={styles.backspace}>
+          <FontAwesome name="long-arrow-left" size={18} color="#fff" />
+        </Pressable>
       </View>
-    </Modal>
+
+      <View style={styles.pad}>
+        {KEYS.map((row, ri) => (
+          <View key={ri} style={styles.padRow}>
+            {row.map((k) => {
+              const isOp = /[+\-*/=]/.test(k)
+              return (
+                <Pressable
+                  key={k}
+                  onPress={() => press(k)}
+                  style={({ pressed }) => [
+                    styles.key,
+                    { backgroundColor: pressed ? colors.surfaceMuted : 'transparent' },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.keyText,
+                      { color: isOp ? colors.primary : colors.text },
+                      k === '=' && { color: colors.primary, fontWeight: '900' },
+                    ]}
+                  >
+                    {opGlyph(k)}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.actions}>
+        <Pressable onPress={onClose} style={styles.actionBtn} hitSlop={8}>
+          <Text style={[styles.actionText, { color: colors.danger }]}>CANCEL</Text>
+        </Pressable>
+        <Pressable onPress={apply} style={styles.actionBtn} hitSlop={8}>
+          <Text style={[styles.actionText, { color: colors.primary }]}>APPLY</Text>
+        </Pressable>
+      </View>
+    </AppSheet>
   )
 }
 
 const styles = StyleSheet.create({
-  backdropWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
-    backgroundColor: 'rgba(15,23,42,0.5)',
-  },
-  card: {
-    borderRadius: radii.lg,
-    overflow: 'hidden',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 12,
-    zIndex: 2,
-  },
+  body: { paddingTop: spacing.sm },
   display: {
     minHeight: 88,
     paddingHorizontal: spacing.lg,
@@ -206,6 +193,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
+    borderRadius: radii.md,
+    marginBottom: spacing.sm,
   },
   exprText: { color: '#fff', fontSize: 30, fontWeight: '800', textAlign: 'right' },
   previewText: { color: 'rgba(255,255,255,0.85)', fontSize: 14, fontWeight: '700', textAlign: 'right', marginTop: 2 },
@@ -225,7 +214,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: spacing.xl,
-    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
   },
   actionBtn: { paddingVertical: 6, paddingHorizontal: 8 },

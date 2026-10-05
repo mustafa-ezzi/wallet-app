@@ -1,19 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
-import FontAwesome from '@expo/vector-icons/FontAwesome'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { apiErrorMessage, peopleApi } from '@/src/api/client'
+import { AppSheet } from '@/src/components/AppSheet'
 import { ErrorBanner, Field, PrimaryButton } from '@/src/components/ui'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
@@ -37,7 +32,6 @@ export function InvitePersonSheet({
   existingPersonId = null,
   defaultDisplayName = '',
 }: Props) {
-  const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
   const convertMode = Boolean(existingPersonId)
@@ -175,158 +169,131 @@ export function InvitePersonSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.modalRoot}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-      >
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-          <View style={styles.head}>
-            <Text style={styles.title}>{convertMode ? 'Link this person' : 'Add person'}</Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <FontAwesome name="close" size={18} color={colors.textMuted} />
-            </Pressable>
-          </View>
+    <AppSheet
+      visible={visible}
+      onClose={onClose}
+      title={convertMode ? 'Link this person' : 'Add person'}
+      subtitle={convertMode ? 'Keep history and invite a WalletTrails user.' : undefined}
+      scroll
+      maxHeightRatio={0.92}
+    >
+      <View style={styles.seg}>
+        {(convertMode
+          ? [
+              { key: 'invite' as const, label: 'Invite user' },
+              { key: 'code' as const, label: 'Code' },
+            ]
+          : [
+              { key: 'local' as const, label: 'Local' },
+              { key: 'invite' as const, label: 'Invite user' },
+              { key: 'code' as const, label: 'Code' },
+            ]
+        ).map((t) => (
+          <Pressable
+            key={t.key}
+            onPress={() => { setMode(t.key); setError('') }}
+            style={[styles.segBtn, mode === t.key && styles.segOn]}
+          >
+            <Text style={[styles.segText, mode === t.key && styles.segTextOn]}>{t.label}</Text>
+          </Pressable>
+        ))}
+      </View>
 
-          <View style={styles.seg}>
-            {(convertMode
-              ? [
-                  { key: 'invite' as const, label: 'Invite user' },
-                  { key: 'code' as const, label: 'Code' },
-                ]
-              : [
-                  { key: 'local' as const, label: 'Local' },
-                  { key: 'invite' as const, label: 'Invite user' },
-                  { key: 'code' as const, label: 'Code' },
-                ]
-            ).map((t) => (
-              <Pressable
-                key={t.key}
-                onPress={() => { setMode(t.key); setError('') }}
-                style={[styles.segBtn, mode === t.key && styles.segOn]}
-              >
-                <Text style={[styles.segText, mode === t.key && styles.segTextOn]}>{t.label}</Text>
+      <ErrorBanner message={error} />
+
+      {convertMode ? (
+        <Text style={styles.hint}>
+          Keep this person’s history and invite a WalletTrails user to link.
+        </Text>
+      ) : null}
+
+      {mode === 'local' && !convertMode ? (
+        <>
+          <Text style={styles.hint}>
+            For people not on WalletTrails (e.g. Idrees). You post entries alone.
+          </Text>
+          <Field
+            label="Name"
+            value={localName}
+            onChangeText={setLocalName}
+            placeholder="Idrees"
+            autoCapitalize="words"
+          />
+          <PrimaryButton title="Create local person" onPress={() => void submitLocal()} loading={loading} />
+        </>
+      ) : null}
+
+      {mode === 'invite' ? (
+        <>
+          <Text style={styles.hint}>
+            Type their WalletTrails email or username. They’ll get a link request to accept.
+          </Text>
+          <Field
+            label="Email or username"
+            value={query}
+            onChangeText={setQuery}
+            placeholder="hussain@mail.com"
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <Field
+            label="Name on your list (optional)"
+            value={displayName}
+            onChangeText={setDisplayName}
+            placeholder="Hussain"
+            autoCapitalize="words"
+          />
+          <PrimaryButton title="Send link request" onPress={() => void submitInvite()} loading={loading} />
+        </>
+      ) : null}
+
+      {mode === 'code' ? (
+        <>
+          <Text style={styles.hint}>Share your code, or enter theirs to request a link.</Text>
+
+          <View style={[styles.codeCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
+            <Text style={styles.codeLabel}>Your code</Text>
+            {codeBusy && !myCode ? (
+              <ActivityIndicator color={colors.primary} />
+            ) : (
+              <Text style={styles.codeValue}>{myCode || '—'}</Text>
+            )}
+            <View style={styles.codeActions}>
+              <Pressable style={[styles.codeBtn, { backgroundColor: colors.primary }]} onPress={() => void shareCode()}>
+                <Text style={styles.codeBtnText}>Share</Text>
               </Pressable>
-            ))}
+              <Pressable
+                style={[styles.codeBtn, { borderColor: colors.border, borderWidth: 1 }]}
+                onPress={() => void regenerate()}
+              >
+                <Text style={[styles.codeBtnText, { color: colors.text }]}>New code</Text>
+              </Pressable>
+            </View>
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <ErrorBanner message={error} />
-
-            {convertMode ? (
-              <Text style={styles.hint}>
-                Keep this person’s history and invite a WalletTrails user to link.
-              </Text>
-            ) : null}
-
-            {mode === 'local' && !convertMode ? (
-              <>
-                <Text style={styles.hint}>
-                  For people not on WalletTrails (e.g. Idrees). You post entries alone.
-                </Text>
-                <Field
-                  label="Name"
-                  value={localName}
-                  onChangeText={setLocalName}
-                  placeholder="Idrees"
-                  autoCapitalize="words"
-                />
-                <PrimaryButton title="Create local person" onPress={() => void submitLocal()} loading={loading} />
-              </>
-            ) : null}
-
-            {mode === 'invite' ? (
-              <>
-                <Text style={styles.hint}>
-                  Type their WalletTrails email or username. They’ll get a link request to accept.
-                </Text>
-                <Field
-                  label="Email or username"
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="hussain@mail.com"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-                <Field
-                  label="Name on your list (optional)"
-                  value={displayName}
-                  onChangeText={setDisplayName}
-                  placeholder="Hussain"
-                  autoCapitalize="words"
-                />
-                <PrimaryButton title="Send link request" onPress={() => void submitInvite()} loading={loading} />
-              </>
-            ) : null}
-
-            {mode === 'code' ? (
-              <>
-                <Text style={styles.hint}>Share your code, or enter theirs to request a link.</Text>
-
-                <View style={[styles.codeCard, { borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}>
-                  <Text style={styles.codeLabel}>Your code</Text>
-                  {codeBusy && !myCode ? (
-                    <ActivityIndicator color={colors.primary} />
-                  ) : (
-                    <Text style={styles.codeValue}>{myCode || '—'}</Text>
-                  )}
-                  <View style={styles.codeActions}>
-                    <Pressable style={[styles.codeBtn, { backgroundColor: colors.primary }]} onPress={() => void shareCode()}>
-                      <Text style={styles.codeBtnText}>Share</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.codeBtn, { borderColor: colors.border, borderWidth: 1 }]}
-                      onPress={() => void regenerate()}
-                    >
-                      <Text style={[styles.codeBtnText, { color: colors.text }]}>New code</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                <Field
-                  label="Their code"
-                  value={joinCode}
-                  onChangeText={(t) => setJoinCode(t.toUpperCase())}
-                  placeholder="PEEP-XXXXXX"
-                  autoCapitalize="characters"
-                />
-                <Field
-                  label="Name on your list (optional)"
-                  value={displayName}
-                  onChangeText={setDisplayName}
-                  placeholder="Hussain"
-                  autoCapitalize="words"
-                />
-                <PrimaryButton title="Request link with code" onPress={() => void submitJoin()} loading={loading} />
-              </>
-            ) : null}
-          </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+          <Field
+            label="Their code"
+            value={joinCode}
+            onChangeText={(t) => setJoinCode(t.toUpperCase())}
+            placeholder="PEEP-XXXXXX"
+            autoCapitalize="characters"
+          />
+          <Field
+            label="Name on your list (optional)"
+            value={displayName}
+            onChangeText={setDisplayName}
+            placeholder="Hussain"
+            autoCapitalize="words"
+          />
+          <PrimaryButton title="Request link with code" onPress={() => void submitJoin()} loading={loading} />
+        </>
+      ) : null}
+    </AppSheet>
   )
 }
 
 function makeStyles(colors: ColorTokens) {
   return StyleSheet.create({
-    modalRoot: { flex: 1, justifyContent: 'flex-end' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,31,26,0.45)' },
-    sheet: {
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: radii.lg,
-      borderTopRightRadius: radii.lg,
-      padding: spacing.lg,
-      maxHeight: '90%',
-      zIndex: 2,
-    },
-    head: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    title: { fontSize: typography.title, fontWeight: '800', color: colors.primaryDark },
     seg: { flexDirection: 'row', gap: 8, marginBottom: spacing.md },
     segBtn: {
       flex: 1,

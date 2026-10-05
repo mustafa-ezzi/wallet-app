@@ -3,6 +3,7 @@ import { useState } from 'react'
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,13 +17,14 @@ import { GoogleSignInButton } from '@/src/components/GoogleSignInButton'
 import { colors, spacing, typography } from '@/src/theme/colors'
 
 export default function LoginScreen() {
-  const { login, loginWithGoogle } = useAuth()
+  const { login, loginWithGoogle, addingAccount, cancelAddAccount, savedAccounts } = useAuth()
   const insets = useSafeAreaInsets()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
+  const [cancelBusy, setCancelBusy] = useState(false)
 
   const onSubmit = async () => {
     setError('')
@@ -54,6 +56,15 @@ export default function LoginScreen() {
     }
   }
 
+  const onCancelAdd = async () => {
+    setCancelBusy(true)
+    try {
+      await cancelAddAccount()
+    } finally {
+      setCancelBusy(false)
+    }
+  }
+
   return (
     <Screen>
       <KeyboardAvoidingView
@@ -67,9 +78,25 @@ export default function LoginScreen() {
           ]}
           keyboardShouldPersistTaps="handled"
         >
+          {addingAccount ? (
+            <Pressable onPress={() => void onCancelAdd()} disabled={cancelBusy} style={styles.cancelAdd}>
+              <Text style={styles.cancelAddText}>{cancelBusy ? 'Restoring…' : '← Back to accounts'}</Text>
+            </Pressable>
+          ) : null}
+
           <BrandMark size="lg" />
-          <Text style={styles.title}>Welcome back</Text>
-          <Text style={styles.sub}>Sign in to your WalletTrails account</Text>
+          <Text style={styles.title}>{addingAccount ? 'Add account' : 'Welcome back'}</Text>
+          <Text style={styles.sub}>
+            {addingAccount
+              ? 'Sign in to another WalletTrails account. Your other accounts stay saved on this device.'
+              : 'Sign in to your WalletTrails account'}
+          </Text>
+
+          {addingAccount && savedAccounts.length > 0 ? (
+            <Text style={styles.savedHint}>
+              {savedAccounts.length} account{savedAccounts.length === 1 ? '' : 's'} already saved on this device
+            </Text>
+          ) : null}
 
           <View style={styles.card}>
             <ErrorBanner message={error} />
@@ -89,10 +116,18 @@ export default function LoginScreen() {
               autoComplete="password"
               placeholder="••••••••"
             />
-            <Link href="/(auth)/forgot-password" style={styles.forgot}>
-              Forgot password?
-            </Link>
-            <PrimaryButton title="Sign In" onPress={onSubmit} loading={loading} />
+            {!addingAccount ? (
+              <Link href="/(auth)/forgot-password" style={styles.forgot}>
+                Forgot password?
+              </Link>
+            ) : (
+              <View style={{ height: spacing.sm }} />
+            )}
+            <PrimaryButton
+              title={addingAccount ? 'Add & switch' : 'Sign In'}
+              onPress={onSubmit}
+              loading={loading}
+            />
             {(Platform.OS === 'android' || Platform.OS === 'web') ? (
               <>
                 <Text style={styles.or}>or</Text>
@@ -101,12 +136,14 @@ export default function LoginScreen() {
             ) : null}
           </View>
 
-          <Text style={styles.footer}>
-            Don&apos;t have an account?{' '}
-            <Link href="/(auth)/signup" style={styles.link}>
-              Create one
-            </Link>
-          </Text>
+          {!addingAccount ? (
+            <Text style={styles.footer}>
+              Don&apos;t have an account?{' '}
+              <Link href="/(auth)/signup" style={styles.link}>
+                Create one
+              </Link>
+            </Text>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -116,6 +153,16 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   content: {
     paddingHorizontal: spacing.lg,
+  },
+  cancelAdd: {
+    alignSelf: 'flex-start',
+    marginBottom: spacing.md,
+    paddingVertical: 4,
+  },
+  cancelAddText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: typography.body,
   },
   title: {
     fontSize: typography.title,
@@ -127,8 +174,16 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
     marginTop: 4,
+    lineHeight: 18,
+  },
+  savedHint: {
+    textAlign: 'center',
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: typography.caption,
+    marginBottom: spacing.lg,
   },
   card: {
     backgroundColor: colors.surface,

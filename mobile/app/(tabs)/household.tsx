@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -29,6 +28,7 @@ import type {
   LedgerSummary,
 } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
+import { AppSheet } from '@/src/components/AppSheet'
 import { CategoryDonut } from '@/src/components/CategoryDonut'
 import { HouseholdSettleUp, type SettlementData } from '@/src/components/HouseholdSettleUp'
 import { MemberSpendBars } from '@/src/components/MemberSpendBars'
@@ -950,234 +950,182 @@ export default function HouseholdScreen() {
         ) : null}
       </ScrollView>
 
-      {/* Create household */}
-      <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>Create household</Text>
-            <ErrorBanner message={error} />
-            <Field label="Name" value={hhName} onChangeText={setHhName} placeholder="Home" autoCapitalize="words" />
-            <PrimaryButton title="Create" onPress={() => void createHousehold()} loading={busy} />
-          </View>
-        </View>
-      </Modal>
+      <AppSheet visible={createOpen} onClose={() => setCreateOpen(false)} title="Create household">
+        <ErrorBanner message={error} />
+        <Field label="Name" value={hhName} onChangeText={setHhName} placeholder="Home" autoCapitalize="words" />
+        <PrimaryButton title="Create" onPress={() => void createHousehold()} loading={busy} />
+      </AppSheet>
 
-      {/* Join */}
-      <Modal visible={joinOpen} transparent animationType="fade" onRequestClose={() => setJoinOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setJoinOpen(false)} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>Join with code</Text>
-            <ErrorBanner message={error} />
-            <Field
-              label="Invite code"
-              value={joinCode}
-              onChangeText={setJoinCode}
-              placeholder="HOME-XXXXXX"
-              autoCapitalize="characters"
-            />
-            {previewName ? <Text style={styles.preview}>Join “{previewName}”?</Text> : null}
-            <PrimaryButton title="Preview" onPress={() => void previewJoin()} loading={busy} />
-            {previewName ? (
-              <PrimaryButton title="Join household" onPress={() => void acceptJoin()} loading={busy} />
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+      <AppSheet visible={joinOpen} onClose={() => setJoinOpen(false)} title="Join with code">
+        <ErrorBanner message={error} />
+        <Field
+          label="Invite code"
+          value={joinCode}
+          onChangeText={setJoinCode}
+          placeholder="HOME-XXXXXX"
+          autoCapitalize="characters"
+        />
+        {previewName ? <Text style={styles.preview}>Join “{previewName}”?</Text> : null}
+        <PrimaryButton title="Preview" onPress={() => void previewJoin()} loading={busy} />
+        {previewName ? (
+          <PrimaryButton title="Join household" onPress={() => void acceptJoin()} loading={busy} />
+        ) : null}
+      </AppSheet>
 
-      {/* New ledger */}
-      <Modal visible={ledgerOpen} transparent animationType="fade" onRequestClose={() => setLedgerOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setLedgerOpen(false)} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>New ledger</Text>
-            <Field
-              label="Name"
-              value={ledgerForm.name}
-              onChangeText={(t) => setLedgerForm((f) => ({ ...f, name: t }))}
-              placeholder="Home monthly"
-              autoCapitalize="words"
-            />
-            <Text style={styles.label}>Kind</Text>
-            <View style={styles.seg}>
-              {(['ongoing', 'event'] as const).map((k) => (
-                <Pressable
-                  key={k}
-                  onPress={() => setLedgerForm((f) => ({ ...f, kind: k }))}
-                  style={[styles.segBtn, ledgerForm.kind === k && styles.segBtnOn]}
-                >
-                  <Text style={[styles.segText, ledgerForm.kind === k && styles.segTextOn]}>
-                    {k === 'ongoing' ? 'Ongoing' : 'Event'}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <PrimaryButton title="Create ledger" onPress={() => void createLedger()} loading={busy} />
-          </View>
+      <AppSheet visible={ledgerOpen} onClose={() => setLedgerOpen(false)} title="New ledger">
+        <Field
+          label="Name"
+          value={ledgerForm.name}
+          onChangeText={(t) => setLedgerForm((f) => ({ ...f, name: t }))}
+          placeholder="Home monthly"
+          autoCapitalize="words"
+        />
+        <Text style={styles.label}>Kind</Text>
+        <View style={styles.seg}>
+          {(['ongoing', 'event'] as const).map((k) => (
+            <Pressable
+              key={k}
+              onPress={() => setLedgerForm((f) => ({ ...f, kind: k }))}
+              style={[styles.segBtn, ledgerForm.kind === k && styles.segBtnOn]}
+            >
+              <Text style={[styles.segText, ledgerForm.kind === k && styles.segTextOn]}>
+                {k === 'ongoing' ? 'Ongoing' : 'Event'}
+              </Text>
+            </Pressable>
+          ))}
         </View>
-      </Modal>
+        <PrimaryButton title="Create ledger" onPress={() => void createLedger()} loading={busy} />
+      </AppSheet>
 
-      {/* Expense */}
-      <Modal visible={expenseOpen} transparent animationType="fade" onRequestClose={() => setExpenseOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setExpenseOpen(false)} />
-          <ScrollView
-            style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}
-            keyboardShouldPersistTaps="handled"
+      <AppSheet
+        visible={expenseOpen}
+        onClose={() => setExpenseOpen(false)}
+        title="Add shared expense"
+        subtitle="Pay from the pot, your wallet, or both. Pot-funded amounts reduce the pot balance."
+        scroll
+      >
+        <ErrorBanner message={error} />
+        <Field
+          label={`Amount (${selected?.currency || user?.currency || 'PKR'})`}
+          value={expForm.amount}
+          onChangeText={(t) => setExpForm((f) => ({ ...f, amount: t }))}
+          keyboardType="decimal-pad"
+        />
+        <DateField
+          label="Date"
+          value={expForm.date}
+          onChange={(d) => setExpForm((f) => ({ ...f, date: d }))}
+        />
+        <Field
+          label={`Use from pot (available ${money.fmt(potBalance)})`}
+          value={expForm.pot_amount}
+          onChangeText={(t) => setExpForm((f) => ({ ...f, pot_amount: t }))}
+          keyboardType="decimal-pad"
+          placeholder="0"
+        />
+        <View style={styles.potActions}>
+          <Pressable style={styles.secondaryChip} onPress={useMaxPot}>
+            <Text style={styles.secondaryChipText}>Use max pot</Text>
+          </Pressable>
+          <Pressable
+            style={styles.secondaryChip}
+            onPress={() => setExpForm((f) => ({ ...f, pot_amount: '0' }))}
           >
-            <Text style={styles.sheetTitle}>Add shared expense</Text>
-            <Text style={styles.sheetHint}>
-              Pay from the pot, your wallet, or both. Pot-funded amounts reduce the pot balance.
-            </Text>
-            <ErrorBanner message={error} />
-            <Field
-              label={`Amount (${selected?.currency || user?.currency || 'PKR'})`}
-              value={expForm.amount}
-              onChangeText={(t) => setExpForm((f) => ({ ...f, amount: t }))}
-              keyboardType="decimal-pad"
-            />
-            <DateField
-              label="Date"
-              value={expForm.date}
-              onChange={(d) => setExpForm((f) => ({ ...f, date: d }))}
-            />
-            <Field
-              label={`Use from pot (available ${money.fmt(potBalance)})`}
-              value={expForm.pot_amount}
-              onChangeText={(t) => setExpForm((f) => ({ ...f, pot_amount: t }))}
-              keyboardType="decimal-pad"
-              placeholder="0"
-            />
-            <View style={styles.potActions}>
-              <Pressable style={styles.secondaryChip} onPress={useMaxPot}>
-                <Text style={styles.secondaryChipText}>Use max pot</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryChip}
-                onPress={() => setExpForm((f) => ({ ...f, pot_amount: '0' }))}
-              >
-                <Text style={styles.secondaryChipText}>Clear pot</Text>
-              </Pressable>
-            </View>
-            {toMoney(expForm.amount) > toMoney(expForm.pot_amount) ? (
-              <SelectField
-                label="Link wallet (remainder)"
-                value={expForm.linked_account}
-                options={[
-                  { value: '', label: 'None' },
-                  ...accounts.map((a) => ({ value: String(a.id), label: a.name })),
-                ]}
-                onChange={(v) => setExpForm((f) => ({ ...f, linked_account: v }))}
-                placeholder="Select wallet…"
-              />
-            ) : null}
-            <Field
-              label="Category"
-              value={expForm.category}
-              onChangeText={(t) => setExpForm((f) => ({ ...f, category: t }))}
-              placeholder="Groceries, Utilities…"
-              autoCapitalize="words"
-            />
-            <Field
-              label="Notes"
-              value={expForm.notes}
-              onChangeText={(t) => setExpForm((f) => ({ ...f, notes: t }))}
-            />
-            <PrimaryButton title="Add expense" onPress={() => void addExpense()} loading={busy} />
-          </ScrollView>
+            <Text style={styles.secondaryChipText}>Clear pot</Text>
+          </Pressable>
         </View>
-      </Modal>
+        {toMoney(expForm.amount) > toMoney(expForm.pot_amount) ? (
+          <SelectField
+            label="Link wallet (remainder)"
+            value={expForm.linked_account}
+            options={[
+              { value: '', label: 'None' },
+              ...accounts.map((a) => ({ value: String(a.id), label: a.name })),
+            ]}
+            onChange={(v) => setExpForm((f) => ({ ...f, linked_account: v }))}
+            placeholder="Select wallet…"
+          />
+        ) : null}
+        <Field
+          label="Category"
+          value={expForm.category}
+          onChangeText={(t) => setExpForm((f) => ({ ...f, category: t }))}
+          placeholder="Groceries, Utilities…"
+          autoCapitalize="words"
+        />
+        <Field
+          label="Notes"
+          value={expForm.notes}
+          onChangeText={(t) => setExpForm((f) => ({ ...f, notes: t }))}
+        />
+        <PrimaryButton title="Add expense" onPress={() => void addExpense()} loading={busy} />
+      </AppSheet>
 
-      {/* Edit household */}
-      <Modal visible={editHhOpen} transparent animationType="fade" onRequestClose={() => setEditHhOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setEditHhOpen(false)} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>Edit household</Text>
-            <ErrorBanner message={error} />
-            <Field
-              label="Name"
-              value={editHhName}
-              onChangeText={setEditHhName}
-              autoCapitalize="words"
-            />
-            <PrimaryButton title="Save" onPress={() => void saveHouseholdName()} loading={busy} />
-          </View>
-        </View>
-      </Modal>
+      <AppSheet visible={editHhOpen} onClose={() => setEditHhOpen(false)} title="Edit household">
+        <ErrorBanner message={error} />
+        <Field
+          label="Name"
+          value={editHhName}
+          onChangeText={setEditHhName}
+          autoCapitalize="words"
+        />
+        <PrimaryButton title="Save" onPress={() => void saveHouseholdName()} loading={busy} />
+      </AppSheet>
 
-      {/* Members */}
-      <Modal visible={membersOpen} transparent animationType="fade" onRequestClose={() => setMembersOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setMembersOpen(false)} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg), maxHeight: '70%' }]}>
-            <Text style={styles.sheetTitle}>Members</Text>
-            <ScrollView>
-              {members.length === 0 ? (
-                <Text style={styles.emptyBody}>No members loaded.</Text>
-              ) : (
-                members.map((m) => (
-                  <View key={m.id} style={styles.memberRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle}>{m.display_name || m.email}</Text>
-                      <Text style={styles.cardMeta}>{m.role} · {m.status}</Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
-            <PrimaryButton title="Close" onPress={() => setMembersOpen(false)} />
-          </View>
-        </View>
-      </Modal>
-
-      {/* Invite */}
-      <Modal visible={inviteOpen} transparent animationType="fade" onRequestClose={() => setInviteOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setInviteOpen(false)} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>Invite members</Text>
-            <ErrorBanner message={error} />
-            {invite?.code ? (
-              <View style={styles.inviteCard}>
-                <Text style={styles.inviteLab}>Invite code</Text>
-                <Text style={styles.inviteCode}>{invite.code}</Text>
+      <AppSheet
+        visible={membersOpen}
+        onClose={() => setMembersOpen(false)}
+        title="Members"
+        scroll
+        maxHeightRatio={0.7}
+      >
+        {members.length === 0 ? (
+          <Text style={styles.emptyBody}>No members loaded.</Text>
+        ) : (
+          members.map((m) => (
+            <View key={m.id} style={styles.memberRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>{m.display_name || m.email}</Text>
+                <Text style={styles.cardMeta}>{m.role} · {m.status}</Text>
               </View>
-            ) : (
-              <Text style={styles.emptyBody}>Generating invite…</Text>
-            )}
-            <View style={styles.actions}>
-              <Pressable style={styles.primaryChip} onPress={() => void shareInvite()}>
-                <Text style={styles.primaryChipText}>Share / WhatsApp</Text>
-              </Pressable>
-              <Pressable
-                style={styles.secondaryChip}
-                onPress={() => {
-                  if (!requireOnline() || !selected) return
-                  void householdsApi.regenerateInvite(selected.id).then((r) => setInvite(r.data))
-                }}
-              >
-                <Text style={styles.secondaryChipText}>New code</Text>
-              </Pressable>
             </View>
-            <PrimaryButton title="Done" onPress={() => setInviteOpen(false)} />
-          </View>
-        </View>
-      </Modal>
+          ))
+        )}
+        <PrimaryButton title="Close" onPress={() => setMembersOpen(false)} />
+      </AppSheet>
 
-      {/* Contribution */}
-      <Modal visible={contribOpen} transparent animationType="fade" onRequestClose={() => setContribOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setContribOpen(false)} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>Contribute to pot</Text>
-            <Field label="Amount" value={contribForm.amount} onChangeText={(t) => setContribForm((f) => ({ ...f, amount: t }))} keyboardType="decimal-pad" />
-            <Field label="Notes" value={contribForm.notes} onChangeText={(t) => setContribForm((f) => ({ ...f, notes: t }))} />
-            <PrimaryButton title="Add contribution" onPress={() => void addContribution()} loading={busy} />
+      <AppSheet visible={inviteOpen} onClose={() => setInviteOpen(false)} title="Invite members">
+        <ErrorBanner message={error} />
+        {invite?.code ? (
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteLab}>Invite code</Text>
+            <Text style={styles.inviteCode}>{invite.code}</Text>
           </View>
+        ) : (
+          <Text style={styles.emptyBody}>Generating invite…</Text>
+        )}
+        <View style={styles.actions}>
+          <Pressable style={styles.primaryChip} onPress={() => void shareInvite()}>
+            <Text style={styles.primaryChipText}>Share / WhatsApp</Text>
+          </Pressable>
+          <Pressable
+            style={styles.secondaryChip}
+            onPress={() => {
+              if (!requireOnline() || !selected) return
+              void householdsApi.regenerateInvite(selected.id).then((r) => setInvite(r.data))
+            }}
+          >
+            <Text style={styles.secondaryChipText}>New code</Text>
+          </Pressable>
         </View>
-      </Modal>
+        <PrimaryButton title="Done" onPress={() => setInviteOpen(false)} />
+      </AppSheet>
+
+      <AppSheet visible={contribOpen} onClose={() => setContribOpen(false)} title="Contribute to pot">
+        <Field label="Amount" value={contribForm.amount} onChangeText={(t) => setContribForm((f) => ({ ...f, amount: t }))} keyboardType="decimal-pad" />
+        <Field label="Notes" value={contribForm.notes} onChangeText={(t) => setContribForm((f) => ({ ...f, notes: t }))} />
+        <PrimaryButton title="Add contribution" onPress={() => void addContribution()} loading={busy} />
+      </AppSheet>
     </Screen>
   )
 }

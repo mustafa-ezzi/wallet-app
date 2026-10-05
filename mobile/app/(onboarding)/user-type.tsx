@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +11,7 @@ import { Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { authApi, apiErrorMessage, wakeServer } from '@/src/api/client'
+import { AppSheet } from '@/src/components/AppSheet'
 import { ErrorBanner } from '@/src/components/ui'
 import { useAuth } from '@/src/context/AuthContext'
 import {
@@ -234,73 +234,71 @@ export default function UserTypeScreen() {
         </Pressable>
       </View>
 
-      <Modal visible={countryOpen} transparent animationType="fade" onRequestClose={() => setCountryOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setCountryOpen(false)} />
-          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>Select country</Text>
-            <ScrollView style={{ maxHeight: 360 }}>
-              {COUNTRIES.map((c) => {
-                const active = c === country
-                return (
-                  <Pressable
-                    key={c}
-                    onPress={() => {
-                      setCountry(c)
-                      setCurrency(defaultCurrencyForCountry(c))
-                      setCountryOpen(false)
-                    }}
-                    style={[
-                      styles.option,
-                      { borderBottomColor: colors.border },
-                      active && { backgroundColor: `${colors.primary}14` },
-                    ]}
-                  >
-                    <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>{c}</Text>
-                    {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <AppSheet
+        visible={countryOpen}
+        onClose={() => setCountryOpen(false)}
+        title="Select country"
+        scroll
+        maxHeightRatio={0.7}
+        contentStyle={{ paddingHorizontal: 0, paddingTop: 0 }}
+      >
+        {COUNTRIES.map((c) => {
+          const active = c === country
+          return (
+            <Pressable
+              key={c}
+              onPress={() => {
+                setCountry(c)
+                setCurrency(defaultCurrencyForCountry(c))
+                setCountryOpen(false)
+              }}
+              style={[
+                styles.option,
+                { borderBottomColor: colors.border },
+                active && { backgroundColor: `${colors.primary}14` },
+              ]}
+            >
+              <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>{c}</Text>
+              {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
+            </Pressable>
+          )
+        })}
+      </AppSheet>
 
-      <Modal visible={currencyOpen} transparent animationType="fade" onRequestClose={() => setCurrencyOpen(false)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => setCurrencyOpen(false)} />
-          <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>Select currency</Text>
-            <ScrollView style={{ maxHeight: 360 }}>
-              {HOME_CURRENCIES.map((c) => {
-                const active = c.code === currency
-                return (
-                  <Pressable
-                    key={c.code}
-                    onPress={() => {
-                      setCurrency(c.code)
-                      setCurrencyOpen(false)
-                    }}
-                    style={[
-                      styles.option,
-                      { borderBottomColor: colors.border },
-                      active && { backgroundColor: `${colors.primary}14` },
-                    ]}
-                  >
-                    <View>
-                      <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>
-                        {c.symbol}  {c.code}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{c.name}</Text>
-                    </View>
-                    {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <AppSheet
+        visible={currencyOpen}
+        onClose={() => setCurrencyOpen(false)}
+        title="Select currency"
+        scroll
+        maxHeightRatio={0.7}
+        contentStyle={{ paddingHorizontal: 0, paddingTop: 0 }}
+      >
+        {HOME_CURRENCIES.map((c) => {
+          const active = c.code === currency
+          return (
+            <Pressable
+              key={c.code}
+              onPress={() => {
+                setCurrency(c.code)
+                setCurrencyOpen(false)
+              }}
+              style={[
+                styles.option,
+                { borderBottomColor: colors.border },
+                active && { backgroundColor: `${colors.primary}14` },
+              ]}
+            >
+              <View>
+                <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>
+                  {c.symbol}  {c.code}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{c.name}</Text>
+              </View>
+              {active ? <FontAwesome name="check" size={14} color={colors.primary} /> : null}
+            </Pressable>
+          )
+        })}
+      </AppSheet>
     </View>
   )
 }

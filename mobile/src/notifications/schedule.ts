@@ -147,6 +147,11 @@ function leadLabel(lead: number): string {
   return `due in ${lead} days`
 }
 
+function displayName(name: string, fallback: string): string {
+  const trimmed = (name || '').trim()
+  return trimmed || fallback
+}
+
 function bodyFor(
   kind: ReminderData['kind'],
   name: string,
@@ -155,34 +160,44 @@ function bodyFor(
   privacyOn: boolean,
 ): { title: string; body: string } {
   const when = leadLabel(lead)
-  if (privacyOn) {
-    if (kind === 'payable') {
-      return { title: 'Loan reminder', body: `An installment is ${when}. Open WalletTrails to review.` }
-    }
-    if (kind === 'receivable') {
-      return { title: 'Money owed reminder', body: `A receipt is ${when}. Open WalletTrails to review.` }
-    }
-    if (kind === 'credit_card') {
-      return { title: 'Card payment due', body: `A credit card payment is ${when}. Open WalletTrails to review.` }
-    }
-    return { title: 'Bill reminder', body: `A bill is ${when}. Open WalletTrails to review.` }
-  }
   const money = fmt(toMoney(amount))
+  const hasAmount = !privacyOn && toMoney(amount) > 0
+
   if (kind === 'payable') {
-    return { title: 'Loan reminder', body: `${name} is ${when} — ${money}` }
+    const label = displayName(name, 'Loan installment')
+    return {
+      title: label,
+      body: hasAmount
+        ? `${label} is ${when} — ${money}. Please pay.`
+        : `${label} is ${when}. Please pay.`,
+    }
   }
   if (kind === 'receivable') {
-    return { title: 'Money owed reminder', body: `${name} is ${when} — ${money}` }
-  }
-  if (kind === 'credit_card') {
+    const label = displayName(name, 'Money owed')
     return {
-      title: 'Card payment due',
-      body: amount && toMoney(amount) > 0
-        ? `${name} is ${when} — you owe ${money}`
-        : `${name} payment is ${when}`,
+      title: label,
+      body: hasAmount
+        ? `${label} is ${when} — ${money}. Please check.`
+        : `${label} is ${when}. Please check.`,
     }
   }
-  return { title: 'Bill reminder', body: `${name} is ${when} — ${money}` }
+  if (kind === 'credit_card') {
+    const label = displayName(name, 'Credit card')
+    return {
+      title: `${label} payment`,
+      body: hasAmount
+        ? `${label} payment is ${when} — you owe ${money}. Please pay.`
+        : `${label} payment is ${when}. Please pay.`,
+    }
+  }
+  // Monthly / recurring expense (e.g. house rent)
+  const label = displayName(name, 'Bill')
+  return {
+    title: label,
+    body: hasAmount
+      ? `${label} is ${when} — ${money}. Please pay.`
+      : `${label} is ${when}. Please pay.`,
+  }
 }
 
 async function scheduleOne(

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { apiErrorMessage, budgetsApi } from '@/src/api/client'
 import type { BudgetPayload, BudgetRow } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
+import { AppSheet } from '@/src/components/AppSheet'
 import { BouncyPressable, Reveal } from '@/src/components/motion'
 import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
 import { getCategoryMeta } from '@/src/constants/categories'
@@ -345,35 +345,31 @@ export default function BudgetsScreen() {
         ) : null}
       </ScrollView>
 
-      <Modal visible={Boolean(editing)} transparent animationType="fade" onRequestClose={() => setEditing(null)}>
-        <View style={styles.modalRoot}>
-          <Pressable style={styles.backdrop} onPress={() => !saving && setEditing(null)} />
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-            <Text style={styles.sheetTitle}>
-              {editing?.category === '__all__'
-                ? 'Overall monthly budget'
-                : `Budget · ${editing?.label || ''}`}
-            </Text>
-            <Text style={styles.sheetHint}>
-              Spent this month: {money.fmt(editing?.spent ?? 0)}
-            </Text>
-            <ErrorBanner message={error} />
-            <Field
-              label={`Monthly limit (${getHomeCurrencyCode()})`}
-              value={limitInput}
-              onChangeText={setLimitInput}
-              keyboardType="decimal-pad"
-              placeholder="e.g. 15000"
-            />
-            <PrimaryButton title={saving ? 'Saving…' : 'Save'} onPress={() => void saveLimit()} loading={saving} />
-            {editing?.has_limit ? (
-              <Pressable onPress={() => void clearLimit()} style={{ marginTop: 14, alignItems: 'center' }}>
-                <Text style={{ color: colors.danger, fontWeight: '700' }}>Clear limit</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+      <AppSheet
+        visible={Boolean(editing)}
+        onClose={() => { if (!saving) setEditing(null) }}
+        title={
+          editing?.category === '__all__'
+            ? 'Overall monthly budget'
+            : `Budget · ${editing?.label || ''}`
+        }
+        subtitle={`Spent this month: ${money.fmt(editing?.spent ?? 0)}`}
+      >
+        <ErrorBanner message={error} />
+        <Field
+          label={`Monthly limit (${getHomeCurrencyCode()})`}
+          value={limitInput}
+          onChangeText={setLimitInput}
+          keyboardType="decimal-pad"
+          placeholder="e.g. 15000"
+        />
+        <PrimaryButton title={saving ? 'Saving…' : 'Save'} onPress={() => void saveLimit()} loading={saving} />
+        {editing?.has_limit ? (
+          <Pressable onPress={() => void clearLimit()} style={{ marginTop: 14, alignItems: 'center' }}>
+            <Text style={{ color: colors.danger, fontWeight: '700' }}>Clear limit</Text>
+          </Pressable>
+        ) : null}
+      </AppSheet>
     </Screen>
   )
 }

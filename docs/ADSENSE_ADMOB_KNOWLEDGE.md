@@ -8,10 +8,12 @@
 
 ## 1. Two different Google products (do not mix them up)
 
-| Product | What it is | Where it runs | WalletTrails use |
-|---------|------------|---------------|------------------|
-| **AdMob** | Ads **inside mobile apps** (Android / iOS) | Native SDK in the APK | **Primary** — banners (and later rewarded) in the Expo/React Native app |
-| **AdSense** | Ads on **websites** | Script / auto ads on HTML pages | **Marketing site / blog / public web pages** — *not* the money screens of the logged-in finance web app |
+
+| Product     | What it is                                 | Where it runs                   | WalletTrails use                                                                                        |
+| ----------- | ------------------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **AdMob**   | Ads **inside mobile apps** (Android / iOS) | Native SDK in the APK           | **Primary** — banners (and later rewarded) in the Expo/React Native app                                 |
+| **AdSense** | Ads on **websites**                        | Script / auto ads on HTML pages | **Marketing site / blog / public web pages** — *not* the money screens of the logged-in finance web app |
+
 
 **Rule of thumb**
 
@@ -47,11 +49,11 @@ Google pays you (AdMob / AdSense account) after threshold + verification
 ### 3.1 One-time Google setup (you do this in a browser)
 
 1. Create / open [Google AdMob](https://admob.google.com/) with the same Google account you use for Play Console (recommended).
-2. Add an **app** → Android → package id **`com.WalletTrails.app`** (or the exact id in `mobile/app.json` / Play Console).
+2. Add an **app** → Android → package id `com.WalletTrails.app` (or the exact id in `mobile/app.json` / Play Console).
 3. Create **ad units**:
-   - Banner (required first)
-   - Interstitial (optional; keep off for finance flows)
-   - Rewarded (optional; e.g. “watch ad to unlock a report export”)
+  - Banner (required first)
+  - Interstitial (optional; keep off for finance flows)
+  - Rewarded (optional; e.g. “watch ad to unlock a report export”)
 4. Copy each **unit ID** (looks like `ca-app-pub-XXXXXXXX/YYYYYYYY`).
 5. Link AdMob to the **Play Console** app when asked (helps policy + payments).
 6. Complete **payments profile** (tax / address) or you never get paid.
@@ -63,12 +65,14 @@ Google pays you (AdMob / AdSense account) after threshold + verification
 
 ### 3.2 What WalletTrails already has
 
-| Piece | Where | Role |
-|-------|--------|------|
-| Banner UI | `mobile/src/ads/AdBanner.tsx` | Renders banner when ads should show |
-| Home placement | `mobile/app/(tabs)/index.tsx` | Imports `AdBanner` |
+
+| Piece               | Where                                                   | Role                                                                       |
+| ------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Banner UI           | `mobile/src/ads/AdBanner.tsx`                           | Renders banner when ads should show                                        |
+| Home placement      | `mobile/app/(tabs)/index.tsx`                           | Imports `AdBanner`                                                         |
 | Kill switch / units | Ops remote config + `frontend-admin` → **Ads & Config** | Turn ads on/off, set unit IDs, premium hides ads, countries, session gates |
-| Backend flags | `premium_hides_ads`, ad unit fields on ops config | Server-driven — change without a new store release |
+| Backend flags       | `premium_hides_ads`, ad unit fields on ops config       | Server-driven — change without a new store release                         |
+
 
 `AdBanner` only loads the real SDK if `react-native-google-mobile-ads` is installed in a **native (EAS) build**. Expo Go shows a dev placeholder when config says ads are on.
 
@@ -90,12 +94,14 @@ Then:
 
 ### 3.4 Recommended placement (finance-safe)
 
-| Screen | Ads? | Why |
-|--------|------|-----|
-| Home (below fold / non-balance chrome) | Soft banner OK | Already wired via `AdBanner` |
-| Settings / Support | Soft banner OK | Low trust risk |
-| Add expense / Approve bank SMS / Wallets balances | **No** | Users are entering money; feels scammy + policy risk |
-| Interstitials between every screen | **No** | High uninstall; bad for finance |
+
+| Screen                                            | Ads?           | Why                                                  |
+| ------------------------------------------------- | -------------- | ---------------------------------------------------- |
+| Home (below fold / non-balance chrome)            | Soft banner OK | Already wired via `AdBanner`                         |
+| Settings / Support                                | Soft banner OK | Low trust risk                                       |
+| Add expense / Approve bank SMS / Wallets balances | **No**         | Users are entering money; feels scammy + policy risk |
+| Interstitials between every screen                | **No**         | High uninstall; bad for finance                      |
+
 
 Ops already can delay ads (`show_after_sessions`) and throttle interstitials (`interstitial_min_interval_sec`). Keep interstitial **disabled** until you have a clear non-money moment.
 
@@ -190,11 +196,13 @@ Admin → **Ads & Config** (ops remote config).
 
 ## 8. Related files in this repo
 
-| File | Purpose |
-|------|---------|
-| `mobile/src/ads/AdBanner.tsx` | Banner component |
-| `frontend-admin/src/pages/AdsConfigPage.tsx` | Ops UI for units + toggles |
-| `docs/REVENUE_AND_LAUNCH_RESEARCH.md` | Strategy, pricing, where not to put ads |
-| Backend ops / premium APIs | Entitlements + `premium_hides_ads` |
+
+| File                                         | Purpose                                 |
+| -------------------------------------------- | --------------------------------------- |
+| `mobile/src/ads/AdBanner.tsx`                | Banner component                        |
+| `frontend-admin/src/pages/AdsConfigPage.tsx` | Ops UI for units + toggles              |
+| `docs/REVENUE_AND_LAUNCH_RESEARCH.md`        | Strategy, pricing, where not to put ads |
+| Backend ops / premium APIs                   | Entitlements + `premium_hides_ads`      |
+
 
 When you are ready to **implement** (install SDK, wire App ID, turn on production units), treat that as a separate engineering task using this document as the checklist.

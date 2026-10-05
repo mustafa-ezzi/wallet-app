@@ -5,6 +5,7 @@ import {
   getAccessToken,
   getRefreshToken,
   setTokens,
+  upsertActiveSession,
 } from './authStorage'
 
 /** Always-on fallback so a misconfigured EAS build never points at invalid.local. */
@@ -198,6 +199,7 @@ api.interceptors.response.use(
             { timeout: DEFAULT_TIMEOUT_MS },
           )
           await setTokens(data.access, refresh)
+          await upsertActiveSession()
           original.headers = original.headers ?? {}
           original.headers.Authorization = `Bearer ${data.access}`
           return api(original)

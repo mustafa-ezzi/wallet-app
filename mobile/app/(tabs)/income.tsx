@@ -2,9 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,6 +19,7 @@ import {
 } from '@/src/api/client'
 import type { Account, Project } from '@/src/api/types'
 import { AmountEyeToggle } from '@/src/components/AmountEyeToggle'
+import { AppSheet } from '@/src/components/AppSheet'
 import { BouncyPressable, Reveal } from '@/src/components/motion'
 import { DateField, SelectField } from '@/src/components/SelectFields'
 import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
@@ -74,6 +72,7 @@ export default function IncomeScreen() {
     notes: '',
   })
   const [receiveAmount, setReceiveAmount] = useState('')
+  const [receiveAccount, setReceiveAccount] = useState('')
 
   const load = useCallback(async (soft = false) => {
     if (!soft) setLoading(true)
@@ -165,13 +164,14 @@ export default function IncomeScreen() {
     if (busyRef.current) return
     if (!receiveOpen) return
     const amount = toMoney(receiveAmount || receiveOpen.installment_amount || receiveOpen.amount)
-    const account = receiveOpen.default_account || accounts[0]?.id
+    const account = Number(receiveAccount) || receiveOpen.default_account || accounts[0]?.id
     if (!account || amount <= 0) {
       setError('Pick a wallet and amount.')
       return
     }
     busyRef.current = true
     setBusy(true)
+    setError('')
     try {
       await transactionsApi.create({
         type: 'income',
@@ -185,6 +185,7 @@ export default function IncomeScreen() {
       })
       setReceiveOpen(null)
       setReceiveAmount('')
+      setReceiveAccount('')
       bumpRefresh()
       await load(true)
     } catch (err) {
@@ -268,6 +269,14 @@ export default function IncomeScreen() {
             style={[styles.actionBtn, { backgroundColor: colors.primary }]}
             onPress={() => {
               setReceiveAmount(String(p.remaining_amount || p.installment_amount || p.amount || ''))
+              setReceiveAccount(
+                p.default_account
+                  ? String(p.default_account)
+                  : accounts[0]
+                    ? String(accounts[0].id)
+                    : '',
+              )
+              setError('')
               setReceiveOpen(p)
             }}
           >
@@ -356,89 +365,91 @@ export default function IncomeScreen() {
         )}
       </ScrollView>
 
-      <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
-        <KeyboardAvoidingView
-          style={styles.modalRoot}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        >
-          <Pressable style={styles.backdrop} onPress={() => setCreateOpen(false)} />
-          <ScrollView
-            style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>New income source</Text>
-            <ErrorBanner message={error} />
-            <Field label="Name" value={form.name} onChangeText={(t) => setForm((f) => ({ ...f, name: t }))} placeholder="Client / Salary" autoCapitalize="words" />
-            <SelectField
-              label="How do you get paid?"
-              value={form.income_type}
-              options={INCOME_TYPES.map((t) => ({
-                value: t,
-                label: TYPE_LABEL[t],
-              }))}
-              onChange={(t) => setForm((f) => ({ ...f, income_type: t as Project['income_type'] }))}
-            />
-            <Text style={[styles.hint, { color: colors.textMuted }]}>{TYPE_HINT[form.income_type]}</Text>
-            <Field
-              label={form.income_type === 'recurring_monthly' || form.income_type === 'contract_monthly' ? 'Amount each month' : 'Total amount'}
-              value={form.amount}
-              onChangeText={(t) => setForm((f) => ({ ...f, amount: t }))}
-              keyboardType="decimal-pad"
-            />
-            {form.income_type === 'one_time_installments' ? (
-              <Field
-                label="Each payment"
-                value={form.installment_amount}
-                onChangeText={(t) => setForm((f) => ({ ...f, installment_amount: t }))}
-                keyboardType="decimal-pad"
-                placeholder="e.g. 20000"
-              />
-            ) : null}
-            {OWED_TYPES.has(form.income_type) ? (
-              <Field
-                label="Advance already received (optional)"
-                value={form.advance_amount}
-                onChangeText={(t) => setForm((f) => ({ ...f, advance_amount: t }))}
-                keyboardType="decimal-pad"
-              />
-            ) : null}
-            <DateField
-              label="Start date"
-              value={form.start_date}
-              onChange={(d) => setForm((f) => ({ ...f, start_date: d }))}
-            />
-            {accounts.length > 0 ? (
-              <SelectField
-                label="Default wallet (optional)"
-                value={form.default_account}
-                options={[
-                  { value: '', label: 'None' },
-                  ...accounts.map((a) => ({ value: String(a.id), label: a.name })),
-                ]}
-                onChange={(v) => setForm((f) => ({ ...f, default_account: v }))}
-                placeholder="None"
-              />
-            ) : null}
-            <PrimaryButton title="Create" onPress={() => void create()} loading={busy} />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
+      <AppSheet
+        visible={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="New income source"
+        scroll
+      >
+        <ErrorBanner message={error} />
+        <Field label="Name" value={form.name} onChangeText={(t) => setForm((f) => ({ ...f, name: t }))} placeholder="Client / Salary" autoCapitalize="words" />
+        <SelectField
+          label="How do you get paid?"
+          value={form.income_type}
+          options={INCOME_TYPES.map((t) => ({
+            value: t,
+            label: TYPE_LABEL[t],
+          }))}
+          onChange={(t) => setForm((f) => ({ ...f, income_type: t as Project['income_type'] }))}
+        />
+        <Text style={[styles.hint, { color: colors.textMuted }]}>{TYPE_HINT[form.income_type]}</Text>
+        <Field
+          label={form.income_type === 'recurring_monthly' || form.income_type === 'contract_monthly' ? 'Amount each month' : 'Total amount'}
+          value={form.amount}
+          onChangeText={(t) => setForm((f) => ({ ...f, amount: t }))}
+          keyboardType="decimal-pad"
+        />
+        {form.income_type === 'one_time_installments' ? (
+          <Field
+            label="Each payment"
+            value={form.installment_amount}
+            onChangeText={(t) => setForm((f) => ({ ...f, installment_amount: t }))}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 20000"
+          />
+        ) : null}
+        {OWED_TYPES.has(form.income_type) ? (
+          <Field
+            label="Advance already received (optional)"
+            value={form.advance_amount}
+            onChangeText={(t) => setForm((f) => ({ ...f, advance_amount: t }))}
+            keyboardType="decimal-pad"
+          />
+        ) : null}
+        <DateField
+          label="Start date"
+          value={form.start_date}
+          onChange={(d) => setForm((f) => ({ ...f, start_date: d }))}
+        />
+        {accounts.length > 0 ? (
+          <SelectField
+            label="Default wallet (optional)"
+            value={form.default_account}
+            options={[
+              { value: '', label: 'None' },
+              ...accounts.map((a) => ({ value: String(a.id), label: a.name })),
+            ]}
+            onChange={(v) => setForm((f) => ({ ...f, default_account: v }))}
+            placeholder="None"
+          />
+        ) : null}
+        <PrimaryButton title="Create" onPress={() => void create()} loading={busy} />
+      </AppSheet>
 
-      <Modal visible={!!receiveOpen} transparent animationType="fade" onRequestClose={() => setReceiveOpen(null)}>
-        <KeyboardAvoidingView
-          style={styles.modalRoot}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        >
-          <Pressable style={styles.backdrop} onPress={() => setReceiveOpen(null)} />
-          <View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + 16 }]}>
-            <Text style={[styles.sheetTitle, { color: colors.primaryDark }]}>
-              Record received — {receiveOpen?.name}
-            </Text>
-            <Field label="Amount" value={receiveAmount} onChangeText={setReceiveAmount} keyboardType="decimal-pad" />
-            <PrimaryButton title="Save receipt" onPress={() => void recordReceived()} loading={busy} />
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <AppSheet
+        visible={!!receiveOpen}
+        onClose={() => {
+          setReceiveOpen(null)
+          setReceiveAccount('')
+        }}
+        title={receiveOpen ? `Record received — ${receiveOpen.name}` : 'Record received'}
+        subtitle="Choose the wallet this payment went into."
+      >
+        <ErrorBanner message={error} />
+        <Field label="Amount" value={receiveAmount} onChangeText={setReceiveAmount} keyboardType="decimal-pad" />
+        {accounts.length === 0 ? (
+          <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>Create a wallet first.</Text>
+        ) : (
+          <SelectField
+            label="Into wallet"
+            value={receiveAccount}
+            options={accounts.map((a) => ({ value: String(a.id), label: a.name }))}
+            onChange={setReceiveAccount}
+            placeholder="Select wallet…"
+          />
+        )}
+        <PrimaryButton title="Save receipt" onPress={() => void recordReceived()} loading={busy} />
+      </AppSheet>
     </Screen>
   )
 }

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   Alert,
   DeviceEventEmitter,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -14,6 +13,7 @@ import {
 } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useRouter } from 'expo-router'
+import { AppSheet } from '@/src/components/AppSheet'
 import { Screen, PrimaryButton, ErrorBanner } from '@/src/components/ui'
 import { SettingsDeleteAccountRow, SettingsGroup, SettingsLogoutRow, SettingsRow } from '@/src/components/SettingsList'
 import { useAuth } from '@/src/context/AuthContext'
@@ -40,10 +40,24 @@ const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
   { id: '5m', label: '5 minutes' },
 ]
 
-type Panel = 'home' | 'appearance' | 'privacy' | 'notifications' | 'advanced' | 'categories'
+type Panel = 'home' | 'appearance' | 'privacy' | 'notifications' | 'advanced' | 'categories' | 'accounts'
+
+function accountLabel(u: { first_name?: string; last_name?: string; username?: string; email?: string }) {
+  const name = [u.first_name, u.last_name].filter(Boolean).join(' ').trim()
+  return name || u.username || u.email || 'Account'
+}
 
 export default function SettingsScreen() {
-  const { user, logout, refreshUser } = useAuth()
+  const {
+    user,
+    logout,
+    logoutAll,
+    refreshUser,
+    savedAccounts,
+    switchAccount,
+    beginAddAccount,
+    removeAccount,
+  } = useAuth()
   const router = useRouter()
   const { clearLocal, online, pending, syncNow, syncing } = useOffline()
   const reminders = useReminders()
@@ -86,7 +100,10 @@ export default function SettingsScreen() {
   const [deleteConfirm, setDeleteConfirm] = useState('')
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [switchBusy, setSwitchBusy] = useState(false)
+  const [switchError, setSwitchError] = useState('')
   const username = user?.username || user?.email || ''
+  const otherAccounts = savedAccounts.filter((a) => a.id !== user?.id)
 
   useEffect(() => {
     if (!user) return
@@ -197,7 +214,83 @@ export default function SettingsScreen() {
         : panel === 'notifications' ? 'Reminders'
           : panel === 'advanced' ? 'Advanced'
             : panel === 'categories' ? 'Categories'
-              : ''
+              : panel === 'accounts' ? 'Accounts'
+                : ''
+
+  const confirmSwitch = (targetId: number, label: string) => {
+    const go = () => {
+      setSwitchBusy(true)
+      setSwitchError('')
+      void (async () => {
+        try {
+          if (pending > 0) await syncNow()
+          await clearLocal()
+          await switchAccount(targetId)
+          setPanel('home')
+        } catch (err) {
+          setSwitchError(apiErrorMessage(err, 'Could not switch account.'))
+        } finally {
+          setSwitchBusy(false)
+        }
+      })()
+    }
+    if (pending > 0) {
+      Alert.alert(
+        'Switch account?',
+        `You have ${pending} unsynced change${pending === 1 ? '' : 's'}. We’ll try to sync, then open ${label}.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch', onPress: go },
+        ],
+      )
+      return
+    }
+    go()
+  }
+
+  const onAddAccount = () => {
+    const go = () => {
+      void (async () => {
+        try {
+          if (pending > 0) await syncNow()
+          await beginAddAccount()
+        } catch (err) {
+          Alert.alert('Add account', apiErrorMessage(err, 'Could not start add account.'))
+        }
+      })()
+    }
+    if (pending > 0) {
+      Alert.alert(
+        'Add another account?',
+        `You have ${pending} unsynced change${pending === 1 ? '' : 's'}. Sync first so nothing is lost.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue', onPress: go },
+        ],
+      )
+      return
+    }
+    go()
+  }
+
+  const onRemoveSaved = (accountId: number, label: string) => {
+    Alert.alert(
+      'Remove account?',
+      `Remove “${label}” from this device? You can sign in again later.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            void removeAccount(accountId).catch((err) => {
+              setSwitchError(apiErrorMessage(err, 'Could not remove account.'))
+            })
+          },
+        },
+      ],
+    )
+  }
 
   return (
     <Screen>
@@ -211,6 +304,32 @@ export default function SettingsScreen() {
 
         {panel === 'home' ? (
           <>
+            <SettingsGroup>
+              <SettingsRow
+                icon="user"
+                title={accountLabel(user || {})}
+                value={user?.email || user?.username || ''}
+                onPress={() => {
+                  setSwitchError('')
+                  setPanel('accounts')
+                }}
+              />
+              <SettingsRow
+                icon="exchange"
+                title="Switch account"
+                value={
+                  otherAccounts.length
+                    ? `${otherAccounts.length} saved`
+                    : 'Add'
+                }
+                onPress={() => {
+                  setSwitchError('')
+                  setPanel('accounts')
+                }}
+                last
+              />
+            </SettingsGroup>
+
             <SettingsGroup>
               <SettingsRow
                 icon="wallet"
@@ -335,6 +454,7 @@ export default function SettingsScreen() {
             </SettingsGroup>
 
             <SettingsLogoutRow
+              title={otherAccounts.length > 0 ? 'Log out of this account' : 'Logout'}
               onPress={() => {
                 void (async () => {
                   await clearLocal()
@@ -342,6 +462,53 @@ export default function SettingsScreen() {
                 })()
               }}
             />
+            {otherAccounts.length > 0 || savedAccounts.length > 1 ? (
+              <SettingsGroup>
+                <Pressable
+                  onPress={() => {
+                    Alert.alert(
+                      'Log out of all accounts?',
+                      'Removes every saved account from this device. You’ll need to sign in again.',
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Log out all',
+                          style: 'destructive',
+                          onPress: () => {
+                            void (async () => {
+                              await clearLocal()
+                              await logoutAll()
+                            })()
+                          },
+                        },
+                      ],
+                    )
+                  }}
+                  style={({ pressed }) => [
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 12,
+                      paddingHorizontal: 14,
+                      paddingVertical: 14,
+                    },
+                    pressed ? { backgroundColor: colors.surfaceMuted } : null,
+                  ]}
+                >
+                  <View style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: colors.surfaceMuted,
+                  }}>
+                    <FontAwesome name="sign-out" size={15} color={colors.danger} />
+                  </View>
+                  <Text style={{ flex: 1, fontWeight: '700', color: colors.danger }}>Log out all accounts</Text>
+                </Pressable>
+              </SettingsGroup>
+            ) : null}
             <SettingsDeleteAccountRow
               onPress={() => {
                 setDeleteConfirm('')
@@ -352,6 +519,64 @@ export default function SettingsScreen() {
             {enableError ? <Text style={styles.tip}>{enableError}</Text> : null}
             {currencyError ? <Text style={styles.tip}>{currencyError}</Text> : null}
           </>
+        ) : null}
+
+        {panel === 'accounts' ? (
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.meta, { color: colors.textMuted, marginTop: 0, marginBottom: spacing.md }]}>
+              Switch without signing in again, or add another account (like Instagram).
+            </Text>
+            {switchError ? <Text style={styles.tip}>{switchError}</Text> : null}
+
+            {user ? (
+              <View style={[styles.accountRow, { borderColor: colors.border, backgroundColor: `${colors.primary}12` }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowTitle, { color: colors.primaryDark }]}>{accountLabel(user)}</Text>
+                  <Text style={[styles.meta, { color: colors.textMuted, marginTop: 2 }]}>
+                    {user.email || user.username} · Active
+                  </Text>
+                </View>
+                <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 12 }}>Current</Text>
+              </View>
+            ) : null}
+
+            {otherAccounts.map((a) => (
+              <View key={a.id} style={[styles.accountRow, { borderColor: colors.border }]}>
+                <Pressable
+                  style={{ flex: 1 }}
+                  disabled={switchBusy}
+                  onPress={() => confirmSwitch(a.id, accountLabel(a))}
+                >
+                  <Text style={[styles.rowTitle, { color: colors.text }]}>{accountLabel(a)}</Text>
+                  <Text style={[styles.meta, { color: colors.textMuted, marginTop: 2 }]}>
+                    {a.email || a.username}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => onRemoveSaved(a.id, accountLabel(a))}
+                  hitSlop={10}
+                  style={{ padding: 8 }}
+                >
+                  <FontAwesome name="trash-o" size={16} color={colors.danger} />
+                </Pressable>
+                <Pressable
+                  onPress={() => confirmSwitch(a.id, accountLabel(a))}
+                  disabled={switchBusy}
+                  style={[styles.lockBtn, { marginTop: 0, paddingHorizontal: 12, backgroundColor: colors.primary }]}
+                >
+                  <Text style={[styles.lockBtnText, { color: '#fff' }]}>
+                    {switchBusy ? '…' : 'Switch'}
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+
+            <PrimaryButton
+              title="Add account"
+              onPress={onAddAccount}
+              loading={switchBusy}
+            />
+          </View>
         ) : null}
 
         {panel === 'appearance' ? (
@@ -707,124 +932,112 @@ export default function SettingsScreen() {
         ) : null}
       </ScrollView>
 
-      <Modal visible={currencyOpen} transparent animationType="fade" onRequestClose={() => setCurrencyOpen(false)}>
-        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
-          <Pressable
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)' }}
-            onPress={() => !currencyBusy && setCurrencyOpen(false)}
-          />
-          <View style={[styles.card, { backgroundColor: '#ffffff', borderColor: colors.border, zIndex: 2, marginBottom: 0 }]}>
-            <Text style={[styles.rowTitle, { color: colors.primaryDark }]}>Currency</Text>
-            <ScrollView style={{ maxHeight: 360 }}>
-              {HOME_CURRENCIES.map((c) => {
-                const active = c.code === homeMeta.code
-                return (
-                  <Pressable
-                    key={c.code}
-                    disabled={currencyBusy}
-                    onPress={() => void onPickCurrency(c.code)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 12,
-                      borderBottomWidth: StyleSheet.hairlineWidth,
-                      borderBottomColor: colors.border,
-                      opacity: currencyBusy ? 0.55 : 1,
-                    }}
-                  >
-                    <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>
-                      {c.symbol}  {c.code}
-                    </Text>
-                    {active ? <Text style={{ color: colors.primary, fontWeight: '800' }}>Selected</Text> : null}
-                  </Pressable>
-                )
-              })}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={deleteOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => !deleteBusy && setDeleteOpen(false)}
+      <AppSheet
+        visible={currencyOpen}
+        onClose={() => { if (!currencyBusy) setCurrencyOpen(false) }}
+        title="Currency"
+        scroll
+        maxHeightRatio={0.7}
+        contentStyle={{ paddingHorizontal: 0, paddingTop: 0 }}
       >
-        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
-          <Pressable
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.55)' }}
-            onPress={() => !deleteBusy && setDeleteOpen(false)}
-          />
-          <View style={[styles.card, { backgroundColor: '#ffffff', borderColor: colors.border, zIndex: 2, marginBottom: 0 }]}>
-            <Text style={[styles.rowTitle, { color: colors.danger }]}>Delete my account</Text>
-            <Text style={[styles.meta, { color: colors.textMuted, marginTop: 8, marginBottom: spacing.md }]}>
-              This permanently deletes your WalletTrails account and all data. Type{'\n'}
-              <Text style={{ fontWeight: '800', color: colors.text }}>{username}</Text>
-              {'\n'}to confirm.
-            </Text>
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: '#f8fafc' }]}
-              placeholder={username}
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-              value={deleteConfirm}
-              editable={!deleteBusy}
-              onChangeText={(t) => {
-                setDeleteConfirm(t)
-                setDeleteError('')
+        {HOME_CURRENCIES.map((c) => {
+          const active = c.code === homeMeta.code
+          return (
+            <Pressable
+              key={c.code}
+              disabled={currencyBusy}
+              onPress={() => void onPickCurrency(c.code)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 14,
+                paddingHorizontal: spacing.lg,
+                borderBottomWidth: StyleSheet.hairlineWidth,
+                borderBottomColor: colors.border,
+                opacity: currencyBusy ? 0.55 : 1,
+                backgroundColor: active ? `${colors.primary}14` : 'transparent',
               }}
-            />
-            {deleteError ? <Text style={[styles.tip, { marginTop: 8 }]}>{deleteError}</Text> : null}
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md }}>
-              <Pressable
-                style={[styles.lockBtn, { flex: 1, backgroundColor: colors.surfaceMuted, marginTop: 0 }]}
-                disabled={deleteBusy}
-                onPress={() => setDeleteOpen(false)}
-              >
-                <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.lockBtn,
-                  {
-                    flex: 1,
-                    marginTop: 0,
-                    backgroundColor: colors.danger,
-                    opacity: deleteBusy || deleteConfirm !== username ? 0.5 : 1,
-                  },
-                ]}
-                disabled={deleteBusy || deleteConfirm !== username}
-                onPress={() => {
-                  void (async () => {
-                    if (!username || deleteConfirm !== username) {
-                      setDeleteError(`Type ${username} exactly.`)
-                      return
-                    }
-                    setDeleteBusy(true)
-                    setDeleteError('')
-                    try {
-                      await authApi.deleteAccount(deleteConfirm)
-                      setDeleteOpen(false)
-                      await clearLocal()
-                      await logout()
-                    } catch (err) {
-                      setDeleteError(apiErrorMessage(err, 'Could not delete account.'))
-                    } finally {
-                      setDeleteBusy(false)
-                    }
-                  })()
-                }}
-              >
-                <Text style={[styles.lockBtnText, { color: '#fff' }]}>
-                  {deleteBusy ? 'Deleting…' : 'Delete forever'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
+            >
+              <Text style={{ fontWeight: '700', color: active ? colors.primaryDark : colors.text }}>
+                {c.symbol}  {c.code}
+              </Text>
+              {active ? <Text style={{ color: colors.primary, fontWeight: '800' }}>Selected</Text> : null}
+            </Pressable>
+          )
+        })}
+      </AppSheet>
+
+      <AppSheet
+        visible={deleteOpen}
+        onClose={() => { if (!deleteBusy) setDeleteOpen(false) }}
+        title="Delete my account"
+        subtitle="This permanently deletes your WalletTrails account and all data."
+        placement="center"
+      >
+        <Text style={[styles.meta, { color: colors.textMuted, marginBottom: spacing.md }]}>
+          Type <Text style={{ fontWeight: '800', color: colors.text }}>{username}</Text> to confirm.
+        </Text>
+        <TextInput
+          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surfaceMuted }]}
+          placeholder={username}
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          value={deleteConfirm}
+          editable={!deleteBusy}
+          onChangeText={(t) => {
+            setDeleteConfirm(t)
+            setDeleteError('')
+          }}
+        />
+        {deleteError ? <Text style={[styles.tip, { marginTop: 8 }]}>{deleteError}</Text> : null}
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing.md }}>
+          <Pressable
+            style={[styles.lockBtn, { flex: 1, backgroundColor: colors.surfaceMuted, marginTop: 0 }]}
+            disabled={deleteBusy}
+            onPress={() => setDeleteOpen(false)}
+          >
+            <Text style={[styles.lockBtnText, { color: colors.primaryDark }]}>Cancel</Text>
+          </Pressable>
+          <Pressable
+            style={[
+              styles.lockBtn,
+              {
+                flex: 1,
+                marginTop: 0,
+                backgroundColor: colors.danger,
+                opacity: deleteBusy || deleteConfirm !== username ? 0.5 : 1,
+              },
+            ]}
+            disabled={deleteBusy || deleteConfirm !== username}
+            onPress={() => {
+              void (async () => {
+                if (!username || deleteConfirm !== username) {
+                  setDeleteError(`Type ${username} exactly.`)
+                  return
+                }
+                setDeleteBusy(true)
+                setDeleteError('')
+                try {
+                  await authApi.deleteAccount(deleteConfirm)
+                  setDeleteOpen(false)
+                  await clearLocal()
+                  await logout()
+                } catch (err) {
+                  setDeleteError(apiErrorMessage(err, 'Could not delete account.'))
+                } finally {
+                  setDeleteBusy(false)
+                }
+              })()
+            }}
+          >
+            <Text style={[styles.lockBtnText, { color: '#fff' }]}>
+              {deleteBusy ? 'Deleting…' : 'Delete forever'}
+            </Text>
+          </Pressable>
         </View>
-      </Modal>
+      </AppSheet>
     </Screen>
   )
 }
@@ -855,6 +1068,15 @@ const styles = StyleSheet.create({
   swatchCheck: { color: '#fff', fontWeight: '900', fontSize: 14 },
   swatchLabel: { fontSize: 10, fontWeight: '700', marginTop: 6 },
   rowTitle: { fontWeight: '700', fontSize: typography.body },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
   inlineRow: { flexDirection: 'row', alignItems: 'center' },
   meta: { marginTop: 8, fontSize: typography.caption },
   tip: { marginTop: spacing.sm, fontSize: typography.caption, color: '#c2410c' },
