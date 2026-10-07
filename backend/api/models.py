@@ -1554,12 +1554,14 @@ class BankSmsImport(models.Model):
     KIND_ATM = 'atm'
     KIND_INCOME = 'income'
     KIND_REVERSAL = 'reversal'
+    KIND_TRANSFER = 'transfer'
     KIND_UNKNOWN = 'unknown'
     KIND_CHOICES = [
         (KIND_EXPENSE, 'Expense'),
         (KIND_ATM, 'ATM'),
         (KIND_INCOME, 'Income'),
         (KIND_REVERSAL, 'Reversal'),
+        (KIND_TRANSFER, 'Transfer'),
         (KIND_UNKNOWN, 'Unknown'),
     ]
 

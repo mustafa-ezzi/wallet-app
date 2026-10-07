@@ -1,3 +1,4 @@
+import { parseTransferEndpointHints } from './parse'
 import type { ParsedBankSms, WalletLike } from './types'
 
 export type WalletAlias = {
@@ -120,6 +121,36 @@ export function suggestBankWalletDetailed(
   }
 
   return matchInPool(banks, parsed, aliases)
+}
+
+/** Destination wallet for bank→bank / wallet transfers (excludes source id). */
+export function suggestTransferDestinationWallet(
+  wallets: WalletLike[],
+  parsed: Pick<ParsedBankSms, 'counterparty' | 'raw' | 'bankHint'>,
+  excludeId?: number | null,
+  aliases: WalletAlias[] = [],
+): WalletLike | null {
+  const pool = wallets.filter(
+    (w) => (w.type === 'bank' || w.type === 'cash') && w.id !== excludeId,
+  )
+  if (!pool.length) return null
+
+  const tryHint = (hint: string | null | undefined): WalletLike | null => {
+    if (!hint) return null
+    const hit = suggestBankWalletDetailed(pool, { bankHint: hint, accountMask: null }, aliases)
+    return hit.wallet
+  }
+
+  const fromCounterparty = parsed.counterparty ? norm(parsed.counterparty) : ''
+  if (fromCounterparty) {
+    const byName = pool.find(
+      (w) => norm(w.name).includes(fromCounterparty) || fromCounterparty.includes(norm(w.name)),
+    )
+    if (byName) return byName
+  }
+
+  const { toHint } = parseTransferEndpointHints(parsed.raw || '')
+  return tryHint(toHint)
 }
 
 export function preferCashWallet(

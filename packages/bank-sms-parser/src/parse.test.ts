@@ -198,6 +198,36 @@ describe('wallet suggest + approve plan', () => {
     expect(needsManualTypePick({ kind: 'expense', confidence: 0.8 })).toBe(false)
   })
 
+  it('detects wallet-to-wallet transfer (NayaPay → Meezan)', () => {
+    const text =
+      'You have transferred PKR 5,000.00 from your NayaPay account to your Meezan Bank account on 01-Oct-2025.'
+    const p = parseBankSms(text)
+    expect(p.kind).toBe('transfer')
+    expect(p.amount).toBe(5000)
+    expect(p.bankHint).toBe('nayapay')
+    expect(p.counterparty?.toLowerCase()).toContain('meezan')
+  })
+
+  it('transfer approve plan posts out + in on two bank wallets', () => {
+    const text =
+      'You have transferred PKR 5,000.00 from your NayaPay account to your Meezan Bank account on 01-Oct-2025.'
+    const p = parseBankSms(text)
+    const xferWallets = [
+      { id: 1, name: 'NayaPay', type: 'bank' },
+      { id: 2, name: 'Meezan', type: 'bank' },
+    ]
+    const draft = buildApproveDraft(p, xferWallets)
+    expect(draft.kind).toBe('transfer')
+    expect(draft.sourceBankAccountId).toBe(1)
+    expect(draft.bankAccountId).toBe(2)
+    const plan = buildApprovePlan(draft)
+    expect(plan.steps).toHaveLength(2)
+    expect(plan.steps[0].type).toBe('expense')
+    expect(plan.steps[0].accountId).toBe(1)
+    expect(plan.steps[1].type).toBe('income')
+    expect(plan.steps[1].accountId).toBe(2)
+  })
+
   it('ATM plan creates bank→cash transfer steps', () => {
     const p = parseBankSms(FIXTURE_SMS.find((x) => x.id === 'product-atm-tid')!.text)
     const draft = buildApproveDraft(p, wallets)

@@ -5,6 +5,7 @@ export type BankSmsKind =
   | 'atm'
   | 'income'
   | 'reversal'
+  | 'transfer'
   | 'unknown'
 
 /** Payment instrument: bank account vs credit card (Phase B). */

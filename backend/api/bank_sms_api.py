@@ -378,6 +378,7 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
     # Phase C: card bill payment → transfer from bank → credit card (preferred)
     source_bank_id = overrides.get('source_bank_account_id')
     income_only = bool(overrides.get('record_card_payment_as_income_only'))
+    wallet_transfer = kind == BankSmsImport.KIND_TRANSFER
     card_payment_transfer = (
         kind == BankSmsImport.KIND_INCOME
         and bank
@@ -385,7 +386,36 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
         and not income_only
         and source_bank_id
     )
-    if card_payment_transfer:
+    if wallet_transfer:
+        if not source_bank_id:
+            raise ValueError('Pick the wallet you transferred from.')
+        source = _user_wallet(user, source_bank_id, types=['bank', 'cash'])
+        if not source:
+            raise ValueError('Pick the wallet you transferred from.')
+        if not bank or bank.type not in ('bank', 'cash'):
+            raise ValueError('Pick the destination wallet.')
+        if source.id == bank.id:
+            raise ValueError('From and to wallets must be different.')
+        out_tx = Transaction.objects.create(
+            user=user,
+            type='expense',
+            amount=amount,
+            date=tx_date,
+            account=source,
+            category='Bank Transfer',
+            notes=f'{notes} (transfer out)',
+        )
+        in_tx = Transaction.objects.create(
+            user=user,
+            type='income',
+            amount=amount,
+            date=tx_date,
+            account=bank,
+            category='Bank Transfer',
+            notes=f'{notes} (transfer in)',
+        )
+        created_ids = [out_tx.id, in_tx.id]
+    elif card_payment_transfer:
         source = _user_wallet(user, source_bank_id, types=['bank'])
         if not source or source.type != 'bank':
             raise ValueError('Pick the bank wallet you paid from.')
@@ -525,6 +555,7 @@ def approve_bank_sms_import(user, item: BankSmsImport, overrides: dict) -> BankS
     if overrides.get('remember_kind') and kind in (
         BankSmsImport.KIND_EXPENSE, BankSmsImport.KIND_ATM,
         BankSmsImport.KIND_INCOME, BankSmsImport.KIND_REVERSAL,
+        BankSmsImport.KIND_TRANSFER,
     ):
         settings_obj.kind_overrides = _upsert_kind_override(
             list(settings_obj.kind_overrides or []),

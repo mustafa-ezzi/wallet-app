@@ -177,7 +177,60 @@ function parseCounterparty(text: string): string | null {
   if (sent) return sent[1].trim()
   const recv = text.match(/\breceived from\s+([A-Z0-9 .'-]{2,40}?)(?:\s+AC|\s+PK|\s+as\s+|\s+on\s+)/i)
   if (recv) return recv[1].trim()
+  const xfer = parseTransferEndpointHints(text)
+  if (xfer.toLabel) return xfer.toLabel
   return null
+}
+
+function hintFromPhrase(phrase: string): string | null {
+  const p = phrase.trim()
+  if (!p) return null
+  for (const { re, hint } of BANK_HINTS) {
+    if (hint && re.test(p)) return hint
+  }
+  const n = p.toLowerCase().replace(/[^a-z0-9]/g, '')
+  return n.length >= 3 ? n : null
+}
+
+/** Parse "from … to …" wallet hints for internal transfers (NayaPay → Meezan, IBFT, etc.). */
+export function parseTransferEndpointHints(text: string): {
+  fromHint: string | null
+  toHint: string | null
+  toLabel: string | null
+} {
+  const pair = text.match(
+    /\bfrom\s+(?:your\s+)?(.+?)\s+to\s+(?:your\s+)?(.+?)(?=\s+(?:on|dated|for|pk|pkr|rs\.?|amount|\.(?:\s|$))|\s*$)/i,
+  )
+  if (pair) {
+    const fromPhrase = pair[1].replace(/\s+(?:account|wallet|a\/c|bank)\s*$/i, '').trim()
+    const toPhrase = pair[2].replace(/\s+(?:account|wallet|a\/c|bank)\s*$/i, '').trim()
+    return {
+      fromHint: hintFromPhrase(fromPhrase),
+      toHint: hintFromPhrase(toPhrase),
+      toLabel: toPhrase || null,
+    }
+  }
+  const toOnly = text.match(
+    /\bto\s+(?:your\s+)?([A-Za-z][A-Za-z0-9 .'-]{2,48}?)(?:\s+(?:bank|wallet|account|a\/c))?(?=\s+(?:on|dated|pk|pkr|rs\.?|\.)|\s*$)/i,
+  )
+  if (toOnly) {
+    const toPhrase = toOnly[1].trim()
+    return { fromHint: null, toHint: hintFromPhrase(toPhrase), toLabel: toPhrase }
+  }
+  return { fromHint: null, toHint: null, toLabel: null }
+}
+
+function looksLikeInternalTransfer(text: string): boolean {
+  if (
+    /\b(?:ibft|inter\s*bank|intra\s*bank|between\s+(?:your\s+)?accounts|own\s+account|internal\s+transfer|wallet\s+to\s+wallet)\b/i.test(
+      text,
+    )
+  ) {
+    return true
+  }
+  if (/\btransfer(?:red)?\s+from\b/i.test(text)) return true
+  if (/\bfrom\s+your\s+\w+/i.test(text) && /\bto\s+your\s+\w+/i.test(text)) return true
+  return false
 }
 
 function parseBankHint(text: string): string | null {
@@ -264,6 +317,9 @@ function classify(text: string, tid: string | null): { kind: BankSmsKind; reason
     || /\bfunds?\s+(?:added|received)\b/i.test(t)
   ) {
     return { kind: 'income', reason: 'keyword:received/credited', confidence: 0.9 }
+  }
+  if (looksLikeInternalTransfer(t)) {
+    return { kind: 'transfer', reason: 'keyword:wallet-transfer', confidence: 0.88 }
   }
   // Wallet push: "You paid", "You spent", "You sent", "Payment of Rs… successful"
   if (
@@ -374,12 +430,13 @@ export function parseBankSms(
   const amount = parseAmount(raw)
   const tid = parseTid(raw)
   const accountMask = parseAccountMask(raw)
-  const counterparty = parseCounterparty(raw)
-  const bankHint = parseBankHint(raw)
   const instrument = detectInstrument(raw)
   const { isoDate, occurredAt } = parseOccurred(raw)
   const base = classify(raw, tid)
-  const { kind, reason, confidence } = applyBankTemplate(raw, bankHint, base)
+  const { kind, reason, confidence } = applyBankTemplate(raw, parseBankHint(raw), base)
+  const xferHints = kind === 'transfer' ? parseTransferEndpointHints(raw) : null
+  const bankHint = xferHints?.fromHint ?? parseBankHint(raw)
+  const counterparty = parseCounterparty(raw)
 
   // Rs. amount alone (restaurant deal, telco /Day offer) is not a bank alert
   if (
@@ -427,13 +484,14 @@ export function parseBankSms(
 
 export function kindToUiBucket(kind: BankSmsKind): BankSmsUiBucket {
   if (kind === 'atm') return 'atm'
+  if (kind === 'transfer') return 'atm'
   if (kind === 'income') return 'received'
   if (kind === 'reversal') return 'reversed'
   return 'expense'
 }
 
 export function defaultCategoryForKind(kind: BankSmsKind): string {
-  if (kind === 'atm') return 'Bank Transfer'
+  if (kind === 'atm' || kind === 'transfer') return 'Bank Transfer'
   if (kind === 'income') return 'Other'
   if (kind === 'reversal') return 'Other'
   if (kind === 'expense') return 'Miscellaneous'

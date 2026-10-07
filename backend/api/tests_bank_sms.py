@@ -148,6 +148,37 @@ class BankSmsImportTests(TestCase):
         self.assertEqual(Decimal(str(card.current_balance)), Decimal('35000'))
         self.assertEqual(Decimal(str(self.bank.current_balance)), Decimal('90000'))
 
+    def test_approve_wallet_to_wallet_transfer(self):
+        nayapay = Account.objects.create(
+            user=self.user, name='NayaPay', type='bank', opening_balance=Decimal('20000'),
+        )
+        created = self.client.post('/api/bank-sms-imports/', {
+            'kind': 'transfer',
+            'amount': '5000',
+            'tx_date': '2025-10-01',
+            'fingerprint': 'fp_xfer',
+            'suggested_account_id': self.bank.id,
+            'bank_hint': 'nayapay',
+            'notes': 'wallet transfer · via bank SMS',
+            'parse_reason': 'keyword:wallet-transfer',
+        }, format='json')
+        pk = created.data['id']
+        res = self.client.post(f'/api/bank-sms-imports/{pk}/approve/', {
+            'resolved_account_id': self.bank.id,
+            'source_bank_account_id': nayapay.id,
+        }, format='json')
+        self.assertEqual(res.status_code, 200, res.data)
+        self.assertEqual(len(res.data['created_transaction_ids']), 2)
+        txs = list(Transaction.objects.filter(id__in=res.data['created_transaction_ids']).order_by('id'))
+        self.assertEqual(txs[0].type, 'expense')
+        self.assertEqual(txs[0].account_id, nayapay.id)
+        self.assertEqual(txs[1].type, 'income')
+        self.assertEqual(txs[1].account_id, self.bank.id)
+        nayapay.refresh_from_db()
+        self.bank.refresh_from_db()
+        self.assertEqual(Decimal(str(nayapay.current_balance)), Decimal('15000'))
+        self.assertEqual(Decimal(str(self.bank.current_balance)), Decimal('105000'))
+
     def test_approve_atm_transfer(self):
         created = self.client.post('/api/bank-sms-imports/', {
             'kind': 'atm',

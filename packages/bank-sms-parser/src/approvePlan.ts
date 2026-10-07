@@ -1,5 +1,5 @@
 import { defaultCategoryForKind, isCardPayment, todayIsoDate } from './parse'
-import { preferCashWallet, suggestBankWallet } from './matchWallet'
+import { preferCashWallet, suggestBankWallet, suggestTransferDestinationWallet } from './matchWallet'
 import type { WalletAlias } from './matchWallet'
 import type { ApproveDraft, BankSmsKind, ParsedBankSms, WalletLike } from './types'
 
@@ -42,13 +42,26 @@ export function buildApproveDraft(
   overrides?: Partial<ApproveDraft>,
   opts?: { aliases?: WalletAlias[]; defaultCashId?: number | null },
 ): ApproveDraft {
-  const primary = suggestBankWallet(wallets, parsed, opts?.aliases ?? [])
   const cash = preferCashWallet(wallets, opts?.defaultCashId)
   const kind = (overrides?.kind ?? parsed.kind) as BankSmsKind
   const amount = overrides?.amount ?? parsed.amount ?? 0
   const date = overrides?.date ?? parsed.date ?? todayIsoDate()
   const cardPay = isCardPayment({ ...parsed, kind: kind === 'unknown' ? parsed.kind : kind })
-  const primaryId = overrides?.bankAccountId ?? primary?.id ?? null
+  const isTransfer = kind === 'transfer'
+  const primary = suggestBankWallet(wallets, parsed, opts?.aliases ?? [])
+  let primaryId = overrides?.bankAccountId ?? primary?.id ?? null
+  let sourceId = overrides?.sourceBankAccountId ?? null
+  if (isTransfer) {
+    const sourceWallet = suggestBankWallet(wallets, parsed, opts?.aliases ?? [])
+    sourceId = overrides?.sourceBankAccountId ?? sourceWallet?.id ?? null
+    const destWallet = suggestTransferDestinationWallet(
+      wallets,
+      parsed,
+      sourceId,
+      opts?.aliases ?? [],
+    )
+    primaryId = overrides?.bankAccountId ?? destWallet?.id ?? (primary?.id !== sourceId ? primary?.id : null)
+  }
   const sourceBank = preferSourceBank(wallets, parsed, primaryId)
 
   const noteBits = [
@@ -64,7 +77,7 @@ export function buildApproveDraft(
     date,
     bankAccountId: primaryId,
     cashAccountId: overrides?.cashAccountId ?? cash?.id ?? null,
-    sourceBankAccountId: overrides?.sourceBankAccountId ?? (cardPay ? sourceBank?.id ?? null : null),
+    sourceBankAccountId: overrides?.sourceBankAccountId ?? (isTransfer ? sourceId : cardPay ? sourceBank?.id ?? null : null),
     category: overrides?.category ?? defaultCategoryForKind(kind === 'unknown' ? 'expense' : kind),
     notes: overrides?.notes ?? noteBits.join(' · '),
     createCashNamed: cash ? null : 'Cash',
@@ -124,6 +137,40 @@ export function buildApprovePlan(draft: ApproveDraft, opts?: { isCardPayment?: b
     && draft.sourceBankAccountId != null
     && draft.bankAccountId != null
     && draft.sourceBankAccountId !== draft.bankAccountId
+
+  if (draft.kind === 'transfer') {
+    if (draft.sourceBankAccountId == null || draft.bankAccountId == null) {
+      return { steps: [], createCashNamed: null, summary: 'Pick from and to wallets' }
+    }
+    if (draft.sourceBankAccountId === draft.bankAccountId) {
+      return { steps: [], createCashNamed: null, summary: 'From and to wallets must differ' }
+    }
+    const destRole = 'bank' as const
+    return {
+      createCashNamed: null,
+      summary: `Transfer PKR ${amount} wallet → wallet`,
+      steps: [
+        {
+          type: 'expense',
+          amount,
+          date,
+          accountId: draft.sourceBankAccountId,
+          accountRole: 'bank',
+          category: 'Bank Transfer',
+          notes: `${notes} (transfer out)`,
+        },
+        {
+          type: 'income',
+          amount,
+          date,
+          accountId: draft.bankAccountId,
+          accountRole: destRole,
+          category: 'Bank Transfer',
+          notes: `${notes} (transfer in)`,
+        },
+      ],
+    }
+  }
 
   if (cardPaymentTransfer) {
     return {

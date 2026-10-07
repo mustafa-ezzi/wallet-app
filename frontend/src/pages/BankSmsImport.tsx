@@ -47,13 +47,14 @@ type Acc = { id: number; name: string; type: string }
 const KINDS: { value: BankSmsKind; label: string }[] = [
   { value: 'expense', label: 'Expense' },
   { value: 'atm', label: 'ATM (cash out)' },
+  { value: 'transfer', label: 'Transfer (wallet → wallet)' },
   { value: 'income', label: 'Received' },
   { value: 'reversal', label: 'Reversed' },
 ]
 
 function kindBadgeClass(kind: string): string {
   if (kind === 'income') return 'badge badge-green'
-  if (kind === 'atm') return 'badge badge-blue'
+  if (kind === 'atm' || kind === 'transfer') return 'badge badge-blue'
   if (kind === 'reversal') return 'badge badge-yellow'
   if (kind === 'expense') return 'badge badge-red'
   return 'badge badge-gray'
@@ -72,7 +73,7 @@ function draftFromRow(row: BankSmsImportRow): ApproveDraft {
     bankAccountId: row.resolved_account ?? row.suggested_account,
     cashAccountId: row.cash_account,
     sourceBankAccountId: null,
-    category: row.category || (kind === 'atm' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous'),
+    category: row.category || (kind === 'atm' || kind === 'transfer' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous'),
     notes: row.notes || '',
     createCashNamed: row.cash_account ? null : 'Cash',
     recordAtmAsExpense: row.record_atm_as_expense,
@@ -214,6 +215,7 @@ export default function BankSmsImportPage() {
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
   const cards = useMemo(() => wallets.filter((w) => w.type === 'credit_card'), [wallets])
   const cashWallets = useMemo(() => wallets.filter((w) => w.type === 'cash'), [wallets])
+  const transferWallets = useMemo(() => [...banks, ...cashWallets], [banks, cashWallets])
   const primaryWallets = useMemo(() => {
     const atmOnly = draft?.kind === 'atm' && !draft.recordAtmAsExpense
     if (atmOnly) return banks
@@ -334,6 +336,7 @@ export default function BankSmsImportPage() {
     if (!draft) return expenseCategories
     if (draft.kind === 'income' || draft.kind === 'reversal') return incomeCategories
     if (draft.kind === 'atm' && !draft.recordAtmAsExpense) return []
+    if (draft.kind === 'transfer') return []
     return expenseCategories
   }, [draft, expenseCategories, incomeCategories])
 
@@ -342,7 +345,16 @@ export default function BankSmsImportPage() {
       setError('Detect and sync a message first (or open one from the pending inbox).')
       return
     }
-    if (!draft.bankAccountId) {
+    if (draft.kind === 'transfer') {
+      if (!draft.sourceBankAccountId || !draft.bankAccountId) {
+        setError('Pick both wallets — from and to.')
+        return
+      }
+      if (draft.sourceBankAccountId === draft.bankAccountId) {
+        setError('From and to wallets must be different.')
+        return
+      }
+    } else if (!draft.bankAccountId) {
       setError('Pick a wallet.')
       return
     }
@@ -728,10 +740,19 @@ export default function BankSmsImportPage() {
                 onChange={(e) => {
                   const kind = e.target.value as BankSmsKind
                   setAssociateKey('')
+                  const rebuilt = parsed
+                    ? buildApproveDraft(parsed, wallets, { ...draft, kind }, { aliases, defaultCashId })
+                    : null
                   patchDraft({
                     kind,
-                    category: kind === 'atm' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous',
+                    category: kind === 'atm' || kind === 'transfer' ? 'Bank Transfer' : kind === 'income' || kind === 'reversal' ? 'Other' : 'Miscellaneous',
                     recordAtmAsExpense: kind === 'atm' ? draft.recordAtmAsExpense : false,
+                    ...(rebuilt && kind === 'transfer'
+                      ? {
+                          sourceBankAccountId: rebuilt.sourceBankAccountId,
+                          bankAccountId: rebuilt.bankAccountId,
+                        }
+                      : {}),
                   })
                 }}
               >
@@ -758,22 +779,54 @@ export default function BankSmsImportPage() {
               </div>
             </div>
 
-            <div className="form-group">
-              <label>
-                {parsed && isCardPayment(parsed) ? 'Credit card wallet' : parsed?.instrument === 'credit_card' ? 'Wallet (credit card)' : 'Wallet'}
-              </label>
-              <select
-                value={draft.bankAccountId ?? ''}
-                onChange={(e) => patchDraft({ bankAccountId: e.target.value ? Number(e.target.value) : null })}
-              >
-                <option value="">Select wallet…</option>
-                {(parsed && isCardPayment(parsed) ? cards : primaryWallets).map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.type === 'credit_card' ? `${w.name} (card)` : w.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {draft.kind === 'transfer' ? (
+              <>
+                <div className="form-group">
+                  <label>From wallet</label>
+                  <select
+                    value={draft.sourceBankAccountId ?? ''}
+                    onChange={(e) => patchDraft({ sourceBankAccountId: e.target.value ? Number(e.target.value) : null })}
+                  >
+                    <option value="">Select wallet…</option>
+                    {transferWallets.map((w) => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>To wallet</label>
+                  <select
+                    value={draft.bankAccountId ?? ''}
+                    onChange={(e) => patchDraft({ bankAccountId: e.target.value ? Number(e.target.value) : null })}
+                  >
+                    <option value="">Select wallet…</option>
+                    {transferWallets.map((w) => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-muted" style={{ fontSize: '0.8rem', marginTop: '-0.35rem' }}>
+                  Posts Bank Transfer: expense on source, income on destination.
+                </p>
+              </>
+            ) : (
+              <div className="form-group">
+                <label>
+                  {parsed && isCardPayment(parsed) ? 'Credit card wallet' : parsed?.instrument === 'credit_card' ? 'Wallet (credit card)' : 'Wallet'}
+                </label>
+                <select
+                  value={draft.bankAccountId ?? ''}
+                  onChange={(e) => patchDraft({ bankAccountId: e.target.value ? Number(e.target.value) : null })}
+                >
+                  <option value="">Select wallet…</option>
+                  {(parsed && isCardPayment(parsed) ? cards : primaryWallets).map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.type === 'credit_card' ? `${w.name} (card)` : w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {parsed && isCardPayment(parsed) && draft.kind === 'income' ? (
               <div style={{ marginBottom: '0.85rem' }}>
