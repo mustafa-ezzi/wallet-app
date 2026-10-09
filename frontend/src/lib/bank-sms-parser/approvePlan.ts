@@ -60,7 +60,7 @@ export function buildApproveDraft(
       sourceId,
       opts?.aliases ?? [],
     )
-    primaryId = overrides?.bankAccountId ?? destWallet?.id ?? (primary?.id !== sourceId ? primary?.id : null)
+    primaryId = overrides?.bankAccountId ?? destWallet?.id ?? (primary?.id != null && primary.id !== sourceId ? primary.id : null)
   }
   const sourceBank = preferSourceBank(wallets, parsed, primaryId)
 
