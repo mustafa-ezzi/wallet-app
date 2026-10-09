@@ -480,7 +480,7 @@ Web (`E`) can start after `C` if needed. Linked web (`I`) waits on `H`.
 
 ## Out of scope (v1 / local People)
 
-- Multi-currency wallets (Meezan in AED)  
+- Multi-currency wallets (Meezan in AED)   
 - Travel Mode on bills / salary / household ledgers  
 - Splitting a bill with a person (that is Family / household)  
 - Interest, due dates, or “loan product” on a person  
