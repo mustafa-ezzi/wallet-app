@@ -102,6 +102,8 @@ export default function BillsScreen() {
   const [editingPayableId, setEditingPayableId] = useState<number | null>(null)
   const [receivableOpen, setReceivableOpen] = useState(false)
   const [editingReceivableId, setEditingReceivableId] = useState<number | null>(null)
+  const [projectOpen, setProjectOpen] = useState(false)
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null)
   const [expForm, setExpForm] = useState({
     name: '',
     amount: '',
@@ -123,6 +125,13 @@ export default function BillsScreen() {
     monthly_amount: '',
     total_installments: '6',
     start_date: todayISO(),
+  })
+  const [projForm, setProjForm] = useState({
+    name: '',
+    amount: '',
+    advance_amount: '',
+    default_account: '',
+    notes: '',
   })
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -585,6 +594,47 @@ export default function BillsScreen() {
         },
       },
     ])
+  }
+
+  const openEditProject = (item: Project) => {
+    setEditingProjectId(item.id)
+    setProjForm({
+      name: item.name,
+      amount: String(item.amount),
+      advance_amount: item.advance_amount != null ? String(item.advance_amount) : '',
+      default_account: item.default_account != null ? String(item.default_account) : '',
+      notes: item.notes || '',
+    })
+    setError('')
+    setProjectOpen(true)
+  }
+
+  const saveProject = async () => {
+    if (savingRef.current || !editingProjectId) return
+    if (!projForm.name.trim() || toMoney(projForm.amount) <= 0) {
+      setError('Name and amount required.')
+      return
+    }
+    savingRef.current = true
+    setSaving(true)
+    try {
+      await projectsApi.update(editingProjectId, {
+        name: projForm.name.trim(),
+        amount: toMoney(projForm.amount),
+        advance_amount: projForm.advance_amount ? toMoney(projForm.advance_amount) : 0,
+        default_account: projForm.default_account ? Number(projForm.default_account) : null,
+        notes: projForm.notes.trim(),
+      })
+      setProjectOpen(false)
+      setEditingProjectId(null)
+      bumpRefresh()
+      await load(true)
+    } catch (err) {
+      setError(apiErrorMessage(err, 'Could not update one-time payment.'))
+    } finally {
+      savingRef.current = false
+      setSaving(false)
+    }
   }
 
   const markProjectStuck = (item: Project) => {
@@ -1074,6 +1124,12 @@ export default function BillsScreen() {
                                   <Text style={[styles.actionBtnMutedText, { color: colors.success }]}>✓ Fully received</Text>
                                 </View>
                               )}
+                              <BouncyPressable
+                                style={[styles.actionBtnOutline, { borderColor: colors.border }]}
+                                onPress={() => openEditProject(p)}
+                              >
+                                <Text style={[styles.actionOutlineText, { color: colors.textSecondary }]}>Edit</Text>
+                              </BouncyPressable>
                               {!done ? (
                                 <BouncyPressable
                                   disabled={isBusy}
@@ -1255,6 +1311,55 @@ export default function BillsScreen() {
         <Field label="Total installments" value={payForm.total_installments} onChangeText={(t) => setPayForm((f) => ({ ...f, total_installments: t }))} keyboardType="number-pad" />
         <Field label="Due day" value={payForm.due_day} onChangeText={(t) => setPayForm((f) => ({ ...f, due_day: t }))} keyboardType="number-pad" />
         <PrimaryButton title="Save" onPress={() => void savePayable()} loading={saving} />
+      </AppSheet>
+
+      <AppSheet
+        visible={projectOpen}
+        onClose={() => {
+          setProjectOpen(false)
+          setEditingProjectId(null)
+        }}
+        title="Edit one-time payment"
+        scroll
+      >
+        <ErrorBanner message={error} />
+        <Field
+          label="Name"
+          value={projForm.name}
+          onChangeText={(t) => setProjForm((f) => ({ ...f, name: t }))}
+          autoCapitalize="words"
+        />
+        <Field
+          label="Total amount"
+          value={projForm.amount}
+          onChangeText={(t) => setProjForm((f) => ({ ...f, amount: t }))}
+          keyboardType="decimal-pad"
+        />
+        <Field
+          label="Advance already received"
+          value={projForm.advance_amount}
+          onChangeText={(t) => setProjForm((f) => ({ ...f, advance_amount: t }))}
+          keyboardType="decimal-pad"
+          placeholder="0"
+        />
+        {accounts.length ? (
+          <SelectField
+            label="Default wallet"
+            value={projForm.default_account}
+            options={[
+              { value: '', label: 'None' },
+              ...accounts.map((a) => ({ value: String(a.id), label: a.name })),
+            ]}
+            onChange={(v) => setProjForm((f) => ({ ...f, default_account: v }))}
+            placeholder="Select wallet…"
+          />
+        ) : null}
+        <Field
+          label="Notes"
+          value={projForm.notes}
+          onChangeText={(t) => setProjForm((f) => ({ ...f, notes: t }))}
+        />
+        <PrimaryButton title="Save" onPress={() => void saveProject()} loading={saving} />
       </AppSheet>
 
       <AppSheet

@@ -263,6 +263,10 @@ export type HouseholdExpense = {
   paid_by_name: string
   created_by: number
   account_name?: string | null
+  original_amount?: number | string | null
+  original_currency?: string | null
+  fx_rate?: number | string | null
+  fx_source?: string | null
 }
 
 export type HouseholdInvite = {

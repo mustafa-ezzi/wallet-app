@@ -498,6 +498,7 @@ class HouseholdExpenseSerializer(serializers.ModelSerializer):
         model = HouseholdExpense
         fields = (
             'id', 'ledger', 'amount', 'date', 'category', 'notes', 'pot_amount', 'personal_amount',
+            'original_amount', 'original_currency', 'fx_rate', 'fx_source',
             'created_by', 'created_by_name', 'paid_by', 'paid_by_name',
             'linked_transaction', 'linked_account', 'account_name', 'created_at',
         )
@@ -506,6 +507,10 @@ class HouseholdExpenseSerializer(serializers.ModelSerializer):
             'ledger': {'required': False},
             'paid_by': {'required': False},
             'pot_amount': {'required': False},
+            'original_amount': {'required': False, 'allow_null': True},
+            'original_currency': {'required': False, 'allow_blank': True},
+            'fx_rate': {'required': False, 'allow_null': True},
+            'fx_source': {'required': False, 'allow_blank': True},
         }
 
     def get_paid_by_name(self, obj):
@@ -516,6 +521,38 @@ class HouseholdExpenseSerializer(serializers.ModelSerializer):
 
     def get_account_name(self, obj):
         return obj.linked_account.name if obj.linked_account_id else None
+
+    def validate(self, attrs):
+        orig = attrs.get(
+            'original_amount',
+            getattr(self.instance, 'original_amount', None) if self.instance else None,
+        )
+        rate = attrs.get(
+            'fx_rate',
+            getattr(self.instance, 'fx_rate', None) if self.instance else None,
+        )
+        currency = attrs.get(
+            'original_currency',
+            getattr(self.instance, 'original_currency', '') if self.instance else '',
+        )
+        currency = (currency or '').strip().upper()
+        if attrs.get('original_currency') is not None:
+            attrs['original_currency'] = currency
+
+        # Foreign amount + rate → derive book amount (same as personal Travel Mode)
+        if orig is not None and rate is not None:
+            from .fx import convert_to_pkr, validate_rate
+            try:
+                validate_rate(rate)
+            except ValueError as exc:
+                raise serializers.ValidationError({'fx_rate': str(exc)}) from exc
+            if not currency:
+                raise serializers.ValidationError({
+                    'original_currency': 'Required when using a foreign amount.',
+                })
+            attrs['amount'] = convert_to_pkr(orig, rate)
+            attrs['original_currency'] = currency
+        return attrs
 
 
 class HouseholdContributionSerializer(serializers.ModelSerializer):
@@ -1127,15 +1164,34 @@ class HouseholdLedgerViewSet(viewsets.ModelViewSet):
                     {'linked_account': 'You can only pay from your own wallet.'},
                     status=400,
                 )
-            linked_tx = Transaction.objects.create(
-                user=request.user,
-                type='expense',
-                amount=personal,
-                date=ser.validated_data['date'],
-                account=linked_account,
-                category=ser.validated_data.get('category') or '',
-                notes=ser.validated_data.get('notes') or f'Household: {ledger.name}',
-            )
+            tx_kwargs = {
+                'user': request.user,
+                'type': 'expense',
+                'amount': personal,
+                'date': ser.validated_data['date'],
+                'account': linked_account,
+                'category': ser.validated_data.get('category') or '',
+                'notes': ser.validated_data.get('notes') or f'Household: {ledger.name}',
+            }
+            # Copy Travel Mode snapshot onto the personal wallet leg (scaled share)
+            orig = ser.validated_data.get('original_amount')
+            rate = ser.validated_data.get('fx_rate')
+            cur = (ser.validated_data.get('original_currency') or '').strip().upper()
+            src = (ser.validated_data.get('fx_source') or '').strip()
+            if orig is not None and rate is not None and cur and amount > 0:
+                from decimal import Decimal, ROUND_HALF_UP
+                from .fx import convert_to_pkr
+                personal_foreign = (
+                    Decimal(str(orig)) * Decimal(str(personal)) / Decimal(str(amount))
+                ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                tx_kwargs.update({
+                    'original_amount': personal_foreign,
+                    'original_currency': cur,
+                    'fx_rate': rate,
+                    'fx_source': src,
+                    'amount': convert_to_pkr(personal_foreign, rate),
+                })
+            linked_tx = Transaction.objects.create(**tx_kwargs)
         elif linked_account and personal <= 0:
             linked_account = None
 

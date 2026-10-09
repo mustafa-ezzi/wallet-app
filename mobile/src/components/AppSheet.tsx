@@ -31,6 +31,8 @@ type Props = {
   scroll?: boolean
   /** Hide the X button (still dismiss via backdrop). */
   hideClose?: boolean
+  /** When false, tapping the dimmed area does not close (default true). */
+  dismissOnBackdrop?: boolean
   /** Extra style on the sheet card. */
   sheetStyle?: ViewStyle
   /** Extra style on the body wrapper (inside padding). */
@@ -42,6 +44,7 @@ type Props = {
 /**
  * Shared popup shell — bottom sheet by default with handle, header,
  * safe-area padding, and a soft elevated card.
+ * Tap outside (dimmed backdrop) dismisses unless dismissOnBackdrop={false}.
  */
 export function AppSheet({
   visible,
@@ -52,6 +55,7 @@ export function AppSheet({
   placement = 'bottom',
   scroll = false,
   hideClose = false,
+  dismissOnBackdrop = true,
   sheetStyle,
   contentStyle,
   maxHeightRatio = 0.92,
@@ -83,68 +87,74 @@ export function AppSheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <KeyboardAvoidingView
-        style={[styles.root, isBottom ? styles.rootBottom : styles.rootCenter]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-      >
+      {/* Backdrop sits behind KAV so Android taps on the dimmed area always dismiss. */}
+      <View style={styles.root}>
         <Pressable
           style={styles.backdrop}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Dismiss"
+          onPress={dismissOnBackdrop ? onClose : undefined}
+          accessible={dismissOnBackdrop}
+          accessibilityRole={dismissOnBackdrop ? 'button' : undefined}
+          accessibilityLabel={dismissOnBackdrop ? 'Dismiss' : undefined}
         />
-        <View
-          style={[
-            styles.sheet,
-            isBottom ? styles.sheetBottom : styles.sheetCenter,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              maxHeight: `${Math.round(maxHeightRatio * 100)}%` as DimensionValue,
-              paddingBottom: isBottom ? bottom : spacing.lg,
-            },
-            iosShadow,
-            sheetStyle,
-          ]}
+        <KeyboardAvoidingView
+          style={[styles.kav, isBottom ? styles.rootBottom : styles.rootCenter]}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          pointerEvents="box-none"
         >
-          {isBottom ? (
-            <View style={styles.handleRow}>
-              <View style={[styles.handle, { backgroundColor: handleColor }]} />
-            </View>
-          ) : null}
+          <View
+            style={[
+              styles.sheet,
+              isBottom ? styles.sheetBottom : styles.sheetCenter,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                maxHeight: `${Math.round(maxHeightRatio * 100)}%` as DimensionValue,
+                paddingBottom: isBottom ? bottom : spacing.lg,
+              },
+              iosShadow,
+              sheetStyle,
+            ]}
+          >
+            {isBottom ? (
+              <View style={styles.handleRow}>
+                <View style={[styles.handle, { backgroundColor: handleColor }]} />
+              </View>
+            ) : null}
 
-          <View style={styles.header}>
-            <View style={styles.headerText}>
-              <Text style={[styles.title, { color: colors.primaryDark }]} numberOfLines={2}>
-                {title}
-              </Text>
-              {subtitle ? (
-                <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={3}>
-                  {subtitle}
+            <View style={styles.header}>
+              <View style={styles.headerText}>
+                <Text style={[styles.title, { color: colors.primaryDark }]} numberOfLines={2}>
+                  {title}
                 </Text>
+                {subtitle ? (
+                  <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={3}>
+                    {subtitle}
+                  </Text>
+                ) : null}
+              </View>
+              {!hideClose ? (
+                <BouncyPressable
+                  onPress={onClose}
+                  style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+                  accessibilityLabel="Close"
+                >
+                  <FontAwesome name="times" size={14} color={colors.textSecondary} />
+                </BouncyPressable>
               ) : null}
             </View>
-            {!hideClose ? (
-              <BouncyPressable
-                onPress={onClose}
-                style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
-                accessibilityLabel="Close"
-              >
-                <FontAwesome name="times" size={14} color={colors.textSecondary} />
-              </BouncyPressable>
-            ) : null}
-          </View>
 
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          {body}
-        </View>
-      </KeyboardAvoidingView>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            {body}
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  kav: { flex: 1, zIndex: 1 },
   rootBottom: { justifyContent: 'flex-end' },
   rootCenter: {
     justifyContent: 'center',

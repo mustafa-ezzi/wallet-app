@@ -43,6 +43,9 @@ import { iosShadow, radii, spacing, typography, type ColorTokens } from '@/src/t
 import { todayISO, toMoney } from '@/src/utils/format'
 import { buildHouseholdInviteMessage } from '@/src/utils/shareInvite'
 import { useAuth } from '@/src/context/AuthContext'
+import { useTravelMode } from '@/src/travel/TravelModeContext'
+import { formatForeignSubtitle, formatRateLine } from '@/src/travel/currencies'
+import { getHomeCurrencyCode } from '@/src/currency/homeCurrency'
 
 type ViewMode = 'list' | 'detail' | 'ledger'
 type PeriodMode = 'month' | 'all'
@@ -59,6 +62,14 @@ export default function HouseholdScreen() {
   const money = useMaskedMoney()
   const { online } = useOffline()
   const { user } = useAuth()
+  const {
+    isActive: travelOn,
+    currency: travelCurrency,
+    rate: travelRate,
+    rateLine,
+    toPkr,
+  } = useTravelMode()
+  const bookCurrency = (selected?.currency || user?.currency || getHomeCurrencyCode() || 'PKR').toUpperCase()
 
   const [view, setView] = useState<ViewMode>('list')
   const [households, setHouseholds] = useState<Household[]>([])
@@ -418,8 +429,9 @@ export default function HouseholdScreen() {
   }
 
   const useMaxPot = () => {
-    const amt = toMoney(expForm.amount)
-    const max = Math.min(potBalance, amt > 0 ? amt : potBalance)
+    const entered = toMoney(expForm.amount)
+    const bookAmt = travelOn && travelRate > 0 ? toPkr(entered) : entered
+    const max = Math.min(potBalance, bookAmt > 0 ? bookAmt : potBalance)
     setExpForm((f) => ({ ...f, pot_amount: String(max || 0) }))
   }
 
@@ -446,11 +458,13 @@ export default function HouseholdScreen() {
 
   const addExpense = async () => {
     if (!requireOnline() || !activeLedger || busyRef.current) return
-    const amount = toMoney(expForm.amount)
-    if (amount <= 0) {
+    const entered = toMoney(expForm.amount)
+    if (entered <= 0) {
       setError('Enter a valid amount.')
       return
     }
+    const useTravel = travelOn && !!travelCurrency && travelRate > 0
+    const amount = useTravel ? toPkr(entered) : entered
     const potAmt = toMoney(expForm.pot_amount)
     if (potAmt > amount) {
       setError('Pot amount can’t be more than the expense total.')
@@ -470,6 +484,12 @@ export default function HouseholdScreen() {
         date: expForm.date || todayISO(),
         notes: expForm.notes.trim(),
         pot_amount: potAmt,
+      }
+      if (useTravel) {
+        payload.original_amount = entered
+        payload.original_currency = travelCurrency
+        payload.fx_rate = travelRate
+        payload.fx_source = 'manual'
       }
       if (expForm.linked_account && potAmt < amount) {
         payload.linked_account = Number(expForm.linked_account)
@@ -889,6 +909,11 @@ export default function HouseholdScreen() {
                               {ex.notes}
                             </Text>
                           ) : null}
+                          {formatForeignSubtitle(ex.original_amount, ex.original_currency, ex.fx_rate) ? (
+                            <Text style={styles.expenseNotes} numberOfLines={1}>
+                              {formatForeignSubtitle(ex.original_amount, ex.original_currency, ex.fx_rate)}
+                            </Text>
+                          ) : null}
                           {potAmt > 0 || personal > 0 ? (
                             <View style={styles.expenseTags}>
                               {potAmt > 0 ? (
@@ -1005,8 +1030,23 @@ export default function HouseholdScreen() {
         scroll
       >
         <ErrorBanner message={error} />
+        {travelOn ? (
+          <View style={[styles.travelBanner, { backgroundColor: colors.infoBg, borderColor: colors.border }]}>
+            <Text style={[styles.travelBannerTitle, { color: colors.infoText }]}>
+              Travel Mode · amounts in {travelCurrency}
+            </Text>
+            <Text style={[styles.travelBannerSub, { color: colors.textMuted }]}>
+              {rateLine || formatRateLine(travelCurrency, travelRate, bookCurrency)}
+            </Text>
+            {toMoney(expForm.amount) > 0 ? (
+              <Text style={[styles.travelBannerSub, { color: colors.textMuted }]}>
+                ≈ {money.fmt(toPkr(toMoney(expForm.amount)))} {bookCurrency} on the household book
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         <Field
-          label={`Amount (${selected?.currency || user?.currency || 'PKR'})`}
+          label={`Amount (${travelOn ? travelCurrency : bookCurrency})`}
           value={expForm.amount}
           onChangeText={(t) => setExpForm((f) => ({ ...f, amount: t }))}
           keyboardType="decimal-pad"
@@ -1017,7 +1057,7 @@ export default function HouseholdScreen() {
           onChange={(d) => setExpForm((f) => ({ ...f, date: d }))}
         />
         <Field
-          label={`Use from pot (available ${money.fmt(potBalance)})`}
+          label={`Use from pot in ${bookCurrency} (available ${money.fmt(potBalance)})`}
           value={expForm.pot_amount}
           onChangeText={(t) => setExpForm((f) => ({ ...f, pot_amount: t }))}
           keyboardType="decimal-pad"
@@ -1034,7 +1074,7 @@ export default function HouseholdScreen() {
             <Text style={styles.secondaryChipText}>Clear pot</Text>
           </Pressable>
         </View>
-        {toMoney(expForm.amount) > toMoney(expForm.pot_amount) ? (
+        {(travelOn && travelRate > 0 ? toPkr(toMoney(expForm.amount)) : toMoney(expForm.amount)) > toMoney(expForm.pot_amount) ? (
           <SelectField
             label="Link wallet (remainder)"
             value={expForm.linked_account}
@@ -1188,6 +1228,15 @@ function makeStyles(colors: ColorTokens) {
       borderRadius: radii.sm,
     },
     secondaryChipText: { color: colors.primaryDark, fontWeight: '800', fontSize: 13 },
+    travelBanner: {
+      borderWidth: 1,
+      borderRadius: radii.md,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      gap: 4,
+    },
+    travelBannerTitle: { fontWeight: '800', fontSize: 13 },
+    travelBannerSub: { fontSize: 12, fontWeight: '600', lineHeight: 16 },
     hhCard: {
       flexDirection: 'row',
       alignItems: 'center',

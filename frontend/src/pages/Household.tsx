@@ -9,6 +9,8 @@ import HouseholdReportPanel from '../components/HouseholdReportPanel'
 import HouseholdSettlementPanel from '../components/HouseholdSettlementPanel'
 import InviteQr from '../components/InviteQr'
 import { track } from '../lib/analytics'
+import { useTravelMode } from '../travel/TravelModeContext'
+import { formatForeignSubtitle, formatRateLine } from '../travel/currencies'
 
 interface Household {
   id: number
@@ -90,10 +92,21 @@ interface Expense {
   created_by: number
   account_name: string | null
   linked_transaction: number | null
+  original_amount?: number | null
+  original_currency?: string | null
+  fx_rate?: number | string | null
+  fx_source?: string | null
 }
 
 export default function HouseholdPage() {
   const { user } = useAuth()
+  const {
+    isActive: travelOn,
+    currency: travelCurrency,
+    rate: travelRate,
+    rateLine,
+    toPkr,
+  } = useTravelMode()
   const { confirm, dialog: confirmDialog } = useConfirm()
   const [searchParams, setSearchParams] = useSearchParams()
   const [households, setHouseholds] = useState<Household[]>([])
@@ -361,14 +374,22 @@ export default function HouseholdPage() {
     if (!activeLedger) return
     setSaving(true); setError('')
     try {
-      const amount = parseFloat(expForm.amount)
+      const entered = parseFloat(expForm.amount)
+      const useTravel = !editingExpense && travelOn && !!travelCurrency && travelRate > 0
+      const amount = useTravel ? toPkr(entered) : entered
       const potAmt = parseFloat(expForm.pot_amount || '0') || 0
-      const payload = {
+      const payload: Record<string, unknown> = {
         amount,
         category: expForm.category,
         date: expForm.date,
         notes: expForm.notes,
         pot_amount: potAmt,
+      }
+      if (useTravel) {
+        payload.original_amount = entered
+        payload.original_currency = travelCurrency
+        payload.fx_rate = travelRate
+        payload.fx_source = 'manual'
       }
       if (editingExpense) {
         await householdsApi.updateExpense(editingExpense.id, payload)
@@ -1237,6 +1258,11 @@ export default function HouseholdPage() {
                           )}
                         </div>
                         <div className="text-muted" style={{ fontSize: '0.78rem' }}>{e.date} · paid by {e.paid_by_name}</div>
+                        {formatForeignSubtitle(e.original_amount, e.original_currency, e.fx_rate) ? (
+                          <div className="text-muted" style={{ fontSize: '0.72rem' }}>
+                            {formatForeignSubtitle(e.original_amount, e.original_currency, e.fx_rate)}
+                          </div>
+                        ) : null}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexShrink: 0 }}>
                         <div className="amt-negative" style={{ fontWeight: 800 }}>{fmt(e.amount)}</div>
@@ -1550,9 +1576,26 @@ export default function HouseholdPage() {
                 : 'Pay from the pot, your wallet, or both. Pot-funded amounts reduce the pot balance.'}
             </p>
             <form onSubmit={addExpense} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              {!editingExpense && travelOn ? (
+                <div className="glass" style={{ padding: '0.75rem 0.9rem', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                    Travel Mode · amounts in {travelCurrency}
+                  </div>
+                  <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 2 }}>
+                    {rateLine || formatRateLine(travelCurrency, travelRate)}
+                  </div>
+                  {parseFloat(expForm.amount) > 0 ? (
+                    <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: 4 }}>
+                      ≈ {fmt(toPkr(parseFloat(expForm.amount) || 0))} on the household book
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="grid-2">
                 <div className="form-group">
-                  <label>Amount (PKR)</label>
+                  <label>
+                    Amount ({!editingExpense && travelOn ? travelCurrency : (selected?.currency || user?.currency || 'PKR')})
+                  </label>
                   <input type="number" min="0" step="any" value={expForm.amount} onChange={e => setExpForm(f => ({ ...f, amount: e.target.value }))} required />
                 </div>
                 <div className="form-group">
@@ -1563,7 +1606,7 @@ export default function HouseholdPage() {
               {(contribTotal > 0 || Number(editingExpense?.pot_amount) > 0 || Number(expForm.pot_amount) > 0) && (
                 <div className="form-group">
                   <label>
-                    Use from pot
+                    Use from pot ({selected?.currency || user?.currency || 'PKR'})
                     <span className="text-muted" style={{ fontWeight: 400, marginLeft: '0.35rem' }}>
                       (available {fmt(
                         potBalance + (editingExpense ? Number(editingExpense.pot_amount) || 0 : 0),
@@ -1585,8 +1628,9 @@ export default function HouseholdPage() {
                       style={{ fontSize: '0.72rem' }}
                       onClick={() => {
                         const avail = potBalance + (editingExpense ? Number(editingExpense.pot_amount) || 0 : 0)
-                        const amt = parseFloat(expForm.amount) || 0
-                        setExpForm(f => ({ ...f, pot_amount: String(Math.min(avail, amt) || 0) }))
+                        const entered = parseFloat(expForm.amount) || 0
+                        const bookAmt = !editingExpense && travelOn && travelRate > 0 ? toPkr(entered) : entered
+                        setExpForm(f => ({ ...f, pot_amount: String(Math.min(avail, bookAmt) || 0) }))
                       }}
                     >
                       Use max pot
@@ -1614,7 +1658,11 @@ export default function HouseholdPage() {
                   })()}
                 </div>
               )}
-              {!editingExpense && (parseFloat(expForm.amount) || 0) > (parseFloat(expForm.pot_amount || '0') || 0) && (
+              {!editingExpense && (() => {
+                const entered = parseFloat(expForm.amount) || 0
+                const bookAmt = travelOn && travelRate > 0 ? toPkr(entered) : entered
+                return bookAmt > (parseFloat(expForm.pot_amount || '0') || 0)
+              })() && (
                 <div className="form-group">
                   <label>Link to bank (personal portion)</label>
                   <select value={expForm.linked_account} onChange={e => setExpForm(f => ({ ...f, linked_account: e.target.value }))}>

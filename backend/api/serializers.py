@@ -330,6 +330,10 @@ class TransactionSerializer(serializers.ModelSerializer):
                 paid_by=tx.user,
                 linked_transaction=tx,
                 linked_account=tx.account,
+                original_amount=tx.original_amount,
+                original_currency=tx.original_currency or '',
+                fx_rate=tx.fx_rate,
+                fx_source=tx.fx_source or '',
             )
             from .household_api import notify_household_members, _display_name
             cat = he.category or 'Expense'

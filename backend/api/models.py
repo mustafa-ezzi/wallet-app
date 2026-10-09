@@ -614,6 +614,7 @@ class HouseholdLedger(models.Model):
 
 class HouseholdExpense(models.Model):
     ledger = models.ForeignKey(HouseholdLedger, on_delete=models.CASCADE, related_name='expenses')
+    # Book amount — always in Household.currency (settlement/reports use this)
     amount = models.DecimalField(max_digits=14, decimal_places=2)
     date = models.DateField()
     category = models.CharField(max_length=100, blank=True, default='')
@@ -622,6 +623,11 @@ class HouseholdExpense(models.Model):
     paid_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='household_expenses_paid')
     # Portion of this expense funded from the shared pot (reduces pot balance)
     pot_amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    # Travel Mode snapshot — amount stays book currency; optional foreign entry display
+    original_amount = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    original_currency = models.CharField(max_length=10, blank=True, default='')
+    fx_rate = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
+    fx_source = models.CharField(max_length=16, blank=True, default='', choices=Transaction.FX_SOURCES)
     linked_transaction = models.ForeignKey(
         'Transaction', null=True, blank=True, on_delete=models.SET_NULL, related_name='household_expenses')
     linked_account = models.ForeignKey(
