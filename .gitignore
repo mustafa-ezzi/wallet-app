@@ -32,6 +32,12 @@ Thumbs.db
 .env
 .env*.local
 
+# Scheduled analytics output (regenerated; may contain aggregate financial totals)
+/analytics.json
+/analytics.json.tmp
+/analytics.json.lock
+/analytics_agent/logs/
+
 # Local / generated
 mobile/eas-archive-check/
 mobile/ios/

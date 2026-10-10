@@ -1,0 +1,7 @@
+# WalletTrails analytics agent.
+# Installs the Django stack the agent uses for read-only queries, plus the
+# validator and the test runner.
+-r ../backend/requirements.txt
+jsonschema>=4.23,<5
+tzdata>=2024.1
+pytest>=8.3,<9

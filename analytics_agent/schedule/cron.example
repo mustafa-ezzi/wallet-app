@@ -1,0 +1,4 @@
+# WalletTrails analytics agent.
+# Run from the repository root. Keep this clock aligned with ANALYTICS_CRON
+# (default 02:15 Asia/Karachi). If the host is UTC, use 15 21 * * * instead.
+15 2 * * * cd /path/to/My-Wallet && /usr/bin/python -m analytics_agent

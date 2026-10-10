@@ -1,0 +1,1660 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wallettrails.local/schemas/analytics.json",
+  "title": "WalletTrails analytics report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "app",
+    "generated_at",
+    "schedule",
+    "period",
+    "metrics",
+    "trends",
+    "insights",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "app": {
+      "type": "string",
+      "const": "wallettrails"
+    },
+    "generated_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cron",
+        "timezone"
+      ],
+      "properties": {
+        "cron": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timezone",
+        "days",
+        "start",
+        "end",
+        "previous_start",
+        "previous_end",
+        "label"
+      ],
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "minLength": 1
+        },
+        "days": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 366
+        },
+        "start": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "end": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "previous_start": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "previous_end": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "records",
+        "users",
+        "activity",
+        "money",
+        "growth",
+        "breakdowns",
+        "support",
+        "households",
+        "budgets",
+        "features"
+      ],
+      "properties": {
+        "records": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "users",
+            "transactions",
+            "accounts",
+            "projects",
+            "recurring_expenses",
+            "receivables",
+            "payables",
+            "households",
+            "household_expenses",
+            "bank_sms_imports",
+            "category_budgets",
+            "support_threads",
+            "entitlements"
+          ],
+          "properties": {
+            "users": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "transactions": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "accounts": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "projects": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "recurring_expenses": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "receivables": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "payables": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "households": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "household_expenses": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "bank_sms_imports": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "category_budgets": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "support_threads": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "entitlements": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "total",
+                "new",
+                "previous_new"
+              ],
+              "properties": {
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "new": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "previous_new": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "users": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "active_1d",
+            "active_7d",
+            "active_30d",
+            "suspended",
+            "onboarding_complete",
+            "onboarding_incomplete",
+            "new_24h",
+            "new_7d",
+            "inactivity",
+            "premium_live",
+            "push_tokens",
+            "users_with_push"
+          ],
+          "properties": {
+            "active_1d": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "active_7d": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "active_30d": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "suspended": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "onboarding_complete": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "onboarding_incomplete": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "new_24h": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "new_7d": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "inactivity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "none",
+                "7d",
+                "30d",
+                "90d",
+                "other"
+              ],
+              "properties": {
+                "none": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "7d": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "30d": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "90d": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "premium_live": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "push_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "users_with_push": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "activity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "daily",
+            "weekly",
+            "monthly"
+          ],
+          "properties": {
+            "daily": {
+              "type": "array",
+              "maxItems": 366,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "date",
+                  "transactions",
+                  "signups",
+                  "income_pkr",
+                  "expense_pkr"
+                ],
+                "properties": {
+                  "date": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                  },
+                  "transactions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "signups": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "income_pkr": {
+                    "type": "number"
+                  },
+                  "expense_pkr": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            "weekly": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "week",
+                  "transactions",
+                  "signups",
+                  "income_pkr",
+                  "expense_pkr"
+                ],
+                "properties": {
+                  "week": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-W\\d{2}$"
+                  },
+                  "transactions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "signups": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "income_pkr": {
+                    "type": "number"
+                  },
+                  "expense_pkr": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            "monthly": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "month",
+                  "transactions",
+                  "signups",
+                  "income_pkr",
+                  "expense_pkr"
+                ],
+                "properties": {
+                  "month": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}$"
+                  },
+                  "transactions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "signups": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "income_pkr": {
+                    "type": "number"
+                  },
+                  "expense_pkr": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "money": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "currency",
+            "definition",
+            "current",
+            "previous",
+            "excluded_rows_in_period"
+          ],
+          "properties": {
+            "currency": {
+              "type": "string",
+              "const": "PKR"
+            },
+            "definition": {
+              "type": "string",
+              "const": "Platform sum of Transaction.amount in PKR. Excludes category 'Bank Transfer' and rows with a non-empty people_action, matching DashboardView income and expense. No per-user amounts are included."
+            },
+            "current": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "income_pkr",
+                "expense_pkr",
+                "net_pkr"
+              ],
+              "properties": {
+                "income_pkr": {
+                  "type": "number"
+                },
+                "expense_pkr": {
+                  "type": "number"
+                },
+                "net_pkr": {
+                  "type": "number"
+                }
+              }
+            },
+            "previous": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "income_pkr",
+                "expense_pkr",
+                "net_pkr"
+              ],
+              "properties": {
+                "income_pkr": {
+                  "type": "number"
+                },
+                "expense_pkr": {
+                  "type": "number"
+                },
+                "net_pkr": {
+                  "type": "number"
+                }
+              }
+            },
+            "excluded_rows_in_period": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bank_transfer",
+                "people_action"
+              ],
+              "properties": {
+                "bank_transfer": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "people_action": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "growth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "users_new",
+            "transactions_created",
+            "transaction_activity",
+            "signups",
+            "income_pkr",
+            "expense_pkr"
+          ],
+          "properties": {
+            "users_new": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "current",
+                "previous",
+                "absolute_change",
+                "percent_change"
+              ],
+              "properties": {
+                "current": {
+                  "type": "number"
+                },
+                "previous": {
+                  "type": "number"
+                },
+                "absolute_change": {
+                  "type": "number"
+                },
+                "percent_change": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "transactions_created": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "current",
+                "previous",
+                "absolute_change",
+                "percent_change"
+              ],
+              "properties": {
+                "current": {
+                  "type": "number"
+                },
+                "previous": {
+                  "type": "number"
+                },
+                "absolute_change": {
+                  "type": "number"
+                },
+                "percent_change": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "transaction_activity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "current",
+                "previous",
+                "absolute_change",
+                "percent_change"
+              ],
+              "properties": {
+                "current": {
+                  "type": "number"
+                },
+                "previous": {
+                  "type": "number"
+                },
+                "absolute_change": {
+                  "type": "number"
+                },
+                "percent_change": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "signups": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "current",
+                "previous",
+                "absolute_change",
+                "percent_change"
+              ],
+              "properties": {
+                "current": {
+                  "type": "number"
+                },
+                "previous": {
+                  "type": "number"
+                },
+                "absolute_change": {
+                  "type": "number"
+                },
+                "percent_change": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "income_pkr": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "current",
+                "previous",
+                "absolute_change",
+                "percent_change"
+              ],
+              "properties": {
+                "current": {
+                  "type": "number"
+                },
+                "previous": {
+                  "type": "number"
+                },
+                "absolute_change": {
+                  "type": "number"
+                },
+                "percent_change": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "expense_pkr": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "current",
+                "previous",
+                "absolute_change",
+                "percent_change"
+              ],
+              "properties": {
+                "current": {
+                  "type": "number"
+                },
+                "previous": {
+                  "type": "number"
+                },
+                "absolute_change": {
+                  "type": "number"
+                },
+                "percent_change": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "breakdowns": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "account_type",
+            "project_status",
+            "project_income_type",
+            "payable_status",
+            "receivable_status",
+            "recurring_expenses",
+            "household_membership_status",
+            "bank_sms_status",
+            "bank_sms_source",
+            "support_status",
+            "entitlement_product_live",
+            "device_platform",
+            "user_type",
+            "expense_categories",
+            "income_categories"
+          ],
+          "properties": {
+            "account_type": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "bank",
+                "cash",
+                "credit_card",
+                "person",
+                "other"
+              ],
+              "properties": {
+                "bank": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "cash": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "credit_card": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "person": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "project_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "active",
+                "completed",
+                "paused",
+                "stuck",
+                "other"
+              ],
+              "properties": {
+                "active": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "completed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "paused": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "stuck": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "project_income_type": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "recurring_monthly",
+                "contract_monthly",
+                "one_time",
+                "one_time_installments",
+                "other"
+              ],
+              "properties": {
+                "recurring_monthly": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "contract_monthly": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "one_time": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "one_time_installments": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "payable_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ongoing",
+                "completed",
+                "stuck",
+                "other"
+              ],
+              "properties": {
+                "ongoing": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "completed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "stuck": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "receivable_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ongoing",
+                "completed",
+                "stuck",
+                "other"
+              ],
+              "properties": {
+                "ongoing": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "completed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "stuck": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "recurring_expenses": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "active",
+                "inactive",
+                "other"
+              ],
+              "properties": {
+                "active": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "inactive": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "household_membership_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "invited",
+                "active",
+                "left",
+                "declined",
+                "other"
+              ],
+              "properties": {
+                "invited": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "active": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "left": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "declined": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "bank_sms_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pending",
+                "approved",
+                "rejected",
+                "expired",
+                "other"
+              ],
+              "properties": {
+                "pending": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "approved": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "rejected": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "expired": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "bank_sms_source": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "paste",
+                "android_sms",
+                "share",
+                "notification",
+                "other"
+              ],
+              "properties": {
+                "paste": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "android_sms": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "share": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "notification": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "support_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "open",
+                "waiting_user",
+                "waiting_ops",
+                "closed",
+                "other"
+              ],
+              "properties": {
+                "open": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "waiting_user": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "waiting_ops": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "closed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "entitlement_product_live": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "premium_monthly",
+                "premium_yearly",
+                "premium_lifetime",
+                "other"
+              ],
+              "properties": {
+                "premium_monthly": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "premium_yearly": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "premium_lifetime": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "device_platform": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "android",
+                "ios",
+                "web",
+                "unknown",
+                "other"
+              ],
+              "properties": {
+                "android": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "ios": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "web": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "unknown": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "user_type": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "student",
+                "professional",
+                "self_employed",
+                "retired",
+                "unset",
+                "other"
+              ],
+              "properties": {
+                "student": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "professional": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "self_employed": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "retired": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "unset": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            },
+            "expense_categories": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "category",
+                  "count",
+                  "amount_pkr"
+                ],
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "amount_pkr": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            "income_categories": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "category",
+                  "count",
+                  "amount_pkr"
+                ],
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 48
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "amount_pkr": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "open",
+            "waiting_ops",
+            "waiting_user"
+          ],
+          "properties": {
+            "open": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "waiting_ops": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "waiting_user": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "households": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "total",
+            "memberships_by_status"
+          ],
+          "properties": {
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "memberships_by_status": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "invited",
+                "active",
+                "left",
+                "declined",
+                "other"
+              ],
+              "properties": {
+                "invited": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "active": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "left": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "declined": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "other": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "budgets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "current_month",
+            "overall_caps_current_month"
+          ],
+          "properties": {
+            "current_month": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "overall_caps_current_month": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "features": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "travel_mode_enabled",
+            "bank_sms_settings_enabled"
+          ],
+          "properties": {
+            "travel_mode_enabled": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "bank_sms_settings_enabled": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "trends": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anomaly_rule",
+        "direction",
+        "anomalies"
+      ],
+      "properties": {
+        "anomaly_rule": {
+          "type": "string",
+          "const": "Leave-one-out z-score on each day in the current window. A day is flagged when the other days have non-zero standard deviation and |z| >= 2, or when those days have zero variance and this day differs. Windows shorter than 7 days are not scored."
+        },
+        "direction": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "users_new",
+            "transaction_activity",
+            "income_pkr",
+            "expense_pkr"
+          ],
+          "properties": {
+            "users_new": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down",
+                "flat"
+              ]
+            },
+            "transaction_activity": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down",
+                "flat"
+              ]
+            },
+            "income_pkr": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down",
+                "flat"
+              ]
+            },
+            "expense_pkr": {
+              "type": "string",
+              "enum": [
+                "up",
+                "down",
+                "flat"
+              ]
+            }
+          }
+        },
+        "anomalies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "date",
+              "metric",
+              "value",
+              "baseline_mean",
+              "z_score",
+              "direction"
+            ],
+            "properties": {
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "metric": {
+                "type": "string",
+                "enum": [
+                  "transactions",
+                  "expense_pkr"
+                ]
+              },
+              "value": {
+                "type": "number"
+              },
+              "baseline_mean": {
+                "type": "number"
+              },
+              "z_score": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "direction": {
+                "type": "string",
+                "enum": [
+                  "high",
+                  "low"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "insights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "summary",
+        "highlights"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "llm",
+            "rules"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "highlights": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "read_only",
+        "warnings"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "partial"
+          ]
+        },
+        "read_only": {
+          "type": "boolean",
+          "const": true
+        },
+        "warnings": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    }
+  }
+}
