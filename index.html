@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WalletTrails analytics</title>
+  <style>
+    :root { color-scheme: light; --ink: #14221c; --muted: #5c6b64; --line: #d7e3dc; --paper: #f6f8f6; --card: #fff; --green: #047857; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.5 "Segoe UI", sans-serif; color: var(--ink); background: var(--paper); }
+    main { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; }
+    h1 { font-size: 1.8rem; margin: 0 0 4px; }
+    h2 { font-size: 1.05rem; margin: 28px 0 10px; }
+    p { margin: 0; }
+    .meta, .note { color: var(--muted); }
+    .summary { margin-top: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .card, table { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+    .card { padding: 14px 16px; }
+    .card b { display: block; font-size: 1.35rem; }
+    table { width: 100%; border-collapse: collapse; overflow: hidden; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; }
+    a { color: var(--green); }
+    .error { color: #9f1239; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>WalletTrails analytics</h1>
+    <p class="meta" id="meta">Loading report…</p>
+    <p class="summary" id="summary"></p>
+    <h2>Snapshot</h2>
+    <div class="grid" id="cards"></div>
+    <h2>Records</h2>
+    <table>
+      <thead><tr><th>Record</th><th>Total</th><th>New in window</th><th>Previous window</th></tr></thead>
+      <tbody id="records"></tbody>
+    </table>
+    <p class="note" style="margin-top: 24px;">Raw data: <a href="./analytics.json">analytics.json</a></p>
+  </main>
+  <script>
+    const money = new Intl.NumberFormat("en-PK", { maximumFractionDigits: 0 });
+    const label = (key) => key.replaceAll("_", " ");
+
+    function card(title, value) {
+      const el = document.createElement("div");
+      el.className = "card";
+      el.innerHTML = "<span></span><b></b>";
+      el.querySelector("span").textContent = title;
+      el.querySelector("b").textContent = value;
+      return el;
+    }
+
+    fetch("./analytics.json")
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not load analytics.json");
+        return response.json();
+      })
+      .then((report) => {
+        const period = report.period;
+        const users = report.metrics.records.users;
+        const moneyNow = report.metrics.money.current;
+        document.getElementById("meta").textContent =
+          "Generated " + report.generated_at + " · " + period.start + " to " + period.end + " (" + period.timezone + ")";
+        document.getElementById("summary").textContent = report.insights.summary;
+        const cards = document.getElementById("cards");
+        [
+          ["Users", users.total],
+          ["Active in 7 days", report.metrics.users.active_7d],
+          ["Transactions", report.metrics.records.transactions.total],
+          ["Income PKR", money.format(moneyNow.income_pkr)],
+          ["Expense PKR", money.format(moneyNow.expense_pkr)],
+          ["Net PKR", money.format(moneyNow.net_pkr)],
+        ].forEach(([title, value]) => cards.append(card(title, value)));
+        const body = document.getElementById("records");
+        Object.entries(report.metrics.records).forEach(([name, row]) => {
+          const tr = document.createElement("tr");
+          [label(name), row.total, row.new, row.previous_new].forEach((value) => {
+            const td = document.createElement("td");
+            td.textContent = value;
+            tr.append(td);
+          });
+          body.append(tr);
+        });
+      })
+      .catch((error) => {
+        document.getElementById("meta").textContent = error.message;
+        document.getElementById("meta").className = "error";
+      });
+  </script>
+</body>
+</html>
