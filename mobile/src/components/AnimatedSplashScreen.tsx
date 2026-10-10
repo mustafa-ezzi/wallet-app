@@ -29,7 +29,7 @@ const logoSource = require('../../assets/images/wallettrail-logo.png')
 const studioLogoSource = require('../../assets/images/splash-powerpulse-labs.png')
 
 /**
- * Professional black splash — clean mark, wordmark, quiet footer.
+ * Professional black splash — clean mark, wordmark, PowerPulse Labs footer.
  */
 export function AnimatedSplashScreen() {
   const { loading } = useAuth()

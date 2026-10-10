@@ -14,6 +14,7 @@ import {
   Receipt,
   Smartphone,
   Tags,
+  Shield,
   Trash2,
   Users,
   UserRound,
@@ -26,6 +27,7 @@ import { useAuth } from '../context/AuthContext'
 import { useCategories } from '../context/CategoriesContext'
 import { useConfirm } from '../hooks/useConfirm'
 import { useTheme } from '../theme/ThemeProvider'
+import { PRIVACY_POLICY_URL } from '../constants/legal'
 
 type ExpandId = 'profile' | 'password' | 'appearance' | 'categories' | 'accounts' | null
 
@@ -581,6 +583,14 @@ export default function Settings() {
             </div>
           ) : null}
           <Row icon={<CloudDownload {...icon} />} title="Restore Purchase" value={user?.is_premium ? 'Premium' : undefined} />
+        </div>
+
+        <div className="settings-group">
+          <Row
+            icon={<Shield {...icon} />}
+            title="Privacy policy"
+            onClick={() => window.open(PRIVACY_POLICY_URL, '_blank', 'noopener,noreferrer')}
+          />
         </div>
 
         <div className="settings-group">

@@ -2,7 +2,8 @@
 
 > **Use this as the release form for the first public Android launch.** Mark a box only after the evidence is available. Items marked **BLOCKER** must be complete before requesting production access or starting a production rollout.
 >
-> Last reviewed: **12 September 2026** · Package name: `com.wallettrails.app` · Platform: Android / Expo
+> Last reviewed: **10 October 2026** · Package name: `com.wallettrails.app` · Platform: Android / Expo  
+> **Status snapshot:** see [`GOOGLE_PLAY_LAUNCH_STATUS.md`](./GOOGLE_PLAY_LAUNCH_STATUS.md).
 
 ---
 
@@ -112,15 +113,15 @@ Run this on the exact Internal/Closed build that will be promoted.
 
 ### Privacy policy
 
-- [ ] **BLOCKER** A public, stable **HTTPS** privacy-policy URL is live: `____________________________`.
-- [ ] **BLOCKER** The policy is linked inside WalletTrails and supplied in Play Console.
+- [x] **BLOCKER** A public, stable **HTTPS** privacy-policy URL is live: `https://wallettrails-landing.up.railway.app/privacy.html`.
+- [x] **BLOCKER** The policy is linked inside WalletTrails (Settings → Privacy policy). Still required: same URL in Play Console.
 - [ ] The policy accurately covers account information, financial records, wallets, transactions, bills, reports, Household information, and support messages.
 - [ ] The policy explains offline storage and synchronization.
 - [ ] The policy explains biometric / device-credential amount unlock without claiming WalletTrails stores biometrics.
 - [ ] The policy explains notifications, push tokens, and reminder behavior.
 - [ ] The policy explains analytics and diagnostics, including PostHog if enabled.
 - [ ] The policy explains bank SMS / notification import if shipped.
-- [ ] The policy states how a user can request account and data deletion.
+- [x] The policy states how a user can request account and data deletion (Settings → Delete my account; see also `/delete-account.html` on landing).
 - [ ] The support/deletion channel is monitored and a deletion-request process has an owner.
 
 ### Data Safety form
@@ -163,7 +164,7 @@ Choose this only if bank-SMS parsing is a critical, implemented feature and the 
 - [ ] The app uses SMS data only for the approved **SMS-based money management** purpose.
 - [ ] The app restricts processing to financial / transactional SMS needed for money tracking.
 - [ ] The app does not collect, upload, sell, share, profile, or use unrelated personal SMS data for advertising or analytics.
-- [ ] An in-app prominent disclosure appears immediately before the permission request and clearly explains what is read, why, and how the user benefits.
+- [x] An in-app prominent disclosure appears immediately before the permission request and clearly explains what is read, why, and how the user benefits (onboarding + Notification access sheet before system settings).
 - [ ] Explicit user consent is collected before SMS access.
 - [ ] A no-SMS path remains usable; permission denial is handled without a crash or misleading screen.
 - [ ] The Permissions Declaration Form is completed accurately in Play Console.
@@ -184,7 +185,7 @@ Choose this if the feature is optional or the declaration cannot be fully substa
 
 ### Notification listener and other permissions
 
-- [x] Notification access is optional and restricted in code to the Bank alerts feature / bank-app allowlist. A live-device permission-flow test is still required.
+- [x] Notification access is optional and restricted in code to the Bank alerts feature / bank-app allowlist. Prominent in-app disclosure before opening Notification access settings. A live-device permission-flow test is still required.
 - [x] Android SMS permission is requested only after the user taps the Bank alerts opt-in action.
 - [ ] Every requested Android permission has a written purpose: `____________________________`.
 - [ ] Permission-denial, revoke, and “Don’t ask again” flows were tested.

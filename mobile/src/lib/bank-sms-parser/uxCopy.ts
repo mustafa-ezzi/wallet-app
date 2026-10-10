@@ -8,6 +8,12 @@ export const BANK_SMS_UX = {
   permissionAllow: 'Allow',
   permissionNotNow: 'Not now',
 
+  notifAccessDisclosureTitle: 'Allow Notification access?',
+  notifAccessDisclosureBody:
+    'WalletTrails reads transaction notifications only from selected bank and wallet apps (for example NayaPay, SadaPay, Meezan) '
+    + 'to draft bookkeeping entries. We do not read unrelated notifications, sell this data, or post transactions without your approval. '
+    + 'Android will open Notification access settings next so you can allow WalletTrails.',
+
   pasteTitle: 'Paste bank SMS',
   pasteHint:
     'Paste a bank transaction message. WalletTrails will suggest the type and wallet — you approve before anything is posted.',

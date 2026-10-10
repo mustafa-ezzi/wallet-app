@@ -28,6 +28,7 @@ import {
   processQueuedWalletNotifications,
   subscribeWalletNotifications,
 } from './nativeNotification'
+import { confirmNotificationAccessDisclosure } from './notifDisclosureGate'
 import {
   getBankNotifEnabled,
   getBankSmsAutoApprove,
@@ -60,7 +61,7 @@ type BankSmsContextValue = {
   markPromptSeen: () => Promise<void>
   requestPermissionAndEnable: () => Promise<boolean>
   openSettings: () => Promise<void>
-  openNotifSettings: () => void
+  openNotifSettings: () => Promise<void>
   refreshPending: () => Promise<void>
   ingestBody: (body: string) => Promise<void>
 }
@@ -222,7 +223,10 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       setNotifEnabledState(true)
       const notifGranted = getNotificationListenerGranted()
       setNotifPermissionGranted(notifGranted)
-      if (!notifGranted) openNotificationListenerSettings()
+      if (!notifGranted) {
+        const ok = await confirmNotificationAccessDisclosure()
+        if (ok) openNotificationListenerSettings()
+      }
       return
     }
     await setBankSmsEnabled(false)
@@ -239,7 +243,8 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
         // Persist intent; user must grant Notification Access in system settings.
         await setBankNotifEnabled(true)
         setNotifEnabledState(true)
-        openNotificationListenerSettings()
+        const ok = await confirmNotificationAccessDisclosure()
+        if (ok) openNotificationListenerSettings()
         return
       }
       await setBankNotifEnabled(true)
@@ -248,6 +253,11 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     }
     await setBankNotifEnabled(false)
     setNotifEnabledState(false)
+  }, [])
+
+  const openNotifSettings = useCallback(async () => {
+    const ok = await confirmNotificationAccessDisclosure()
+    if (ok) openNotificationListenerSettings()
   }, [])
 
   const setAutoApprove = useCallback(async (on: boolean) => {
@@ -275,7 +285,10 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     setNotifEnabledState(true)
     const notifGranted = getNotificationListenerGranted()
     setNotifPermissionGranted(notifGranted)
-    if (!notifGranted) openNotificationListenerSettings()
+    if (!notifGranted) {
+      const ok = await confirmNotificationAccessDisclosure()
+      if (ok) openNotificationListenerSettings()
+    }
     return true
   }, [markPromptSeen])
 
@@ -309,7 +322,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       markPromptSeen,
       requestPermissionAndEnable,
       openSettings: openAppPermissionSettings,
-      openNotifSettings: openNotificationListenerSettings,
+      openNotifSettings,
       refreshPending,
       ingestBody,
     }),
@@ -330,6 +343,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       setAutoApprove,
       markPromptSeen,
       requestPermissionAndEnable,
+      openNotifSettings,
       refreshPending,
       ingestBody,
     ],

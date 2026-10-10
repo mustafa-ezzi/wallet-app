@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Platform,
   Pressable,
@@ -27,6 +27,7 @@ import {
   type WalletLike,
 } from '@/src/lib/bank-sms-parser'
 import { DateField, SelectField } from '@/src/components/SelectFields'
+import { AppSheet } from '@/src/components/AppSheet'
 import { ErrorBanner, PrimaryButton } from '@/src/components/ui'
 import {
   accountsApi,
@@ -44,6 +45,7 @@ import type { Payable, Project, Receivable, RecurringExpense } from '@/src/api/t
 import { useCategories } from '@/src/context/CategoriesContext'
 import { useOffline } from '@/src/offline'
 import { useBankSms } from '@/src/bankSms'
+import { registerNotifAccessDisclosureGate } from '@/src/bankSms/notifDisclosureGate'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { useColors } from '@/src/theme/ThemeContext'
 import { iosShadow, radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
@@ -131,6 +133,26 @@ export default function BankSmsScreen() {
   const [error, setError] = useState('')
   const [okMsg, setOkMsg] = useState('')
   const [busy, setBusy] = useState(false)
+  const [notifDisclosureOpen, setNotifDisclosureOpen] = useState(false)
+  const notifDisclosureResolve = useRef<((ok: boolean) => void) | null>(null)
+
+  useEffect(() => {
+    registerNotifAccessDisclosureGate(
+      () =>
+        new Promise<boolean>((resolve) => {
+          notifDisclosureResolve.current = resolve
+          setNotifDisclosureOpen(true)
+        }),
+    )
+    return () => registerNotifAccessDisclosureGate(null)
+  }, [])
+
+  const closeNotifDisclosure = (ok: boolean) => {
+    setNotifDisclosureOpen(false)
+    const resolve = notifDisclosureResolve.current
+    notifDisclosureResolve.current = null
+    resolve?.(ok)
+  }
 
   const loadWallets = useCallback(async () => {
     try {
@@ -679,7 +701,7 @@ export default function BankSmsScreen() {
                       : 'Turn on Notification access for NayaPay / SadaPay / bank apps'}
                   </Text>
                   {!bankSms.notifPermissionGranted ? (
-                    <Pressable onPress={() => bankSms.openNotifSettings()} style={{ marginTop: 6 }}>
+                    <Pressable onPress={() => void bankSms.openNotifSettings()} style={{ marginTop: 6 }}>
                       <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>
                         Open Notification access
                       </Text>
@@ -1142,6 +1164,21 @@ export default function BankSmsScreen() {
           ) : null}
         </View>
       </ScrollView>
+
+      <AppSheet
+        visible={notifDisclosureOpen}
+        onClose={() => closeNotifDisclosure(false)}
+        title={BANK_SMS_UX.notifAccessDisclosureTitle}
+        placement="center"
+      >
+        <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 22, marginBottom: spacing.md }}>
+          {BANK_SMS_UX.notifAccessDisclosureBody}
+        </Text>
+        <PrimaryButton title="Continue to settings" onPress={() => closeNotifDisclosure(true)} />
+        <Pressable onPress={() => closeNotifDisclosure(false)} style={{ marginTop: 12, paddingVertical: 8 }}>
+          <Text style={{ textAlign: 'center', color: colors.textMuted, fontWeight: '700' }}>Not now</Text>
+        </Pressable>
+      </AppSheet>
     </View>
   )
 }

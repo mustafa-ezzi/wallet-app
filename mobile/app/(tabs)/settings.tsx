@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   Alert,
   DeviceEventEmitter,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -33,6 +34,7 @@ import { useTheme } from '@/src/theme/ThemeContext'
 import { useRemoteConfig } from '@/src/config/RemoteConfigContext'
 import { radii, spacing, typography } from '@/src/theme/colors'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
+import { PRIVACY_POLICY_URL } from '@/src/constants/legal'
 
 const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
   { id: 'immediate', label: 'Immediate' },
@@ -426,6 +428,11 @@ export default function SettingsScreen() {
             </SettingsGroup>
 
             <SettingsGroup>
+              <SettingsRow
+                icon="file-text-o"
+                title="Privacy policy"
+                onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}
+              />
               <SettingsRow
                 icon="question-circle"
                 title="Help Center"
