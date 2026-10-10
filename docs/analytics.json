@@ -1,0 +1,689 @@
+{
+  "schema_version": 1,
+  "app": "wallettrails",
+  "generated_at": "2026-10-10T15:10:30+05:00",
+  "schedule": {
+    "cron": "15 2 * * *",
+    "timezone": "Asia/Karachi"
+  },
+  "period": {
+    "timezone": "Asia/Karachi",
+    "days": 30,
+    "start": "2026-09-11",
+    "end": "2026-10-10",
+    "previous_start": "2026-08-12",
+    "previous_end": "2026-09-10",
+    "label": "trailing_30_days"
+  },
+  "metrics": {
+    "records": {
+      "users": {
+        "total": 24,
+        "new": 1,
+        "previous_new": 3
+      },
+      "transactions": {
+        "total": 606,
+        "new": 179,
+        "previous_new": 217
+      },
+      "accounts": {
+        "total": 46,
+        "new": 4,
+        "previous_new": 9
+      },
+      "projects": {
+        "total": 48,
+        "new": 11,
+        "previous_new": 5
+      },
+      "recurring_expenses": {
+        "total": 24,
+        "new": 3,
+        "previous_new": 1
+      },
+      "receivables": {
+        "total": 8,
+        "new": 4,
+        "previous_new": 1
+      },
+      "payables": {
+        "total": 4,
+        "new": 1,
+        "previous_new": 1
+      },
+      "households": {
+        "total": 13,
+        "new": 1,
+        "previous_new": 4
+      },
+      "household_expenses": {
+        "total": 236,
+        "new": 82,
+        "previous_new": 84
+      },
+      "bank_sms_imports": {
+        "total": 294,
+        "new": 132,
+        "previous_new": 162
+      },
+      "category_budgets": {
+        "total": 6,
+        "new": 2,
+        "previous_new": 4
+      },
+      "support_threads": {
+        "total": 6,
+        "new": 0,
+        "previous_new": 4
+      },
+      "entitlements": {
+        "total": 9,
+        "new": 0,
+        "previous_new": 2
+      }
+    },
+    "users": {
+      "active_1d": 5,
+      "active_7d": 7,
+      "active_30d": 8,
+      "suspended": 0,
+      "onboarding_complete": 24,
+      "onboarding_incomplete": 0,
+      "new_24h": 0,
+      "new_7d": 0,
+      "inactivity": {
+        "none": 12,
+        "7d": 12,
+        "30d": 0,
+        "90d": 0,
+        "other": 0
+      },
+      "premium_live": 0,
+      "push_tokens": 5,
+      "users_with_push": 5
+    },
+    "activity": {
+      "daily": [
+        {
+          "date": "2026-09-11",
+          "transactions": 9,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 17260.0
+        },
+        {
+          "date": "2026-09-12",
+          "transactions": 3,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 5610.0
+        },
+        {
+          "date": "2026-09-13",
+          "transactions": 7,
+          "signups": 0,
+          "income_pkr": 7000.0,
+          "expense_pkr": 3100.0
+        },
+        {
+          "date": "2026-09-14",
+          "transactions": 10,
+          "signups": 0,
+          "income_pkr": 3000.0,
+          "expense_pkr": 5860.0
+        },
+        {
+          "date": "2026-09-15",
+          "transactions": 24,
+          "signups": 1,
+          "income_pkr": 29072.0,
+          "expense_pkr": 28970.0
+        },
+        {
+          "date": "2026-09-16",
+          "transactions": 1,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 180.0
+        },
+        {
+          "date": "2026-09-17",
+          "transactions": 0,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 0.0
+        },
+        {
+          "date": "2026-09-18",
+          "transactions": 0,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 0.0
+        },
+        {
+          "date": "2026-09-19",
+          "transactions": 0,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 0.0
+        },
+        {
+          "date": "2026-09-20",
+          "transactions": 8,
+          "signups": 0,
+          "income_pkr": 6272.0,
+          "expense_pkr": 370.0
+        },
+        {
+          "date": "2026-09-21",
+          "transactions": 7,
+          "signups": 0,
+          "income_pkr": 12500.0,
+          "expense_pkr": 18410.0
+        },
+        {
+          "date": "2026-09-22",
+          "transactions": 9,
+          "signups": 0,
+          "income_pkr": 42000.0,
+          "expense_pkr": 39.0
+        },
+        {
+          "date": "2026-09-23",
+          "transactions": 0,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 0.0
+        },
+        {
+          "date": "2026-09-24",
+          "transactions": 2,
+          "signups": 0,
+          "income_pkr": 9000.0,
+          "expense_pkr": 0.0
+        },
+        {
+          "date": "2026-09-25",
+          "transactions": 5,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 277.39
+        },
+        {
+          "date": "2026-09-26",
+          "transactions": 8,
+          "signups": 0,
+          "income_pkr": 46000.0,
+          "expense_pkr": 17500.0
+        },
+        {
+          "date": "2026-09-27",
+          "transactions": 0,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 0.0
+        },
+        {
+          "date": "2026-09-28",
+          "transactions": 6,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 206080.0
+        },
+        {
+          "date": "2026-09-29",
+          "transactions": 2,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 618.0
+        },
+        {
+          "date": "2026-09-30",
+          "transactions": 10,
+          "signups": 0,
+          "income_pkr": 313709.0,
+          "expense_pkr": 26344.0
+        },
+        {
+          "date": "2026-10-01",
+          "transactions": 4,
+          "signups": 0,
+          "income_pkr": 370.0,
+          "expense_pkr": 2300.0
+        },
+        {
+          "date": "2026-10-02",
+          "transactions": 5,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 5500.0
+        },
+        {
+          "date": "2026-10-03",
+          "transactions": 2,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 405.0
+        },
+        {
+          "date": "2026-10-04",
+          "transactions": 2,
+          "signups": 0,
+          "income_pkr": 5000.0,
+          "expense_pkr": 0.0
+        },
+        {
+          "date": "2026-10-05",
+          "transactions": 7,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 590.0
+        },
+        {
+          "date": "2026-10-06",
+          "transactions": 15,
+          "signups": 0,
+          "income_pkr": 50.0,
+          "expense_pkr": 3200.0
+        },
+        {
+          "date": "2026-10-07",
+          "transactions": 7,
+          "signups": 0,
+          "income_pkr": 5000.0,
+          "expense_pkr": 420.0
+        },
+        {
+          "date": "2026-10-08",
+          "transactions": 11,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 3529.0
+        },
+        {
+          "date": "2026-10-09",
+          "transactions": 7,
+          "signups": 0,
+          "income_pkr": 30555.0,
+          "expense_pkr": 36906.5
+        },
+        {
+          "date": "2026-10-10",
+          "transactions": 0,
+          "signups": 0,
+          "income_pkr": 0.0,
+          "expense_pkr": 0.0
+        }
+      ],
+      "weekly": [
+        {
+          "week": "2026-W37",
+          "transactions": 19,
+          "signups": 0,
+          "income_pkr": 7000.0,
+          "expense_pkr": 25970.0
+        },
+        {
+          "week": "2026-W38",
+          "transactions": 43,
+          "signups": 1,
+          "income_pkr": 38344.0,
+          "expense_pkr": 35380.0
+        },
+        {
+          "week": "2026-W39",
+          "transactions": 31,
+          "signups": 0,
+          "income_pkr": 109500.0,
+          "expense_pkr": 36226.39
+        },
+        {
+          "week": "2026-W40",
+          "transactions": 31,
+          "signups": 0,
+          "income_pkr": 319079.0,
+          "expense_pkr": 241247.0
+        },
+        {
+          "week": "2026-W41",
+          "transactions": 47,
+          "signups": 0,
+          "income_pkr": 35605.0,
+          "expense_pkr": 44645.5
+        }
+      ],
+      "monthly": [
+        {
+          "month": "2026-09",
+          "transactions": 111,
+          "signups": 1,
+          "income_pkr": 468553.0,
+          "expense_pkr": 330618.39
+        },
+        {
+          "month": "2026-10",
+          "transactions": 60,
+          "signups": 0,
+          "income_pkr": 40975.0,
+          "expense_pkr": 52850.5
+        }
+      ]
+    },
+    "money": {
+      "currency": "PKR",
+      "definition": "Platform sum of Transaction.amount in PKR. Excludes category 'Bank Transfer' and rows with a non-empty people_action, matching DashboardView income and expense. No per-user amounts are included.",
+      "current": {
+        "income_pkr": 509528.0,
+        "expense_pkr": 383468.89,
+        "net_pkr": 126059.11
+      },
+      "previous": {
+        "income_pkr": 1562844.4,
+        "expense_pkr": 529054.7,
+        "net_pkr": 1033789.7
+      },
+      "excluded_rows_in_period": {
+        "bank_transfer": 38,
+        "people_action": 4
+      }
+    },
+    "growth": {
+      "users_new": {
+        "current": 1,
+        "previous": 3,
+        "absolute_change": -2,
+        "percent_change": -66.67
+      },
+      "transactions_created": {
+        "current": 179,
+        "previous": 217,
+        "absolute_change": -38,
+        "percent_change": -17.51
+      },
+      "transaction_activity": {
+        "current": 171,
+        "previous": 220,
+        "absolute_change": -49,
+        "percent_change": -22.27
+      },
+      "signups": {
+        "current": 1,
+        "previous": 3,
+        "absolute_change": -2,
+        "percent_change": -66.67
+      },
+      "income_pkr": {
+        "current": 509528.0,
+        "previous": 1562844.4,
+        "absolute_change": -1053316.4,
+        "percent_change": -67.4
+      },
+      "expense_pkr": {
+        "current": 383468.89,
+        "previous": 529054.7,
+        "absolute_change": -145585.81,
+        "percent_change": -27.52
+      }
+    },
+    "breakdowns": {
+      "account_type": {
+        "bank": 28,
+        "cash": 12,
+        "credit_card": 0,
+        "person": 6,
+        "other": 0
+      },
+      "project_status": {
+        "active": 40,
+        "completed": 1,
+        "paused": 2,
+        "stuck": 5,
+        "other": 0
+      },
+      "project_income_type": {
+        "recurring_monthly": 16,
+        "contract_monthly": 8,
+        "one_time": 9,
+        "one_time_installments": 15,
+        "other": 0
+      },
+      "payable_status": {
+        "ongoing": 3,
+        "completed": 1,
+        "stuck": 0,
+        "other": 0
+      },
+      "receivable_status": {
+        "ongoing": 8,
+        "completed": 0,
+        "stuck": 0,
+        "other": 0
+      },
+      "recurring_expenses": {
+        "active": 24,
+        "inactive": 0,
+        "other": 0
+      },
+      "household_membership_status": {
+        "invited": 0,
+        "active": 17,
+        "left": 0,
+        "declined": 0,
+        "other": 0
+      },
+      "bank_sms_status": {
+        "pending": 75,
+        "approved": 117,
+        "rejected": 102,
+        "expired": 0,
+        "other": 0
+      },
+      "bank_sms_source": {
+        "paste": 16,
+        "android_sms": 157,
+        "share": 0,
+        "notification": 121,
+        "other": 0
+      },
+      "support_status": {
+        "open": 0,
+        "waiting_user": 0,
+        "waiting_ops": 6,
+        "closed": 0,
+        "other": 0
+      },
+      "entitlement_product_live": {
+        "premium_monthly": 0,
+        "premium_yearly": 0,
+        "premium_lifetime": 0,
+        "other": 0
+      },
+      "device_platform": {
+        "android": 5,
+        "ios": 0,
+        "web": 0,
+        "unknown": 0,
+        "other": 0
+      },
+      "user_type": {
+        "student": 1,
+        "professional": 3,
+        "self_employed": 0,
+        "retired": 0,
+        "unset": 20,
+        "other": 0
+      },
+      "expense_categories": [
+        {
+          "category": "Miscellaneous",
+          "count": 40,
+          "amount_pkr": 266469.0
+        },
+        {
+          "category": "Loan Repayment",
+          "count": 3,
+          "amount_pkr": 25000.0
+        },
+        {
+          "category": "Transport",
+          "count": 1,
+          "amount_pkr": 19106.5
+        },
+        {
+          "category": "Personal",
+          "count": 8,
+          "amount_pkr": 16090.0
+        },
+        {
+          "category": "Fiancé",
+          "count": 6,
+          "amount_pkr": 13750.0
+        },
+        {
+          "category": "Bills & Utilities",
+          "count": 5,
+          "amount_pkr": 13421.0
+        },
+        {
+          "category": "Aliakbar Khalu",
+          "count": 1,
+          "amount_pkr": 11000.0
+        },
+        {
+          "category": "Food & Drink",
+          "count": 17,
+          "amount_pkr": 10560.0
+        },
+        {
+          "category": "Railway charges",
+          "count": 1,
+          "amount_pkr": 5025.0
+        },
+        {
+          "category": "Grocery",
+          "count": 6,
+          "amount_pkr": 1897.39
+        }
+      ],
+      "income_categories": [
+        {
+          "category": "Other",
+          "count": 13,
+          "amount_pkr": 333528.0
+        },
+        {
+          "category": "Installment Receipt",
+          "count": 11,
+          "amount_pkr": 71000.0
+        },
+        {
+          "category": "One-time Income",
+          "count": 3,
+          "amount_pkr": 43000.0
+        },
+        {
+          "category": "AliAkber",
+          "count": 1,
+          "amount_pkr": 30000.0
+        },
+        {
+          "category": "Client C",
+          "count": 1,
+          "amount_pkr": 10000.0
+        },
+        {
+          "category": "Monthly Income",
+          "count": 3,
+          "amount_pkr": 7000.0
+        },
+        {
+          "category": "Sams traders ERP (mustafa bhai)",
+          "count": 1,
+          "amount_pkr": 7000.0
+        },
+        {
+          "category": "Crochet Website Maintenance",
+          "count": 1,
+          "amount_pkr": 3000.0
+        },
+        {
+          "category": "Sooicy",
+          "count": 1,
+          "amount_pkr": 3000.0
+        },
+        {
+          "category": "Waqt",
+          "count": 1,
+          "amount_pkr": 2000.0
+        }
+      ]
+    },
+    "support": {
+      "open": 6,
+      "waiting_ops": 6,
+      "waiting_user": 0
+    },
+    "households": {
+      "total": 13,
+      "memberships_by_status": {
+        "invited": 0,
+        "active": 17,
+        "left": 0,
+        "declined": 0,
+        "other": 0
+      }
+    },
+    "budgets": {
+      "current_month": 2,
+      "overall_caps_current_month": 0
+    },
+    "features": {
+      "travel_mode_enabled": 1,
+      "bank_sms_settings_enabled": 5
+    }
+  },
+  "trends": {
+    "anomaly_rule": "Leave-one-out z-score on each day in the current window. A day is flagged when the other days have non-zero standard deviation and |z| >= 2, or when those days have zero variance and this day differs. Windows shorter than 7 days are not scored.",
+    "direction": {
+      "users_new": "down",
+      "transaction_activity": "down",
+      "income_pkr": "down",
+      "expense_pkr": "down"
+    },
+    "anomalies": [
+      {
+        "date": "2026-09-15",
+        "metric": "transactions",
+        "value": 24,
+        "baseline_mean": 5.07,
+        "z_score": 4.65,
+        "direction": "high"
+      },
+      {
+        "date": "2026-09-28",
+        "metric": "expense_pkr",
+        "value": 206080.0,
+        "baseline_mean": 6116.86,
+        "z_score": 19.69,
+        "direction": "high"
+      }
+    ]
+  },
+  "status": {
+    "state": "ok",
+    "read_only": true,
+    "warnings": []
+  },
+  "insights": {
+    "source": "rules",
+    "summary": "1 new users in the trailing 30 days (down 66.67% versus the previous window); 24 users total. 171 transactions dated in the window (down 22.27% versus the previous window). Personal cash flow was PKR 509528.00 income and PKR 383468.89 expense (net PKR 126059.11). Largest expense category was Miscellaneous at PKR 266469.00 across 40 transactions. 2 daily anomalies flagged at |z| >= 2.",
+    "highlights": [
+      "1 new users in the trailing 30 days (down 66.67% versus the previous window); 24 users total.",
+      "171 transactions dated in the window (down 22.27% versus the previous window).",
+      "Personal cash flow was PKR 509528.00 income and PKR 383468.89 expense (net PKR 126059.11).",
+      "Largest expense category was Miscellaneous at PKR 266469.00 across 40 transactions.",
+      "2 daily anomalies flagged at |z| >= 2."
+    ]
+  }
+}
