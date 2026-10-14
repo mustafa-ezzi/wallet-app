@@ -309,7 +309,7 @@ Confidence score example:
 - Freeze kinds, ATM vs expense rule, no-cash-wallet policy  
 - Fixture pack: `packages/bank-sms-parser/src/fixtures.ts` (product samples + bank variants + ignore cases)  
 - UX copy: `packages/bank-sms-parser/src/uxCopy.ts`  
-- Privacy draft: `docs/BANK_SMS_PRIVACY.md`  
+- Privacy draft: `docs/bank-sms-privacy-disclosure.md`  
 
 **Exit:** Fixture pack + approved UX copy for permission + approval sheet  
 
@@ -391,7 +391,7 @@ Confidence score example:
 - Harder OTP / verification / promo / declined filters + fixtures  
 - Batch review: `POST …/batch-approve/` + `batch-reject/` (web + mobile)  
 - Optional People name hint for RAAST counterparties  
-- Play Policy answers documented in `docs/BANK_SMS_PRIVACY.md`  
+- Play Policy answers documented in `docs/bank-sms-privacy-disclosure.md`  
 
 **Exit:** Low false-positive rate on ignore fixtures; batch + corrections ship; policy Q&A documented  
 
@@ -500,7 +500,7 @@ Until (1)–(3) ship, dual-on is fine for testing; tell power users to enable **
 | Channel | Why it helps |
 |---------|----------------|
 | **Google Play** (Internal testing → Closed → Production) | Play-signed, Play-distributed apps are far less often blocked by Play Protect than random APKs |
-| **Play Console declarations** | Declare **financial SMS** use case; link Privacy Policy; document Approve-only + allowlist (see `BANK_SMS_PRIVACY.md`) |
+| **Play Console declarations** | Declare **financial SMS** use case; link Privacy Policy; document Approve-only + allowlist (see `docs/bank-sms-privacy-disclosure.md`) |
 | **Same signing key forever** | Avoid “update blocked / invalid package” when users already have an older sideload with a different key — migrate testers to Play builds and uninstall old sideloads once |
 | **Internal testing track** | Replace WhatsApp APK shares for QA; testers install from Play |
 

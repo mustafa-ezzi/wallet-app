@@ -1,6 +1,6 @@
 # Google Play launch — status (10 October 2026)
 
-Living tracker for the first production launch. Use [`GOOGLE_PLAY_LAUNCH_CHECKLIST.md`](./GOOGLE_PLAY_LAUNCH_CHECKLIST.md) as the full form; this file records **what is done in repo/product** vs **what you still do in Play Console / EAS**.
+Living tracker for the first production launch. Use [`google-play-first-release-checklist.md`](./google-play-first-release-checklist.md) as the full form; this file records **what is done in repo/product** vs **what you still do in Play Console / EAS**.
 
 | Item | Status | Notes |
 |------|--------|--------|

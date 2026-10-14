@@ -37,7 +37,7 @@ WalletTrails’s **Bank SMS assist** turns bank transaction alerts into **draft*
 
 ## What may sync to your WalletTrails account
 
-Structured draft fields (+ short snippet), wallet aliases, and type corrections so you can review the same pending queue on web and mobile. See `docs/BANK_SMS_IMPORT_PHASES.md`.
+Structured draft fields (+ short snippet), wallet aliases, and type corrections so you can review the same pending queue on web and mobile. See `docs/research/bank-sms-auto-detect-approve-or-reject.md`.
 
 ## Play Console — SMS permission answers (draft)
 

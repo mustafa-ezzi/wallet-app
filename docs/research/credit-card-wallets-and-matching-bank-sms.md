@@ -2,7 +2,7 @@
 
 **Audience:** You (product owner) — how to add credit cards to WalletTrails and make SMS import understand them  
 **Current state:** Wallets are mainly `bank` + `cash` (+ `person` for lending). There is **no** dedicated `credit_card` type yet.  
-**Related:** `docs/BANK_SMS_IMPORT_PHASES.md`, `packages/bank-sms-parser/`
+**Related:** `docs/research/bank-sms-auto-detect-approve-or-reject.md`, `packages/bank-sms-parser/`
 
 ---
 
@@ -118,7 +118,7 @@ instrument: 'account' | 'credit_card' | 'unknown'
 
 **Weak / shared with debit:** plain `PKR X has been debited` with no card keywords — keep as **account/debit** unless user alias forces a card wallet.
 
-Classification order (add near existing kind order in `BANK_SMS_IMPORT_PHASES.md`):
+Classification order (add near existing kind order in `docs/research/bank-sms-auto-detect-approve-or-reject.md`):
 
 1. Reversal / refund  
 2. Card **payment received** (bill pay) → not a new purchase  
@@ -233,7 +233,7 @@ Do **not** skip Phase A: SMS matching without a real card wallet type will keep 
 | Match | `packages/bank-sms-parser/src/matchWallet.ts` — today banks only |
 | Approve plan | `approvePlan.ts` / bank SMS API — new steps for card payment |
 | UI | `mobile/app/bank-sms.tsx`, web `BankSmsImport.tsx`, wallets tabs |
-| Spec | Extend `docs/BANK_SMS_IMPORT_PHASES.md` with card kinds |
+| Spec | Extend `docs/research/bank-sms-auto-detect-approve-or-reject.md` with card kinds |
 
 ---
 

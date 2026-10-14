@@ -4,6 +4,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '@/src/context/AuthContext'
 import { BouncingFab } from '@/src/components/BouncingFab'
+import { TraiDock } from '@/src/components/TraiDock'
 import { FloatingIslandTabBar } from '@/src/components/FloatingIslandTabBar'
 import { OfflineBanner } from '@/src/offline'
 import { AmountUnlockSheet } from '@/src/privacy/AmountUnlockSheet'
@@ -75,6 +76,7 @@ function TabsShell() {
           bottom={78 + Math.max(insets.bottom - 8, 0)}
         />
       ) : null}
+      {user ? <TraiDock bottom={78 + Math.max(insets.bottom - 8, 0)} /> : null}
 
       <AmountUnlockSheet />
       {user ? <BudgetsWhatsNewDialog /> : null}

@@ -1673,3 +1673,56 @@ class CategoryBudget(models.Model):
 
     def __str__(self):
         return f'Budget({self.user_id} {self.year}-{self.month:02d} {self.category}={self.limit_amount})'
+
+
+class BotDraft(models.Model):
+    """One unconfirmed Trai entry. Nothing is written to the books until confirm."""
+
+    PENDING = 'pending'
+    SAVED = 'saved'
+    CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (PENDING, 'Pending'),
+        (SAVED, 'Saved'),
+        (CANCELLED, 'Cancelled'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bot_drafts')
+    payload = models.JSONField()
+    client_mutation_id = models.CharField(max_length=64)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=PENDING)
+    expires_at = models.DateTimeField()
+    transaction = models.ForeignKey(
+        'Transaction', null=True, blank=True, on_delete=models.SET_NULL, related_name='bot_drafts',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user'],
+                condition=models.Q(status='pending'),
+                name='uniq_pending_bot_draft',
+            ),
+        ]
+
+    def __str__(self):
+        return f'BotDraft({self.user_id} {self.status})'
+
+
+class BotDailyUsage(models.Model):
+    """How many model calls this user has made on a calendar day."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bot_usage')
+    day = models.DateField()
+    count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'day'], name='uniq_bot_usage_user_day'),
+        ]
+
+    def __str__(self):
+        return f'BotDailyUsage({self.user_id} {self.day} {self.count})'

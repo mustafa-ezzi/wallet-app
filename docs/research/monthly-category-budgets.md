@@ -340,4 +340,4 @@ class CategoryBudget(models.Model):
 
 ---
 
-*Related:* `docs/WalletTrails_USER_GUIDE.md`, `docs/TRAVEL_AND_PEOPLE_PHASES.md`
+*Related:* `docs/wallettrails-quick-user-guide.md`, `docs/research/travel-mode-foreign-currency-and-people-balances.md`

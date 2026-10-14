@@ -410,6 +410,39 @@ export const bankSmsApi = {
   updateSettings: (data: object) => api.patch<BankSmsImportSettings>('/bank-sms-import-settings/', data),
 }
 
+export type BotAction = {
+  action: string
+  amount: string | null
+  account_id: number | null
+  linked_project_id: number | null
+  category: string
+  notes: string
+  date: string | null
+  ask: string | null
+  month?: string | null
+  month_label?: string | null
+  expense_count?: number | null
+  top_categories?: { category: string; amount: string }[] | null
+  month_income?: string | null
+  month_expense?: string | null
+  month_net?: string | null
+}
+
+export type BotTurnResult = {
+  reply?: string
+  action?: BotAction
+  saved: boolean
+  draft_id?: number
+  transaction_id?: number
+  warning?: string | null
+  detail?: string
+}
+
+export const botApi = {
+  message: (text: string) => api.post<BotTurnResult>('/bot/message/', { text }),
+  confirm: (id: number) => api.post<BotTurnResult>('/bot/confirm/', { id }),
+}
+
 export type BankSmsImportSettings = {
   sms_import_enabled: boolean
   sms_permission_prompted_at: string | null

@@ -3,7 +3,7 @@
 > **Use this as the release form for the first public Android launch.** Mark a box only after the evidence is available. Items marked **BLOCKER** must be complete before requesting production access or starting a production rollout.
 >
 > Last reviewed: **10 October 2026** · Package name: `com.wallettrails.app` · Platform: Android / Expo  
-> **Status snapshot:** see [`GOOGLE_PLAY_LAUNCH_STATUS.md`](./GOOGLE_PLAY_LAUNCH_STATUS.md).
+> **Status snapshot:** see [`google-play-launch-done-and-remaining.md`](./google-play-launch-done-and-remaining.md).
 
 ---
 

@@ -18,6 +18,7 @@ from . import travel_people_api
 from . import people_linked_api
 from . import bank_sms_api
 from . import budgets_api
+from . import bot_api
 
 router = DefaultRouter()
 router.register('categories', categories_api.UserCategoryViewSet, basename='category')
@@ -45,6 +46,8 @@ urlpatterns = [
     path('auth/reset-password/', password_reset_api.ResetPasswordView.as_view(), name='reset-password'),
     path('me/', views.MeView.as_view(), name='me'),
     path('dashboard/', views.DashboardView.as_view(), name='dashboard'),
+    path('bot/message/', bot_api.BotMessageView.as_view(), name='bot-message'),
+    path('bot/confirm/', bot_api.BotConfirmView.as_view(), name='bot-confirm'),
     path('forecast/<int:year>/<int:month>/', views.ForecastView.as_view(), name='forecast'),
     path('budgets/', budgets_api.BudgetsView.as_view(), name='budgets'),
     path('budgets/copy-from-previous/', budgets_api.BudgetCopyPreviousView.as_view(), name='budgets-copy'),

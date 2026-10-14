@@ -249,3 +249,15 @@ GOOGLE_OAUTH_CLIENT_IDS = _google_oauth_client_ids()
 GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.wallettrails.app').strip()
 GOOGLE_PLAY_SERVICE_ACCOUNT_JSON = os.environ.get('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON', '').strip()
 
+# Trai — server-only. Never send this key to the web app or the phone.
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
+BOT_GEMINI_MODEL = os.environ.get('BOT_GEMINI_MODEL', 'gemini-3.5-flash-lite').strip() or 'gemini-3.5-flash-lite'
+try:
+    BOT_GEMINI_TEMPERATURE = min(0.2, max(0.0, float(os.environ.get('BOT_GEMINI_TEMPERATURE', '0.1'))))
+except ValueError:
+    BOT_GEMINI_TEMPERATURE = 0.1
+try:
+    BOT_DAILY_MESSAGE_CAP = int(os.environ.get('BOT_DAILY_MESSAGE_CAP', '30'))
+except ValueError:
+    BOT_DAILY_MESSAGE_CAP = 30
+

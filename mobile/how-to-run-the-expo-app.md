@@ -167,5 +167,3 @@ When P0–P1 feel good on a real phone:
 1. Live **Home** (total balance, month in/out, recent txs with category + notes)
 2. **Wallets** list + create
 3. **Add money** FAB + bottom sheet (income / expense / transfer)
-
-Track progress in `REACT_NATIVE_BUILD_PHASES.md`.

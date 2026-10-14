@@ -20,6 +20,7 @@ from .serializers import (
     AccountSerializer, ProjectSerializer, TransactionSerializer,
     RecurringExpenseSerializer, ReceivableInstallmentSerializer, PayableInstallmentSerializer
 )
+from .bot_reads import month_totals
 
 
 def _ym_index(year, month):
@@ -326,23 +327,7 @@ class DashboardView(APIView):
             })
 
         today = date.today()
-        month_start = today.replace(day=1)
-        month_end = today.replace(day=calendar.monthrange(today.year, today.month)[1])
-
-        # Bank transfers + people double-entry are not personal income/expense
-        month_income = Transaction.objects.filter(
-            user=user, type='income',
-            date__gte=month_start, date__lte=month_end,
-        ).exclude(category='Bank Transfer').exclude(
-            people_action__gt='',
-        ).aggregate(total=Sum('amount'))['total'] or 0
-
-        month_expense = Transaction.objects.filter(
-            user=user, type='expense',
-            date__gte=month_start, date__lte=month_end,
-        ).exclude(category='Bank Transfer').exclude(
-            people_action__gt='',
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        totals = month_totals(user, today)
 
         # Recent: prefer wallet activity (exclude person-leg rows so pairs aren't doubled)
         recent_transactions = Transaction.objects.filter(user=user).exclude(
@@ -355,9 +340,9 @@ class DashboardView(APIView):
             'card_debt': float(card_debt),
             'accounts': account_data,
             'people': people_data,
-            'month_income': float(month_income),
-            'month_expense': float(month_expense),
-            'month_net': float(month_income) - float(month_expense),
+            'month_income': float(totals['month_income']),
+            'month_expense': float(totals['month_expense']),
+            'month_net': float(totals['month_net']),
             'recent_transactions': tx_data,
         })
 

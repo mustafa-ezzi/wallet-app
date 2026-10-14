@@ -409,7 +409,7 @@ export function CampaignsPage() {
         receive broadcasts. Due-date reminders are separate.
         If estimate is <strong>0 devices</strong>, nobody has linked push yet — install a native EAS APK
         (with Firebase FCM), then Settings → <em>Link this device for push</em>. See{' '}
-        <code>mobile/PUSH_SETUP.md</code>.
+        <code>mobile/android-push-notifications-firebase-setup.md</code>.
       </p>
     </div>
   )

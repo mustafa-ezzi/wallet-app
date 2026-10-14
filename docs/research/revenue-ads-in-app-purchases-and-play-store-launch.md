@@ -790,7 +790,7 @@ Ignore VAT on top (the user may pay more than list). Your 15% is on the **amount
 
 ## 6. Play Store launch strategy (international)
 
-This complements `GOOGLE_PLAY_LAUNCH_CHECKLIST.md`. That file is the **release form**. This section is the **go-to-market sequence for a worldwide listing**.
+This complements `docs/google-play-first-release-checklist.md`. That file is the **release form**. This section is the **go-to-market sequence for a worldwide listing**.
 
 ### 6.1 What “good launches” in Finance actually did
 
@@ -810,7 +810,7 @@ This complements `GOOGLE_PLAY_LAUNCH_CHECKLIST.md`. That file is the **release f
 2. **Closed test (BLOCKER for new personal accounts):** **≥12 testers opted in continuously for 14 days**, then apply for production. Recruit **20+ testers in more than one country** if you can (US/EU + home market) so dropouts don’t reset the clock and you catch locale bugs.
 3. **Privacy policy + terms** live on HTTPS, written for **international** users: SMS/import, ads, IAP, account deletion, GDPR contact, data location.
 4. **Data safety form:** finance data, optional SMS, ads SDK. Must match **every** region you ship to.
-5. **SMS permission justification** — Play is strict **globally**. Copy must match `BANK_SMS_PRIVACY.md`: optional, user-reviewed drafts, not silent posting. App must be **fully usable if the user denies SMS** (US/EU reviewers will deny SMS).
+5. **SMS permission justification** — Play is strict **globally**. Copy must match `docs/bank-sms-privacy-disclosure.md`: optional, user-reviewed drafts, not silent posting. App must be **fully usable if the user denies SMS** (US/EU reviewers will deny SMS).
 6. **Production AAB** (API 36+ for submissions after 31 Aug 2026), Play App Signing, production API healthy from **multiple geos** (not only one country’s network).
 7. **IAP:** create SKUs; set **USD default + regional prices**; license testers in **several countries**. **Do not** enable heavy ads or a hard paywall on the first public build.
 8. **Store listing (ASO)**  
@@ -938,7 +938,7 @@ Use these to re-verify prices and fees before locking SKUs (stores change **by c
 - YNAB pricing / timeline: ynab.com/pricing; ynab.com about timeline (spreadsheet 2004 → SaaS 2015).
 - Splitwise Pro, Goodbudget Premium, PocketGuard Plus, Money Lover, Wallet by BudgetBakers: public store/pricing pages and 2026 roundups (**regional prices vary**).
 
-**Internal:** `WALLETTRAILS_PRODUCT_GUIDE.md` §19–23; `GOOGLE_PLAY_LAUNCH_CHECKLIST.md`; `BANK_SMS_PRIVACY.md`.
+**Internal:** `docs/wallettrails-full-product-guide.md` §19–23; `docs/google-play-first-release-checklist.md`; `docs/bank-sms-privacy-disclosure.md`.
 
 ---
 

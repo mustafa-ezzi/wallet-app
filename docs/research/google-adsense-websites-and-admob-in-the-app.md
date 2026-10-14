@@ -21,7 +21,7 @@
 - Public website / blog → **AdSense**
 - Logged-in finance UI (balances, transactions) → prefer **no ads** (trust + Google “sensitive finance” policies)
 
-You already have research in `docs/REVENUE_AND_LAUNCH_RESEARCH.md`. This file is the **how it works / how to wire it** companion.
+You already have research in `docs/research/revenue-ads-in-app-purchases-and-play-store-launch.md`. This file is the **how it works / how to wire it** companion.
 
 ---
 
@@ -201,7 +201,7 @@ Admin → **Ads & Config** (ops remote config).
 | -------------------------------------------- | --------------------------------------- |
 | `mobile/src/ads/AdBanner.tsx`                | Banner component                        |
 | `frontend-admin/src/pages/AdsConfigPage.tsx` | Ops UI for units + toggles              |
-| `docs/REVENUE_AND_LAUNCH_RESEARCH.md`        | Strategy, pricing, where not to put ads |
+| `docs/research/revenue-ads-in-app-purchases-and-play-store-launch.md`        | Strategy, pricing, where not to put ads |
 | Backend ops / premium APIs                   | Entitlements + `premium_hides_ads`      |
 
 

@@ -3,7 +3,7 @@
 **Document type:** Product + engineering research (plan, not shipped code)  
 **Product:** WalletTrails (Android + web + Django API)  
 **Plans:** **Free → Plus → Pro** (strictly nested: each paid tier includes everything below it)  
-**Related docs:** `docs/REVENUE_AND_LAUNCH_RESEARCH.md` (pricing & launch), `docs/ADSENSE_ADMOB_KNOWLEDGE.md` (ads), `docs/WALLETTRAILS_PRODUCT_GUIDE.md` (features)  
+**Related docs:** `docs/research/revenue-ads-in-app-purchases-and-play-store-launch.md` (pricing & launch), `docs/research/google-adsense-websites-and-admob-in-the-app.md` (ads), `docs/wallettrails-full-product-guide.md` (features)  
 **Reviewed:** 7 October 2026  
 **Status:** Research for how we define packages and how we **enforce** them so Free cannot use Plus/Pro, and Plus cannot use Pro.
 
@@ -375,7 +375,7 @@ Do **not** turn on hard caps in production until Play products and upgrade UX ar
 
 ## 9. Pricing (summary only)
 
-Full international pricing lives in `docs/REVENUE_AND_LAUNCH_RESEARCH.md`. Starting USD list (marketing):
+Full international pricing lives in `docs/research/revenue-ads-in-app-purchases-and-play-store-launch.md`. Starting USD list (marketing):
 
 | Plan | Monthly | Yearly |
 | --- | --- | --- |

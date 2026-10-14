@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import anime from 'animejs'
 import AddTransactionModal from './AddTransactionModal'
+import TraiPanel from './TraiPanel'
 import InstallAppDialog from './InstallAppDialog'
 import OnboardingTour from './OnboardingTour'
 import AndroidInstallTour from './AndroidInstallTour'
@@ -99,6 +100,7 @@ export default function Layout() {
   }, [location.pathname])
 
   return (
+    <>
     <div className="app-shell" key={refreshKey}>
       <header className="mobile-header">
         <div className="mobile-header-brand" data-tour="brand">
@@ -345,5 +347,7 @@ export default function Layout() {
       <OnboardingTour />
       <AndroidInstallTour apkUrl={ANDROID_APK_URL} />
     </div>
+    <TraiPanel onSaved={handleAdded} />
+    </>
   )
 }
