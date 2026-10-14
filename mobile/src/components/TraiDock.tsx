@@ -20,11 +20,15 @@ import { voiceErrorLine } from '@/src/lib/traiVoice'
 import { useColors } from '@/src/theme/ThemeContext'
 
 type MicButton = typeof import('./TraiMicButton').TraiMicButton
+type WakeListener = typeof import('./TraiWakeListener').TraiWakeListener
 let TraiMicButton: MicButton | null = null
+let TraiWakeListener: WakeListener | null = null
 try {
   TraiMicButton = require('./TraiMicButton').TraiMicButton as MicButton
+  TraiWakeListener = require('./TraiWakeListener').TraiWakeListener as WakeListener
 } catch {
   TraiMicButton = null
+  TraiWakeListener = null
 }
 
 type Wallet = { id: number; name: string; type: string }
@@ -126,6 +130,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [listening, setListening] = useState(false)
+  const [wakeArmed, setWakeArmed] = useState(false)
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [keyboard, setKeyboard] = useState(0)
   const nextId = useRef(1)
@@ -268,7 +273,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: colors.text }]}>Trai</Text>
               <Text style={[styles.sub, { color: colors.textMuted }]}>
-                Add an expense, mark income, or ask about this month.
+                Say “Hey Trai”, or tap the robot. Then add an expense or ask about this month.
               </Text>
             </View>
             <Pressable onPress={() => setOpen(false)} hitSlop={8} accessibilityLabel="Close">
@@ -421,10 +426,22 @@ export function TraiDock({ bottom }: { bottom: number }) {
           </View>
         </View>
       ) : null}
+      {TraiWakeListener ? (
+        <TraiWakeListener
+          paused={open}
+          onArmed={setWakeArmed}
+          onWake={command => {
+            setOpen(true)
+            if (command) void sendRef.current(command)
+            else push({ role: 'trai', text: "I'm here." })
+          }}
+        />
+      ) : null}
+      {wakeArmed && !open ? <View pointerEvents="none" style={[styles.wakeRing, { bottom: bottom - 6 }]} /> : null}
       <Pressable
         style={[styles.fab, { bottom }]}
         onPress={() => setOpen(value => !value)}
-        accessibilityLabel={open ? 'Close Trai' : 'Open Trai'}
+        accessibilityLabel={wakeArmed && !open ? 'Trai is listening for Hey Trai' : open ? 'Close Trai' : 'Open Trai'}
       >
         <Image source={traiIcon} style={styles.fabImage} resizeMode="cover" accessibilityIgnoresInvertColors />
         {!open && draft ? <View style={styles.dot} /> : null}
@@ -451,6 +468,16 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
+  },
+  wakeRing: {
+    position: 'absolute',
+    left: 14,
+    zIndex: 49,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: '#6ee7b7',
   },
   dot: {
     position: 'absolute',
