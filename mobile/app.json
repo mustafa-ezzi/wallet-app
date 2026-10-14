@@ -113,6 +113,18 @@
               "previewImage": "./assets/images/widget-preview.png",
               "resizeMode": "horizontal|vertical",
               "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "WalletTrailsTrai",
+              "label": "Trai",
+              "description": "A little robot you can poke for your latest transaction, balance, or this month",
+              "minWidth": "180dp",
+              "minHeight": "140dp",
+              "targetCellWidth": 3,
+              "targetCellHeight": 2,
+              "previewImage": "./assets/images/widget-preview.png",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
             }
           ]
         }

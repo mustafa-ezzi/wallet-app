@@ -8,12 +8,14 @@ import { fmt, fmtBalance } from '@/src/utils/format'
 import type { BalanceWidgetData } from './BalanceWidget'
 import type { MonthFlowWidgetData } from './MonthFlowWidget'
 import type { QuickGlanceWidgetData } from './QuickGlanceWidget'
+import type { TraiWidgetData } from './TraiWidget'
 import type { WalletsWidgetData } from './WalletsWidget'
 
 export const BALANCE_WIDGET_NAME = 'WalletTrailsBalance'
 export const MONTH_FLOW_WIDGET_NAME = 'WalletTrailsMonthFlow'
 export const WALLETS_WIDGET_NAME = 'WalletTrailsWallets'
 export const QUICK_GLANCE_WIDGET_NAME = 'WalletTrailsQuickGlance'
+export const TRAI_WIDGET_NAME = 'WalletTrailsTrai'
 
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -128,6 +130,34 @@ export async function loadWalletsWidgetData(): Promise<WalletsWidgetData> {
   }
 }
 
+export async function loadTraiWidgetData(): Promise<TraiWidgetData> {
+  try {
+    await hydrateHomeCurrency()
+    const store = await getOfflineStore()
+    const accounts = await store.listAccounts()
+    const byId = new Map(accounts.map(account => [account.serverId, account]))
+    const wallets = bankCashAccounts(accounts)
+    const total = wallets.reduce((sum, account) => sum + (Number(account.currentBalance) || 0), 0)
+    const txs = await store.listTransactions()
+    const latest = txs.find(tx => byId.get(tx.accountServerId)?.type !== 'person')
+    const wallet = latest ? byId.get(latest.accountServerId) : undefined
+    const what = (latest?.notes || latest?.category || '').trim()
+    const latestLine = latest
+      ? `Latest: ${what || (latest.type === 'income' ? 'income' : 'expense')}, ${fmt(latest.amount)}${wallet ? `, ${wallet.name}` : ''}`
+      : 'No transaction yet. Tell me one inside the app.'
+    return {
+      lines: [
+        'Poke me. I keep an eye on the rupees.',
+        wallets.length ? `You have ${fmtBalance(total)}.` : 'Open the app once so I can see your wallets.',
+        latestLine,
+        'Tap Latest, Balance, or Month and I will answer inside.',
+      ],
+    }
+  } catch {
+    return { lines: ['Poke me. Open WalletTrails once so I can look.'] }
+  }
+}
+
 export async function loadQuickGlanceWidgetData(): Promise<QuickGlanceWidgetData> {
   try {
     await hydrateHomeCurrency()
@@ -166,16 +196,19 @@ export async function updateAllWidgets() {
     const month = await loadMonthFlowWidgetData()
     const wallets = await loadWalletsWidgetData()
     const glance = await loadQuickGlanceWidgetData()
+    const trai = await loadTraiWidgetData()
     const [
       { BalanceWidget },
       { MonthFlowWidget },
       { WalletsWidget },
       { QuickGlanceWidget },
+      { TraiWidget },
     ] = await Promise.all([
       import('./BalanceWidget'),
       import('./MonthFlowWidget'),
       import('./WalletsWidget'),
       import('./QuickGlanceWidget'),
+      import('./TraiWidget'),
     ])
 
     await Promise.all([
@@ -190,6 +223,9 @@ export async function updateAllWidgets() {
       )),
       safeRequest(QUICK_GLANCE_WIDGET_NAME, (info) => (
         <QuickGlanceWidget {...glance} size={{ width: info.width, height: info.height }} />
+      )),
+      safeRequest(TRAI_WIDGET_NAME, (info) => (
+        <TraiWidget {...trai} size={{ width: info.width, height: info.height }} />
       )),
     ])
   } catch (err) {

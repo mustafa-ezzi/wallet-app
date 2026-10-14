@@ -39,6 +39,7 @@ function ThemedStack() {
         <Stack.Screen name="bank-sms" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen name="people/[id]" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen name="support" options={{ headerShown: false, presentation: 'card' }} />
+        <Stack.Screen name="trai" options={{ headerShown: false }} />
       </Stack>
       <ForceUpdateGate />
       <AnimatedSplashScreen />

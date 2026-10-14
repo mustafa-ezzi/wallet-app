@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { accountsApi, botApi, type BotTurnResult } from '@/src/api/client'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
+import { subscribeTraiAsk } from '@/src/lib/traiLaunch'
 import { voiceErrorLine } from '@/src/lib/traiVoice'
 import { useColors } from '@/src/theme/ThemeContext'
 
@@ -131,6 +132,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const inputRef = useRef<TextInput>(null)
   const saving = useRef(false)
   const stopVoiceRef = useRef<() => void>(() => {})
+  const sendRef = useRef<(raw: string) => void>(() => {})
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
@@ -142,6 +144,11 @@ export function TraiDock({ bottom }: { bottom: number }) {
       hide.remove()
     }
   }, [])
+
+  useEffect(() => subscribeTraiAsk(message => {
+    setOpen(true)
+    if (message) void sendRef.current(message)
+  }), [])
 
   useEffect(() => {
     if (!open) return
@@ -217,6 +224,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
       setBusy(false)
     }
   }
+  sendRef.current = send
 
   const save = async () => {
     if (!draft || saving.current) return
