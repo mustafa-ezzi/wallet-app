@@ -580,7 +580,7 @@ The name in the UI is **Trai** (Trails Rupee Account Intelligence) from the firs
 
 **Gate**
 
-- A spoken “50 from cash for chips” produces the same card as the typed sentence.
+- A spoken “50 from cash for chips” produces the same card as the    typed sentence.
 - Denying the microphone leaves typing working.
 - Audio is not stored on the server in this phase.
 
