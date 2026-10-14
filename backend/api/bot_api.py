@@ -20,7 +20,7 @@ from .bot_draft import (
     store_proposal,
 )
 from .bot_gemini import BotModelError, generate_action
-from .bot_reads import READ_ACTIONS, resolve_read
+from .bot_reads import READ_ACTIONS, regular_question, resolve_read
 
 
 def _without_empty_warning(result: dict) -> dict:
@@ -75,12 +75,18 @@ class BotMessageView(APIView):
             if corrected is not None:
                 return Response(_without_empty_warning(corrected))
 
+        catalog = load_catalog(request.user)
+        local = regular_question(text, catalog)
+        if local is not None:
+            result = resolve_read(request.user, local, catalog, text)
+            result['saved'] = False
+            return Response(_without_empty_warning(result))
+
         if not allow_model_call(request.user):
             return Response(
                 {'detail': 'Trai is resting until tomorrow.', 'saved': False},
                 status=429,
             )
-        catalog = load_catalog(request.user)
         try:
             raw = generate_action(text, catalog)
         except BotModelError as exc:

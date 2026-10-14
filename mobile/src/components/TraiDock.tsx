@@ -11,10 +11,20 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { accountsApi, botApi, type BotTurnResult } from '@/src/api/client'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
+import { voiceErrorLine } from '@/src/lib/traiVoice'
 import { useColors } from '@/src/theme/ThemeContext'
+
+type MicButton = typeof import('./TraiMicButton').TraiMicButton
+let TraiMicButton: MicButton | null = null
+try {
+  TraiMicButton = require('./TraiMicButton').TraiMicButton as MicButton
+} catch {
+  TraiMicButton = null
+}
 
 type Wallet = { id: number; name: string; type: string }
 type Card = {
@@ -25,10 +35,16 @@ type Card = {
   notes: string
 }
 type ReadLine = { label: string; amount: string; emphasis?: boolean }
-type ReadBlock = { title: string; lines: ReadLine[]; breakdown?: ReadLine[]; note?: string }
+type ReadBlock = { title: string; lines: ReadLine[]; breakdown?: ReadLine[]; breakdownTitle?: string; note?: string }
 type Turn = { id: number; role: 'user' | 'trai'; text: string; card?: Card | null; read?: ReadBlock; ask?: boolean }
 
-const EXAMPLES = ['Slanty chips, Rp 50, cash', 'Salary of 50 thousand in Meezan', 'How was my month?']
+const EXAMPLES = [
+  'Slanty chips, Rp 50, cash',
+  'Salary of 50 thousand in Meezan',
+  'How was my month?',
+  'What was my recent transaction?',
+  "What's my balance?",
+]
 const traiIcon = require('../../assets/images/trai-icon.jpg')
 
 function errorDetail(err: unknown): { status: number; detail: string } {
@@ -82,6 +98,18 @@ function readLines(action: BotTurnResult['action']): ReadBlock | null {
       lines: [{ label: 'Spent', amount: action.amount || '0', emphasis: true }],
     }
   }
+  if (action.action === 'recent_transaction' || action.action === 'balance') {
+    const rows = action.items || []
+    if (!rows.length) return null
+    const [first, ...rest] = rows
+    return {
+      title: action.month_label || 'Latest',
+      lines: [{ label: first.label, amount: first.amount, emphasis: true }],
+      breakdown: rest.map(row => ({ label: row.label, amount: row.amount })),
+      breakdownTitle: action.action === 'balance' ? 'Wallets' : 'Before that',
+      note: first.detail || undefined,
+    }
+  }
   return null
 }
 
@@ -96,11 +124,13 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const [draft, setDraft] = useState<Card | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [listening, setListening] = useState(false)
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [keyboard, setKeyboard] = useState(0)
   const nextId = useRef(1)
   const inputRef = useRef<TextInput>(null)
   const saving = useRef(false)
+  const stopVoiceRef = useRef<() => void>(() => {})
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
@@ -172,6 +202,8 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const send = async (raw: string) => {
     const message = raw.trim()
     if (!message || busy) return
+    stopVoiceRef.current()
+    setListening(false)
     setText('')
     push({ role: 'user', text: message })
     setBusy(true)
@@ -273,7 +305,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
                     ))}
                     {turn.read.breakdown && turn.read.breakdown.length > 0 ? (
                       <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }}>
-                        <Text style={[styles.kicker, { color: colors.textMuted }]}>Where it went</Text>
+                        <Text style={[styles.kicker, { color: colors.textMuted }]}>{turn.read.breakdownTitle || 'Where it went'}</Text>
                         {turn.read.breakdown.map(line => (
                           <View key={line.label} style={styles.monthRow}>
                             <Text style={{ color: colors.text, flex: 1 }}>{line.label}</Text>
@@ -342,13 +374,34 @@ export function TraiDock({ bottom }: { bottom: number }) {
               ref={inputRef}
               value={text}
               onChangeText={setText}
-              placeholder="Slanty chips, Rp 50, cash"
+              placeholder={listening ? 'Listening…' : 'Slanty chips, Rp 50, cash'}
               placeholderTextColor={colors.textMuted}
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
               editable={!busy}
               maxLength={500}
               onSubmitEditing={() => void send(text)}
             />
+            {TraiMicButton ? (
+              <TraiMicButton
+                busy={busy}
+                primary={colors.primary}
+                border={colors.border}
+                stopRef={stopVoiceRef}
+                onTranscript={message => { void send(message) }}
+                onPartial={setText}
+                onNotice={line => push({ role: 'trai', text: line })}
+                onListening={setListening}
+              />
+            ) : (
+              <Pressable
+                style={[styles.mic, { borderColor: colors.border, opacity: busy ? 0.5 : 1 }]}
+                disabled={busy}
+                onPress={() => push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })}
+                accessibilityLabel="Speak to Trai"
+              >
+                <Ionicons name="mic" size={18} color={colors.primary} />
+              </Pressable>
+            )}
             <Pressable
               style={[styles.send, { backgroundColor: colors.primary, opacity: busy || !text.trim() ? 0.5 : 1 }]}
               disabled={busy || !text.trim()}
@@ -436,5 +489,6 @@ const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 10 },
   composer: { flexDirection: 'row', gap: 8, padding: 10, borderTopWidth: StyleSheet.hairlineWidth, alignItems: 'center' },
   input: { flex: 1, borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 10 : 8 },
+  mic: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   send: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
 })

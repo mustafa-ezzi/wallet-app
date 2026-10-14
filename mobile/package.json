@@ -29,6 +29,7 @@
     "expo-secure-store": "~57.0.1",
     "expo-sharing": "~57.0.8",
     "expo-sms-listener": "^1.0.10",
+    "expo-speech-recognition": "^57.1.1",
     "expo-splash-screen": "~57.0.5",
     "expo-sqlite": "~57.0.1",
     "expo-status-bar": "~57.0.1",

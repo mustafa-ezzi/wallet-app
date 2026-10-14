@@ -73,6 +73,10 @@ class BotFixture(TestCase):
         self.assertFalse(catalog_key_set(catalog) & FORBIDDEN_CATALOG_KEYS)
         return response
 
+    def post_local(self, text):
+        with patch('api.bot_api.generate_action', side_effect=AssertionError('regular questions do not call the model')):
+            return self.client.post('/api/bot/message/', {'text': text}, format='json')
+
 
 class BotCatalogTests(BotFixture):
     def test_catalog_is_only_this_users_wallets_and_hides_secrets(self):
@@ -565,7 +569,7 @@ class BotReadTests(BotFixture):
         self._tx(self.user, self.cash, 'expense', '400', 'Food & Drink', 'lend')
         self._tx(self.other, self.other_wallet, 'expense', '8000', 'Food & Drink')
         before = Transaction.objects.count()
-        response = self.post_fake('How was my month?', {'action': 'month_summary', 'month_income': '1'})
+        response = self.post_local('How was my month?')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertFalse(response.data['saved'])
         self.assertNotIn('draft_id', response.data)
@@ -596,11 +600,7 @@ class BotReadTests(BotFixture):
         self._tx(self.user, self.cash, 'expense', '150', 'Food & Drink')
         self._tx(self.user, self.cash, 'expense', '80', 'Fuel & Maintenance')
         self._tx(self.other, self.other_wallet, 'expense', '8000', 'Food & Drink')
-        response = self.post_fake('Monthly spend of Food & Drink', {
-            'action': 'category_spent',
-            'category': 'chips',
-            'amount': '99999',
-        })
+        response = self.post_local('Monthly spend of Food & Drink')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['action']['category'], 'Food & Drink')
         self.assertEqual(Decimal(response.data['action']['amount']), Decimal('150.00'))
@@ -619,7 +619,7 @@ class BotReadTests(BotFixture):
 
     def test_yes_after_a_read_does_not_write(self):
         before = Transaction.objects.count()
-        read = self.post_fake('How was my month?', {'action': 'month_summary'})
+        read = self.post_local('How was my month?')
         self.assertEqual(read.status_code, 200)
         yes = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
         self.assertEqual(yes.status_code, 200)
@@ -636,3 +636,58 @@ class BotReadTests(BotFixture):
         self.assertEqual(response.data['action']['action'], 'ask')
         self.assertNotIn('draft_id', response.data)
         self.assertNotIn('150', response.data['reply'])
+
+    def test_recent_transaction_is_this_users_latest(self):
+        older = self._tx(self.user, self.cash, 'expense', '150', 'Food & Drink')
+        older.notes = 'chips'
+        older.save(update_fields=['notes'])
+        latest = self._tx(self.user, self.meezan, 'expense', '80', 'Fuel & Maintenance')
+        latest.notes = 'petrol'
+        latest.save(update_fields=['notes'])
+        self._tx(self.other, self.other_wallet, 'expense', '8000', 'Food & Drink')
+        response = self.post_local('what was my recent transaction')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertNotIn('draft_id', response.data)
+        self.assertNotIn('Save it?', response.data['reply'])
+        self.assertNotIn('8000', response.data['reply'])
+        self.assertIn('petrol', response.data['reply'])
+        self.assertIn('Meezan', response.data['reply'])
+        self.assertIn('Rs 80', response.data['reply'])
+        self.assertEqual(response.data['action']['action'], 'recent_transaction')
+        self.assertEqual(Decimal(response.data['action']['amount']), Decimal('80.00'))
+        self.assertEqual(BotDraft.objects.count(), 0)
+
+    def test_recent_transaction_when_the_books_are_empty(self):
+        response = self.post_local('what was my recent transaction')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIn('do not have a transaction', response.data['reply'])
+        self.assertNotIn('draft_id', response.data)
+        self.assertEqual(BotDraft.objects.count(), 0)
+
+    def test_balance_matches_the_home_screen(self):
+        self._tx(self.user, self.cash, 'income', '5000', 'Salary')
+        self._tx(self.user, self.cash, 'expense', '150', 'Food & Drink')
+        self._tx(self.other, self.other_wallet, 'income', '8000', 'Salary')
+        response = self.post_local("what's my balance")
+        dash = self.client.get('/api/dashboard/')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(Decimal(response.data['action']['amount']), Decimal(str(dash.data['total_balance'])))
+        self.assertNotIn('8000', response.data['reply'])
+        self.assertNotIn('Save it?', response.data['reply'])
+        self.assertEqual(BotDraft.objects.count(), 0)
+
+    def test_balance_of_one_wallet(self):
+        self._tx(self.user, self.cash, 'income', '5000', 'Salary')
+        self._tx(self.user, self.meezan, 'income', '20', 'Salary')
+        response = self.post_local('how much is in Cash')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(Decimal(response.data['action']['amount']), Decimal('5000.00'))
+        self.assertIn('Cash', response.data['reply'])
+        self.assertNotIn('Meezan', response.data['reply'])
+
+    def test_another_persons_recent_transaction_is_refused(self):
+        self._tx(self.other, self.other_wallet, 'expense', '8000', 'Food & Drink')
+        response = self.post_local("what was Ahmed's recent transaction")
+        self.assertEqual(response.data['action']['action'], 'refuse')
+        self.assertNotIn('8000', response.data['reply'])
+        self.assertEqual(BotDraft.objects.count(), 0)

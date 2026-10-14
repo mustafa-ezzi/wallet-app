@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
-import { Send, X } from 'lucide-react'
+import { Mic, Send, X } from 'lucide-react'
 import { accountsApi, botApi, type BotTurnResult } from '../api/client'
+import { transcriptMessage, voiceErrorLine } from '../lib/traiVoice'
 
 type Wallet = { id: number; name: string; type: string }
 type Card = {
@@ -11,7 +12,7 @@ type Card = {
   notes: string
 }
 type ReadLine = { label: string; amount: string; emphasis?: boolean }
-type ReadBlock = { title: string; lines: ReadLine[]; breakdown?: ReadLine[]; note?: string }
+type ReadBlock = { title: string; lines: ReadLine[]; breakdown?: ReadLine[]; breakdownTitle?: string; note?: string }
 type Turn = {
   id: number
   role: 'user' | 'trai'
@@ -25,6 +26,8 @@ const EXAMPLES = [
   { label: 'Slanty chips, Rp 50, cash', text: 'Slanty chips, Rp 50, cash' },
   { label: 'Salary of 50 thousand in Meezan', text: 'Salary of 50 thousand in Meezan' },
   { label: 'How was my month?', text: 'How was my month?' },
+  { label: 'What was my recent transaction?', text: 'What was my recent transaction?' },
+  { label: "What's my balance?", text: "What's my balance?" },
 ]
 
 function errorDetail(err: unknown): { status: number; detail: string } {
@@ -56,6 +59,27 @@ function isLatestCard(turns: Turn[], turn: Turn, draftId: number | null | undefi
   return false
 }
 
+type BrowserSpeechRecognition = {
+  lang: string
+  interimResults: boolean
+  continuous: boolean
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  onerror: ((event: { error: string }) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+  abort: () => void
+}
+
+function speechRecognition(): BrowserSpeechRecognition | null {
+  const host = window as Window & {
+    SpeechRecognition?: new () => BrowserSpeechRecognition
+    webkitSpeechRecognition?: new () => BrowserSpeechRecognition
+  }
+  const Ctor = host.SpeechRecognition || host.webkitSpeechRecognition
+  return Ctor ? new Ctor() : null
+}
+
 function readLines(action: BotTurnResult['action']): ReadBlock | null {
   if (!action) return null
   if (action.action === 'month_summary') {
@@ -78,6 +102,18 @@ function readLines(action: BotTurnResult['action']): ReadBlock | null {
       lines: [{ label: 'Spent', amount: action.amount || '0', emphasis: true }],
     }
   }
+  if (action.action === 'recent_transaction' || action.action === 'balance') {
+    const rows = action.items || []
+    if (!rows.length) return null
+    const [first, ...rest] = rows
+    return {
+      title: action.month_label || 'Latest',
+      lines: [{ label: first.label, amount: first.amount, emphasis: true }],
+      breakdown: rest.map(row => ({ label: row.label, amount: row.amount })),
+      breakdownTitle: action.action === 'balance' ? 'Wallets' : 'Before that',
+      note: first.detail || undefined,
+    }
+  }
   return null
 }
 
@@ -87,11 +123,16 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   const [draft, setDraft] = useState<Card | null>(null)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [listening, setListening] = useState(false)
   const [wallets, setWallets] = useState<Wallet[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
   const threadRef = useRef<HTMLDivElement>(null)
   const nextId = useRef(1)
   const saving = useRef(false)
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null)
+  const heardRef = useRef('')
+  const ignoreEndRef = useRef(false)
+  const sendRef = useRef<(raw: string) => void>(() => {})
 
   useEffect(() => {
     if (!open) return
@@ -101,6 +142,26 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
     }).catch(() => setWallets([]))
     inputRef.current?.focus()
   }, [open])
+
+  useEffect(() => {
+    if (open) return
+    ignoreEndRef.current = true
+    try {
+      recognitionRef.current?.abort()
+    } catch {
+      // The recognizer already finished.
+    }
+    setListening(false)
+  }, [open])
+
+  useEffect(() => () => {
+    ignoreEndRef.current = true
+    try {
+      recognitionRef.current?.abort()
+    } catch {
+      // The recognizer already finished.
+    }
+  }, [])
 
   useEffect(() => {
     const el = threadRef.current
@@ -162,6 +223,13 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   const send = async (raw: string) => {
     const message = raw.trim()
     if (!message || busy) return
+    ignoreEndRef.current = true
+    try {
+      recognitionRef.current?.abort()
+    } catch {
+      // The recognizer already finished.
+    }
+    setListening(false)
     setText('')
     push({ role: 'user', text: message })
     setBusy(true)
@@ -173,6 +241,57 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
       push({ role: 'trai', text: detail })
     } finally {
       setBusy(false)
+    }
+  }
+  sendRef.current = send
+
+  const toggleMic = () => {
+    if (busy) return
+    if (listening) {
+      recognitionRef.current?.stop()
+      return
+    }
+    const recognition = speechRecognition()
+    if (!recognition) {
+      push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
+      return
+    }
+    heardRef.current = ''
+    ignoreEndRef.current = false
+    recognition.lang = 'en-US'
+    recognition.interimResults = true
+    recognition.continuous = false
+    recognition.onresult = (event) => {
+      let said = ''
+      for (let index = 0; index < event.results.length; index += 1) {
+        said += event.results[index][0]?.transcript || ''
+      }
+      const message = transcriptMessage(said)
+      heardRef.current = message
+      setText(message)
+    }
+    recognition.onerror = (event) => {
+      const keepTranscript = event.error === 'no-speech' || event.error === 'speech-timeout'
+      if (!keepTranscript) heardRef.current = ''
+      const line = voiceErrorLine(event.error)
+      if (line && !heardRef.current) push({ role: 'trai', text: line })
+    }
+    recognition.onend = () => {
+      setListening(false)
+      const message = heardRef.current
+      heardRef.current = ''
+      if (ignoreEndRef.current) {
+        ignoreEndRef.current = false
+        return
+      }
+      if (message) sendRef.current(message)
+    }
+    recognitionRef.current = recognition
+    try {
+      recognition.start()
+      setListening(true)
+    } catch {
+      push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
     }
   }
 
@@ -239,7 +358,7 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
                     ))}
                     {turn.read.breakdown && turn.read.breakdown.length > 0 ? (
                       <div className="trai-month-split">
-                        <div className="trai-month-kicker">Where it went</div>
+                        <div className="trai-month-kicker">{turn.read.breakdownTitle || 'Where it went'}</div>
                         {turn.read.breakdown.map(line => (
                           <div key={line.label} className="trai-month-row">
                             <span>{line.label}</span>
@@ -296,11 +415,21 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
               ref={inputRef}
               value={text}
               onChange={event => setText(event.target.value)}
-              placeholder="Slanty chips, Rp 50, cash"
+              placeholder={listening ? 'Listening…' : 'Slanty chips, Rp 50, cash'}
               aria-label="Message Trai"
               disabled={busy}
               maxLength={500}
             />
+            <button
+              type="button"
+              className={`trai-mic${listening ? ' listening' : ''}`}
+              onClick={toggleMic}
+              disabled={busy}
+              aria-label={listening ? 'Stop and send' : 'Speak to Trai'}
+              aria-pressed={listening}
+            >
+              <Mic size={16} />
+            </button>
             <button type="submit" disabled={busy || !text.trim()} aria-label="Send">
               <Send size={16} />
             </button>
