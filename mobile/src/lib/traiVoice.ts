@@ -4,6 +4,19 @@ export function transcriptMessage(transcript: string): string {
   return transcript.replace(/\s+/g, ' ').trim().slice(0, 500)
 }
 
+export function handsFreeAfter(result: { saved?: boolean; draft_id?: number; action?: { action?: string } | null }): boolean {
+  if (result.saved) return false
+  const action = result.action?.action
+  if (action === 'ask') return true
+  if (result.draft_id && action && action !== 'refuse') return true
+  return false
+}
+
+export function stopHandsFree(transcript: string): boolean {
+  const text = transcript.replace(/[.!?]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
+  return /^(?:stop listening|stop|never mind|nevermind|that is enough|thats enough)$/.test(text)
+}
+
 export function voiceErrorLine(code: string): string | null {
   if (code === 'aborted') return null
   if (code === 'not-allowed') return 'The microphone stayed off. Typing still works.'

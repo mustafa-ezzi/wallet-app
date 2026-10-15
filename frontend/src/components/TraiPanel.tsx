@@ -1,7 +1,11 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Mic, Send, X } from 'lucide-react'
 import { accountsApi, botApi, type BotTurnResult } from '../api/client'
-import { transcriptMessage, voiceErrorLine } from '../lib/traiVoice'
+import { handsFreeAfter, stopHandsFree, transcriptMessage, voiceErrorLine } from '../lib/traiVoice'
+import { isThemeId } from '../theme/themes'
+import { useTheme } from '../theme/useTheme'
+import { useTravelMode } from '../travel/TravelModeContext'
 
 type Wallet = { id: number; name: string; type: string }
 type Card = {
@@ -30,6 +34,7 @@ const EXAMPLES = [
   { label: 'What was my recent transaction?', text: 'What was my recent transaction?' },
   { label: "What's my balance?", text: "What's my balance?" },
   { label: 'Mark rent paid', text: 'Mark rent paid' },
+  { label: 'Switch to Ocean', text: 'Switch to Ocean' },
 ]
 
 function errorDetail(err: unknown): { status: number; detail: string } {
@@ -98,7 +103,17 @@ function readLines(action: BotTurnResult['action']): ReadBlock | null {
       note: count ? `${count} expense${count === 1 ? '' : 's'}, not counting transfers` : undefined,
     }
   }
-  if (action.action === 'category_spent') {
+  if (action.action === 'category_spent' || action.action === 'budget_status') {
+    const rows = action.action === 'budget_status' ? (action.items || []) : []
+    if (action.action === 'budget_status' && rows.length) {
+      const [first, ...rest] = rows
+      return {
+        title: action.category || 'Budget',
+        lines: [{ label: first.label, amount: first.amount, emphasis: true }],
+        breakdown: rest.map(row => ({ label: row.label, amount: row.amount })),
+        breakdownTitle: action.month_label || 'This month',
+      }
+    }
     return {
       title: action.category || 'Category',
       lines: [{ label: 'Spent', amount: action.amount || '0', emphasis: true }],
@@ -120,6 +135,9 @@ function readLines(action: BotTurnResult['action']): ReadBlock | null {
 }
 
 export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
+  const navigate = useNavigate()
+  const { setTheme } = useTheme()
+  const { refresh: refreshTravel } = useTravelMode()
   const [open, setOpen] = useState(false)
   const [turns, setTurns] = useState<Turn[]>([])
   const [draft, setDraft] = useState<Card | null>(null)
@@ -134,7 +152,25 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null)
   const heardRef = useRef('')
   const ignoreEndRef = useRef(false)
+  const handsFreeRef = useRef(false)
+  const missesRef = useRef(0)
+  const listenGen = useRef(0)
+  const [handsFree, setHandsFree] = useState(false)
   const sendRef = useRef<(raw: string) => void>(() => {})
+
+  const endHandsFree = () => {
+    listenGen.current += 1
+    handsFreeRef.current = false
+    setHandsFree(false)
+    ignoreEndRef.current = true
+    try {
+      recognitionRef.current?.abort()
+    } catch {
+      // The recognizer already finished.
+    }
+    setListening(false)
+    setText('')
+  }
 
   useEffect(() => {
     if (!open) return
@@ -147,6 +183,9 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
 
   useEffect(() => {
     if (open) return
+    listenGen.current += 1
+    handsFreeRef.current = false
+    setHandsFree(false)
     ignoreEndRef.current = true
     try {
       recognitionRef.current?.abort()
@@ -176,7 +215,26 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   }
 
   const applyResult = (data: BotTurnResult) => {
+    if (handsFreeRef.current && !handsFreeAfter(data)) endHandsFree()
     const action = data.action
+    if (data.saved && action?.action === 'set_theme' && isThemeId(action.theme)) setTheme(action.theme)
+    if (data.saved && action?.action === 'set_travel') void refreshTravel()
+    if (!data.saved && action?.action === 'open_page') {
+      const path = {
+        home: '/',
+        wallets: '/accounts',
+        budgets: '/budgets',
+        bills: '/expenses',
+        reports: '/reports',
+        settings: '/settings',
+        travel: '/travel-mode',
+      }[action.page || '']
+      if (path) {
+        endHandsFree()
+        setOpen(false)
+        navigate(path)
+      }
+    }
     const reply = data.reply || data.detail || ''
     if (data.saved) {
       setDraft(null)
@@ -226,6 +284,7 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   const send = async (raw: string) => {
     const message = raw.trim()
     if (!message || busy) return
+    listenGen.current += 1
     ignoreEndRef.current = true
     try {
       recognitionRef.current?.abort()
@@ -244,21 +303,18 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
       push({ role: 'trai', text: detail })
     } finally {
       setBusy(false)
+      if (handsFreeRef.current) startListening()
     }
   }
   sendRef.current = send
 
-  const toggleMic = () => {
-    if (busy) return
-    if (listening) {
-      recognitionRef.current?.stop()
-      return
-    }
+  const startListening = () => {
     const recognition = speechRecognition()
     if (!recognition) {
-      push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
+      if (!handsFreeRef.current) push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
       return
     }
+    const generation = ++listenGen.current
     heardRef.current = ''
     ignoreEndRef.current = false
     recognition.lang = 'en-US'
@@ -277,9 +333,10 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
       const keepTranscript = event.error === 'no-speech' || event.error === 'speech-timeout'
       if (!keepTranscript) heardRef.current = ''
       const line = voiceErrorLine(event.error)
-      if (line && !heardRef.current) push({ role: 'trai', text: line })
+      if (line && !heardRef.current && !handsFreeRef.current) push({ role: 'trai', text: line })
     }
     recognition.onend = () => {
+      if (generation !== listenGen.current) return
       setListening(false)
       const message = heardRef.current
       heardRef.current = ''
@@ -287,15 +344,47 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
         ignoreEndRef.current = false
         return
       }
-      if (message) sendRef.current(message)
+      if (!message) {
+        if (!handsFreeRef.current) return
+        missesRef.current += 1
+        if (missesRef.current >= 3) {
+          missesRef.current = 0
+          handsFreeRef.current = false
+          setHandsFree(false)
+          push({ role: 'trai', text: voiceErrorLine('no-speech') || '' })
+          return
+        }
+        startListening()
+        return
+      }
+      missesRef.current = 0
+      if (stopHandsFree(message)) {
+        endHandsFree()
+        return
+      }
+      if (handsFreeRef.current) setHandsFree(true)
+      sendRef.current(message)
     }
     recognitionRef.current = recognition
     try {
       recognition.start()
       setListening(true)
     } catch {
-      push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
+      if (!handsFreeRef.current) push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
     }
+  }
+
+  const toggleMic = () => {
+    if (busy) return
+    if (listening) {
+      handsFreeRef.current = false
+      setHandsFree(false)
+      recognitionRef.current?.stop()
+      return
+    }
+    handsFreeRef.current = true
+    setHandsFree(true)
+    startListening()
   }
 
   const save = async () => {
@@ -324,16 +413,16 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
 
   return (
     <>
-      {open ? <button type="button" className="trai-backdrop" aria-label="Close Trai" onClick={() => setOpen(false)} /> : null}
+      {open ? <button type="button" className="trai-backdrop" aria-label="Close Trai" onClick={() => { endHandsFree(); setOpen(false) }} /> : null}
       {open ? (
         <section className="trai-panel" aria-label="Trai">
           <header className="trai-head">
             <img src="/trai-icon.jpg" alt="" className="trai-mark" />
             <div>
               <strong>Trai</strong>
-              <p>Add an expense, mark a bill, move money, or ask about this month.</p>
+              <p>Tap the mic and keep talking. Say “yes save it” when the card looks right.</p>
             </div>
-            <button type="button" className="trai-close" onClick={() => setOpen(false)} aria-label="Close">
+            <button type="button" className="trai-close" onClick={() => { endHandsFree(); setOpen(false) }} aria-label="Close">
               <X size={18} />
             </button>
           </header>
@@ -419,12 +508,19 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
             ) : null}
             {busy ? <p className="trai-thinking">Trai is counting on its fingers…</p> : null}
           </div>
+          {handsFree ? (
+            <div className="trai-live">
+              <span className="trai-live-dot" aria-hidden="true" />
+              <span>{busy ? 'Trai is thinking…' : 'Listening'}</span>
+              <button type="button" onClick={endHandsFree}>Stop</button>
+            </div>
+          ) : null}
           <form className="trai-composer" onSubmit={onSubmit}>
             <input
               ref={inputRef}
               value={text}
               onChange={event => setText(event.target.value)}
-              placeholder={listening ? 'Listening…' : 'Slanty chips, Rp 50, cash'}
+              placeholder={handsFree || listening ? 'Listening… say the bank, or yes save it' : 'Slanty chips, Rp 50, cash'}
               aria-label="Message Trai"
               disabled={busy}
               maxLength={500}
@@ -450,7 +546,10 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
         className="trai-fab"
         aria-label={open ? 'Close Trai' : 'Open Trai'}
         aria-expanded={open}
-        onClick={() => setOpen(value => !value)}
+        onClick={() => {
+          if (open) endHandsFree()
+          setOpen(value => !value)
+        }}
       >
         <img src="/trai-icon.jpg" alt="" />
         {!open && draft ? <span className="trai-dot" aria-label="Confirmation waiting" /> : null}

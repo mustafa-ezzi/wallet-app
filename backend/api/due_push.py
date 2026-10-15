@@ -198,7 +198,7 @@ def collect_due_events(today: date | None = None) -> list[dict]:
     expenses = RecurringExpense.objects.filter(active=True).select_related('user')
     for e in expenses:
         pref = prefs_for(e.user)
-        if not pref.enabled:
+        if not pref.enabled or not e.remind:
             continue
         leads = pref.lead_days() or list(DEFAULT_LEADS)
         due_day = int(e.due_day or 1)

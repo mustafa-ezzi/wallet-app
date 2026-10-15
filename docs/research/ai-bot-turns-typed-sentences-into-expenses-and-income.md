@@ -378,6 +378,7 @@ Once write-by-sentence is trustworthy, these are the natural next jobs. Each one
 - Urdu script, not only Roman Urdu.
 - Create a new income source or wallet from chat (higher risk; keep it behind an explicit confirm).
 - Household shared expenses.
+- Assistant tasks that are not new ledger types: change the theme, hide or show amounts, open a screen, ask or set a budget, turn Travel Mode on or off, toggle a bill reminder. The pass is phase 9. Sign-out, a PIN, a password, and email are not assistant tasks.
 
 ---
 
@@ -403,7 +404,7 @@ API keys live in server environment variables (`GEMINI_API_KEY`, later `GROQ_API
 | Before real users           | Leave the Gemini free tier if we still need Google, so prompts are not used to train their models. Re-check Groq’s privacy policy if Groq wins the eval. |
 | What is the bot called?     | **Trai**. Full form: **Trails Rupee Account Intelligence**. The icon and panel say Trai.                                                                 |
 | How does it open?           | A robot icon on the app shell. The panel opens only when the icon is tapped.                                                                             |
-| What is explicitly later?   | Voice is phase 7. Deletes, transfers, people, household, and new wallets stay out until the phases in §13 are green.                                     |
+| What is explicitly later?   | Voice is phase 7. Ledger jobs are phase 8. Assistant settings (theme, navigation, budgets, travel, reminders) are phase 9. Household, Urdu script, sign-out, and PIN stay out. |
 
 
 ---
@@ -595,3 +596,36 @@ Only after phase 7’s gate. Each item is its own small slice with the same rule
 5. New income source or new wallet, only after its own confirm card.
 
 Household shared expenses stay out of Trai until that feature has its own pass. They are not part of these phases.
+
+### Phase 9 — Assistant tasks, still inside the app
+
+Only after phase 8’s gate. Trai can change a setting or open a screen the app already has. It does not grow a new settings system, and it does not take a PIN, a password, or a sign-out.
+
+A theme change and the amount eye stay on the device. A budget or Travel Mode change uses the API that screen already uses, and only after a confirm card. The model still returns one JSON action. The app checks the value against a fixed list. An unknown color, page, or currency is `ask`, not a new option.
+
+Each item is its own slice: action name, where it runs, a confirm card if it changes something, tests before the panel copy changes.
+
+1. `set_theme` — “Switch to Ocean”, “make it rose”. Only the five themes the picker already has: Emerald, Ocean, Violet, Rose, Amber (`forest`, `ocean`, `slate`, `blush`, `clay`). The card names the color and waits for Save. “Spent 50 at the ocean” stays an expense. A sixth color asks which of the five.
+2. `hide_amounts` / `show_amounts` — “Hide the numbers”, “show the amounts”. Hide uses the existing eye and locks the figures. Show opens the PIN sheet the app already has. The PIN is never typed to Trai, never sent to the model, and never stored on a draft.
+3. `open_page` — “Open budgets”, “take me to travel mode”, “open reports”. Pages that already exist: home, wallets, budgets, bills, reports, settings, travel. Nothing is saved, so there is no confirm card. It does not open another person’s books, and it does not start an export or a share.
+4. `budget_status` — “Am I over food this month?” A read, in the same spirit as the month summary. No Save. Another person’s budget is `refuse`.
+5. `set_budget` — “Set food to 8000 this month.” Confirm card with the category, the amount, and the month. Uses the budgets API. It does not invent a category.
+6. `set_travel` — “Turn on travel mode in AED”, “turn travel mode off”. Confirm card. The rate is the quote Travel Mode already uses. Trai does not invent a rate. Turning it off is also a confirm, so a slip does not drop the trip.
+7. `set_reminder` — “Remind me the day rent is due.” Turns the existing bill reminder on or off for a bill this user already has. Confirm card. It does not create a new bill.
+
+These stay refused, even when the sentence sounds like a setting:
+
+- Sign out, delete the account, change the password, or change the email.
+- Set, change, or speak a PIN.
+- Household shared expenses.
+- “Email my report” or “send this to Ahmed”.
+- Any theme, page, or currency that is not already in the app.
+
+**Gate**
+
+- “Switch to Ocean” changes the theme only after Save, and only to a theme the picker already has. “Spent 50 at the ocean” is still an expense card.
+- “Hide the amounts” hides them. “Show the amounts” opens the PIN sheet and does not unlock by itself. The PIN is not in the draft.
+- “Open budgets” lands on Budgets and writes nothing.
+- “Am I over food?” matches the budgets screen and does not save. “Set food to 8000” saves one budget after confirm, and a second confirm does not write a second row.
+- “Turn on travel mode in dirhams” shows the currency and the existing rate, then saves only after confirm.
+- “Log me out” and “change my PIN to 1234” are refused. The session stays up. The PIN is not in the draft or the model payload.

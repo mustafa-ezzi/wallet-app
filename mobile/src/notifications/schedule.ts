@@ -282,7 +282,7 @@ export async function rescheduleDueReminders(input: ScheduleInput): Promise<numb
   }
 
   for (const e of input.expenses ?? []) {
-    if (!e.active) continue
+    if (!e.active || e.remind === false) continue
     if (e.paid_this_month) continue
     const dueDay = Number(e.due_day) || 1
     for (const lead of leads) {

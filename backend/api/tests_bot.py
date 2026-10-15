@@ -14,7 +14,17 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from api.bot_catalog import FORBIDDEN_CATALOG_KEYS, catalog_key_set, load_catalog
 from api.bot_gemini import BotModelError, build_user_message, generate_action
-from api.models import Account, BotDraft, Project, RecurringExpense, Transaction, UserProfile
+from api.models import (
+    Account,
+    BotDraft,
+    CategoryBudget,
+    NotificationPreference,
+    Project,
+    RecurringExpense,
+    Transaction,
+    TravelMode,
+    UserProfile,
+)
 
 
 class BotFixture(TestCase):
@@ -342,6 +352,23 @@ class BotConfirmTests(BotFixture):
             saved = self.client.post('/api/bot/message/', {'text': word}, format='json')
             self.assertTrue(saved.data['saved'], word)
         self.assertEqual(Transaction.objects.count(), 2)
+
+    def test_yes_save_it_confirms_and_a_new_sentence_does_not(self):
+        self._propose_chips()
+        saved = self.client.post('/api/bot/message/', {'text': 'Yes, save it.'}, format='json')
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertTrue(saved.data['saved'])
+        self.assertEqual(Transaction.objects.count(), 1)
+        self._propose_chips()
+        response = self.post_fake('yes I spent 80 from Meezan', {
+            'action': 'create_expense',
+            'amount': '80',
+            'account_id': self.meezan.id,
+            'category': 'Food & Drink',
+            'notes': 'chips',
+        })
+        self.assertFalse(response.data['saved'])
+        self.assertEqual(Transaction.objects.count(), 1)
 
     def test_aliakbar_confirm_links_this_months_income(self):
         proposed = self.post_fake('I got the monthly recurring from Aliakbar', {
@@ -1001,3 +1028,164 @@ class BotPhase8Tests(BotFixture):
         self.assertNotIn('draft_id', response.data)
         self.assertEqual(Transaction.objects.count(), before)
 
+
+class BotPhase9Tests(BotFixture):
+    def _yes(self, proposed):
+        self.assertEqual(proposed.status_code, 200, proposed.data)
+        self.assertIn('draft_id', proposed.data)
+        self.assertFalse(proposed.data['saved'])
+        saved = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertTrue(saved.data['saved'], saved.data)
+        return saved
+
+    def test_ocean_theme_waits_for_save_and_spending_at_the_ocean_stays_an_expense(self):
+        proposed = self.post_local('Switch to Ocean')
+        self.assertEqual(proposed.data['action']['action'], 'set_theme')
+        self.assertEqual(proposed.data['action']['theme'], 'ocean')
+        self.assertEqual(proposed.data['action']['theme_label'], 'Ocean')
+        self.assertEqual(Transaction.objects.count(), 0)
+        saved = self._yes(proposed)
+        self.assertEqual(saved.data['action']['theme'], 'ocean')
+        self.assertEqual(Transaction.objects.count(), 0)
+        again = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertTrue(again.data['saved'])
+        self.assertEqual(Transaction.objects.count(), 0)
+        expense = self.post_fake('spent 50 at the ocean', {
+            'action': 'create_expense',
+            'amount': '50',
+            'account_id': self.cash.id,
+            'category': 'Food & Drink',
+            'notes': 'ocean',
+        })
+        self.assertEqual(expense.data['action']['action'], 'create_expense')
+
+    def test_unknown_color_asks_for_one_of_the_five(self):
+        response = self.post_local('switch to gold')
+        self.assertEqual(response.data['action']['action'], 'ask')
+        self.assertIn('Emerald', response.data['reply'])
+        self.assertNotIn('draft_id', response.data)
+
+    def test_hide_and_show_do_not_store_a_pin(self):
+        hidden = self.post_local('Hide the amounts')
+        self.assertEqual(hidden.data['action']['action'], 'hide_amounts')
+        self.assertNotIn('draft_id', hidden.data)
+        shown = self.post_local('Show the amounts')
+        self.assertEqual(shown.data['action']['action'], 'show_amounts')
+        self.assertNotIn('pin', shown.data['action'])
+        self.assertNotIn('draft_id', shown.data)
+        refused = self.post_local('change my PIN to 1234')
+        self.assertEqual(refused.data['action']['action'], 'refuse')
+        self.assertNotIn('1234', json.dumps(refused.data))
+        self.assertNotIn('draft_id', refused.data)
+        still = self.post_local('How was my month?')
+        self.assertEqual(still.status_code, 200)
+
+    def test_open_budgets_writes_nothing_and_household_stays_closed(self):
+        before = Transaction.objects.count()
+        opened = self.post_local('Open budgets')
+        self.assertEqual(opened.data['action']['action'], 'open_page')
+        self.assertEqual(opened.data['action']['page'], 'budgets')
+        self.assertNotIn('draft_id', opened.data)
+        self.assertEqual(Transaction.objects.count(), before)
+        household = self.post_local('open the household page')
+        self.assertEqual(household.data['action']['action'], 'refuse')
+
+    def test_food_budget_status_matches_the_books_and_another_person_is_refused(self):
+        today = timezone.localdate()
+        CategoryBudget.objects.create(
+            user=self.user, year=today.year, month=today.month,
+            category='Food & Drink', limit_amount=Decimal('8000.00'),
+        )
+        Transaction.objects.create(
+            user=self.user, type='expense', amount=Decimal('9000.00'),
+            date=today, account=self.cash, category='Food & Drink', notes='lunch',
+        )
+        response = self.post_local('Am I over food?')
+        self.assertEqual(response.data['action']['action'], 'budget_status')
+        self.assertNotIn('draft_id', response.data)
+        self.assertEqual(response.data['action']['category'], 'Food & Drink')
+        self.assertIn('9000.00', response.data['reply'])
+        self.assertIn('8000.00', response.data['reply'])
+        self.assertEqual(CategoryBudget.objects.count(), 1)
+        other = self.post_local("What is Ahmed's food budget?")
+        self.assertEqual(other.data['action']['action'], 'refuse')
+        self.assertNotIn('draft_id', other.data)
+
+    def test_set_food_budget_saves_one_row(self):
+        proposed = self.post_local('Set food to 8000 this month')
+        self.assertEqual(proposed.data['action']['action'], 'set_budget')
+        self.assertEqual(proposed.data['action']['category'], 'Food & Drink')
+        self.assertEqual(proposed.data['action']['amount'], '8000.00')
+        self.assertEqual(CategoryBudget.objects.count(), 0)
+        self._yes(proposed)
+        row = CategoryBudget.objects.get(user=self.user, category='Food & Drink')
+        self.assertEqual(row.limit_amount, Decimal('8000.00'))
+        again = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertTrue(again.data['saved'])
+        self.assertEqual(CategoryBudget.objects.filter(user=self.user, category='Food & Drink').count(), 1)
+        unknown = self.post_local('Set spaceships to 10')
+        self.assertEqual(unknown.data['action']['action'], 'ask')
+        self.assertEqual(CategoryBudget.objects.filter(category='spaceships').count(), 0)
+
+    def test_travel_uses_the_quote_and_ignores_a_made_up_rate(self):
+        with patch('api.bot_phase9.get_fx_quote', return_value={'rate': '75.500000', 'stale': False}) as quote:
+            proposed = self.post_local('Turn on travel mode in dirhams')
+            self.assertEqual(proposed.data['action']['action'], 'set_travel')
+            self.assertEqual(proposed.data['action']['travel_currency'], 'AED')
+            self.assertEqual(proposed.data['action']['rate'], '75.500000')
+            self.assertFalse(TravelMode.objects.filter(user=self.user, enabled=True).exists())
+            draft = BotDraft.objects.get(user=self.user, status=BotDraft.PENDING)
+            draft.payload = {**draft.payload, 'rate': '999'}
+            draft.save(update_fields=['payload', 'updated_at'])
+            saved = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+            self.assertTrue(saved.data['saved'], saved.data)
+            mode = TravelMode.objects.get(user=self.user)
+            self.assertTrue(mode.enabled)
+            self.assertEqual(mode.travel_currency, 'AED')
+            self.assertEqual(mode.rate, Decimal('75.500000'))
+            self.assertGreaterEqual(quote.call_count, 2)
+        off = self.post_local('turn travel mode off')
+        self._yes(off)
+        self.assertFalse(TravelMode.objects.get(user=self.user).enabled)
+
+    def test_unknown_travel_currency_does_not_invent_a_rate(self):
+        with patch('api.bot_phase9.get_fx_quote', side_effect=AssertionError('no quote')):
+            response = self.post_local('Turn on travel mode in pesos')
+        self.assertEqual(response.data['action']['action'], 'ask')
+        self.assertFalse(TravelMode.objects.filter(user=self.user, enabled=True).exists())
+
+    def test_rent_reminder_toggles_the_existing_bill(self):
+        rent = RecurringExpense.objects.create(
+            user=self.user, name='Rent', amount=Decimal('15000.00'),
+            frequency='monthly', account=self.cash, active=True,
+        )
+        before = RecurringExpense.objects.filter(user=self.user).count()
+        proposed = self.post_local('Remind me the day rent is due')
+        self.assertEqual(proposed.data['action']['action'], 'set_reminder')
+        self.assertEqual(proposed.data['action']['bill_id'], rent.id)
+        self.assertTrue(proposed.data['action']['remind'])
+        self.assertEqual(RecurringExpense.objects.filter(user=self.user).count(), before)
+        self._yes(proposed)
+        rent.refresh_from_db()
+        self.assertTrue(rent.remind)
+        pref = NotificationPreference.objects.get(user=self.user)
+        self.assertTrue(pref.enabled)
+        self.assertTrue(pref.lead_due)
+        stopped = self.post_local('stop reminding me about rent')
+        self._yes(stopped)
+        rent.refresh_from_db()
+        self.assertFalse(rent.remind)
+        missing = self.post_local('Remind me about a spaceship bill')
+        self.assertEqual(missing.data['action']['action'], 'ask')
+        self.assertEqual(RecurringExpense.objects.filter(user=self.user).count(), before)
+
+    def test_sign_out_and_a_report_email_are_refused(self):
+        response = self.post_local('Log me out')
+        self.assertEqual(response.data['action']['action'], 'refuse')
+        self.assertNotIn('draft_id', response.data)
+        follow = self.post_local("What's my balance?")
+        self.assertEqual(follow.status_code, 200)
+        report = self.post_local('Email my report')
+        self.assertEqual(report.data['action']['action'], 'refuse')
+        self.assertNotIn('draft_id', report.data)

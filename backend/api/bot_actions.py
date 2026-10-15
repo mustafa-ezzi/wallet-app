@@ -18,18 +18,34 @@ PHASE8_ACTIONS = frozenset({
     'create_wallet',
     'create_income_source',
 })
+PHASE9_ACTIONS = frozenset({
+    'set_theme',
+    'hide_amounts',
+    'show_amounts',
+    'open_page',
+    'budget_status',
+    'set_budget',
+    'set_travel',
+    'set_reminder',
+})
+PHASE9_WRITES = frozenset({
+    'set_theme',
+    'set_budget',
+    'set_travel',
+    'set_reminder',
+})
 ALLOWED_ACTIONS = frozenset({
     'create_expense',
     'create_income',
     'mark_recurring_income',
     'ask',
     'refuse',
-}) | PHASE8_ACTIONS
+}) | PHASE8_ACTIONS | PHASE9_ACTIONS
 WRITE_ACTIONS = frozenset({
     'create_expense',
     'create_income',
     'mark_recurring_income',
-}) | PHASE8_ACTIONS
+}) | PHASE8_ACTIONS | PHASE9_WRITES
 
 _SQL_RE = re.compile(
     r'\b(select|insert|update|delete|drop|alter|union)\b',
@@ -73,6 +89,9 @@ def normalize_action(raw, catalog, today=None, user=None) -> dict:
         if reason in ('erase', 'household'):
             from .bot_phase8 import phase8_refusal
             return phase8_refusal(reason)
+        if reason in ('pin', 'signout', 'login', 'report', 'other'):
+            from .bot_phase9 import phase9_refusal
+            return phase9_refusal(reason)
         return _refuse()
     if action == 'ask':
         question = _safe_question(raw.get('ask')) or ''
@@ -81,6 +100,9 @@ def normalize_action(raw, catalog, today=None, user=None) -> dict:
         action = 'mark_recurring_income' if _optional_int(raw.get('linked_project_id')) else 'create_expense'
         raw = {**raw, 'date': None}
 
+    if action in PHASE9_ACTIONS:
+        from .bot_phase9 import normalize_phase9
+        return normalize_phase9(raw, catalog, user=user, today=today)
     if action in PHASE8_ACTIONS:
         from .bot_phase8 import normalize_phase8
         return normalize_phase8(raw, catalog, user=user, today=today)

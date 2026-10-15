@@ -428,6 +428,14 @@ export type BotAction = {
   month_income?: string | null
   month_expense?: string | null
   month_net?: string | null
+  theme?: string | null
+  theme_label?: string | null
+  page?: string | null
+  travel_currency?: string | null
+  rate?: string | null
+  enabled?: boolean | null
+  remind?: boolean | null
+  bill_id?: number | null
 }
 
 export type BotTurnResult = {

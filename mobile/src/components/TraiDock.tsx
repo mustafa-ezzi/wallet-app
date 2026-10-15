@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'expo-router'
 import {
   Image,
   Keyboard,
@@ -16,19 +17,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { accountsApi, botApi, type BotTurnResult } from '@/src/api/client'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { subscribeTraiAsk } from '@/src/lib/traiLaunch'
-import { voiceErrorLine } from '@/src/lib/traiVoice'
-import { useColors } from '@/src/theme/ThemeContext'
+import { handsFreeAfter, stopHandsFree, voiceErrorLine } from '@/src/lib/traiVoice'
+import { useReminders } from '@/src/notifications'
+import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
+import { isThemeId } from '@/src/theme/colors'
+import { useColors, useTheme } from '@/src/theme/ThemeContext'
+import { useTravelMode } from '@/src/travel/TravelModeContext'
 
 type MicButton = typeof import('./TraiMicButton').TraiMicButton
 type WakeListener = typeof import('./TraiWakeListener').TraiWakeListener
+type Conversation = typeof import('./TraiConversation').TraiConversation
 let TraiMicButton: MicButton | null = null
 let TraiWakeListener: WakeListener | null = null
+let TraiConversation: Conversation | null = null
 try {
   TraiMicButton = require('./TraiMicButton').TraiMicButton as MicButton
   TraiWakeListener = require('./TraiWakeListener').TraiWakeListener as WakeListener
+  TraiConversation = require('./TraiConversation').TraiConversation as Conversation
 } catch {
   TraiMicButton = null
   TraiWakeListener = null
+  TraiConversation = null
 }
 
 type Wallet = { id: number; name: string; type: string }
@@ -99,7 +108,17 @@ function readLines(action: BotTurnResult['action']): ReadBlock | null {
       note: count ? `${count} expense${count === 1 ? '' : 's'}, not counting transfers` : undefined,
     }
   }
-  if (action.action === 'category_spent') {
+  if (action.action === 'category_spent' || action.action === 'budget_status') {
+    const rows = action.action === 'budget_status' ? (action.items || []) : []
+    if (action.action === 'budget_status' && rows.length) {
+      const [first, ...rest] = rows
+      return {
+        title: action.category || 'Budget',
+        lines: [{ label: first.label, amount: first.amount, emphasis: true }],
+        breakdown: rest.map(row => ({ label: row.label, amount: row.amount })),
+        breakdownTitle: action.month_label || 'This month',
+      }
+    }
     return {
       title: action.category || 'Category',
       lines: [{ label: 'Spent', amount: action.amount || '0', emphasis: true }],
@@ -123,6 +142,11 @@ function readLines(action: BotTurnResult['action']): ReadBlock | null {
 /** Robot button on the left. The add button stays on the right. */
 export function TraiDock({ bottom }: { bottom: number }) {
   const colors = useColors()
+  const router = useRouter()
+  const { setThemeId } = useTheme()
+  const privacy = usePrivacyLock()
+  const reminders = useReminders()
+  const { refresh: refreshTravel } = useTravelMode()
   const insets = useSafeAreaInsets()
   const { height } = useWindowDimensions()
   const { bumpRefresh } = useMoneyUi()
@@ -133,6 +157,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const [busy, setBusy] = useState(false)
   const [listening, setListening] = useState(false)
   const [wakeArmed, setWakeArmed] = useState(false)
+  const [handsFree, setHandsFree] = useState(false)
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [keyboard, setKeyboard] = useState(0)
   const nextId = useRef(1)
@@ -140,6 +165,16 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const saving = useRef(false)
   const stopVoiceRef = useRef<() => void>(() => {})
   const sendRef = useRef<(raw: string) => void>(() => {})
+  const handsFreeRef = useRef(false)
+  const endHandsFree = () => {
+    handsFreeRef.current = false
+    setHandsFree(false)
+    setText('')
+  }
+  const beginHandsFree = () => {
+    handsFreeRef.current = true
+    setHandsFree(true)
+  }
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
@@ -171,7 +206,34 @@ export function TraiDock({ bottom }: { bottom: number }) {
   }
 
   const applyResult = (data: BotTurnResult) => {
+    if (handsFreeRef.current && !handsFreeAfter(data)) endHandsFree()
     const action = data.action
+    if (data.saved && action?.action === 'set_theme' && isThemeId(action.theme)) void setThemeId(action.theme)
+    if (data.saved && action?.action === 'set_travel') void refreshTravel()
+    if (data.saved && action?.action === 'set_reminder' && action.remind) {
+      void reminders.updatePrefs({ enabled: true, leadDue: true })
+    }
+    if (!data.saved && action?.action === 'hide_amounts') {
+      if (privacy.enabled) privacy.lockNow()
+      else void privacy.setEnabled(true)
+    }
+    if (!data.saved && action?.action === 'show_amounts' && privacy.amountsHidden) privacy.openUnlockSheet()
+    if (!data.saved && action?.action === 'open_page') {
+      const path = {
+        home: '/(tabs)',
+        wallets: '/(tabs)/wallets',
+        budgets: '/(tabs)/budgets',
+        bills: '/(tabs)/bills',
+        reports: '/(tabs)/reports',
+        settings: '/(tabs)/settings',
+        travel: '/travel-mode',
+      }[action.page || ''] as '/(tabs)' | '/(tabs)/wallets' | '/(tabs)/budgets' | '/(tabs)/bills' | '/(tabs)/reports' | '/(tabs)/settings' | '/travel-mode' | undefined
+      if (path) {
+        endHandsFree()
+        setOpen(false)
+        router.push(path)
+      }
+    }
     const reply = data.reply || data.detail || ''
     if (data.saved) {
       setDraft(null)
@@ -257,7 +319,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   return (
     <>
       {open ? (
-        <Pressable style={styles.backdrop} onPress={() => setOpen(false)} accessibilityLabel="Close Trai" />
+        <Pressable style={styles.backdrop} onPress={() => { endHandsFree(); setOpen(false) }} accessibilityLabel="Close Trai" />
       ) : null}
       {open ? (
         <View
@@ -276,10 +338,10 @@ export function TraiDock({ bottom }: { bottom: number }) {
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: colors.text }]}>Trai</Text>
               <Text style={[styles.sub, { color: colors.textMuted }]}>
-                Say “Hey Trai”, or tap the robot. Then add an expense, mark a bill, or ask about this month.
+                Say “Hey Trai”, then keep talking. Say “yes save it” when the card looks right.
               </Text>
             </View>
-            <Pressable onPress={() => setOpen(false)} hitSlop={8} accessibilityLabel="Close">
+            <Pressable onPress={() => { endHandsFree(); setOpen(false) }} hitSlop={8} accessibilityLabel="Close">
               <Text style={{ color: colors.textMuted, fontSize: 18 }}>✕</Text>
             </Pressable>
           </View>
@@ -391,19 +453,41 @@ export function TraiDock({ bottom }: { bottom: number }) {
             ) : null}
             {busy ? <Text style={{ color: colors.textMuted }}>Trai is counting on its fingers…</Text> : null}
           </ScrollView>
+          {handsFree && TraiConversation ? (
+            <TraiConversation
+              active={open && !busy}
+              busy={busy}
+              prompt={turns[turns.length - 1]?.role === 'trai' ? turns[turns.length - 1].text : ''}
+              partial={text}
+              primary={colors.primary}
+              ink={colors.text}
+              muted={colors.textMuted}
+              hints={wallets.map(wallet => wallet.name)}
+              onTranscript={message => {
+                if (stopHandsFree(message)) {
+                  endHandsFree()
+                  return
+                }
+                void send(message)
+              }}
+              onPartial={setText}
+              onNotice={line => push({ role: 'trai', text: line })}
+              onStop={endHandsFree}
+            />
+          ) : null}
           <View style={[styles.composer, { borderTopColor: colors.border }]}>
             <TextInput
               ref={inputRef}
               value={text}
               onChangeText={setText}
-              placeholder={listening ? 'Listening…' : 'Slanty chips, Rp 50, cash'}
+              placeholder={handsFree || listening ? 'Listening…' : 'Slanty chips, Rp 50, cash'}
               placeholderTextColor={colors.textMuted}
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
               editable={!busy}
               maxLength={500}
               onSubmitEditing={() => void send(text)}
             />
-            {TraiMicButton ? (
+            {TraiMicButton && !handsFree ? (
               <TraiMicButton
                 busy={busy}
                 primary={colors.primary}
@@ -414,7 +498,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
                 onNotice={line => push({ role: 'trai', text: line })}
                 onListening={setListening}
               />
-            ) : (
+            ) : !handsFree ? (
               <Pressable
                 style={[styles.mic, { borderColor: colors.border, opacity: busy ? 0.5 : 1 }]}
                 disabled={busy}
@@ -423,7 +507,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
               >
                 <Ionicons name="mic" size={18} color={colors.primary} />
               </Pressable>
-            )}
+            ) : null}
             <Pressable
               style={[styles.send, { backgroundColor: colors.primary, opacity: busy || !text.trim() ? 0.5 : 1 }]}
               disabled={busy || !text.trim()}
@@ -441,15 +525,19 @@ export function TraiDock({ bottom }: { bottom: number }) {
           onArmed={setWakeArmed}
           onWake={command => {
             setOpen(true)
+            beginHandsFree()
             if (command) void sendRef.current(command)
-            else push({ role: 'trai', text: "I'm here." })
+            else push({ role: 'trai', text: "I'm here. What should I write down?" })
           }}
         />
       ) : null}
       {wakeArmed && !open ? <View pointerEvents="none" style={[styles.wakeRing, { bottom: bottom - 6 }]} /> : null}
       <Pressable
         style={[styles.fab, { bottom }]}
-        onPress={() => setOpen(value => !value)}
+        onPress={() => {
+          if (open) endHandsFree()
+          setOpen(value => !value)
+        }}
         accessibilityLabel={wakeArmed && !open ? 'Trai is listening for Hey Trai' : open ? 'Close Trai' : 'Open Trai'}
       >
         <Image source={traiIcon} style={styles.fabImage} resizeMode="cover" accessibilityIgnoresInvertColors />

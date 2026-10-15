@@ -375,9 +375,9 @@ class RecurringExpenseSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'amount', 'frequency', 'due_day', 'account',
             'account_name', 'active', 'paid_this_month', 'remaining_amount',
-            'paid_amount', 'created_at'
+            'paid_amount', 'created_at', 'remind',
         )
-        read_only_fields = ('created_at',)
+        read_only_fields = ('created_at', 'remind')
 
     def get_account_name(self, obj):
         return obj.account.name if obj.account else None

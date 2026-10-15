@@ -10,7 +10,7 @@ from django.db.models import F
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
-from .bot_actions import PHASE8_ACTIONS, WRITE_ACTIONS, match_known_category, normalize_action
+from .bot_actions import PHASE8_ACTIONS, PHASE9_WRITES, WRITE_ACTIONS, match_known_category, normalize_action
 from .bot_catalog import load_catalog
 from .models import BotDailyUsage, BotDraft
 from .serializers import TransactionSerializer
@@ -18,6 +18,11 @@ from .serializers import TransactionSerializer
 DRAFT_MINUTES = 10
 CONFIRM_WORDS = frozenset({'yes', 'save', 'han', 'haan'})
 CANCEL_WORDS = frozenset({'no', 'cancel', 'nope'})
+_SPOKEN_CONFIRM_RE = re.compile(
+    r'^(?:yes|yeah|yep|yup|ok|okay|han|haan|sure)\s+save(?:\s+it)?$'
+    r'|^save\s+it$'
+    r'|^(?:yes|yeah|yep|ok|okay)\s+do\s+it$',
+)
 _AMOUNT_RE = re.compile(
     r'^(?:make it|it was|change (?:it|the amount|amount) to)\s*(?:rs|rp|pkr)?\s*([0-9][0-9,]*)',
     re.IGNORECASE,
@@ -64,7 +69,8 @@ def message_kind(text: str) -> str:
         or _NOTE_RE.search(cleaned)
     ):
         return 'correct'
-    if cleaned in CONFIRM_WORDS:
+    spoken = ' '.join(cleaned.replace(',', ' ').split())
+    if cleaned in CONFIRM_WORDS or _SPOKEN_CONFIRM_RE.search(spoken):
         return 'confirm'
     if cleaned in CANCEL_WORDS:
         return 'cancel'
@@ -182,7 +188,7 @@ def confirm_draft(user, draft_id=None, request=None) -> dict:
         action = checked['action']
         if action.get('action') not in WRITE_ACTIONS:
             original = (draft.payload or {}).get('action')
-            if original in PHASE8_ACTIONS and action.get('action') == 'ask':
+            if original in (PHASE8_ACTIONS | PHASE9_WRITES) and action.get('action') == 'ask':
                 draft.status = BotDraft.CANCELLED
                 draft.save(update_fields=['status', 'updated_at'])
                 reply = checked.get('reply') or ''
@@ -196,6 +202,9 @@ def confirm_draft(user, draft_id=None, request=None) -> dict:
         if action['action'] in PHASE8_ACTIONS:
             from .bot_phase8 import execute_phase8
             tx = execute_phase8(user, action, draft.client_mutation_id, request)
+        elif action['action'] in PHASE9_WRITES:
+            from .bot_phase9 import execute_phase9
+            tx = execute_phase9(user, action, request)
         else:
             tx = _create_transaction(user, action, draft.client_mutation_id, request)
         draft.status = BotDraft.SAVED
@@ -252,6 +261,14 @@ def _saved_body(draft) -> dict:
     elif action == 'correct_last':
         wallet = tx.account.name if tx and tx.account_id else 'Your wallet'
         reply = f'Saved. The last entry now matches, and {wallet} is updated.'
+    elif action == 'set_theme':
+        reply = f'Saved. The theme is now {payload.get("theme_label") or "the color you picked"}.'
+    elif action == 'set_budget':
+        reply = 'Saved. That budget is set for this month.'
+    elif action == 'set_travel':
+        reply = 'Saved. Travel mode matches that card.'
+    elif action == 'set_reminder':
+        reply = 'Saved. That bill reminder is updated.'
     else:
         wallet = tx.account.name if tx and tx.account_id else 'Your wallet'
         reply = f'Saved. {wallet} is updated, and it did not even complain.'

@@ -374,6 +374,7 @@ class RecurringExpense(models.Model):
     account = models.ForeignKey(
         Account, null=True, blank=True, on_delete=models.SET_NULL, related_name='recurring_expenses')
     active = models.BooleanField(default=True)
+    remind = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

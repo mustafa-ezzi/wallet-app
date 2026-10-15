@@ -1988,6 +1988,31 @@ select option { background: var(--surface); color: var(--text-primary); }
 }
 .trai-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .trai-thinking, .trai-notice { margin: 0; font-size: 0.82rem; color: var(--text-muted, #64748b); }
+.trai-live {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--primary, #059669);
+}
+.trai-live-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: var(--primary, #059669);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary, #059669) 28%, transparent);
+}
+.trai-live button {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
 .trai-composer {
   display: flex;
   gap: 0.4rem;

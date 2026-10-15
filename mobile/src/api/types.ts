@@ -155,6 +155,7 @@ export type RecurringExpense = {
   paid_this_month: boolean
   remaining_amount?: number | string
   paid_amount?: number | string
+  remind?: boolean
 }
 
 export type Payable = {

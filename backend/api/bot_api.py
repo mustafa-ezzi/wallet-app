@@ -21,6 +21,7 @@ from .bot_draft import (
 )
 from .bot_gemini import BotModelError, generate_action
 from .bot_phase8 import phase8_question
+from .bot_phase9 import phase9_question
 from .bot_reads import READ_ACTIONS, regular_question, resolve_read
 
 
@@ -77,7 +78,9 @@ class BotMessageView(APIView):
                 return Response(_without_empty_warning(corrected))
 
         catalog = load_catalog(request.user)
-        raw = phase8_question(text, catalog)
+        raw = phase9_question(text, catalog)
+        if raw is None:
+            raw = phase8_question(text, catalog)
         if raw is None:
             local = regular_question(text, catalog)
             if local is not None:
