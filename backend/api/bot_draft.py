@@ -10,7 +10,7 @@ from django.db.models import F
 from django.utils import timezone
 from rest_framework.exceptions import NotFound, ValidationError
 
-from .bot_actions import WRITE_ACTIONS, match_known_category, normalize_action
+from .bot_actions import PHASE8_ACTIONS, WRITE_ACTIONS, match_known_category, normalize_action
 from .bot_catalog import load_catalog
 from .models import BotDailyUsage, BotDraft
 from .serializers import TransactionSerializer
@@ -139,7 +139,7 @@ def correct_pending(user, text: str) -> dict | None:
         raw['notes'] = note_match.group(1)
     if not amount_match and not wallet_match and not category_match and not note_match:
         return None
-    result = normalize_action(raw, catalog)
+    result = normalize_action(raw, catalog, user=user)
     if result['action']['action'] in WRITE_ACTIONS:
         draft.payload = result['action']
         draft.expires_at = timezone.now() + timedelta(minutes=DRAFT_MINUTES)
@@ -171,20 +171,33 @@ def _ask_about_draft(draft, question: str) -> dict:
 def confirm_draft(user, draft_id=None, request=None) -> dict:
     with transaction.atomic():
         draft = _locked_draft(user, draft_id)
-        if draft.status == BotDraft.SAVED and draft.transaction_id:
+        if draft.status == BotDraft.SAVED:
             return _saved_body(draft)
         if draft.status != BotDraft.PENDING:
             raise NotFound('Not found.')
         if _expired(draft):
             raise DraftExpired('That confirmation expired. Say it again.')
         catalog = load_catalog(user)
-        checked = normalize_action(draft.payload, catalog)
+        checked = normalize_action(draft.payload, catalog, user=user)
         action = checked['action']
         if action.get('action') not in WRITE_ACTIONS:
+            original = (draft.payload or {}).get('action')
+            if original in PHASE8_ACTIONS and action.get('action') == 'ask':
+                draft.status = BotDraft.CANCELLED
+                draft.save(update_fields=['status', 'updated_at'])
+                reply = checked.get('reply') or ''
+                if not str(reply).startswith('Cancelled.'):
+                    checked['reply'] = f'Cancelled. {reply}'
+                checked['saved'] = False
+                return checked
             checked['saved'] = False
             checked['draft_id'] = draft.id
             return checked
-        tx = _create_transaction(user, action, draft.client_mutation_id, request)
+        if action['action'] in PHASE8_ACTIONS:
+            from .bot_phase8 import execute_phase8
+            tx = execute_phase8(user, action, draft.client_mutation_id, request)
+        else:
+            tx = _create_transaction(user, action, draft.client_mutation_id, request)
         draft.status = BotDraft.SAVED
         draft.transaction = tx
         draft.save(update_fields=['status', 'transaction', 'updated_at'])
@@ -221,11 +234,30 @@ def _locked_draft(user, draft_id):
 
 
 def _saved_body(draft) -> dict:
+    payload = draft.payload or {}
+    action = payload.get('action')
     tx = draft.transaction
-    wallet = tx.account.name if tx and tx.account_id else 'Your wallet'
+    if action == 'delete_last':
+        reply = 'Removed. That entry is gone, and the notebook looks tidier.'
+    elif action == 'create_wallet':
+        reply = f'Saved. {payload.get("wallet_name") or "That wallet"} is ready.'
+    elif action == 'create_income_source':
+        reply = f'Saved. {payload.get("source_name") or "That income"} is on the list.'
+    elif action == 'transfer':
+        reply = 'Saved. The transfer is in both wallets.'
+    elif action == 'people_action':
+        reply = 'Saved. That people entry is in the books.'
+    elif action == 'mark_bill_paid':
+        reply = f'Saved. {payload.get("category") or "That bill"} is marked paid.'
+    elif action == 'correct_last':
+        wallet = tx.account.name if tx and tx.account_id else 'Your wallet'
+        reply = f'Saved. The last entry now matches, and {wallet} is updated.'
+    else:
+        wallet = tx.account.name if tx and tx.account_id else 'Your wallet'
+        reply = f'Saved. {wallet} is updated, and it did not even complain.'
     return {
-        'reply': f'Saved. {wallet} is updated, and it did not even complain.',
-        'action': draft.payload,
+        'reply': reply,
+        'action': payload,
         'saved': True,
         'draft_id': draft.id,
         'transaction_id': tx.id if tx else None,

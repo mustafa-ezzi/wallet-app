@@ -38,6 +38,7 @@ type Card = {
   accountId: number | null
   category: string
   notes: string
+  summary?: string
 }
 type ReadLine = { label: string; amount: string; emphasis?: boolean }
 type ReadBlock = { title: string; lines: ReadLine[]; breakdown?: ReadLine[]; breakdownTitle?: string; note?: string }
@@ -49,6 +50,7 @@ const EXAMPLES = [
   'How was my month?',
   'What was my recent transaction?',
   "What's my balance?",
+  'Mark rent paid',
 ]
 const traiIcon = require('../../assets/images/trai-icon.jpg')
 
@@ -182,7 +184,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
       push({ role: 'trai', text: reply, read: lines })
       return
     }
-    const writing = action && ['create_expense', 'create_income', 'mark_recurring_income'].includes(action.action)
+    const writing = Boolean(action && data.draft_id && action.action !== 'ask' && action.action !== 'refuse')
     if (writing && data.draft_id && action) {
       const card: Card = {
         draftId: data.draft_id,
@@ -190,6 +192,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
         accountId: action.account_id,
         category: action.category || '',
         notes: action.notes || '',
+        summary: action.summary || '',
       }
       setDraft(card)
       push({ role: 'trai', text: reply, card })
@@ -273,7 +276,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: colors.text }]}>Trai</Text>
               <Text style={[styles.sub, { color: colors.textMuted }]}>
-                Say “Hey Trai”, or tap the robot. Then add an expense or ask about this month.
+                Say “Hey Trai”, or tap the robot. Then add an expense, mark a bill, or ask about this month.
               </Text>
             </View>
             <Pressable onPress={() => setOpen(false)} hitSlop={8} accessibilityLabel="Close">
@@ -334,12 +337,18 @@ export function TraiDock({ bottom }: { bottom: number }) {
                 ) : null}
                 {turn.card ? (
                   <View style={{ marginTop: 8, gap: 4 }}>
-                    <Text style={{ color: colors.text, fontWeight: '700' }}>
-                      {money(turn.card.amount)} · {walletName(turn.card.accountId)}
-                    </Text>
-                    <Text style={{ color: colors.textSecondary }}>
-                      {turn.card.category}{turn.card.notes ? ` · ${turn.card.notes}` : ''}
-                    </Text>
+                    {turn.card.summary ? (
+                      <Text style={{ color: colors.text, fontWeight: '700' }}>{turn.card.summary}</Text>
+                    ) : (
+                      <>
+                        <Text style={{ color: colors.text, fontWeight: '700' }}>
+                          {money(turn.card.amount)} · {walletName(turn.card.accountId)}
+                        </Text>
+                        <Text style={{ color: colors.textSecondary }}>
+                          {turn.card.category}{turn.card.notes ? ` · ${turn.card.notes}` : ''}
+                        </Text>
+                      </>
+                    )}
                     {isLatestCard(turns, turn, draft?.draftId) ? (
                       <View style={{ gap: 6 }}>
                         <View style={styles.row}>

@@ -20,6 +20,7 @@ from .bot_draft import (
     store_proposal,
 )
 from .bot_gemini import BotModelError, generate_action
+from .bot_phase8 import phase8_question
 from .bot_reads import READ_ACTIONS, regular_question, resolve_read
 
 
@@ -76,26 +77,28 @@ class BotMessageView(APIView):
                 return Response(_without_empty_warning(corrected))
 
         catalog = load_catalog(request.user)
-        local = regular_question(text, catalog)
-        if local is not None:
-            result = resolve_read(request.user, local, catalog, text)
-            result['saved'] = False
-            return Response(_without_empty_warning(result))
+        raw = phase8_question(text, catalog)
+        if raw is None:
+            local = regular_question(text, catalog)
+            if local is not None:
+                result = resolve_read(request.user, local, catalog, text)
+                result['saved'] = False
+                return Response(_without_empty_warning(result))
 
-        if not allow_model_call(request.user):
-            return Response(
-                {'detail': 'Trai is resting until tomorrow.', 'saved': False},
-                status=429,
-            )
-        try:
-            raw = generate_action(text, catalog)
-        except BotModelError as exc:
-            return Response({'detail': str(exc), 'saved': False}, status=503)
-        if str(raw.get('action') if isinstance(raw, dict) else '') in READ_ACTIONS:
-            result = resolve_read(request.user, raw, catalog, text)
-            result['saved'] = False
-            return Response(_without_empty_warning(result))
-        result = normalize_action(raw, catalog)
+            if not allow_model_call(request.user):
+                return Response(
+                    {'detail': 'Trai is resting until tomorrow.', 'saved': False},
+                    status=429,
+                )
+            try:
+                raw = generate_action(text, catalog)
+            except BotModelError as exc:
+                return Response({'detail': str(exc), 'saved': False}, status=503)
+            if str(raw.get('action') if isinstance(raw, dict) else '') in READ_ACTIONS:
+                result = resolve_read(request.user, raw, catalog, text)
+                result['saved'] = False
+                return Response(_without_empty_warning(result))
+        result = normalize_action(raw, catalog, user=request.user)
         if result['action']['action'] in WRITE_ACTIONS:
             draft = store_proposal(request.user, result['action'])
             result['draft_id'] = draft.id

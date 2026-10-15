@@ -558,6 +558,7 @@ export type BotAction = {
   expense_count?: number | null
   top_categories?: { category: string; amount: string }[] | null
   items?: { label: string; amount: string; detail?: string }[] | null
+  summary?: string | null
   month_income?: string | null
   month_expense?: string | null
   month_net?: string | null

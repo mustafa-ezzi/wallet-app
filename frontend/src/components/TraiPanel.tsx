@@ -10,6 +10,7 @@ type Card = {
   accountId: number | null
   category: string
   notes: string
+  summary?: string
 }
 type ReadLine = { label: string; amount: string; emphasis?: boolean }
 type ReadBlock = { title: string; lines: ReadLine[]; breakdown?: ReadLine[]; breakdownTitle?: string; note?: string }
@@ -28,6 +29,7 @@ const EXAMPLES = [
   { label: 'How was my month?', text: 'How was my month?' },
   { label: 'What was my recent transaction?', text: 'What was my recent transaction?' },
   { label: "What's my balance?", text: "What's my balance?" },
+  { label: 'Mark rent paid', text: 'Mark rent paid' },
 ]
 
 function errorDetail(err: unknown): { status: number; detail: string } {
@@ -187,7 +189,7 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
       push({ role: 'trai', text: reply, read: lines })
       return
     }
-    const writing = action && ['create_expense', 'create_income', 'mark_recurring_income'].includes(action.action)
+    const writing = Boolean(action && data.draft_id && action.action !== 'ask' && action.action !== 'refuse')
     if (writing && data.draft_id && action) {
       const card: Card = {
         draftId: data.draft_id,
@@ -195,6 +197,7 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
         accountId: action.account_id,
         category: action.category || '',
         notes: action.notes || '',
+        summary: action.summary || '',
       }
       setDraft(card)
       push({ role: 'trai', text: reply, card })
@@ -328,7 +331,7 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
             <img src="/trai-icon.jpg" alt="" className="trai-mark" />
             <div>
               <strong>Trai</strong>
-              <p>Add an expense, mark income, or ask about this month.</p>
+              <p>Add an expense, mark a bill, move money, or ask about this month.</p>
             </div>
             <button type="button" className="trai-close" onClick={() => setOpen(false)} aria-label="Close">
               <X size={18} />
@@ -372,8 +375,14 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
                 ) : null}
                 {turn.card ? (
                   <div className="trai-card">
-                    <div><b>{money(turn.card.amount)}</b> · {walletName(turn.card.accountId)}</div>
-                    <div>{turn.card.category}{turn.card.notes ? ` · ${turn.card.notes}` : ''}</div>
+                    {turn.card.summary ? (
+                      <div><b>{turn.card.summary}</b></div>
+                    ) : (
+                      <>
+                        <div><b>{money(turn.card.amount)}</b> · {walletName(turn.card.accountId)}</div>
+                        <div>{turn.card.category}{turn.card.notes ? ` · ${turn.card.notes}` : ''}</div>
+                      </>
+                    )}
                     {isLatestCard(turns, turn, draft?.draftId) ? (
                       <>
                         <div className="trai-card-actions">

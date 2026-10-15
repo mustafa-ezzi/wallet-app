@@ -6,7 +6,7 @@ no login ids, and no rows that belong to anyone else.
 
 from decimal import Decimal
 
-from .models import Account, Project, UserCategory
+from .models import Account, Project, RecurringExpense, UserCategory
 
 EXPENSE_CATEGORIES = (
     'Personal',
@@ -80,6 +80,21 @@ def load_catalog(user) -> dict:
         if row.name not in bucket:
             bucket.append(row.name)
 
+    bills = []
+    for bill in RecurringExpense.objects.filter(user=user, active=True).order_by('name', 'id'):
+        account_id = bill.account_id if bill.account_id in wallet_ids else None
+        bills.append({
+            'id': bill.id,
+            'name': bill.name,
+            'amount': _money(bill.amount),
+            'account_id': account_id,
+            'paid_this_month': bill.remaining_amount <= 0.01,
+        })
+    people = [
+        {'id': row.id, 'name': row.name}
+        for row in Account.objects.filter(user=user, type='person').order_by('name', 'id')
+    ]
+
     return {
         'wallets': [
             {'id': wallet.id, 'name': wallet.name, 'type': wallet.type}
@@ -90,6 +105,8 @@ def load_catalog(user) -> dict:
             'expense': expense_names,
             'income': income_names,
         },
+        'bills': bills,
+        'people': people,
     }
 
 

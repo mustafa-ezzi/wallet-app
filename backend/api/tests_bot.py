@@ -14,7 +14,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from api.bot_catalog import FORBIDDEN_CATALOG_KEYS, catalog_key_set, load_catalog
 from api.bot_gemini import BotModelError, build_user_message, generate_action
-from api.models import Account, BotDraft, Project, Transaction, UserProfile
+from api.models import Account, BotDraft, Project, RecurringExpense, Transaction, UserProfile
 
 
 class BotFixture(TestCase):
@@ -691,3 +691,313 @@ class BotReadTests(BotFixture):
         self.assertEqual(response.data['action']['action'], 'refuse')
         self.assertNotIn('8000', response.data['reply'])
         self.assertEqual(BotDraft.objects.count(), 0)
+
+
+class BotPhase8Tests(BotFixture):
+    def setUp(self):
+        super().setUp()
+        self.ahmed = Account.objects.get(user=self.user, name='Ahmed', type='person')
+        self.rent = RecurringExpense.objects.create(
+            user=self.user,
+            name='Rent',
+            amount=Decimal('15000.00'),
+            frequency='monthly',
+            account=self.cash,
+            active=True,
+        )
+
+    def _yes(self, proposed):
+        self.assertEqual(proposed.status_code, 200, proposed.data)
+        self.assertIn('draft_id', proposed.data)
+        self.assertFalse(proposed.data['saved'])
+        saved = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertEqual(saved.status_code, 200, saved.data)
+        self.assertTrue(saved.data['saved'], saved.data)
+        return saved
+
+    def _save_chips(self):
+        proposed = self.post_fake('chips 50 cash', {
+            'action': 'create_expense',
+            'amount': '50',
+            'account_id': self.cash.id,
+            'category': 'Food & Drink',
+            'notes': 'chips',
+        })
+        self.assertEqual(proposed.data['action']['action'], 'create_expense')
+        saved = self._yes(proposed)
+        return Transaction.objects.get(pk=saved.data['transaction_id'])
+
+    def _manual(self, user, account, amount='80.00'):
+        return Transaction.objects.create(
+            user=user,
+            type='expense',
+            amount=Decimal(amount),
+            date=timezone.localdate(),
+            account=account,
+            category='Fuel & Maintenance',
+            notes='petrol',
+        )
+
+    def test_catalog_lists_this_users_bills_and_people(self):
+        other_bill = RecurringExpense.objects.create(
+            user=self.other, name='Secret Rent', amount=Decimal('10.00'), account=self.other_wallet,
+        )
+        catalog = load_catalog(self.user)
+        self.assertEqual({row['id'] for row in catalog['bills']}, {self.rent.id})
+        self.assertNotIn(other_bill.id, {row['id'] for row in catalog['bills']})
+        self.assertEqual({row['name'] for row in catalog['people']}, {'Ahmed'})
+        self.assertFalse(catalog['bills'][0]['paid_this_month'])
+        self.assertNotIn('Ahmed', {row['name'] for row in catalog['wallets']})
+
+    def test_mark_rent_paid_links_the_bill_once(self):
+        proposed = self.post_local('Mark rent paid')
+        action = proposed.data['action']
+        self.assertEqual(action['action'], 'mark_bill_paid')
+        self.assertEqual(action['bill_id'], self.rent.id)
+        self.assertEqual(action['amount'], '15000.00')
+        self.assertEqual(action['account_id'], self.cash.id)
+        self.assertEqual(action['category'], 'Rent')
+        self.assertIn('Save it?', proposed.data['reply'])
+        self.assertEqual(Transaction.objects.count(), 0)
+        self._yes(proposed)
+        tx = Transaction.objects.get(linked_recurring_expense=self.rent)
+        self.assertEqual(tx.user_id, self.user.id)
+        self.assertEqual(tx.amount, Decimal('15000.00'))
+        self.assertEqual(tx.account_id, self.cash.id)
+        again = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertTrue(again.data['saved'])
+        self.assertEqual(Transaction.objects.filter(linked_recurring_expense=self.rent).count(), 1)
+        repeat = self.post_local('Mark rent paid')
+        self.assertEqual(repeat.data['action']['action'], 'ask')
+        self.assertNotIn('draft_id', repeat.data)
+        self.assertIn('already paid', repeat.data['reply'].lower())
+        self.assertEqual(Transaction.objects.filter(linked_recurring_expense=self.rent).count(), 1)
+
+    def test_mark_rent_paid_can_use_a_stated_amount(self):
+        proposed = self.post_local('mark rent paid 1200')
+        self.assertEqual(proposed.data['action']['amount'], '1200.00')
+        self._yes(proposed)
+        self.assertEqual(Transaction.objects.get(linked_recurring_expense=self.rent).amount, Decimal('1200.00'))
+        self.assertAlmostEqual(self.rent.remaining_amount, 13800.0, places=2)
+
+    def test_another_users_bill_is_refused(self):
+        other_bill = RecurringExpense.objects.create(
+            user=self.other, name='Secret Rent', amount=Decimal('10.00'), account=self.other_wallet,
+        )
+        response = self.post_fake('note a bill', {
+            'action': 'mark_bill_paid',
+            'bill_id': other_bill.id,
+            'amount': '10',
+            'account_id': self.cash.id,
+        })
+        self.assertEqual(response.data['action']['action'], 'refuse')
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_delete_all_refuses_and_keeps_every_row(self):
+        own = self._manual(self.user, self.cash)
+        other = self._manual(self.other, self.other_wallet, '8000.00')
+        response = self.post_local('delete all my expenses')
+        self.assertEqual(response.data['action']['action'], 'refuse')
+        self.assertNotIn('draft_id', response.data)
+        self.assertIn('will not erase', response.data['reply'].lower())
+        self.assertTrue(Transaction.objects.filter(pk=own.id).exists())
+        self.assertTrue(Transaction.objects.filter(pk=other.id).exists())
+
+    def test_delete_last_removes_only_the_entry_trai_saved(self):
+        trai = self._save_chips()
+        manual = self._manual(self.user, self.cash)
+        other = self._manual(self.other, self.other_wallet, '8000.00')
+        proposed = self.post_local('delete the last one')
+        self.assertEqual(proposed.data['action']['action'], 'delete_last')
+        self.assertEqual(proposed.data['action']['target_id'], trai.id)
+        self.assertNotEqual(proposed.data['action']['target_id'], manual.id)
+        self.assertIn('Save it?', proposed.data['reply'])
+        self.assertNotIn('delete', proposed.data['action']['summary'].lower())
+        self._yes(proposed)
+        self.assertFalse(Transaction.objects.filter(pk=trai.id).exists())
+        self.assertTrue(Transaction.objects.filter(pk=manual.id).exists())
+        self.assertTrue(Transaction.objects.filter(pk=other.id).exists())
+        again = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertTrue(again.data['saved'], again.data)
+        self.assertTrue(Transaction.objects.filter(pk=manual.id).exists())
+        self.assertTrue(Transaction.objects.filter(pk=other.id).exists())
+
+    def test_delete_last_asks_when_trai_has_not_saved(self):
+        manual = self._manual(self.user, self.cash)
+        response = self.post_local('delete the last one')
+        self.assertEqual(response.data['action']['action'], 'ask')
+        self.assertNotIn('draft_id', response.data)
+        self.assertTrue(Transaction.objects.filter(pk=manual.id).exists())
+
+    def test_delete_last_ignores_someone_elses_id(self):
+        trai = self._save_chips()
+        other = self._manual(self.other, self.other_wallet, '8000.00')
+        response = self.post_fake('adjust the saved row', {
+            'action': 'delete_last',
+            'target_id': other.id,
+        })
+        self.assertEqual(response.data['action']['target_id'], trai.id)
+        self._yes(response)
+        self.assertFalse(Transaction.objects.filter(pk=trai.id).exists())
+        self.assertTrue(Transaction.objects.filter(pk=other.id).exists())
+
+    def test_correct_last_changes_only_the_trai_entry(self):
+        trai = self._save_chips()
+        manual = self._manual(self.user, self.cash)
+        other = self._manual(self.other, self.other_wallet, '8000.00')
+        proposed = self.post_local('change the last one to 150')
+        self.assertEqual(proposed.data['action']['action'], 'correct_last')
+        self.assertEqual(proposed.data['action']['amount'], '150.00')
+        self.assertEqual(proposed.data['action']['target_id'], trai.id)
+        self._yes(proposed)
+        trai.refresh_from_db()
+        manual.refresh_from_db()
+        other.refresh_from_db()
+        self.assertEqual(trai.amount, Decimal('150.00'))
+        self.assertEqual(manual.amount, Decimal('80.00'))
+        self.assertEqual(other.amount, Decimal('8000.00'))
+        self.assertEqual(Transaction.objects.filter(user=self.user).count(), 2)
+
+    def test_transfer_writes_two_bank_rows_outside_the_month_total(self):
+        proposed = self.post_local('transfer 1000 from Cash to Meezan')
+        action = proposed.data['action']
+        self.assertEqual(action['action'], 'transfer')
+        self.assertEqual(action['amount'], '1000.00')
+        self.assertEqual(action['account_id'], self.cash.id)
+        self.assertEqual(action['to_account_id'], self.meezan.id)
+        self.assertEqual(action['category'], 'Bank Transfer')
+        self.assertEqual(Transaction.objects.count(), 0)
+        self._yes(proposed)
+        rows = Transaction.objects.filter(user=self.user, category='Bank Transfer')
+        self.assertEqual(rows.count(), 2)
+        self.assertEqual(rows.filter(type='expense', account=self.cash).count(), 1)
+        self.assertEqual(rows.filter(type='income', account=self.meezan).count(), 1)
+        again = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertTrue(again.data['saved'])
+        self.assertEqual(Transaction.objects.filter(user=self.user, category='Bank Transfer').count(), 2)
+        month = self.post_local('How was my month?')
+        self.assertEqual(Decimal(month.data['action']['month_expense']), Decimal('0.00'))
+        self.assertEqual(Decimal(month.data['action']['month_income']), Decimal('0.00'))
+        self.assertEqual(Transaction.objects.filter(user=self.other).count(), 0)
+
+    def test_transfer_to_the_same_wallet_asks(self):
+        response = self.post_local('transfer 1000 from Cash to Cash')
+        self.assertEqual(response.data['action']['action'], 'ask')
+        self.assertNotIn('draft_id', response.data)
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_transfer_to_another_users_wallet_is_refused(self):
+        response = self.post_fake('shift funds', {
+            'action': 'transfer',
+            'amount': '1000',
+            'account_id': self.cash.id,
+            'to_account_id': self.other_wallet.id,
+        })
+        self.assertEqual(response.data['action']['action'], 'refuse')
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_lend_uses_people_entries_not_salary(self):
+        proposed = self.post_local('lend 200 to Ahmed from Cash')
+        action = proposed.data['action']
+        self.assertEqual(action['action'], 'people_action')
+        self.assertEqual(action['people_kind'], 'lend')
+        self.assertEqual(action['person_id'], self.ahmed.id)
+        self.assertEqual(action['account_id'], self.cash.id)
+        self.assertEqual(action['amount'], '200.00')
+        self.assertTrue(action['category'].startswith('People:'))
+        self.assertNotEqual(action['category'], 'Salary')
+        self.assertEqual(Transaction.objects.count(), 0)
+        self._yes(proposed)
+        rows = Transaction.objects.filter(user=self.user)
+        self.assertEqual(rows.count(), 2)
+        self.assertEqual(rows.filter(people_action='lend').count(), 2)
+        self.assertFalse(rows.filter(category='Salary').exists())
+        again = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertTrue(again.data['saved'])
+        self.assertEqual(Transaction.objects.filter(user=self.user).count(), 2)
+        month = self.post_local('How was my month?')
+        self.assertEqual(Decimal(month.data['action']['month_expense']), Decimal('0.00'))
+        self.assertEqual(Transaction.objects.filter(user=self.other).count(), 0)
+
+    def test_people_action_ignores_a_salary_category(self):
+        response = self.post_fake('note a person movement', {
+            'action': 'people_action',
+            'people_kind': 'lend',
+            'person_id': self.ahmed.id,
+            'account_id': self.cash.id,
+            'amount': '200',
+            'category': 'Salary',
+        })
+        self.assertEqual(response.data['action']['category'], 'People: Money Lent')
+        self._yes(response)
+        self.assertFalse(Transaction.objects.filter(category='Salary').exists())
+        self.assertEqual(Transaction.objects.filter(user=self.user, people_action='lend').count(), 2)
+
+    def test_another_users_person_is_refused(self):
+        sara = Account.objects.create(user=self.other, name='Sara', type='person')
+        response = self.post_fake('note a person movement', {
+            'action': 'people_action',
+            'people_kind': 'lend',
+            'person_id': sara.id,
+            'account_id': self.cash.id,
+            'amount': '200',
+        })
+        self.assertEqual(response.data['action']['action'], 'refuse')
+        self.assertEqual(Transaction.objects.count(), 0)
+
+    def test_new_wallet_is_created_only_after_confirm(self):
+        before = Account.objects.filter(user=self.user).count()
+        proposed = self.post_local('add a wallet called JazzCash')
+        self.assertEqual(proposed.data['action']['action'], 'create_wallet')
+        self.assertEqual(proposed.data['action']['wallet_name'], 'JazzCash')
+        self.assertEqual(proposed.data['action']['wallet_type'], 'bank')
+        self.assertIn('Save it?', proposed.data['reply'])
+        self.assertNotIn('Rs 0', proposed.data['reply'])
+        self.assertEqual(Account.objects.filter(user=self.user).count(), before)
+        self._yes(proposed)
+        wallet = Account.objects.get(user=self.user, name='JazzCash')
+        self.assertEqual(wallet.type, 'bank')
+        self.assertEqual(wallet.opening_balance, Decimal('0'))
+        again = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertTrue(again.data['saved'])
+        self.assertEqual(Account.objects.filter(user=self.user, name='JazzCash').count(), 1)
+
+    def test_duplicate_wallet_name_asks(self):
+        response = self.post_local('add a wallet called Cash')
+        self.assertEqual(response.data['action']['action'], 'ask')
+        self.assertNotIn('draft_id', response.data)
+        self.assertEqual(Account.objects.filter(user=self.user, name__iexact='Cash').count(), 1)
+
+    def test_person_wallet_is_refused(self):
+        before = Account.objects.filter(user=self.user).count()
+        response = self.post_local('add a person wallet called Ahmed')
+        self.assertEqual(response.data['action']['action'], 'refuse')
+        self.assertIn('people', response.data['reply'].lower())
+        self.assertEqual(Account.objects.filter(user=self.user).count(), before)
+
+    def test_new_income_source_is_created_only_after_confirm(self):
+        before = Project.objects.filter(user=self.user).count()
+        proposed = self.post_local('add income source Side gig 5000')
+        action = proposed.data['action']
+        self.assertEqual(action['action'], 'create_income_source')
+        self.assertEqual(action['source_name'], 'Side gig')
+        self.assertEqual(action['amount'], '5000.00')
+        self.assertEqual(action['income_type'], 'recurring_monthly')
+        self.assertEqual(Project.objects.filter(user=self.user).count(), before)
+        self._yes(proposed)
+        gig = Project.objects.get(user=self.user, name='Side gig')
+        self.assertEqual(gig.amount, Decimal('5000.00'))
+        self.assertEqual(gig.income_type, 'recurring_monthly')
+        self.assertEqual(gig.status, 'active')
+        again = self.client.post('/api/bot/message/', {'text': 'yes'}, format='json')
+        self.assertTrue(again.data['saved'])
+        self.assertEqual(Project.objects.filter(user=self.user, name='Side gig').count(), 1)
+
+    def test_household_sentence_is_refused(self):
+        before = Transaction.objects.count()
+        response = self.post_local('add this rent to the household ledger')
+        self.assertEqual(response.data['action']['action'], 'refuse')
+        self.assertIn('household', response.data['reply'].lower())
+        self.assertNotIn('draft_id', response.data)
+        self.assertEqual(Transaction.objects.count(), before)
+

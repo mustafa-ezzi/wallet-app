@@ -9,18 +9,27 @@ from decimal import Decimal, InvalidOperation
 
 from django.utils import timezone
 
+PHASE8_ACTIONS = frozenset({
+    'mark_bill_paid',
+    'delete_last',
+    'correct_last',
+    'transfer',
+    'people_action',
+    'create_wallet',
+    'create_income_source',
+})
 ALLOWED_ACTIONS = frozenset({
     'create_expense',
     'create_income',
     'mark_recurring_income',
     'ask',
     'refuse',
-})
+}) | PHASE8_ACTIONS
 WRITE_ACTIONS = frozenset({
     'create_expense',
     'create_income',
     'mark_recurring_income',
-})
+}) | PHASE8_ACTIONS
 
 _SQL_RE = re.compile(
     r'\b(select|insert|update|delete|drop|alter|union)\b',
@@ -47,7 +56,7 @@ INCOME_ALIASES = {
 REFUSE_REPLY = 'I can only add your own expenses and income. Other people\'s money is not my business.'
 
 
-def normalize_action(raw, catalog, today=None) -> dict:
+def normalize_action(raw, catalog, today=None, user=None) -> dict:
     """Return reply, action, saved=False, and warning when we block a double mark."""
     today = today or timezone.localdate()
     if not isinstance(raw, dict):
@@ -60,6 +69,10 @@ def normalize_action(raw, catalog, today=None) -> dict:
     if action not in ALLOWED_ACTIONS:
         return _refuse()
     if action == 'refuse':
+        reason = str(raw.get('reason') or '')
+        if reason in ('erase', 'household'):
+            from .bot_phase8 import phase8_refusal
+            return phase8_refusal(reason)
         return _refuse()
     if action == 'ask':
         question = _safe_question(raw.get('ask')) or ''
@@ -67,6 +80,10 @@ def normalize_action(raw, catalog, today=None) -> dict:
             return _ask(question or 'Can you say that again with the amount and the wallet? I am a bookkeeper, not a mind reader.')
         action = 'mark_recurring_income' if _optional_int(raw.get('linked_project_id')) else 'create_expense'
         raw = {**raw, 'date': None}
+
+    if action in PHASE8_ACTIONS:
+        from .bot_phase8 import normalize_phase8
+        return normalize_phase8(raw, catalog, user=user, today=today)
 
     wallets = {row['id']: row for row in catalog.get('wallets') or []}
     sources = {row['id']: row for row in catalog.get('income_sources') or []}
