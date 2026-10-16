@@ -13,7 +13,7 @@ Match the site that is already there. Do not invent a purple SaaS theme, a dark 
 ## What Trai is
 
 Trai is short for Transaction Record Account Intelligence (TRAI). It lives inside WalletTrails. You type or say a sentence, Trai turns it into a money entry, and nothing is written until you say to save it.
-
+ 
 It is a bookkeeper in the app. It is not a general chatbot, and it does not browse the web.
 
 Voice stays on the phone. The recording is not uploaded. The model key stays on the server.
