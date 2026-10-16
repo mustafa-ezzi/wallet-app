@@ -46,6 +46,8 @@ export function TraiConversation({
   const sentRef = useRef(false)
   const missesRef = useRef(0)
   const openedRef = useRef(false)
+  const openedAt = useRef(0)
+  const activeSince = useRef(0)
   const retriesRef = useRef(0)
   const pulse = useRef(new Animated.Value(1)).current
   activeRef.current = active
@@ -83,9 +85,13 @@ export function TraiConversation({
       ExpoSpeechRecognitionModule.start({
         lang: 'en-US',
         interimResults: true,
-        continuous: false,
+        continuous: true,
         requiresOnDeviceRecognition: false,
         contextualStrings: ['Trai', 'yes save it', 'save it', ...hints].slice(0, 12),
+        androidIntentOptions: {
+          EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 2800,
+          EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 1800,
+        },
       })
     } catch {
       if (!activeRef.current || sentRef.current) return
@@ -104,6 +110,7 @@ export function TraiConversation({
   useSpeechRecognitionEvent('start', () => {
     if (!activeRef.current) return
     openedRef.current = true
+    openedAt.current = Date.now()
     retriesRef.current = 0
   })
   useSpeechRecognitionEvent('result', (event) => {
@@ -129,9 +136,21 @@ export function TraiConversation({
       onStopRef.current(true)
     }
   })
+  const keepListening = () => {
+    setTimeout(() => {
+      if (activeRef.current && !sentRef.current) void arm()
+    }, 450)
+  }
+
   useSpeechRecognitionEvent('end', () => {
     if (!activeRef.current || sentRef.current || !openedRef.current) return
+    const justOpened = Date.now() - openedAt.current < 900
+    const settling = Date.now() - activeSince.current < 4000
     openedRef.current = false
+    if (justOpened || settling) {
+      keepListening()
+      return
+    }
     missesRef.current += 1
     if (missesRef.current >= 3) {
       missesRef.current = 0
@@ -139,9 +158,7 @@ export function TraiConversation({
       onStopRef.current(true)
       return
     }
-    setTimeout(() => {
-      if (activeRef.current && !sentRef.current) void arm()
-    }, 350)
+    keepListening()
   })
 
   useEffect(() => {
@@ -153,6 +170,8 @@ export function TraiConversation({
     sentRef.current = false
     missesRef.current = 0
     openedRef.current = false
+    openedAt.current = 0
+    activeSince.current = Date.now()
     retriesRef.current = 0
     const timer = setTimeout(() => {
       void arm()

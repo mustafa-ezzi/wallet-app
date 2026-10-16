@@ -31,10 +31,11 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
     restartTimer.current = null
   }
 
-  const halt = () => {
+  const halt = (stopRecognizer: boolean) => {
     clearRestart()
     recognizing.current = false
     onArmedRef.current(false)
+    if (!stopRecognizer) return
     try {
       ExpoSpeechRecognitionModule.abort()
     } catch {
@@ -135,17 +136,19 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
 
   useEffect(() => {
     const sync = (state: string) => {
-      const active = state === 'active' && !paused && !denied.current
+      const foreground = state === 'active'
+      const active = foreground && !paused && !denied.current
       shouldListen.current = active
       if (active) void arm()
-      else halt()
+      else halt(!foreground)
     }
     sync(AppState.currentState)
     const sub = AppState.addEventListener('change', sync)
     return () => {
       sub.remove()
       shouldListen.current = false
-      halt()
+      // Hands-free already owns the microphone. Aborting here cuts off the sentence after "Hey Trai".
+      halt(!pausedRef.current)
     }
   }, [paused])
 
