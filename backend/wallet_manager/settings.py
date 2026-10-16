@@ -261,3 +261,7 @@ try:
 except ValueError:
     BOT_DAILY_MESSAGE_CAP = 30
 
+# Dotted path of the TraiHost instance. WalletTrails views set the host directly.
+# Another project can mount trai.urls and rely on this setting.
+TRAI_HOST = 'api.trai_host.wallet_host'
+

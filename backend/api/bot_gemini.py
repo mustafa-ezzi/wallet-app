@@ -10,6 +10,8 @@ from urllib.parse import urlsplit
 from django.conf import settings
 from django.utils import timezone
 
+from trai.engine import TraiModelError
+
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """You are Trai, the bookkeeping assistant inside WalletTrails.
@@ -56,7 +58,7 @@ Rules:
 """
 
 
-class BotModelError(Exception):
+class BotModelError(TraiModelError):
     """The model could not be called. The books were not changed."""
 
 

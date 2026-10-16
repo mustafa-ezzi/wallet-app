@@ -17,8 +17,9 @@ type Props = {
   onTranscript: (text: string) => void
   onPartial: (text: string) => void
   onNotice: (text: string) => void
-  onStop: () => void
+  onStop: (holdReply?: boolean) => void
   hints: string[]
+  variant?: 'strip' | 'hidden'
 }
 
 /** One spoken turn at a time, then Trai asks the next question and listens again. */
@@ -35,6 +36,7 @@ export function TraiConversation({
   onNotice,
   onStop,
   hints,
+  variant = 'strip',
 }: Props) {
   const activeRef = useRef(active)
   const onTranscriptRef = useRef(onTranscript)
@@ -63,7 +65,7 @@ export function TraiConversation({
     try {
       if (!ExpoSpeechRecognitionModule.isRecognitionAvailable()) {
         onNoticeRef.current(voiceErrorLine('unavailable') || '')
-        onStopRef.current()
+        onStopRef.current(true)
         return
       }
       const current = await ExpoSpeechRecognitionModule.getPermissionsAsync()
@@ -71,7 +73,7 @@ export function TraiConversation({
         const asked = current.canAskAgain === false ? current : await ExpoSpeechRecognitionModule.requestPermissionsAsync()
         if (!asked.granted) {
           onNoticeRef.current(voiceErrorLine('not-allowed') || '')
-          onStopRef.current()
+          onStopRef.current(true)
           return
         }
       }
@@ -84,7 +86,9 @@ export function TraiConversation({
         contextualStrings: ['Trai', 'yes save it', 'save it', ...hints].slice(0, 12),
       })
     } catch {
-      if (activeRef.current) onNoticeRef.current(voiceErrorLine('unavailable') || '')
+      if (!activeRef.current) return
+      onNoticeRef.current(voiceErrorLine('unavailable') || '')
+      onStopRef.current(true)
     }
   }
 
@@ -108,7 +112,7 @@ export function TraiConversation({
     const line = voiceErrorLine(event.error)
     if (line) onNoticeRef.current(line)
     if (event.error === 'not-allowed' || event.error === 'service-not-allowed' || event.error === 'language-not-supported') {
-      onStopRef.current()
+      onStopRef.current(true)
     }
   })
   useSpeechRecognitionEvent('end', () => {
@@ -117,7 +121,7 @@ export function TraiConversation({
     if (missesRef.current >= 3) {
       missesRef.current = 0
       onNoticeRef.current(voiceErrorLine('no-speech') || '')
-      onStopRef.current()
+      onStopRef.current(true)
       return
     }
     setTimeout(() => {
@@ -147,7 +151,7 @@ export function TraiConversation({
   }, [active])
 
   useEffect(() => {
-    if (!active || busy) return
+    if (variant === 'hidden' || !active || busy) return
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1.18, duration: 700, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -156,7 +160,9 @@ export function TraiConversation({
     )
     loop.start()
     return () => loop.stop()
-  }, [active, busy, pulse])
+  }, [active, busy, pulse, variant])
+
+  if (variant === 'hidden') return null
 
   return (
     <View style={styles.wrap}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import './screenshots.css'
 import './reference-sections.css'
 import './brand.css'
+import './trai.css'
 
 const icons = {
   arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
@@ -37,13 +38,14 @@ const productFeatures = [
 ]
 
 function PhonePreview() {
-  return <div className="phone phone--real-screenshot" aria-label="WalletTrails reports screen preview"><div className="notch" /><img src="/media/screenshots/reports.png" alt="WalletTrails reports screen" /></div>
+  return <div className="phone phone--real-screenshot" aria-label="WalletTrails reports screen preview"><div className="notch" /><img src="/media/screenshots/report.png" alt="WalletTrails reports screen" /></div>
 }
 
 const NAV_LINKS = [
   ['home', 'Home'],
   ['screenshots', 'Screenshots'],
   ['features', 'Features'],
+  ['trai', 'Trai'],
   ['freelancers', 'Freelancers'],
   ['about', 'About'],
   ['how', 'How it works'],
@@ -88,15 +90,90 @@ function ProductDepth() {
 }
 
 const screenshots = [
-  ['/media/screenshots/wallet-overview.png', 'Income', 'Income sources, salary, and client payments'],
-  ['/media/screenshots/wallets.png', 'Wallets', 'Your cash and bank accounts together'],
-  ['/media/screenshots/income.png', 'Everyday money', 'A clear view of the details that matter'],
+  ['/media/screenshots/dashboard.png', 'Home', 'Cash and bank wallets in one total'],
+  ['/media/screenshots/incomes.png', 'Income', 'Salary, clients, and payments'],
   ['/media/screenshots/bills.png', 'Bills', 'Monthly costs, loans, and due dates'],
-  ['/media/screenshots/reports.png', 'Reports', 'Your month, explained in one place'],
-  ['/media/screenshots/household.png', 'Household', 'A shared space for family spending'],
+  ['/media/screenshots/report.png', 'Reports', 'Your month, explained in one place'],
+  ['/media/screenshots/budgets.png', 'Budgets', 'Category limits for the month'],
+  ['/media/screenshots/travel_mode.png', 'Travel', 'Another currency when you are away'],
 ]
 function ScreenshotGallery() {
-  return <section className="screenshots" id="screenshots"><div className="shell"><Reveal className="heading center"><span className="eyebrow">The real app</span><h2>Designed for the moments<br />when you need <em>clarity.</em></h2><p>Explore WalletTrails across income, wallets, bills, reports, shared Household money, and bank SMS drafts you approve.</p></Reveal><div className="screenshot-grid">{screenshots.map(([src, title, description], index) => <Reveal className={`screenshot-card screenshot-card--${index + 1}`} key={src}><a href={`#screen-${index + 1}`}><div className="screenshot-frame"><img src={src} alt={`WalletTrails ${title} screen`} loading="lazy" /></div><div className="screenshot-caption"><span><small>WALLETTRAILS APP</small><b>{title}</b><p>{description}</p></span><i aria-hidden="true">↗</i></div></a></Reveal>)}</div><p className="screenshots-note">Tap a screen to view it in full detail.</p></div>{screenshots.map(([src, title], index) => <div className="screenshot-lightbox" id={`screen-${index + 1}`} key={`screen-${index + 1}`}><a className="lightbox-close" href="#screenshots" aria-label="Close screenshot preview">×</a><a className="lightbox-backdrop" href="#screenshots" aria-label="Close screenshot preview" /><div><img src={src} alt={`WalletTrails ${title} screen`} /><p>{title} <span>WalletTrails for Android</span></p></div></div>)}</section>
+  return <section className="screenshots" id="screenshots"><div className="shell"><Reveal className="heading center"><span className="eyebrow">The real app</span><h2>Designed for the moments<br />when you need <em>clarity.</em></h2><p>Explore WalletTrails across home, income, bills, reports, budgets, and travel.</p></Reveal><div className="screenshot-grid">{screenshots.map(([src, title, description], index) => <Reveal className={`screenshot-card screenshot-card--${index + 1}`} key={src}><a href={`#screen-${index + 1}`}><div className="screenshot-frame"><img src={src} alt={`WalletTrails ${title} screen`} loading="lazy" /></div><div className="screenshot-caption"><span><small>WALLETTRAILS APP</small><b>{title}</b><p>{description}</p></span><i aria-hidden="true">↗</i></div></a></Reveal>)}</div><p className="screenshots-note">Tap a screen to view it in full detail.</p></div>{screenshots.map(([src, title], index) => <div className="screenshot-lightbox" id={`screen-${index + 1}`} key={`screen-${index + 1}`}><a className="lightbox-close" href="#screenshots" aria-label="Close screenshot preview">×</a><a className="lightbox-backdrop" href="#screenshots" aria-label="Close screenshot preview" /><div><img src={src} alt={`WalletTrails ${title} screen`} /><p>{title} <span>WalletTrails for Android</span></p></div></div>)}</section>
+}
+
+const traiCards = [
+  ['Talks it through', 'Say “add an expense of Rp 250.” Trai asks which bank. You answer “from Meezan.” It keeps the whole sentence and then asks if it should save.'],
+  ['Saves only when you say so', '“Yes, save it” writes the entry. “Stop” only turns the microphone off. “No” throws the card away. A second yes does not write a second row.'],
+  ['Answers without guessing', '“What was my recent transaction?”, “What’s my balance?”, and “How was my month?” are answers, not new expenses. Trai does not ask you for an amount just to look something up.'],
+  ['Bills, wallets, and people', 'Mark a bill paid, move money between your wallets, lend or borrow with someone you already track, or add a wallet. Each one waits for Save.'],
+  ['Budgets and travel', '“Am I over food?” reads this month and does not save. “Set food to 8000” and “Turn on travel mode in dirhams” show a card first. The trip uses the rate the app already has. Trai does not invent a rate.'],
+  ['Stays in its lane', 'It will not sign you out, take a PIN, change a password, email a report, or touch a shared household ledger. Hide the amounts and the PIN sheet stay on your phone.'],
+]
+const traiNotes = [
+  ['On the phone.', 'Say “Hey Trai” while the app is open. The lock screen does not wake it.'],
+  ['In the browser.', 'Tap the mic once, then keep talking. There is no always-on wake word.'],
+  ['Your books only.', 'Another person’s wallets, budgets, and reports are refused.'],
+  ['Pakistan first.', 'Rupees, Meezan, cash, and the month you are in. “50 thousand” means 50000.'],
+]
+const traiTurns = [
+  ['you', 'Hey Trai, add an expense of Rp 250'],
+  ['bot', 'Which wallet should I use?'],
+  ['you', 'From Meezan bank'],
+  ['bot', 'Rs 250 from Meezan, Food & Drink. Save it?'],
+  ['you', 'Yes, save it'],
+  ['bot', 'Saved. Meezan is updated.'],
+]
+function TraiSection() {
+  return (
+    <section className="trai-band" id="trai">
+      <div className="shell trai-layout">
+        <Reveal>
+          <span className="eyebrow">Meet Trai</span>
+          <h2>Say it once.<br /><em>Trai writes it down.</em></h2>
+          <p className="trai-lead">Tell Trai an expense, a bill, or a question about this month. It asks when something is missing, shows you the card, and saves only after you say yes.</p>
+          <div className="trai-actions">
+            <a className="button" href="#download">Get the app <Icon name="arrow" size={16} /></a>
+            <a className="trai-textlink" href="#trai-phone">See it listen</a>
+          </div>
+          <div className="trai-grid">
+            {traiCards.map(([title, body]) => (
+              <article className="trai-card" key={title}>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+          <div className="trai-strip">
+            {traiNotes.map(([title, body]) => (
+              <article key={title}><b>{title}</b><span>{body}</span></article>
+            ))}
+          </div>
+        </Reveal>
+        <div className="trai-phone-wrap" id="trai-phone">
+          <div className="trai-phone" aria-label="A sample conversation with Trai">
+            <div className="trai-listen"><i className="trai-dot" />Listening<span className="trai-stop">Stop</span></div>
+            {traiTurns.map(([role, text], index) => (
+              <div className={`trai-turn trai-turn--${role}`} key={`${role}-${index}`}>
+                {role === 'bot' ? <i className="trai-orb" aria-hidden="true" /> : null}
+                <div className="trai-bubble">
+                  {role === 'bot' ? <small>Trai</small> : null}
+                  {text}
+                </div>
+              </div>
+            ))}
+            <div className="trai-confirm">
+              <b>Rs 250</b>
+              <p>Meezan<br />Food &amp; Drink</p>
+              <div className="trai-confirm-actions">
+                <span className="save">Save</span>
+                <span className="change">Change</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
 }
 
 function Freelancers() {
@@ -165,10 +242,10 @@ function AboutSection() {
           <div className="about-orb" />
           <div className="about-dots" />
           <div className="about-screen about-screen--back">
-            <img src="/media/screenshots/household.png" alt="WalletTrails Household shared expense screen" />
+            <img src="/media/screenshots/dashboard.png" alt="WalletTrails home screen with wallets" />
           </div>
           <div className="about-screen about-screen--main">
-            <img src="/media/screenshots/reports.png" alt="WalletTrails monthly reports screen" />
+            <img src="/media/screenshots/report.png" alt="WalletTrails monthly reports screen" />
           </div>
           <div className="about-rating"><span>✦</span> Private by design</div>
           <div className="about-note">Personal money stays private.<br /><b>Shared expenses stay clear.</b></div>
@@ -259,6 +336,7 @@ function App() {
     <ScreenshotGallery />
     <section className="features shell" id="features"><Reveal className="heading split"><div><span className="eyebrow">Everything in reach</span><h2>Less money stress.<br /><em>More clarity.</em></h2></div><p>Helpful tools for understanding each rupee—without making personal finance feel like work.</p></Reveal><div className="feature-grid">{productFeatures.map(([icon, title, text, tone], index) => <Reveal className="feature" key={title}><span className={`ficon ${tone}`}><Icon name={icon} size={21} /></span><i>{String(index + 1).padStart(2, '0')}</i><h3>{title}</h3><p>{text}</p></Reveal>)}</div></section>
     <ProductDepth />
+    <TraiSection />
     <Freelancers />
     <UseCases />
     <AboutSection />

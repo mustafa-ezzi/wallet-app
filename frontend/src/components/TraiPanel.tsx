@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Mic, Send, X } from 'lucide-react'
 import { accountsApi, botApi, type BotTurnResult } from '../api/client'
+import CrystalizedBall from './CrystalizedBall'
 import { handsFreeAfter, stopHandsFree, transcriptMessage, voiceErrorLine } from '../lib/traiVoice'
+import { wakeCommand } from '../lib/traiWake'
 import { isThemeId } from '../theme/themes'
 import { useTheme } from '../theme/useTheme'
 import { useTravelMode } from '../travel/TravelModeContext'
@@ -70,7 +72,7 @@ type BrowserSpeechRecognition = {
   lang: string
   interimResults: boolean
   continuous: boolean
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal?: boolean }> }) => void) | null
   onerror: ((event: { error: string }) => void) | null
   onend: (() => void) | null
   start: () => void
@@ -136,7 +138,7 @@ function readLines(action: BotTurnResult['action']): ReadBlock | null {
 
 export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   const navigate = useNavigate()
-  const { setTheme } = useTheme()
+  const { setTheme, theme } = useTheme()
   const { refresh: refreshTravel } = useTravelMode()
   const [open, setOpen] = useState(false)
   const [turns, setTurns] = useState<Turn[]>([])
@@ -156,9 +158,14 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   const missesRef = useRef(0)
   const listenGen = useRef(0)
   const [handsFree, setHandsFree] = useState(false)
+  const [linger, setLinger] = useState(false)
   const sendRef = useRef<(raw: string) => void>(() => {})
+  const wakeRef = useRef<BrowserSpeechRecognition | null>(null)
+  const micUnlocked = useRef(false)
+  const beginVoiceRef = useRef<(command: string) => void>(() => {})
+  const lingerTimer = useRef<number | null>(null)
 
-  const endHandsFree = () => {
+  const endHandsFree = (holdReply = false) => {
     listenGen.current += 1
     handsFreeRef.current = false
     setHandsFree(false)
@@ -168,39 +175,43 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
     } catch {
       // The recognizer already finished.
     }
+    try {
+      wakeRef.current?.abort()
+    } catch {
+      // Wake listening was not running.
+    }
     setListening(false)
     setText('')
+    if (lingerTimer.current) window.clearTimeout(lingerTimer.current)
+    if (holdReply) {
+      setLinger(true)
+      lingerTimer.current = window.setTimeout(() => setLinger(false), 4200)
+    } else {
+      setLinger(false)
+    }
   }
 
   useEffect(() => {
-    if (!open) return
+    if (!open && !handsFree) return
     accountsApi.list().then(res => {
       const rows = Array.isArray(res.data) ? res.data : []
       setWallets(rows.filter((row: Wallet) => row.type !== 'person'))
     }).catch(() => setWallets([]))
-    inputRef.current?.focus()
-  }, [open])
+    if (open) inputRef.current?.focus()
+  }, [open, handsFree])
 
-  useEffect(() => {
-    if (open) return
-    listenGen.current += 1
-    handsFreeRef.current = false
-    setHandsFree(false)
+  useEffect(() => () => {
     ignoreEndRef.current = true
+    if (lingerTimer.current) window.clearTimeout(lingerTimer.current)
     try {
       recognitionRef.current?.abort()
     } catch {
       // The recognizer already finished.
     }
-    setListening(false)
-  }, [open])
-
-  useEffect(() => () => {
-    ignoreEndRef.current = true
     try {
-      recognitionRef.current?.abort()
+      wakeRef.current?.abort()
     } catch {
-      // The recognizer already finished.
+      // Wake listening was not running.
     }
   }, [])
 
@@ -215,7 +226,7 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   }
 
   const applyResult = (data: BotTurnResult) => {
-    if (handsFreeRef.current && !handsFreeAfter(data)) endHandsFree()
+    if (handsFreeRef.current && !handsFreeAfter(data)) endHandsFree(true)
     const action = data.action
     if (data.saved && action?.action === 'set_theme' && isThemeId(action.theme)) setTheme(action.theme)
     if (data.saved && action?.action === 'set_travel') void refreshTravel()
@@ -309,6 +320,12 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
   sendRef.current = send
 
   const startListening = () => {
+    try {
+      wakeRef.current?.abort()
+    } catch {
+      // Wake listening was not running.
+    }
+    wakeRef.current = null
     const recognition = speechRecognition()
     if (!recognition) {
       if (!handsFreeRef.current) push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
@@ -333,7 +350,15 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
       const keepTranscript = event.error === 'no-speech' || event.error === 'speech-timeout'
       if (!keepTranscript) heardRef.current = ''
       const line = voiceErrorLine(event.error)
-      if (line && !heardRef.current && !handsFreeRef.current) push({ role: 'trai', text: line })
+      if (!line || heardRef.current) return
+      if (!handsFreeRef.current) {
+        push({ role: 'trai', text: line })
+        return
+      }
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        push({ role: 'trai', text: line })
+        endHandsFree(true)
+      }
     }
     recognition.onend = () => {
       if (generation !== listenGen.current) return
@@ -349,9 +374,8 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
         missesRef.current += 1
         if (missesRef.current >= 3) {
           missesRef.current = 0
-          handsFreeRef.current = false
-          setHandsFree(false)
           push({ role: 'trai', text: voiceErrorLine('no-speech') || '' })
+          endHandsFree(true)
           return
         }
         startListening()
@@ -382,10 +406,108 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
       recognitionRef.current?.stop()
       return
     }
+    if (lingerTimer.current) window.clearTimeout(lingerTimer.current)
+    setLinger(false)
     handsFreeRef.current = true
     setHandsFree(true)
+    setOpen(false)
     startListening()
   }
+
+  const beginVoice = (command: string) => {
+    if (lingerTimer.current) window.clearTimeout(lingerTimer.current)
+    setLinger(false)
+    handsFreeRef.current = true
+    setHandsFree(true)
+    setOpen(false)
+    missesRef.current = 0
+    try {
+      wakeRef.current?.abort()
+    } catch {
+      // Wake listening was not running.
+    }
+    if (command) sendRef.current(command)
+    else {
+      push({ role: 'trai', text: "I'm here. What should I write down?" })
+      startListening()
+    }
+  }
+  beginVoiceRef.current = beginVoice
+
+  useEffect(() => {
+    if (open || handsFree || linger) {
+      try {
+        wakeRef.current?.abort()
+      } catch {
+        // Wake listening was not running.
+      }
+      wakeRef.current = null
+      return
+    }
+    let stopped = false
+    let denied = false
+    let timer: number | null = null
+    const arm = () => {
+      if (stopped || denied || handsFreeRef.current) return
+      const recognition = speechRecognition()
+      if (!recognition) return
+      recognition.lang = 'en-US'
+      recognition.interimResults = false
+      recognition.continuous = true
+      recognition.onresult = (event) => {
+        for (let index = 0; index < event.results.length; index += 1) {
+          const result = event.results[index]
+          if (!result || result.isFinal === false) continue
+          const command = wakeCommand(result[0]?.transcript || '')
+          if (command === null) continue
+          stopped = true
+          try {
+            recognition.abort()
+          } catch {
+            // The phrase already arrived.
+          }
+          beginVoiceRef.current(command)
+          return
+        }
+      }
+      recognition.onerror = (event) => {
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          denied = true
+          stopped = true
+        }
+      }
+      recognition.onend = () => {
+        if (wakeRef.current === recognition) wakeRef.current = null
+        if (stopped || handsFreeRef.current) return
+        timer = window.setTimeout(arm, 500)
+      }
+      wakeRef.current = recognition
+      try {
+        recognition.start()
+      } catch {
+        wakeRef.current = null
+        if (!stopped) timer = window.setTimeout(arm, 800)
+      }
+    }
+    const kick = () => {
+      micUnlocked.current = true
+      if (timer) window.clearTimeout(timer)
+      timer = window.setTimeout(arm, 350)
+    }
+    if (micUnlocked.current) kick()
+    else window.addEventListener('pointerdown', kick, { once: true })
+    return () => {
+      stopped = true
+      if (timer) window.clearTimeout(timer)
+      window.removeEventListener('pointerdown', kick)
+      try {
+        wakeRef.current?.abort()
+      } catch {
+        // Wake listening was not running.
+      }
+      wakeRef.current = null
+    }
+  }, [open, handsFree, linger])
 
   const save = async () => {
     if (!draft || saving.current) return
@@ -410,6 +532,15 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
 
   const walletName = (id: number | null) => wallets.find(wallet => wallet.id === id)?.name || 'your wallet'
   const lastAsk = [...turns].reverse().find(turn => turn.role === 'trai' && turn.ask)
+  const stageOn = (handsFree || linger) && !open
+  const lastTrai = [...turns].reverse().find(turn => turn.role === 'trai')
+  const stageReply = busy ? 'Trai is thinking…' : (lastTrai?.text || 'Listening…')
+  const stageDetail = !busy && lastTrai?.read
+    ? lastTrai.read.lines.slice(0, 3).map(line => `${line.label} ${money(line.amount)}`).join('   ·   ')
+    : !busy && lastTrai?.card?.summary && lastTrai.card.summary !== lastTrai.text
+      ? lastTrai.card.summary
+      : ''
+  const stageHeard = handsFree ? text.trim() : ''
 
   return (
     <>
@@ -508,11 +639,11 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
             ) : null}
             {busy ? <p className="trai-thinking">Trai is counting on its fingers…</p> : null}
           </div>
-          {handsFree ? (
+          {handsFree && open ? (
             <div className="trai-live">
               <span className="trai-live-dot" aria-hidden="true" />
               <span>{busy ? 'Trai is thinking…' : 'Listening'}</span>
-              <button type="button" onClick={endHandsFree}>Stop</button>
+              <button type="button" onClick={() => endHandsFree()}>Stop</button>
             </div>
           ) : null}
           <form className="trai-composer" onSubmit={onSubmit}>
@@ -540,6 +671,30 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
             </button>
           </form>
         </section>
+      ) : null}
+      {stageOn ? (
+        <div className="trai-stage" role="status" aria-live="polite">
+          <p className="trai-stage-reply">{stageReply}</p>
+          {stageDetail ? <p className="trai-stage-detail">{stageDetail}</p> : null}
+          {stageHeard ? <p className="trai-stage-heard">{stageHeard}</p> : null}
+          <button
+            type="button"
+            className="trai-stage-knot"
+            onClick={() => endHandsFree()}
+            aria-label={handsFree ? 'Stop listening' : 'Dismiss Trai'}
+          >
+            <CrystalizedBall
+              preset="plasma"
+              color={theme.swatch}
+              theme="dark"
+              size={0.85}
+              crackle={0.85}
+              fill={0.5}
+              interactive
+              hoverStrength={0.7}
+            />
+          </button>
+        </div>
       ) : null}
       <button
         type="button"

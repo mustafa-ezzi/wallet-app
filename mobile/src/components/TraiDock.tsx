@@ -23,6 +23,7 @@ import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import { isThemeId } from '@/src/theme/colors'
 import { useColors, useTheme } from '@/src/theme/ThemeContext'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
+import { TraiCrystal } from './TraiCrystal'
 
 type MicButton = typeof import('./TraiMicButton').TraiMicButton
 type WakeListener = typeof import('./TraiWakeListener').TraiWakeListener
@@ -158,6 +159,8 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const [listening, setListening] = useState(false)
   const [wakeArmed, setWakeArmed] = useState(false)
   const [handsFree, setHandsFree] = useState(false)
+  const [linger, setLinger] = useState(false)
+  const [preview, setPreview] = useState(false)
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [keyboard, setKeyboard] = useState(0)
   const nextId = useRef(1)
@@ -166,12 +169,28 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const stopVoiceRef = useRef<() => void>(() => {})
   const sendRef = useRef<(raw: string) => void>(() => {})
   const handsFreeRef = useRef(false)
-  const endHandsFree = () => {
+  const lingerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearLinger = () => {
+    if (lingerTimer.current) clearTimeout(lingerTimer.current)
+    lingerTimer.current = null
+  }
+  const endHandsFree = (holdReply = false) => {
     handsFreeRef.current = false
     setHandsFree(false)
     setText('')
+    clearLinger()
+    setPreview(false)
+    if (holdReply) {
+      setLinger(true)
+      lingerTimer.current = setTimeout(() => setLinger(false), 4200)
+    } else {
+      setLinger(false)
+    }
   }
   const beginHandsFree = () => {
+    clearLinger()
+    setLinger(false)
+    setPreview(false)
     handsFreeRef.current = true
     setHandsFree(true)
   }
@@ -193,12 +212,12 @@ export function TraiDock({ bottom }: { bottom: number }) {
   }), [])
 
   useEffect(() => {
-    if (!open) return
+    if (!open && !handsFree) return
     accountsApi.list().then(res => {
       const rows = Array.isArray(res.data) ? (res.data as Wallet[]) : []
       setWallets(rows.filter(row => row.type !== 'person'))
     }).catch(() => setWallets([]))
-  }, [open])
+  }, [open, handsFree])
 
   const push = (turn: Omit<Turn, 'id'>) => {
     const id = nextId.current++
@@ -206,7 +225,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   }
 
   const applyResult = (data: BotTurnResult) => {
-    if (handsFreeRef.current && !handsFreeAfter(data)) endHandsFree()
+    if (handsFreeRef.current && !handsFreeAfter(data)) endHandsFree(true)
     const action = data.action
     if (data.saved && action?.action === 'set_theme' && isThemeId(action.theme)) void setThemeId(action.theme)
     if (data.saved && action?.action === 'set_travel') void refreshTravel()
@@ -315,6 +334,15 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const panelMax = Math.min(height * 0.7, height - panelBottom - insets.top - 16)
   const lastAsk = [...turns].reverse().find(turn => turn.role === 'trai' && turn.ask)
   const walletName = (id: number | null) => wallets.find(wallet => wallet.id === id)?.name || 'your wallet'
+  const stageOn = (handsFree || linger || preview) && !open
+  const showingPreview = preview && !handsFree
+  const lastTrai = [...turns].reverse().find(turn => turn.role === 'trai')
+  const stageReply = showingPreview ? 'Which wallet was that?' : (lastTrai?.text || 'Listening…')
+  const stageDetail = showingPreview ? 'Rp 250' : lastTrai?.read
+    ? lastTrai.read.lines.slice(0, 3).map(line => `${line.label} ${money(line.amount)}`).join('   ·   ')
+    : lastTrai?.card?.summary && lastTrai.card.summary !== lastTrai.text
+      ? lastTrai.card.summary
+      : ''
 
   return (
     <>
@@ -453,7 +481,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
             ) : null}
             {busy ? <Text style={{ color: colors.textMuted }}>Trai is counting on its fingers…</Text> : null}
           </ScrollView>
-          {handsFree && TraiConversation ? (
+          {handsFree && open && TraiConversation ? (
             <TraiConversation
               active={open && !busy}
               busy={busy}
@@ -472,7 +500,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
               }}
               onPartial={setText}
               onNotice={line => push({ role: 'trai', text: line })}
-              onStop={endHandsFree}
+              onStop={hold => endHandsFree(Boolean(hold))}
             />
           ) : null}
           <View style={[styles.composer, { borderTopColor: colors.border }]}>
@@ -521,17 +549,72 @@ export function TraiDock({ bottom }: { bottom: number }) {
       ) : null}
       {TraiWakeListener ? (
         <TraiWakeListener
-          paused={open}
+          paused={open || handsFree || linger || preview}
           onArmed={setWakeArmed}
           onWake={command => {
-            setOpen(true)
             beginHandsFree()
             if (command) void sendRef.current(command)
             else push({ role: 'trai', text: "I'm here. What should I write down?" })
           }}
         />
       ) : null}
+      {stageOn ? (
+        <View style={[styles.stage, { bottom: bottom + 8 }]} pointerEvents="box-none">
+          <Text pointerEvents="none" numberOfLines={3} style={[styles.stageReply, { color: colors.text, textShadowColor: colors.background }]}>
+            {busy ? 'Trai is thinking…' : stageReply}
+          </Text>
+          {stageDetail ? (
+            <Text pointerEvents="none" numberOfLines={2} style={[styles.stageDetail, { color: colors.primary, textShadowColor: colors.background }]}>{stageDetail}</Text>
+          ) : null}
+          {showingPreview ? (
+            <Text pointerEvents="none" numberOfLines={2} style={[styles.stageHeard, { color: colors.textMuted, textShadowColor: colors.background }]}>from Meezan bank</Text>
+          ) : handsFree && text.trim() ? (
+            <Text pointerEvents="none" numberOfLines={2} style={[styles.stageHeard, { color: colors.textMuted, textShadowColor: colors.background }]}>{text.trim()}</Text>
+          ) : null}
+          <Pressable onPress={() => endHandsFree()} accessibilityLabel={handsFree ? 'Stop listening' : 'Dismiss Trai'}>
+            <TraiCrystal primary={colors.primary} highlight={colors.primarySoft} />
+          </Pressable>
+          {handsFree && TraiConversation ? (
+            <TraiConversation
+              variant="hidden"
+              active={!open && !busy}
+              busy={busy}
+              prompt=""
+              partial={text}
+              primary={colors.primary}
+              ink={colors.text}
+              muted={colors.textMuted}
+              hints={wallets.map(wallet => wallet.name)}
+              onTranscript={message => {
+                if (stopHandsFree(message)) {
+                  endHandsFree()
+                  return
+                }
+                void send(message)
+              }}
+              onPartial={setText}
+              onNotice={line => push({ role: 'trai', text: line })}
+              onStop={hold => endHandsFree(Boolean(hold))}
+            />
+          ) : null}
+        </View>
+      ) : null}
       {wakeArmed && !open ? <View pointerEvents="none" style={[styles.wakeRing, { bottom: bottom - 6 }]} /> : null}
+      {Platform.OS === 'web' ? (
+        <Pressable
+          style={[styles.previewBtn, { bottom: bottom + 64, backgroundColor: colors.primary }]}
+          onPress={() => {
+            if (preview) endHandsFree()
+            else {
+              setOpen(false)
+              setPreview(true)
+            }
+          }}
+          accessibilityLabel="Preview the Trai listening knot"
+        >
+          <Text style={styles.previewLabel}>{preview ? 'Hide knot' : 'Test knot'}</Text>
+        </Pressable>
+      ) : null}
       <Pressable
         style={[styles.fab, { bottom }]}
         onPress={() => {
@@ -566,6 +649,15 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
   },
+  previewBtn: {
+    position: 'absolute',
+    left: 20,
+    zIndex: 50,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  previewLabel: { color: '#fff', fontWeight: '800', fontSize: 13 },
   wakeRing: {
     position: 'absolute',
     left: 14,
@@ -623,4 +715,34 @@ const styles = StyleSheet.create({
   input: { flex: 1, borderWidth: 1, borderRadius: 999, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 10 : 8 },
   mic: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   send: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 },
+  stage: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    zIndex: 44,
+    alignItems: 'center',
+  },
+  stageReply: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 26,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  stageDetail: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
+  stageHeard: {
+    marginTop: 4,
+    fontSize: 15,
+    textAlign: 'center',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
 })

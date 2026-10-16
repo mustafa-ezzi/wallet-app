@@ -35,6 +35,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.1",
     "expo-web-browser": "~57.0.2",
+    "ogl": "^1.0.11",
     "posthog-react-native": "^4.66.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
