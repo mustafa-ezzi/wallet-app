@@ -560,17 +560,19 @@ export function TraiDock({ bottom }: { bottom: number }) {
       ) : null}
       {stageOn ? (
         <View style={[styles.stage, { bottom: bottom + 8 }]} pointerEvents="box-none">
-          <Text pointerEvents="none" numberOfLines={3} style={[styles.stageReply, { color: colors.text, textShadowColor: colors.background }]}>
-            {busy ? 'Trai is thinking…' : stageReply}
-          </Text>
-          {stageDetail ? (
-            <Text pointerEvents="none" numberOfLines={2} style={[styles.stageDetail, { color: colors.primary, textShadowColor: colors.background }]}>{stageDetail}</Text>
-          ) : null}
-          {showingPreview ? (
-            <Text pointerEvents="none" numberOfLines={2} style={[styles.stageHeard, { color: colors.textMuted, textShadowColor: colors.background }]}>from Meezan bank</Text>
-          ) : handsFree && text.trim() ? (
-            <Text pointerEvents="none" numberOfLines={2} style={[styles.stageHeard, { color: colors.textMuted, textShadowColor: colors.background }]}>{text.trim()}</Text>
-          ) : null}
+          <View pointerEvents="none" style={[styles.stageCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text numberOfLines={3} style={[styles.stageReply, { color: colors.text }]}>
+              {busy ? 'Trai is thinking…' : stageReply}
+            </Text>
+            {stageDetail ? (
+              <Text numberOfLines={2} style={[styles.stageDetail, { color: colors.text }]}>{stageDetail}</Text>
+            ) : null}
+            {showingPreview ? (
+              <Text numberOfLines={2} style={[styles.stageHeard, { color: colors.textMuted }]}>from Meezan bank</Text>
+            ) : handsFree && text.trim() ? (
+              <Text numberOfLines={2} style={[styles.stageHeard, { color: colors.textMuted }]}>{text.trim()}</Text>
+            ) : null}
+          </View>
           <Pressable onPress={() => endHandsFree()} accessibilityLabel={handsFree ? 'Stop listening' : 'Dismiss Trai'}>
             <TraiCrystal primary={colors.primary} highlight={colors.primarySoft} />
           </Pressable>
@@ -722,27 +724,30 @@ const styles = StyleSheet.create({
     zIndex: 44,
     alignItems: 'center',
   },
+  stageCard: {
+    maxWidth: 280,
+    marginBottom: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
   stageReply: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 26,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+    lineHeight: 22,
   },
   stageDetail: {
     marginTop: 4,
     fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
   },
   stageHeard: {
     marginTop: 4,
-    fontSize: 15,
+    fontSize: 14,
     textAlign: 'center',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
   },
 })

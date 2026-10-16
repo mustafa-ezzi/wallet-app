@@ -44,6 +44,7 @@ function PhonePreview() {
 const NAV_LINKS = [
   ['home', 'Home'],
   ['screenshots', 'Screenshots'],
+  ['trai', 'Trai'],
   ['features', 'Features'],
   ['trai', 'Trai'],
   ['freelancers', 'Freelancers'],
@@ -87,6 +88,61 @@ function ProductDepth() {
     ['04 · AUTO DETECT', 'Bank SMS in. Draft ready. You approve.', 'On Android, WalletTrails can optionally notice a bank transaction message, match the wallet, and queue a draft. ATM cash-outs become a bank-to-cash move—not a spend. You stay in the loop.', ['Permission first — no SMS access until you opt in', 'Parses amount, type, and bank from Pakistani alerts', 'Approve, Reject, or edit. Never silent posting'], 'sms'],
   ]
   return <section className="product-depth"><div className="shell"><Reveal className="heading center"><span className="eyebrow">Built around real money life</span><h2>One app for the details<br />that keep life <em>moving.</em></h2><p>WalletTrails is designed around real Pakistan-first routines—from salary day and a client payment to a family grocery run, a trip with friends, or a bank SMS you tap Approve on.</p></Reveal><div className="depth-grid">{blocks.map(([tag, title, body, points, tone]) => <Reveal className={`depth-card depth-card--${tone}`} key={tag}><small>{tag}</small><h3>{title}</h3><p>{body}</p><ul>{points.map((point) => <li key={point}>{point}</li>)}</ul></Reveal>)}</div><Reveal className="privacy-promise"><span className="ficon gold"><Icon name="lock" size={22} /></span><div><small>OUR PRIVACY PROMISE</small><h3>Your personal wallets stay personal.</h3><p>People in a Household can see only the shared ledger—not each other’s bank wallets, income, loans, or unrelated transactions. Your values can also be hidden on-screen when you need privacy.</p></div><a href="/privacy.html">Read privacy policy <Icon name="arrow" size={16} /></a></Reveal></div></section>
+}
+
+const traiFeatures = [
+  ['Talks it through', 'Say “add an expense of Rp 250.” Trai asks which bank. You answer “from Meezan.” It keeps the whole sentence and then asks if it should save.'],
+  ['Saves only when you say so', '“Yes, save it” writes the entry. “Stop” only turns the microphone off. “No” throws the card away. A second yes does not write a second row.'],
+  ['Answers without guessing', '“What was my recent transaction?”, “What’s my balance?”, and “How was my month?” are answers, not new expenses. Trai does not ask you for an amount just to look something up.'],
+  ['Bills, wallets, and people', 'Mark a bill paid, move money between your wallets, lend or borrow with someone you already track, or add a wallet. Each one waits for Save.'],
+  ['Budgets and travel', '“Am I over food?” reads this month and does not save. “Set food to 8000” and “Turn on travel mode in dirhams” show a card first. The trip uses the rate the app already has. Trai does not invent a rate.'],
+  ['Stays in its lane', 'It will not sign you out, take a PIN, change a password, email a report, or touch a shared household ledger. Hide the amounts and the PIN sheet stay on your phone.'],
+]
+
+const traiNotes = [
+  ['On the phone.', 'Say “Hey Trai” while the app is open. The lock screen does not wake it.'],
+  ['In the browser.', 'Tap the mic once, then keep talking. There is no always-on wake word.'],
+  ['Your books only.', 'Another person’s wallets, budgets, and reports are refused.'],
+  ['Pakistan first.', 'Rupees, Meezan, cash, and the month you are in. “50 thousand” means 50000.'],
+]
+
+function TraiSection() {
+  return <section className="trai-band" id="trai">
+    <div className="shell trai-layout">
+      <div className="trai-copy">
+        <span className="eyebrow">MEET TRAI</span>
+        <h2>Say it once.<br /><em>Trai writes it down.</em></h2>
+        <p className="trai-identity">Transaction Record Account Intelligence. A bookkeeper inside WalletTrails—not a general chatbot, and it doesn’t browse the web.</p>
+        <p className="trai-lead">Tell Trai an expense, a bill, or a question about this month. It asks when something is missing, shows you the card, and saves only after you say yes.</p>
+        <div className="trai-actions">
+          <a className="button" href="#download">Get the app <Icon name="arrow" size={16} /></a>
+          <a className="trai-textlink" href="#trai-phone">See it listen</a>
+        </div>
+        <div className="trai-grid">
+          {traiFeatures.map(([title, copy]) => <article className="trai-card" key={title}><h3>{title}</h3><p>{copy}</p></article>)}
+        </div>
+        <div className="trai-strip">
+          {traiNotes.map(([title, copy]) => <article key={title}><b>{title}</b><span>{copy}</span></article>)}
+        </div>
+      </div>
+      <div className="trai-phone-column">
+        <div className="trai-phone-wrap" id="trai-phone">
+          <div className="trai-phone" aria-label="A sample conversation with Trai">
+            <div className="trai-listen"><i className="trai-dot" aria-hidden="true" /><span>Listening</span><span className="trai-stop">Stop</span></div>
+            <div className="trai-turn trai-turn--you"><div className="trai-bubble">Hey Trai, add an expense of Rp 250</div></div>
+            <div className="trai-turn trai-turn--bot"><i className="trai-orb" aria-hidden="true" /><div className="trai-message-group"><div className="trai-bubble"><small>Trai</small>Which wallet should I use?</div></div></div>
+            <div className="trai-turn trai-turn--you"><div className="trai-bubble">From Meezan bank</div></div>
+            <div className="trai-turn trai-turn--bot"><i className="trai-orb" aria-hidden="true" /><div className="trai-message-group"><div className="trai-bubble"><small>Trai</small>Rs 250 from Meezan, Food &amp; Drink. Save it?</div></div></div>
+            <div className="trai-turn trai-turn--you"><div className="trai-bubble">Yes, save it</div></div>
+            <div className="trai-turn trai-turn--bot"><i className="trai-orb" aria-hidden="true" /><div className="trai-message-group"><div className="trai-bubble"><small>Trai</small>Saved. Meezan is updated.</div>
+              <div className="trai-confirm"><b>Rs 250</b><p>Meezan<br />Food &amp; Drink</p><div className="trai-confirm-actions"><span className="save">Save</span><span className="change">Change</span></div></div>
+            </div></div>
+          </div>
+        </div>
+        <p className="trai-privacy-note">Voice stays on your phone. The recording is not uploaded. The model key stays on the server.</p>
+      </div>
+    </div>
+  </section>
 }
 
 const screenshots = [
@@ -333,7 +389,6 @@ function App() {
     <section className="hero" id="home"><div className="shell hero-grid"><Reveal className="hero-copy"><span className="eyebrow"><i />Pakistan-first · Privacy · Auto SMS</span><h1>Follow every <em>rupee.</em><br />Feel more <span>free.</span></h1><p>WalletTrails brings wallets, bills, family ledgers, and optional bank SMS auto-detect together in one calm place. A bank alert can become a draft. You tap Approve.</p><div className="hero-actions"><a className="button" href="#download">Start tracking free <Icon name="arrow" size={17} /></a><button className="watch" onClick={() => setTour(true)}><span><Icon name="play" size={12} /></span>See how it works</button></div><div className="human-note"><div><i>H</i><i>S</i><i>M</i></div>Made for real life, not spreadsheets</div></Reveal><Reveal className="hero-visual"><div className="orb one" /><div className="orb two" /><PhonePreview /><div className="float spent"><span>↘</span><p><small>Spent this week</small><b>Rs. 14,850</b></p><strong>−12%</strong></div><div className="float budget"><span>✓</span><p><small>Budget</small><b>On track</b></p></div></Reveal></div></section>
     <section className="trust"><div className="shell"><p>ONE SIMPLE HOME FOR THE FINANCIAL THINGS THAT MATTER</p><div><span>Personal money</span><i /><span>Freelance work</span><i /><span>Shared living</span><i /><span>Bank SMS drafts</span></div></div></section>
     <section className="showcase" id="preview"><div className="shell"><Reveal className="heading center"><span className="eyebrow">A look inside</span><h2>Clear money moments,<br /><em>beautifully connected.</em></h2><p>From a quick expense to your monthly picture, every detail is designed to feel simple and human.</p></Reveal><div className="showcase-grid"><Reveal className="overview"><header><span>◔</span><p><small>Monthly overview</small><b>September 2026</b></p><i>•••</i></header><div className="total"><small>You have spent</small><b>Rs. 42,780</b><span>of Rs. 55,000 planned</span></div><div className="donut-content"><div className="donut"><span><b>78%</b><small>used</small></span></div><div>{[['Food & dining', 'Rs. 15,200', 'blue'], ['Home & bills', 'Rs. 12,500', 'purple'], ['Travel', 'Rs. 6,750', 'orange'], ['Other', 'Rs. 8,330', 'gray']].map(([label, amount, tone]) => <p className="legend" key={label}><i className={tone} />{label}<b>{amount}</b></p>)}</div></div><footer>Spending by category <a>See details →</a></footer></Reveal><Reveal className="tour-card"><div className="tour-art"><div /><button onClick={() => setTour(true)} aria-label="Play product tour"><Icon name="play" size={18} /></button><span>01:00</span></div><article><small>PRODUCT TOUR</small><h3>Your day, in one minute.</h3><p>See how WalletTrails helps you capture expenses, approve a bank SMS, and stay on course.</p><button onClick={() => setTour(true)}>Play video →</button></article></Reveal><Reveal className="quick-card"><span className="ficon purple">⇄</span><small>BANK SMS IN</small><h3>Drafts you approve.</h3><p>Opt in on Android. Eligible bank alerts become a suggestion—not a silent post.</p><div>SMS <i>→</i> Approve</div></Reveal><Reveal className="people-card"><span className="people"><i>H</i><i>S</i><i>M</i></span><small>SHARED SPENDING</small><h3>Fairness without the maths.</h3><p>Split household expenses and keep everyone in the loop.</p><a href="#features">↗</a></Reveal></div></div></section>
-    <ScreenshotGallery />
     <section className="features shell" id="features"><Reveal className="heading split"><div><span className="eyebrow">Everything in reach</span><h2>Less money stress.<br /><em>More clarity.</em></h2></div><p>Helpful tools for understanding each rupee—without making personal finance feel like work.</p></Reveal><div className="feature-grid">{productFeatures.map(([icon, title, text, tone], index) => <Reveal className="feature" key={title}><span className={`ficon ${tone}`}><Icon name={icon} size={21} /></span><i>{String(index + 1).padStart(2, '0')}</i><h3>{title}</h3><p>{text}</p></Reveal>)}</div></section>
     <ProductDepth />
     <TraiSection />
