@@ -39,7 +39,7 @@
 .trai-bubble small { display: block; margin-bottom: 2px; color: #047857; font-size: 12px; font-weight: 700; }
 .trai-confirm { margin-top: 8px; padding: 10px; border-radius: 12px; background: #fff; border: 1px solid #d7e8de; }
 .trai-confirm b { font: 700 16px var(--display); }
-.trai-confirm p { margin: 2px 0 8px; color: #3f6153; font-size: 12px; line-height: 1.45; }
+.trai-confirm p { margin: 2px 0 8px; color: #3f6153; font-size: 13px; line-height: 1.45; }
 .trai-confirm-actions { display: flex; gap: 8px; }
 .trai-confirm-actions span { padding: 6px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
 .trai-confirm-actions .save { background: #059669; color: #fff; }
