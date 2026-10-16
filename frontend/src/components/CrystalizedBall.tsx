@@ -801,6 +801,34 @@ void main() {
 }
 `;
 
+type CrystalizedBallProps = {
+  preset?: string
+  color?: string
+  theme?: string
+  size?: number
+  strands?: number
+  crackle?: number
+  flares?: number
+  glow?: number
+  sparks?: number
+  particleCount?: number
+  fill?: number
+  motion?: string
+  particleShape?: string
+  depth?: number
+  sway?: number
+  twinkle?: number
+  haze?: number
+  speed?: number
+  dustSpeed?: number
+  interactive?: boolean
+  hoverStrength?: number
+  intro?: boolean
+  paused?: boolean
+  className?: string
+  style?: React.CSSProperties
+}
+
 const CrystalizedBall = ({
   preset = 'plasma',
   color,
@@ -827,7 +855,7 @@ const CrystalizedBall = ({
   paused = false,
   className = '',
   style
-}) => {
+}: CrystalizedBallProps) => {
   const containerRef = useRef(null);
   const settingsRef = useRef(null);
   const wakeRef = useRef(null);
