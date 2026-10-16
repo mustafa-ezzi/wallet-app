@@ -45,6 +45,8 @@ export function TraiConversation({
   const onStopRef = useRef(onStop)
   const sentRef = useRef(false)
   const missesRef = useRef(0)
+  const openedRef = useRef(false)
+  const retriesRef = useRef(0)
   const pulse = useRef(new Animated.Value(1)).current
   activeRef.current = active
   onTranscriptRef.current = onTranscript
@@ -86,12 +88,24 @@ export function TraiConversation({
         contextualStrings: ['Trai', 'yes save it', 'save it', ...hints].slice(0, 12),
       })
     } catch {
-      if (!activeRef.current) return
+      if (!activeRef.current || sentRef.current) return
+      if (retriesRef.current < 4) {
+        retriesRef.current += 1
+        setTimeout(() => {
+          if (activeRef.current && !sentRef.current) void arm()
+        }, 350)
+        return
+      }
       onNoticeRef.current(voiceErrorLine('unavailable') || '')
       onStopRef.current(true)
     }
   }
 
+  useSpeechRecognitionEvent('start', () => {
+    if (!activeRef.current) return
+    openedRef.current = true
+    retriesRef.current = 0
+  })
   useSpeechRecognitionEvent('result', (event) => {
     if (!activeRef.current) return
     const message = transcriptMessage(event.results?.[0]?.transcript || '')
@@ -107,7 +121,7 @@ export function TraiConversation({
     onTranscriptRef.current(message)
   })
   useSpeechRecognitionEvent('error', (event) => {
-    if (!activeRef.current || event.error === 'aborted') return
+    if (!activeRef.current || !openedRef.current || event.error === 'aborted') return
     if (event.error === 'no-speech' || event.error === 'speech-timeout') return
     const line = voiceErrorLine(event.error)
     if (line) onNoticeRef.current(line)
@@ -116,7 +130,8 @@ export function TraiConversation({
     }
   })
   useSpeechRecognitionEvent('end', () => {
-    if (!activeRef.current || sentRef.current) return
+    if (!activeRef.current || sentRef.current || !openedRef.current) return
+    openedRef.current = false
     missesRef.current += 1
     if (missesRef.current >= 3) {
       missesRef.current = 0
@@ -137,6 +152,8 @@ export function TraiConversation({
     }
     sentRef.current = false
     missesRef.current = 0
+    openedRef.current = false
+    retriesRef.current = 0
     const timer = setTimeout(() => {
       void arm()
     }, 350)

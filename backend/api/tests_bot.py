@@ -267,6 +267,25 @@ class BotGeminiClientTests(TestCase):
         self.assertEqual(send.call_count, 2)
         self.assertEqual(result['action'], 'ask')
 
+    @override_settings(GEMINI_API_KEY='server-key', BOT_GEMINI_MODEL='gemini-2.5-flash-lite')
+    def test_a_retired_model_falls_back_to_the_current_one(self):
+        missing = MagicMock(status_code=404)
+        missing.json.return_value = {'error': {'message': 'no longer available'}}
+        ok = MagicMock(status_code=200)
+        ok.json.return_value = {
+            'candidates': [{
+                'content': {'parts': [
+                    {'text': 'planning the reply', 'thought': True},
+                    {'text': 'Sure. {"action": "ask", "ask": "Which wallet?"}', 'thoughtSignature': 'sig'},
+                ]},
+            }],
+        }
+        with patch('api.bot_gemini._ipv4_addresses', return_value=['203.0.113.5']):
+            with patch('api.bot_gemini._send', side_effect=[missing, ok]) as send:
+                result = generate_action('spent 50', {'wallets': []})
+        self.assertEqual(result['action'], 'ask')
+        self.assertIn('gemini-3.5-flash-lite', send.call_args_list[1].args[2])
+
 
 class BotDateTests(TestCase):
     def catalog(self):

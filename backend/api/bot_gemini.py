@@ -69,12 +69,30 @@ def build_user_message(text: str, catalog: dict, today: str | None = None) -> st
     return json.dumps(payload, ensure_ascii=False)
 
 
+FALLBACK_MODEL = 'gemini-3.5-flash-lite'
+
+
 def generate_action(text: str, catalog: dict) -> dict:
     key = (getattr(settings, 'GEMINI_API_KEY', '') or '').strip()
     if not key:
         raise BotModelError('Trai is not configured.')
-    model = (getattr(settings, 'BOT_GEMINI_MODEL', '') or 'gemini-3.5-flash-lite').strip()
-    temperature = _temperature()
+    model = (getattr(settings, 'BOT_GEMINI_MODEL', '') or FALLBACK_MODEL).strip() or FALLBACK_MODEL
+    response = _generate(model, key, text, catalog)
+    if response.status_code == 404 and model != FALLBACK_MODEL:
+        logger.warning('Trai model %s is not available; trying %s', model, FALLBACK_MODEL)
+        response = _generate(FALLBACK_MODEL, key, text, catalog)
+    if response.status_code != 200:
+        logger.warning('Trai model HTTP %s %s', response.status_code, _error_message(response))
+        raise BotModelError('Trai is unavailable right now.')
+    try:
+        parsed = _json_object(_response_text(response.json()))
+    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError, StopIteration) as exc:
+        logger.warning('Trai model returned unreadable JSON')
+        raise BotModelError('Trai is unavailable right now.') from exc
+    return parsed
+
+
+def _generate(model: str, key: str, text: str, catalog: dict):
     url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
     payload = {
         'systemInstruction': {'parts': [{'text': SYSTEM_PROMPT}]},
@@ -83,24 +101,11 @@ def generate_action(text: str, catalog: dict) -> dict:
             'parts': [{'text': build_user_message(text, catalog, timezone.localdate().isoformat())}],
         }],
         'generationConfig': {
-            'temperature': temperature,
+            'temperature': _temperature(),
             'responseMimeType': 'application/json',
         },
     }
-    response = _post(url, key, payload)
-    if response.status_code != 200:
-        logger.warning('Trai model HTTP %s %s', response.status_code, _error_message(response))
-        raise BotModelError('Trai is unavailable right now.')
-    try:
-        body = response.json()
-        raw_text = _response_text(body)
-        parsed = json.loads(_strip_fence(raw_text))
-    except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError, StopIteration) as exc:
-        logger.warning('Trai model returned unreadable JSON')
-        raise BotModelError('Trai is unavailable right now.') from exc
-    if not isinstance(parsed, dict):
-        raise BotModelError('Trai is unavailable right now.')
-    return parsed
+    return _post(url, key, payload)
 
 
 class _HttpResult:
@@ -186,7 +191,29 @@ def _error_message(response) -> str:
 
 def _response_text(body: dict) -> str:
     parts = body['candidates'][0]['content']['parts']
-    return next(part['text'] for part in parts if isinstance(part, dict) and part.get('text'))
+    texts = [
+        part['text']
+        for part in parts
+        if isinstance(part, dict) and part.get('text') and not part.get('thought')
+    ]
+    if not texts:
+        raise StopIteration
+    return texts[-1]
+
+
+def _json_object(text: str) -> dict:
+    cleaned = _strip_fence(text)
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        start = cleaned.find('{')
+        end = cleaned.rfind('}')
+        if start < 0 or end <= start:
+            raise
+        parsed = json.loads(cleaned[start:end + 1])
+    if not isinstance(parsed, dict):
+        raise ValueError('model JSON was not an object')
+    return parsed
 
 
 def _strip_fence(text: str) -> str:

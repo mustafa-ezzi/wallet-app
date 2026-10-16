@@ -20,6 +20,7 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
   const shouldListen = useRef(false)
   const recognizing = useRef(false)
   const denied = useRef(false)
+  const pendingWake = useRef<string | null>(null)
   const restartTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   pausedRef.current = paused
   onArmedRef.current = onArmed
@@ -88,6 +89,13 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
   })
   useSpeechRecognitionEvent('end', () => {
     recognizing.current = false
+    const command = pendingWake.current
+    if (command !== null) {
+      pendingWake.current = null
+      onArmedRef.current(false)
+      onWakeRef.current(command)
+      return
+    }
     if (shouldListen.current && !pausedRef.current) schedule()
   })
   useSpeechRecognitionEvent('error', (event) => {
@@ -105,15 +113,24 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
     if (!event.isFinal || pausedRef.current || !shouldListen.current) return
     const command = wakeCommand(event.results?.[0]?.transcript || '')
     if (command === null) return
+    pendingWake.current = command
     shouldListen.current = false
     recognizing.current = false
     clearRestart()
+    const handoff = setTimeout(() => {
+      if (pendingWake.current !== command) return
+      pendingWake.current = null
+      onArmedRef.current(false)
+      onWakeRef.current(command)
+    }, 700)
     try {
       ExpoSpeechRecognitionModule.abort()
     } catch {
-      // The phrase already arrived.
+      clearTimeout(handoff)
+      if (pendingWake.current !== command) return
+      pendingWake.current = null
+      onWakeRef.current(command)
     }
-    onWakeRef.current(command)
   })
 
   useEffect(() => {

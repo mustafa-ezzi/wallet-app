@@ -360,8 +360,24 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
         endHandsFree(true)
       }
     }
-    recognition.onend = () => {
+    recognitionRef.current = recognition
+    let opened = false
+    const launch = (attempt: number) => {
       if (generation !== listenGen.current) return
+      try {
+        recognition.start()
+        opened = true
+        setListening(true)
+      } catch {
+        if (attempt < 4 && handsFreeRef.current) {
+          window.setTimeout(() => launch(attempt + 1), 280)
+          return
+        }
+        if (!handsFreeRef.current) push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
+      }
+    }
+    recognition.onend = () => {
+      if (!opened || generation !== listenGen.current) return
       setListening(false)
       const message = heardRef.current
       heardRef.current = ''
@@ -389,13 +405,7 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
       if (handsFreeRef.current) setHandsFree(true)
       sendRef.current(message)
     }
-    recognitionRef.current = recognition
-    try {
-      recognition.start()
-      setListening(true)
-    } catch {
-      if (!handsFreeRef.current) push({ role: 'trai', text: voiceErrorLine('unavailable') || '' })
-    }
+    launch(0)
   }
 
   const toggleMic = () => {
@@ -421,15 +431,12 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
     setHandsFree(true)
     setOpen(false)
     missesRef.current = 0
-    try {
-      wakeRef.current?.abort()
-    } catch {
-      // Wake listening was not running.
-    }
     if (command) sendRef.current(command)
     else {
       push({ role: 'trai', text: "I'm here. What should I write down?" })
-      startListening()
+      window.setTimeout(() => {
+        if (handsFreeRef.current) startListening()
+      }, 280)
     }
   }
   beginVoiceRef.current = beginVoice
@@ -447,6 +454,7 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
     let stopped = false
     let denied = false
     let timer: number | null = null
+    let pendingCommand: string | null = null
     const arm = () => {
       if (stopped || denied || handsFreeRef.current) return
       const recognition = speechRecognition()
@@ -461,12 +469,22 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
           const command = wakeCommand(result[0]?.transcript || '')
           if (command === null) continue
           stopped = true
+          pendingCommand = command
+          window.setTimeout(() => {
+            if (pendingCommand !== command) return
+            pendingCommand = null
+            beginVoiceRef.current(command)
+          }, 700)
           try {
-            recognition.abort()
+            recognition.stop()
           } catch {
-            // The phrase already arrived.
+            try {
+              recognition.abort()
+            } catch {
+              pendingCommand = null
+              beginVoiceRef.current(command)
+            }
           }
-          beginVoiceRef.current(command)
           return
         }
       }
@@ -475,9 +493,20 @@ export default function TraiPanel({ onSaved }: { onSaved: () => void }) {
           denied = true
           stopped = true
         }
+        if (event.error === 'aborted' && pendingCommand !== null) {
+          const command = pendingCommand
+          pendingCommand = null
+          beginVoiceRef.current(command)
+        }
       }
       recognition.onend = () => {
         if (wakeRef.current === recognition) wakeRef.current = null
+        if (pendingCommand !== null) {
+          const command = pendingCommand
+          pendingCommand = null
+          beginVoiceRef.current(command)
+          return
+        }
         if (stopped || handsFreeRef.current) return
         timer = window.setTimeout(arm, 500)
       }

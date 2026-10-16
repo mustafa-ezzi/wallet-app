@@ -46,7 +46,6 @@ const NAV_LINKS = [
   ['screenshots', 'Screenshots'],
   ['trai', 'Trai'],
   ['features', 'Features'],
-  ['trai', 'Trai'],
   ['freelancers', 'Freelancers'],
   ['about', 'About'],
   ['how', 'How it works'],
@@ -317,6 +316,7 @@ function App() {
     <section className="features shell" id="features"><Reveal className="heading split"><div><span className="eyebrow">Everything in reach</span><h2>Less money stress.<br /><em>More clarity.</em></h2></div><p>Helpful tools for understanding each rupee—without making personal finance feel like work.</p></Reveal><div className="feature-grid">{productFeatures.map(([icon, title, text, tone], index) => <Reveal className="feature" key={title}><span className={`ficon ${tone}`}><Icon name={icon} size={21} /></span><i>{String(index + 1).padStart(2, '0')}</i><h3>{title}</h3><p>{text}</p></Reveal>)}</div></section>
     <ProductDepth />
     <TraiSection />
+    <ScreenshotGallery />
     <Freelancers />
     <UseCases />
     <AboutSection />
