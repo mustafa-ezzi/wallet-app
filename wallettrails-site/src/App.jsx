@@ -111,7 +111,7 @@ function TraiSection() {
       <div className="trai-copy">
         <span className="eyebrow">MEET TRAI</span>
         <h2>Say it once.<br /><em>Trai writes it down.</em></h2>
-        <p className="trai-identity">Transaction Record Account Intelligence. Your bookkeeper inside WalletTrails—not a general chatbot or web browser.</p>
+        <p className="trai-identity">Transaction Record Account Intelligence. A bookkeeper inside WalletTrails—not a general chatbot, and it doesn’t browse the web.</p>
         <p className="trai-lead">Tell Trai an expense, a bill, or a question about this month. It asks when something is missing, shows you the card, and saves only after you say yes.</p>
         <div className="trai-actions">
           <a className="button" href="#download">Get the app <Icon name="arrow" size={16} /></a>
