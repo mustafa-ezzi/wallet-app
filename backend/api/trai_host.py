@@ -12,6 +12,7 @@ from .bot_draft import (
     message_kind,
     pending_draft,
     recent_saved_draft,
+    resume_wallet_answer,
     store_proposal,
 )
 from .bot_phase8 import phase8_question
@@ -64,6 +65,9 @@ class WalletTraiHost(TraiHost):
 
     def correct(self, user, text: str):
         return correct_pending(user, text)
+
+    def resume_pending(self, user, text: str, request=None):
+        return resume_wallet_answer(user, text, request)
 
 
 wallet_host = WalletTraiHost()

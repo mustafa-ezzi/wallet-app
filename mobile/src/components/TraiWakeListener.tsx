@@ -21,6 +21,9 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
   const recognizing = useRef(false)
   const denied = useRef(false)
   const pendingWake = useRef<string | null>(null)
+  const heardWake = useRef<string | null>(null)
+  const handed = useRef(false)
+  const quietTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const restartTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   pausedRef.current = paused
   onArmedRef.current = onArmed
@@ -31,8 +34,27 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
     restartTimer.current = null
   }
 
+  const clearQuiet = () => {
+    if (quietTimer.current) clearTimeout(quietTimer.current)
+    quietTimer.current = null
+  }
+
+  const deliverWake = (command: string) => {
+    if (handed.current || pausedRef.current) return
+    handed.current = true
+    clearQuiet()
+    clearRestart()
+    pendingWake.current = null
+    heardWake.current = null
+    shouldListen.current = false
+    recognizing.current = false
+    onArmedRef.current(false)
+    onWakeRef.current(command)
+  }
+
   const halt = (stopRecognizer: boolean) => {
     clearRestart()
+    clearQuiet()
     recognizing.current = false
     onArmedRef.current(false)
     if (!stopRecognizer) return
@@ -45,6 +67,7 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
 
   const arm = async () => {
     if (!shouldListen.current || recognizing.current || denied.current || pausedRef.current) return
+    handed.current = false
     try {
       const current = await ExpoSpeechRecognitionModule.getPermissionsAsync()
       if (!current.granted) {
@@ -69,7 +92,7 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
         interimResults: true,
         continuous: true,
         requiresOnDeviceRecognition: false,
-        contextualStrings: ['Trai', 'hey Trai'],
+        contextualStrings: ['hey Trai', 'hey tray', 'hey try', 'Trai'],
       })
     } catch {
       if (shouldListen.current) schedule()
@@ -90,11 +113,9 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
   })
   useSpeechRecognitionEvent('end', () => {
     recognizing.current = false
-    const command = pendingWake.current
-    if (command !== null) {
-      pendingWake.current = null
-      onArmedRef.current(false)
-      onWakeRef.current(command)
+    const command = pendingWake.current ?? heardWake.current
+    if (command !== null && !pausedRef.current) {
+      deliverWake(command)
       return
     }
     if (shouldListen.current && !pausedRef.current) schedule()
@@ -111,27 +132,36 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
     if (shouldListen.current && !pausedRef.current) schedule()
   })
   useSpeechRecognitionEvent('result', (event) => {
-    if (!event.isFinal || pausedRef.current || !shouldListen.current) return
+    if (pausedRef.current || !shouldListen.current || pendingWake.current !== null) return
     const command = wakeCommand(event.results?.[0]?.transcript || '')
-    if (command === null) return
-    pendingWake.current = command
-    shouldListen.current = false
-    recognizing.current = false
-    clearRestart()
-    const handoff = setTimeout(() => {
-      if (pendingWake.current !== command) return
-      pendingWake.current = null
-      onArmedRef.current(false)
-      onWakeRef.current(command)
-    }, 700)
-    try {
-      ExpoSpeechRecognitionModule.abort()
-    } catch {
-      clearTimeout(handoff)
-      if (pendingWake.current !== command) return
-      pendingWake.current = null
-      onWakeRef.current(command)
+    if (command === null) {
+      heardWake.current = null
+      clearQuiet()
+      return
     }
+    heardWake.current = command
+    clearQuiet()
+    if (event.isFinal) {
+      pendingWake.current = command
+      shouldListen.current = false
+      try {
+        ExpoSpeechRecognitionModule.abort()
+      } catch {
+        deliverWake(command)
+      }
+      return
+    }
+    // A normal-volume "hey Trai" often never becomes a final result. Open once the phrase sits still.
+    quietTimer.current = setTimeout(() => {
+      if (heardWake.current !== command || pausedRef.current || !shouldListen.current) return
+      pendingWake.current = command
+      shouldListen.current = false
+      try {
+        ExpoSpeechRecognitionModule.abort()
+      } catch {
+        deliverWake(command)
+      }
+    }, 450)
   })
 
   useEffect(() => {

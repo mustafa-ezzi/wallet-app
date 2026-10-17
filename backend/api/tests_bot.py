@@ -208,6 +208,33 @@ class BotMessageSafetyTests(BotFixture):
         self.assertEqual(action['linked_project_id'], self.aliakbar.id)
         self.assertEqual(Transaction.objects.count(), 0)
 
+    def test_a_later_wallet_answer_keeps_the_milk(self):
+        with patch('api.bot_api.generate_action', return_value={
+            'action': 'create_expense',
+            'amount': 150,
+            'notes': 'milk',
+            'category': 'Food & Drink',
+        }) as mocked:
+            first = self.client.post('/api/bot/message/', {'text': 'i bought milk rp 150'}, format='json')
+        self.assertEqual(mocked.call_count, 1)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.data['action']['action'], 'ask')
+        self.assertFalse(first.data['saved'])
+
+        with patch('api.bot_api.generate_action', side_effect=AssertionError('wallet answer must not call the model')):
+            physical = self.client.post('/api/bot/message/', {'text': 'physical wallet'}, format='json')
+            cash = self.client.post('/api/bot/message/', {'text': 'yes cash wallet'}, format='json')
+        self.assertEqual(physical.status_code, 200)
+        self.assertEqual(physical.data['action']['action'], 'ask')
+        self.assertIn('Cash', physical.data['reply'])
+        self.assertEqual(cash.status_code, 200)
+        self.assertEqual(cash.data['action']['action'], 'create_expense')
+        self.assertEqual(cash.data['action']['amount'], '150.00')
+        self.assertEqual(cash.data['action']['account_id'], self.cash.id)
+        self.assertIn('milk', cash.data['action']['notes'].lower())
+        self.assertFalse(cash.data['saved'])
+        self.assertEqual(Transaction.objects.count(), 0)
+
     def test_model_down_does_not_invent_an_entry(self):
         with patch('api.bot_api.generate_action', side_effect=BotModelError('Trai is unavailable right now.')):
             response = self.client.post('/api/bot/message/', {'text': 'spent 50 cash'}, format='json')

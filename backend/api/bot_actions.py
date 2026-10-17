@@ -131,12 +131,32 @@ def normalize_action(raw, catalog, today=None, user=None) -> dict:
             if account_id not in wallets:
                 return _ask('Which wallet received this? I will not guess and then apologize.')
 
-    if action in WRITE_ACTIONS and account_id is None:
-        return _ask('Which wallet should I use? I know their names, not your mind.')
-
     amount = _amount(raw.get('amount'))
     if action == 'mark_recurring_income' and amount is None and source is not None:
         amount = _amount(source.get('amount'))
+    if action in ('create_expense', 'create_income') and account_id is None:
+        names = ', '.join(row['name'] for row in wallets.values())
+        question = f'Which wallet should I use? You have {names}.' if names else 'Which wallet should I use?'
+        if amount is None or amount <= 0:
+            return _ask(question)
+        kind = 'expense' if action == 'create_expense' else 'income'
+        body = _ask(question)
+        body['partial'] = {
+            'action': action,
+            'amount': f'{amount:.2f}',
+            'account_id': None,
+            'linked_project_id': project_id,
+            'category': _category(kind, raw.get('category'), catalog),
+            'notes': _notes(raw.get('notes')),
+            'date': _date(raw.get('date'), today).isoformat(),
+            'confidence': _confidence(raw.get('confidence')),
+            'awaiting': 'wallet',
+        }
+        return body
+
+    if action in WRITE_ACTIONS and account_id is None:
+        return _ask('Which wallet should I use? I know their names, not your mind.')
+
     if amount is None or amount <= 0:
         return _ask('How much was it? A number would help. I am terrible at guessing rupees.')
 

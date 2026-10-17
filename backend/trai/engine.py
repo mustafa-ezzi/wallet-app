@@ -18,6 +18,11 @@ def handle_message(user, text: str, host, request, model_call) -> tuple[dict, in
     pending = host.pending_draft(user)
     if pending and pending.expires_at <= timezone.now() and kind in ('confirm', 'correct'):
         return {'detail': host.expired, 'saved': False}, 400
+    resume = getattr(host, 'resume_pending', None)
+    if callable(resume) and pending is not None and kind != 'cancel':
+        continued = resume(user, text, request)
+        if continued is not None:
+            return _without_empty_warning(continued), 200
     if kind == 'confirm':
         if pending is not None:
             return _saved_or_raise(host.confirm(user, None, request))
@@ -66,8 +71,12 @@ def handle_message(user, text: str, host, request, model_call) -> tuple[dict, in
             result['saved'] = False
             return _without_empty_warning(result), 200
     result = host.normalize(raw, catalog, user)
+    partial = result.pop('partial', None)
     if result['action']['action'] in host.write_actions:
         draft = host.store_proposal(user, result['action'])
+        result['draft_id'] = draft.id
+    elif partial is not None:
+        draft = host.store_proposal(user, partial)
         result['draft_id'] = draft.id
     result['saved'] = False
     return _without_empty_warning(result), 200

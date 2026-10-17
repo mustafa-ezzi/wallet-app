@@ -164,6 +164,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [keyboard, setKeyboard] = useState(0)
   const nextId = useRef(1)
+  const turnsRef = useRef(turns)
   const inputRef = useRef<TextInput>(null)
   const saving = useRef(false)
   const stopVoiceRef = useRef<() => void>(() => {})
@@ -283,12 +284,15 @@ export function TraiDock({ bottom }: { bottom: number }) {
     push({ role: 'trai', text: reply, ask: action?.action === 'ask' })
   }
 
+  turnsRef.current = turns
+
   const textForModel = (message: string) => {
-    const last = turns[turns.length - 1]
+    const history = turnsRef.current
+    const last = history[history.length - 1]
     if (!last || last.role !== 'trai' || !last.ask) return message
     const earlier: string[] = []
-    for (let index = turns.length - 1; index >= 0; index -= 1) {
-      const turn = turns[index]
+    for (let index = history.length - 1; index >= 0; index -= 1) {
+      const turn = history[index]
       if (turn.role === 'trai' && !turn.ask) break
       if (turn.role === 'user') earlier.unshift(turn.text)
     }

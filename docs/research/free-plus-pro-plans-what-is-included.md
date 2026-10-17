@@ -3,8 +3,9 @@
 **Document type:** Product + engineering research (plan, not shipped code)  
 **Product:** WalletTrails (Android + web + Django API)  
 **Plans:** **Free → Plus → Pro** (strictly nested: each paid tier includes everything below it)  
-**Related docs:** `docs/research/revenue-ads-in-app-purchases-and-play-store-launch.md` (pricing & launch), `docs/research/google-adsense-websites-and-admob-in-the-app.md` (ads), `docs/wallettrails-full-product-guide.md` (features)  
-**Reviewed:** 7 October 2026  
+**Related docs:** `docs/research/revenue-ads-in-app-purchases-and-play-store-launch.md` (pricing & launch), `docs/research/ai-bot-turns-typed-sentences-into-expenses-and-income.md` (Trai), `docs/research/trai-site-section-for-lovable.md` (what Trai may claim), `docs/wallettrails-full-product-guide.md` (features)  
+**Ads:** unused. Older notes in `docs/research/google-adsense-websites-and-admob-in-the-app.md` are not part of these packages.  
+**Reviewed:** 17 October 2026  
 **Status:** Research for how we define packages and how we **enforce** them so Free cannot use Plus/Pro, and Plus cannot use Pro.
 
 ---
@@ -16,8 +17,8 @@ Ship three clear packages:
 | Package | Who it is for | One-line promise |
 | --- | --- | --- |
 | **Free** | Everyone | Honest personal tracker forever |
-| **Plus** | Households & power trackers | Unlimited organization, sharing, no ads |
-| **Pro** | Busy / multi-wallet users | Automation (SMS inbox, travel, PDF, smart rules) |
+| **Plus** | Households & power trackers | Unlimited organization, sharing, Trai by typing |
+| **Pro** | Busy / multi-wallet users | Automation, plus hands-free Trai (voice and “Hey Trai”) |
 
 **Hard rule:** Features are **cumulative**.
 
@@ -37,7 +38,7 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 3. **Server is the source of truth** — mobile/web UI can hide buttons, but the API must reject unauthorized use (otherwise a modified client or web call bypasses the paywall).
 4. **Soft upgrade, not a crash** — when a Free user tries a Plus feature, show an upgrade sheet (“You’ve used 2 of 2 free wallets”) instead of a silent failure.
 5. **Same feature matrix worldwide** — price localizes via Play regional pricing; plans do not.
-6. **Ads only on Free** — Plus and Pro hide ads (`premium_hides_ads` already exists in ops config).
+6. **No ads on any plan** — AdMob and AdSense are unused. Do not sell “no ads” as a Plus or Pro benefit. `premium_hides_ads` may still exist in ops config; leave it unused and do not build a paywall around it.
 
 ---
 
@@ -65,12 +66,16 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 | People (lend/borrow links) | **1** linked person | Unlimited | Unlimited |
 | Themes / appearance | Default only | All themes | All themes |
 | Home-screen widgets (extra) | Basic / none | Unlocked | Unlocked |
+| **Trai typed chat** (expense, income, bill, wallet, person, budget, and “how was my month?”) | No | **Yes** — type only, daily cap (e.g. **30**/day) | Yes, higher daily cap (e.g. **120**/day) |
+| **Trai voice** (mic, spoken “yes, save it”, hands-free follow-ups) | No | No | **Yes** |
+| **“Hey Trai”** wake while the Android app is open | No | No | **Yes** |
+| Trai on the web | No | Type only | Type + tap the mic once. **No** wake word |
 | Bank SMS / notification **paste or share** (manual) | Limited taste (e.g. **15** lifetime approvals) | Higher cap (e.g. **80**/month) | Unlimited / generous |
 | Always-on SMS / notification **inbox** + auto-detect queue | No | No | **Yes** (Android where OS/policy allow) |
 | Wallet aliases, kind overrides, transfer type, smart matching | Basic / manual | Manual + remember on approve | Full inbox + rules |
 | Travel Mode (foreign amount + home books) | No (or short trial) | No | **Yes** |
 | Future open-banking / statement file import | No | No | Pro, **region-gated** when live |
-| Ads (AdMob non-money placements) | Yes | **No** | **No** |
+| Ads (AdMob / AdSense) | **Unused** | **Unused** | **Unused** |
 | Support | Standard | Standard+ | Priority |
 | Logged-in devices | **2** | **5** | **8** (reasonable cap) |
 | Trial | — | 7 days | 7–14 days |
@@ -90,7 +95,7 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 
 **Not included**
 
-- 3rd wallet, unlimited budgets, Household event ledgers, CSV/PDF, themes pack, no-ads, always-on import inbox, Travel Mode.
+- 3rd wallet, unlimited budgets, Household event ledgers, CSV/PDF, themes pack, always-on import inbox, Travel Mode, Trai.
 
 ### 3.3 Plus — “Household & clarity”
 
@@ -99,13 +104,15 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 - Unlimited wallets, incomes, bills, budgets, categories.
 - Full report history + **CSV** export.
 - Full Household (event ledgers, more members) + unlimited People links.
-- All themes, extra widgets, **no ads**.
+- All themes and extra widgets.
 - Higher manual import caps (still **no** always-on SMS/notification listener).
+- **Trai by typing** on Android and web: the same bookkeeper (write a sentence, get a card, nothing is saved until “yes”). No microphone and no wake word.
 
 **Not included (Pro-only)**
 
+- Trai voice, hands-free follow-ups, and “Hey Trai”.
 - Always-on bank SMS / notification auto-inbox.
-- Travel Mode.
+- Travel Mode (including “turn on travel mode” said to Trai).
 - PDF packs / advanced exports.
 - Future bank-aggregator sync / AI receipt scan (when built).
 
@@ -113,13 +120,48 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 
 **Everything in Plus**, plus:
 
+- **Trai voice and “Hey Trai”** (see §3.5). Typing still works. The wake word runs only while the Android app is open.
 - Android SMS and/or notification listener → pending inbox → approve (web can review the **same** queue).
 - Unlimited / generous import approvals, aliases, kind overrides, transfer detection.
 - Travel Mode.
 - PDF export and priority support.
 - Early access to paid betas; later **region-gated** bank sync.
 
-### 3.5 What never goes behind a paywall
+### 3.5 Trai — typed on Plus, spoken on Pro
+
+Trai (Transaction Record Account Intelligence) is the in-app bookkeeper. A sentence becomes a card. Nothing is written until the user confirms. It is not a general chatbot.
+
+| | Free | Plus | Pro |
+| --- | --- | --- | --- |
+| Open Trai | No — upgrade sheet | Yes | Yes |
+| Type a sentence | No | Yes | Yes |
+| Microphone and spoken commands | No | No | Yes |
+| “Hey Trai” while the Android app is open | No | No | Yes |
+| Hands-free follow-ups (no second tap on the mic) | No | No | Yes |
+| Web | No | Composer only | Composer + tap the mic. No always-on wake word |
+
+**Same brain on Plus and Pro.** Voice is speech-to-text on the device. The server only receives text. A Plus user who types “add an expense of 250 from Meezan” gets the same card a Pro user would get by saying it. Pro pays for the microphone, the wake word, and staying in the conversation without tapping again.
+
+**What typed Trai can do (Plus and Pro)**
+
+- Expense, income, and “mark this month’s recurring”.
+- Mark a bill paid, transfer between wallets, lend or borrow with someone already tracked, add a wallet or income source.
+- Read this user’s balance, recent entry, month, and budget (“am I over food?”).
+- Set a budget, switch theme, hide amounts, open a page, set a bill reminder — each write still waits for Save.
+- Correct the open card (“make it 150”, “put it on Meezan”) before Save.
+
+**Still refused on every plan**
+
+- Sign out, delete the account, change the password or email, or take a PIN.
+- Household shared ledgers.
+- Email or share a report.
+- Invent an exchange rate.
+
+**Trai does not skip the rest of this matrix.** “Turn on travel mode” still requires Pro. A theme change still requires Plus (which a Plus user already has). Creating a wallet still counts against the wallet cap. The daily message cap (`BOT_DAILY_MESSAGE_CAP`, 30 today) becomes a **plan meter**: Plus keeps a modest daily cap; Pro gets a higher one. Exact numbers are an open question in §11.
+
+**How to enforce voice.** Hide the mic and do not arm the wake listener unless `plan_at_least(pro)`. `POST /api/bot/message/` and `POST /api/bot/confirm/` require Plus. If the client sends `channel: "voice"`, require Pro. A modified app can still type the same words; that is allowed on Plus. Do not run “Hey Trai” on the lock screen, and do not add a web wake word.
+
+### 3.6 What never goes behind a paywall
 
 - Creating an account / deleting an account.
 - Privacy / biometric / PIN / screenshot protection.
@@ -134,10 +176,13 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 ```
 Sign up → Free (default)
      │
-     ├─ Hits a Free limit (3rd wallet, event ledger, ads, …)
+     ├─ Hits a Free limit (3rd wallet, event ledger, Trai, …)
      │     → Upgrade sheet → Plus or Pro
      │
-     └─ Wants SMS auto-inbox / Travel / PDF
+     ├─ Wants to type to Trai
+     │     → Upgrade sheet → Plus
+     │
+     └─ Wants voice / “Hey Trai” / SMS auto-inbox / Travel / PDF
            → Upgrade sheet → Pro (or try Pro trial)
 ```
 
@@ -152,7 +197,7 @@ Sign up → Free (default)
 2. App calls `POST /api/premium/verify/` (already exists).  
 3. Backend creates/updates `Entitlement` as **active**.  
 4. App refreshes `GET /api/premium/` (or ops config that includes premium summary).  
-5. UI unlocks features; ads hide for Plus/Pro.
+5. UI unlocks features. There is no ad banner to hide.
 
 **Restore purchases** — required by Play: same verify path on “Restore” in Settings.
 
@@ -199,8 +244,10 @@ FEATURE_GATES = {
   "budget.unlimited": "plus",
   "household.event_ledger": "plus",
   "export.csv": "plus",
-  "ads.hide": "plus",
   "import.manual_high_cap": "plus",
+  "trai.chat": "plus",          # typed message + confirm
+  "trai.voice": "pro",          # mic, spoken confirm, hands-free follow-ups
+  "trai.wake": "pro",           # "Hey Trai" while the Android app is open
   "import.auto_inbox": "pro",
   "travel.mode": "pro",
   "export.pdf": "pro",
@@ -208,8 +255,9 @@ FEATURE_GATES = {
 }
 ```
 
-Clients call `canUse("travel.mode")`.  
-API calls `require_plan(user, "pro")` before creating travel sessions or starting SMS auto-ingest.
+Clients call `canUse("travel.mode")` and `canUse("trai.wake")`.  
+API calls `require_plan(user, "plus")` on `/api/bot/message/` and `/api/bot/confirm/`.  
+API calls `require_plan(user, "pro")` before creating travel sessions, starting SMS auto-ingest, or accepting `channel: "voice"`. A Trai action that changes Travel Mode still checks `travel.mode` after the chat gate.
 
 ### 5.3 Layer C — Soft caps vs hard features
 
@@ -217,20 +265,19 @@ API calls `require_plan(user, "pro")` before creating travel sessions or startin
 | --- | --- | --- |
 | **Count caps** | Free max 2 wallets | On create: if count ≥ limit and plan is Free → `403` + `{ code: "upgrade_required", plan: "plus", limit: 2 }` |
 | **Feature flags** | Travel Mode | On enter / create: require Pro |
-| **Usage meters** | Free 15 SMS approvals lifetime | Increment on approve; reject when over |
-| **Ads** | Banner | Client + `premium_hides_ads`; treat Plus/Pro as hide |
+| **Usage meters** | Free 15 SMS approvals lifetime; Plus Trai messages/day | Increment on approve or on a Trai model call; reject when over |
 
 ### 5.4 Where to block (checklist)
 
 | Surface | Free blocked from | Plus blocked from |
 | --- | --- | --- |
-| **API** (must) | Creating 3rd wallet; event ledger; CSV/PDF endpoints; auto SMS ingest; Travel create; high import caps | Travel; auto inbox; PDF; Pro-only betas |
-| **Mobile UI** | Hide or lock with upgrade sheet | Same for Pro-only screens |
-| **Web UI** | Same | Same |
-| **Background jobs** | Do not start SMS listener / auto-approve for Free/Plus | SMS listener only if `plan_at_least(pro)` |
+| **API** (must) | Creating 3rd wallet; event ledger; CSV/PDF endpoints; auto SMS ingest; Travel create; high import caps; `/api/bot/message/` and `/api/bot/confirm/` | Travel; auto inbox; PDF; `channel: "voice"`; Pro-only betas |
+| **Mobile UI** | Hide Trai, or lock it with an upgrade sheet | Show the composer. Hide the mic and do not arm “Hey Trai” |
+| **Web UI** | Same | Composer only. No mic |
+| **Background jobs** | Do not start SMS listener / auto-approve for Free/Plus. Do not arm the wake listener | SMS listener and “Hey Trai” only if `plan_at_least(pro)` |
 | **Admin / promo** | Grant only intended plan | Cannot “accidentally” grant Pro via Plus promo |
 
-**Never trust the client** for: wallet create, household event create, export download, bank-sms auto ingest, travel session create, device-count registration.
+**Never trust the client** for: wallet create, household event create, export download, bank-sms auto ingest, travel session create, device-count registration, Trai message/confirm, or a voice-channel flag.
 
 ### 5.5 Example API responses
 
@@ -254,7 +301,7 @@ When a Plus user tries a Pro feature:
   "code": "upgrade_required",
   "required_plan": "pro",
   "current_plan": "plus",
-  "feature": "import.auto_inbox"
+  "feature": "trai.voice"
 }
 ```
 
@@ -298,7 +345,7 @@ Base plans + offers live in Play Console; app only knows product IDs.
 
 Already present:
 
-- `Entitlement` model, Play verify (`/api/premium/verify/`), me endpoint, staff grant, promo redeem, ads config with `premium_hides_ads`.
+- `Entitlement` model, Play verify (`/api/premium/verify/`), me endpoint, staff grant, promo redeem. Ops config may still carry `premium_hides_ads`; that flag is unused because the app does not show ads.
 
 Add / change:
 
@@ -311,12 +358,12 @@ Add / change:
      "is_paid": true,
      "product_id": "plus_yearly",
      "expires_at": "...",
-     "features": { "ads.hide": true, "travel.mode": false, ... }
+     "features": { "trai.chat": true, "trai.voice": false, "travel.mode": false }
    }
    ```
 
 3. **Gate middleware / helpers** on create/list endpoints that enforce caps.  
-4. **Usage counters** table or fields (e.g. `bank_sms_approvals_lifetime`, `bank_sms_approvals_month`).  
+4. **Usage counters** table or fields (e.g. `bank_sms_approvals_lifetime`, `bank_sms_approvals_month`, Trai messages/day — `BotDailyUsage` already counts messages). Plan decides the cap.  
 5. Ops admin: grant **Plus** or **Pro** explicitly; stats by plan.
 
 ### 6.3 Client changes (mobile + web)
@@ -325,8 +372,9 @@ Add / change:
 2. Central `usePlan()` / `canUse(feature)`.  
 3. Upgrade sheet component (shared copy).  
 4. Settings → “WalletTrails Plus / Pro” with buy, restore, manage subscription (Play deep link).  
-5. Ad banner: show only if `plan === "free"` and ops allow ads.  
-6. Bank SMS screen: Free/Plus = paste path only; Pro = enable listener + inbox.
+5. Bank SMS screen: Free/Plus = paste path only; Pro = enable listener + inbox.  
+6. Trai: hidden on Free. Plus shows the typed composer on Android and web. Pro adds the mic, hands-free follow-ups, and “Hey Trai” on Android only (app open, not the lock screen). Web Pro may tap the mic; it does not listen for a wake word.  
+7. Do not add an ad banner. Ads are unused on Free, Plus, and Pro.
 
 ### 6.4 Web without Play Billing (phase)
 
@@ -342,10 +390,10 @@ Until web checkout exists:
 | Phase | Work | Outcome |
 | --- | --- | --- |
 | **0** | Finalize matrix in this doc; name Pro vs Premium in UI | Product agreement |
-| **1** | Backend `plan` + feature map + API 403s for **wallet cap** + **ads hide for any paid** | Soft launch of Plus value |
+| **1** | Backend `plan` + feature map + API 403s for **wallet cap** | Soft launch of Plus value |
 | **2** | Play SKUs Plus + Pro; verify maps to plan; Settings paywall | Users can buy |
-| **3** | Gate Household events, CSV, themes | Plus conversion |
-| **4** | Gate Travel + SMS auto-inbox + PDF as Pro | Pro conversion |
+| **3** | Gate Household events, CSV, themes, **typed Trai** | Plus conversion |
+| **4** | Gate Travel + SMS auto-inbox + PDF + **Trai voice / “Hey Trai”** as Pro | Pro conversion |
 | **5** | Usage meters, trials, promo → plan, ops dashboards | Ops-ready |
 
 Do **not** turn on hard caps in production until Play products and upgrade UX are live (otherwise Free users hit walls with no buy path).
@@ -357,17 +405,21 @@ Do **not** turn on hard caps in production until Play products and upgrade UX ar
 | Actor | Action | Expected |
 | --- | --- | --- |
 | Free | Create 3rd wallet | Blocked → upgrade to Plus |
+| Free | Open Trai or call `/api/bot/message/` | Blocked → upgrade to Plus |
 | Free | Open Travel Mode | Blocked → upgrade to Pro |
-| Free | Start SMS auto listener | Blocked |
-| Free | See ads (allowed screens) | Ads may show |
+| Free | Start SMS auto listener or say “Hey Trai” | Blocked |
+| Free, Plus, or Pro | Look for an ad banner | None. Ads are unused |
 | Plus | Create unlimited wallets | OK |
 | Plus | Household event ledger | OK |
 | Plus | CSV export | OK |
+| Plus | Type “add 250 from Meezan for food” | Card, then Save. No mic |
+| Plus | Tap the mic or say “Hey Trai” | Blocked → upgrade to Pro |
+| Plus | Tell Trai “turn on travel mode” | Blocked → upgrade to Pro (`travel.mode`) |
 | Plus | Travel / SMS auto inbox / PDF | Blocked → upgrade to Pro |
-| Plus | Ads | Hidden |
 | Pro | All Plus features | OK |
 | Pro | SMS inbox + Travel + PDF | OK |
-| Pro | Ads | Hidden |
+| Pro | Type or say an expense; “Hey Trai” with the app open | OK. Wake does not run on the lock screen or on the web |
+| Pro | Ask Trai to email a report, set a PIN, or touch a household ledger | Refused on every plan |
 | Expired Pro | Any Pro/Plus gated action | Treated as Free |
 | Tampered client calling Pro API as Free | API 403 | Server still blocks |
 
@@ -393,8 +445,9 @@ Play regional pricing applies; website copy: “Prices vary by country and tax.�
 | --- | --- |
 | How many packages? | **Three:** Free, Plus, Pro |
 | What does Free get? | Real tracker + small caps + entry Household/People |
-| What does Plus unlock? | Unlimited organization, Household power, CSV, no ads |
-| What does Pro unlock? | Automation (SMS inbox), Travel, PDF, future bank sync |
+| What does Plus unlock? | Unlimited organization, Household power, CSV, **Trai by typing** |
+| Ads? | **Unused** on Free, Plus, and Pro. Not a reason to upgrade |
+| What does Pro unlock? | Automation (SMS inbox), Travel, PDF, **Trai voice and “Hey Trai”**, future bank sync |
 | How do we stop Free from using Plus/Pro? | **Server plan rank + feature gates + caps**; UI is secondary |
 | How do we stop Plus from using Pro? | Same gates with `required_plan: "pro"` |
 | How do users get a package? | Play Billing → verify → `Entitlement` → clients refresh plan |
@@ -409,5 +462,8 @@ Play regional pricing applies; website copy: “Prices vary by country and tax.�
 3. Is Travel Mode Pro-only (recommended) or Plus?  
 4. Lifetime SKUs: Plus only, Pro only, or neither at launch?  
 5. Does one Household payer unlock Plus for members (“family plan”), or each member pays?  
+6. Trai daily caps: keep Plus at today’s **30** messages/day, and what is Pro (proposal: **120**/day)?  
+7. Any Free taste of Trai (a few lifetime messages), or none? This doc says **none**, so Free stays a manual tracker.  
+8. Web stays tap-the-mic for Pro and never gets a wake word. Confirm that stays true.  
 
 When these are decided, implementation can follow §7 without re-litigating the matrix.

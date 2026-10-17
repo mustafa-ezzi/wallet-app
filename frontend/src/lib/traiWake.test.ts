@@ -13,4 +13,11 @@ describe('Hey Trai', () => {
   it('ignores a sentence that does not start with the wake phrase', () => {
     expect(wakeCommand('add hey trai later')).toBeNull()
   })
+
+  it('hears the wake phrase when the recognizer runs the words together or mishears the name', () => {
+    expect(wakeCommand('heytrai')).toBe('')
+    expect(wakeCommand('hey tray')).toBe('')
+    expect(wakeCommand('he trai')).toBe('')
+    expect(wakeCommand('hey tree add milk')).toBe('add milk')
+  })
 })
