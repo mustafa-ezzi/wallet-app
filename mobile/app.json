@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.wallettrails.app"
     },
     "android": {
-      "package": "com.wallettrails.app",
+      "package": "com.wallettrails.android",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#04333b",
@@ -136,7 +136,9 @@
         {
           "microphonePermission": "Allow WalletTrails to hear a sentence so Trai can turn it into text. The recording is not saved.",
           "speechRecognitionPermission": "Allow WalletTrails to turn your voice into text for Trai.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox"
+          ]
         }
       ],
       "expo-localization",
@@ -148,12 +150,12 @@
     "extra": {
       "router": {},
       "apiUrl": "https://tranquil-radiance-production.up.railway.app",
-      "eas": {
-        "projectId": "c7895bac-9652-44e9-a80a-a779737f7f69"
-      },
       "googleWebClientId": "85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com",
-      "googleAndroidClientId": "85845263961-ehanc5qjtka9sc0ec3i7h5uiemup6mpe.apps.googleusercontent.com"
+      "googleAndroidClientId": "85845263961-9sj1prcfcd8jtuvl57kc6bkaacnvpe6a.apps.googleusercontent.com",
+      "eas": {
+        "projectId": "bf847a85-3034-464b-8ac3-b7018dc543ab"
+      }
     },
-    "owner": "mustafaezzi"
+    "owner": "mustafa101"
   }
 }

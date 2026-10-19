@@ -246,7 +246,7 @@ def _google_oauth_client_ids() -> list[str]:
 GOOGLE_OAUTH_CLIENT_IDS = _google_oauth_client_ids()
 
 # Google Play Billing (Phase 4) — path to service-account JSON for purchase verification
-GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.wallettrails.app').strip()
+GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.wallettrails.android').strip()
 GOOGLE_PLAY_SERVICE_ACCOUNT_JSON = os.environ.get('GOOGLE_PLAY_SERVICE_ACCOUNT_JSON', '').strip()
 
 # Trai — server-only. Never send this key to the web app or the phone.

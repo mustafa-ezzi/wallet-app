@@ -36,6 +36,17 @@ import { radii, spacing, typography } from '@/src/theme/colors'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { PRIVACY_POLICY_URL } from '@/src/constants/legal'
 
+const PLAY_PACKAGE = 'com.wallettrails.android'
+const PLAY_SUBSCRIPTION_SKUS = new Set(['premium_monthly', 'premium_yearly'])
+
+/** Google Play subscription center. sku opens the matching plan when we know it. */
+function playCancelSubscriptionUrl(productId: string | null | undefined): string {
+  const sku = productId && PLAY_SUBSCRIPTION_SKUS.has(productId)
+    ? `&sku=${encodeURIComponent(productId)}`
+    : ''
+  return `https://play.google.com/store/account/subscriptions?package=${PLAY_PACKAGE}${sku}`
+}
+
 const TIMEOUTS: { id: PrivacyTimeout; label: string }[] = [
   { id: 'immediate', label: 'Immediate' },
   { id: '1m', label: '1 minute' },
@@ -452,6 +463,21 @@ export default function SettingsScreen() {
                   void refreshConfig().then(() => setRestoreMsg('Done'))
                 }}
               />
+              {Platform.OS === 'android' ? (
+                <SettingsRow
+                  icon="times-circle"
+                  title="Cancel subscription"
+                  onPress={() => {
+                    const url = playCancelSubscriptionUrl(premium.product_id)
+                    void Linking.openURL(url).catch(() => {
+                      Alert.alert(
+                        'Could not open Google Play',
+                        'Open the Play Store, then go to Payments & subscriptions.',
+                      )
+                    })
+                  }}
+                />
+              ) : null}
               <SettingsRow
                 icon="cog"
                 title="Advanced"

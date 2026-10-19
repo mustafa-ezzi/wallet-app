@@ -4,7 +4,7 @@ const path = require('path')
 function googleServicesScore(filePath) {
   try {
     const raw = fs.readFileSync(filePath, 'utf8')
-    if (!raw.includes('com.wallettrails.app')) return 0
+    if (!raw.includes('com.wallettrails.android')) return 0
     let score = 1
     if (raw.includes('"client_type": 3')) score += 1
     if (raw.includes('"client_type": 1')) score += 2
@@ -34,8 +34,9 @@ module.exports = ({ config }) => {
   )
 
   const preferred = candidates.reduce((best, current) => {
-    if (!best) return current
-    return googleServicesScore(current) > googleServicesScore(best) ? current : best
+    if (googleServicesScore(current) === 0) return best
+    if (!best || googleServicesScore(current) > googleServicesScore(best)) return current
+    return best
   }, null)
 
   if (preferred) {
@@ -48,9 +49,10 @@ module.exports = ({ config }) => {
     }
   }
 
-  const googleServicesFile = fs.existsSync(localPath)
-    ? './google-services.json'
-    : undefined
+  const googleServicesFile =
+    fs.existsSync(localPath) && googleServicesScore(localPath) > 0
+      ? './google-services.json'
+      : undefined
 
   if (googleServicesFile) {
     expo.android = {
@@ -59,7 +61,7 @@ module.exports = ({ config }) => {
     }
   } else {
     console.warn(
-      '[WalletTrails] google-services.json missing — Android push will fail until FCM is wired (see PUSH_SETUP.md).',
+      '[WalletTrails] google-services.json is missing the package com.wallettrails.android — replace it from Firebase before building.',
     )
   }
 

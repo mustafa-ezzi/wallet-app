@@ -14,7 +14,7 @@
       },
       "oauth_client": [
         {
-          "client_id": "85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com",
+          "client_id": "85845263961-9sj1prcfcd8jtuvl57kc6bkaacnvpe6a.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -36,18 +36,18 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:85845263961:android:18138180fdc9a89d7a5348",
+        "mobilesdk_app_id": "1:85845263961:android:9a83c781360461077a5348",
         "android_client_info": {
-          "package_name": "com.wallettrails.app"
+          "package_name": "com.wallettrails.android"
         }
       },
       "oauth_client": [
         {
-          "client_id": "85845263961-ehanc5qjtka9sc0ec3i7h5uiemup6mpe.apps.googleusercontent.com",
+          "client_id": "85845263961-9sj1prcfcd8jtuvl57kc6bkaacnvpe6a.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.wallettrails.app",
-            "certificate_hash": "0ff61b1b5a10510a74e63aa9e448e038c3ec93b9"
+            "package_name": "com.wallettrails.android",
+            "certificate_hash": "746177b120428fe81d41e728fa1dea55e527e9c0"
           }
         },
         {

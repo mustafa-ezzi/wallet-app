@@ -12,7 +12,7 @@ export function ForceUpdateGate() {
   if (!needsForceUpdate) return null
 
   const store = (config.store_url || '').trim()
-    || 'https://play.google.com/store/apps/details?id=com.wallettrails.app'
+    || 'https://play.google.com/store/apps/details?id=com.wallettrails.android'
 
   return (
     <Modal visible animationType="fade" transparent={false}>

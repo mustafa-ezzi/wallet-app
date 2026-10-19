@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'expo-router'
 import {
+  Animated,
   Image,
   Keyboard,
   Platform,
@@ -23,7 +24,6 @@ import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import { isThemeId } from '@/src/theme/colors'
 import { useColors, useTheme } from '@/src/theme/ThemeContext'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
-import { TraiCrystal } from './TraiCrystal'
 
 type MicButton = typeof import('./TraiMicButton').TraiMicButton
 type WakeListener = typeof import('./TraiWakeListener').TraiWakeListener
@@ -63,6 +63,7 @@ const EXAMPLES = [
   'Mark rent paid',
 ]
 const traiIcon = require('../../assets/images/trai-icon.jpg')
+const traiListeningIcon = require('../../assets/images/trai-listening.jpg')
 
 function errorDetail(err: unknown): { status: number; detail: string } {
   const response = (err as { response?: { status?: number; data?: { detail?: unknown } } }).response
@@ -149,7 +150,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const reminders = useReminders()
   const { refresh: refreshTravel } = useTravelMode()
   const insets = useSafeAreaInsets()
-  const { height } = useWindowDimensions()
+  const { height, width } = useWindowDimensions()
   const { bumpRefresh } = useMoneyUi()
   const [open, setOpen] = useState(false)
   const [turns, setTurns] = useState<Turn[]>([])
@@ -163,6 +164,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const [preview, setPreview] = useState(false)
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [keyboard, setKeyboard] = useState(0)
+  const [cardHeight, setCardHeight] = useState(64)
   const nextId = useRef(1)
   const turnsRef = useRef(turns)
   const inputRef = useRef<TextInput>(null)
@@ -171,6 +173,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const sendRef = useRef<(raw: string) => void>(() => {})
   const handsFreeRef = useRef(false)
   const lingerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const stageLift = useRef(new Animated.Value(0)).current
   const clearLinger = () => {
     if (lingerTimer.current) clearTimeout(lingerTimer.current)
     lingerTimer.current = null
@@ -339,6 +342,15 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const lastAsk = [...turns].reverse().find(turn => turn.role === 'trai' && turn.ask)
   const walletName = (id: number | null) => wallets.find(wallet => wallet.id === id)?.name || 'your wallet'
   const stageOn = (handsFree || linger || preview) && !open
+  useEffect(() => {
+    if (stageOn) stageLift.setValue(0)
+    Animated.spring(stageLift, {
+      toValue: stageOn ? 1 : 0,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 70,
+    }).start()
+  }, [stageOn, stageLift])
   const showingPreview = preview && !handsFree
   const lastTrai = [...turns].reverse().find(turn => turn.role === 'trai')
   const stageReply = showingPreview ? 'Which wallet was that?' : (lastTrai?.text || 'Listening…')
@@ -564,22 +576,26 @@ export function TraiDock({ bottom }: { bottom: number }) {
       ) : null}
       {stageOn ? (
         <View style={[styles.stage, { bottom: bottom + 8 }]} pointerEvents="box-none">
-          <View pointerEvents="none" style={[styles.stageCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text numberOfLines={3} style={[styles.stageReply, { color: colors.text }]}>
+          <View
+            pointerEvents="none"
+            onLayout={event => {
+              const next = Math.round(event.nativeEvent.layout.height)
+              setCardHeight(current => (current === next ? current : next))
+            }}
+            style={[styles.stageCard, { borderColor: colors.borderStrong }]}
+          >
+            <Text style={[styles.stageReply, { color: colors.text }]}>
               {busy ? 'Trai is thinking…' : stageReply}
             </Text>
             {stageDetail ? (
-              <Text numberOfLines={2} style={[styles.stageDetail, { color: colors.text }]}>{stageDetail}</Text>
+              <Text style={[styles.stageDetail, { color: colors.text }]}>{stageDetail}</Text>
             ) : null}
             {showingPreview ? (
-              <Text numberOfLines={2} style={[styles.stageHeard, { color: colors.textMuted }]}>from Meezan bank</Text>
+              <Text style={[styles.stageHeard, { color: colors.textMuted }]}>from Meezan bank</Text>
             ) : handsFree && text.trim() ? (
-              <Text numberOfLines={2} style={[styles.stageHeard, { color: colors.textMuted }]}>{text.trim()}</Text>
+              <Text style={[styles.stageHeard, { color: colors.textMuted }]}>{text.trim()}</Text>
             ) : null}
           </View>
-          <Pressable onPress={() => endHandsFree()} accessibilityLabel={handsFree ? 'Stop listening' : 'Dismiss Trai'}>
-            <TraiCrystal primary={colors.primary} highlight={colors.primarySoft} />
-          </Pressable>
           {handsFree && TraiConversation ? (
             <TraiConversation
               variant="hidden"
@@ -605,7 +621,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
           ) : null}
         </View>
       ) : null}
-      {wakeArmed && !open ? <View pointerEvents="none" style={[styles.wakeRing, { bottom: bottom - 6 }]} /> : null}
+      {wakeArmed && !open && !stageOn ? <View pointerEvents="none" style={[styles.wakeRing, { bottom: bottom - 6 }]} /> : null}
       {Platform.OS === 'web' ? (
         <Pressable
           style={[styles.previewBtn, { bottom: bottom + 64, backgroundColor: colors.primary }]}
@@ -621,26 +637,58 @@ export function TraiDock({ bottom }: { bottom: number }) {
           <Text style={styles.previewLabel}>{preview ? 'Hide knot' : 'Test knot'}</Text>
         </Pressable>
       ) : null}
-      <Pressable
-        style={[styles.fab, { bottom }]}
-        onPress={() => {
-          if (open) endHandsFree()
-          setOpen(value => !value)
-        }}
-        accessibilityLabel={wakeArmed && !open ? 'Trai is listening for Hey Trai' : open ? 'Close Trai' : 'Open Trai'}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.fabSlot,
+          {
+            bottom,
+            zIndex: stageOn ? 60 : 50,
+            transform: [
+              {
+                translateX: stageLift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, (width - 52) / 2 - 20],
+                }),
+              },
+              {
+                translateY: stageLift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -(cardHeight - 18)],
+                }),
+              },
+            ],
+          },
+        ]}
       >
-        <Image source={traiIcon} style={styles.fabImage} resizeMode="cover" accessibilityIgnoresInvertColors />
-        {!open && draft ? <View style={styles.dot} /> : null}
-      </Pressable>
+        <Pressable
+          style={styles.fab}
+          onPress={() => {
+            if (stageOn) {
+              endHandsFree()
+              return
+            }
+            if (open) endHandsFree()
+            setOpen(value => !value)
+          }}
+          accessibilityLabel={stageOn ? 'Dismiss Trai' : wakeArmed && !open ? 'Trai is listening for Hey Trai' : open ? 'Close Trai' : 'Open Trai'}
+        >
+          <Image source={stageOn ? traiListeningIcon : traiIcon} style={styles.fabImage} resizeMode="cover" accessibilityIgnoresInvertColors />
+          {!open && !stageOn && draft ? <View style={styles.dot} /> : null}
+        </Pressable>
+      </Animated.View>
     </>
   )
 }
 
 const styles = StyleSheet.create({
-  fab: {
+  fabSlot: {
     position: 'absolute',
     left: 20,
-    zIndex: 50,
+    width: 52,
+    height: 52,
+  },
+  fab: {
     width: 52,
     height: 52,
     borderRadius: 26,
@@ -729,12 +777,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stageCard: {
-    maxWidth: 280,
-    marginBottom: 6,
+    alignSelf: 'stretch',
+    marginTop: 8,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 36,
+    paddingBottom: 14,
     borderRadius: 16,
     borderWidth: 1,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
   },
   stageReply: {

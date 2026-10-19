@@ -40,8 +40,8 @@ type GsiApi = {
 const DEFAULT_WEB_CLIENT_ID =
   '85845263961-bqvqpr0jeo5id40v17aj3dm5u5bt4a1c.apps.googleusercontent.com'
 const DEFAULT_ANDROID_CLIENT_ID =
-  '85845263961-ehanc5qjtka9sc0ec3i7h5uiemup6mpe.apps.googleusercontent.com'
-const ANDROID_PACKAGE = 'com.wallettrails.app'
+  '85845263961-9sj1prcfcd8jtuvl57kc6bkaacnvpe6a.apps.googleusercontent.com'
+const ANDROID_PACKAGE = 'com.wallettrails.android'
 
 const GOOGLE_DISCOVERY: AuthSession.DiscoveryDocument = {
   authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
