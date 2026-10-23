@@ -17,6 +17,13 @@ const icons = {
   sms: <><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" /><path d="M8 9h8M8 13h5" /></>,
   plus: <><path d="M12 5v14M5 12h14" /></>,
   close: <><path d="m6 6 12 12M18 6 6 18" /></>,
+  briefcase: <><rect width="18" height="13" x="3" y="7" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" /></>,
+  camera: <><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" /><circle cx="12" cy="13.5" r="3.5" /></>,
+  home: <><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9v11h14V9M10 20v-6h4v6" /></>,
+  badge: <><rect width="16" height="18" x="4" y="3" rx="2" /><circle cx="12" cy="10" r="3" /><path d="M8 17c.8-1.8 2.2-2.7 4-2.7s3.2.9 4 2.7" /></>,
+  book: <><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z" /><path d="M4 19a2 2 0 0 1 2-2h13M9 7h6" /></>,
+  plane: <><path d="M10.5 13.5 3 11l1.5-1.5 8 1 4-4a2.1 2.1 0 0 1 3 3l-4 4 1 8L15 23l-2.5-7.5" /></>,
+  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
 }
 const Icon = ({ name, size = 20 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{icons[name]}</svg>
 const Reveal = ({ children, className = '' }) => <div className={`reveal ${className}`}>{children}</div>
@@ -42,12 +49,10 @@ function PhonePreview() {
 }
 
 const NAV_LINKS = [
-  ['home', 'Home'],
-  ['screenshots', 'Screenshots'],
-  ['trai', 'Trai'],
   ['features', 'Features'],
-  ['freelancers', 'Freelancers'],
-  ['about', 'About'],
+  ['use-cases', 'Use cases'],
+  ['trai', 'Trai'],
+  ['screenshots', 'Screenshots'],
   ['how', 'How it works'],
   ['faqs', 'FAQs'],
   ['support', 'Support'],
@@ -156,49 +161,171 @@ function ScreenshotGallery() {
   return <section className="screenshots" id="screenshots"><div className="shell"><Reveal className="heading center"><span className="eyebrow">The real app</span><h2>Designed for the moments<br />when you need <em>clarity.</em></h2><p>Explore WalletTrails across home, income, bills, reports, budgets, and travel.</p></Reveal><div className="screenshot-grid">{screenshots.map(([src, title, description], index) => <Reveal className={`screenshot-card screenshot-card--${index + 1}`} key={src}><a href={`#screen-${index + 1}`}><div className="screenshot-frame"><img src={src} alt={`WalletTrails ${title} screen`} loading="lazy" /></div><div className="screenshot-caption"><span><small>WALLETTRAILS APP</small><b>{title}</b><p>{description}</p></span><i aria-hidden="true">↗</i></div></a></Reveal>)}</div><p className="screenshots-note">Tap a screen to view it in full detail.</p></div>{screenshots.map(([src, title], index) => <div className="screenshot-lightbox" id={`screen-${index + 1}`} key={`screen-${index + 1}`}><a className="lightbox-close" href="#screenshots" aria-label="Close screenshot preview">×</a><a className="lightbox-backdrop" href="#screenshots" aria-label="Close screenshot preview" /><div><img src={src} alt={`WalletTrails ${title} screen`} /><p>{title} <span>WalletTrails for Android</span></p></div></div>)}</section>
 }
 
-function Freelancers() {
-  const cards = [
-    ['wallet', 'blue', 'Multiple wallets, one picture', 'Keep JazzCash, bank, cash, and payout wallets you already use in one total. Move money between them without counting it twice.', ['Bank and cash wallets together', 'Clean transfers between your own wallets', 'One balance before you say yes to a job']],
-    ['chart', 'purple', 'Income from more than one place', 'Retainers, one-off projects, advances, and jobs paid in parts each have a home—so you can see what landed and what is still due.', ['Recurring and one-time income sources', 'Advances and remaining amounts in view', 'A month forecast of expected vs actual']],
-    ['globe', 'orange', 'International tools & subscriptions', 'ChatGPT, Adobe, hosting, domains, and other monthly tools live as bills. Due dates and reminders keep renewals from surprising you.', ['Track overseas and local subscriptions', 'Due-soon cues and scheduled reminders', 'See those costs in your monthly picture']],
-    ['bell', 'green', 'Bills, trips, and calm follow-through', 'Internet, rent, loan installments, and money clients still owe you sit in one bills space. Travel Mode helps when a client trip uses another currency. Bank payout SMS can become a draft you approve.', ['Payables, receivables, and recurring costs', 'Optional bank SMS drafts for incoming payouts', 'Travel Mode for work away from home']],
-  ]
+const personas = [
+  {
+    id: 'freelancers',
+    icon: 'briefcase',
+    label: 'Freelancers',
+    title: 'Client money, finally in one place.',
+    body: 'Retainers, one-off projects, advances, and jobs paid in parts each get their own income source. You see what has landed, what is still owed, and what the month will look like before you take the next job.',
+    month: [
+      ['Retainer', 'A monthly client is set as recurring income, so the forecast already expects it.'],
+      ['Project', 'A website job paid in three parts shows the advance received and the amount remaining.'],
+      ['Tools', 'Hosting, domains, and design tools live as monthly bills with due-date reminders.'],
+    ],
+    features: ['Income sources', 'Money owed to you', 'Monthly forecast', 'Bank SMS drafts'],
+    shot: '/media/screenshots/incomes.png',
+    note: ['Client B website', 'Rs 8,000 remaining'],
+  },
+  {
+    id: 'creators',
+    icon: 'camera',
+    label: 'Influencers & creators',
+    title: 'Brand deals, payouts, and gear, without the guesswork.',
+    body: 'Creator income comes in bursts: a brand deal with an advance, a platform payout, a sponsored trip. WalletTrails keeps each one visible, along with the subscriptions and equipment that keep the channel running.',
+    month: [
+      ['Brand deal', 'Add the full fee as a one-time income, record the advance, and keep the balance in view.'],
+      ['Subscriptions', 'Editing apps, music libraries, and cloud storage are monthly bills, so renewals are not a surprise.'],
+      ['Gear', 'A camera bought on installments is a payable, so the remaining payments show in the forecast.'],
+    ],
+    features: ['One-time income with advances', 'Installment payables', 'Credit card wallets', 'Privacy lock'],
+    shot: '/media/screenshots/bills.png',
+    note: ['Hide amounts on camera', 'Privacy lock'],
+  },
+  {
+    id: 'home',
+    icon: 'home',
+    label: 'Home managers',
+    title: 'Run the house budget, and share it fairly.',
+    body: 'Groceries, school fees, electricity, and the maid’s salary all go through one person’s hands. WalletTrails gives the household its own shared ledger, while each member’s personal wallets stay private.',
+    month: [
+      ['Budgets', 'Set a monthly limit for groceries and see how much is left before the next shop.'],
+      ['Bills', 'Electricity, gas, internet, and school fees remind you three days, one day, or on the due date.'],
+      ['Household', 'Family members add shared costs, put money into the pot, and see who has paid what.'],
+    ],
+    features: ['Household ledger', 'Category budgets', 'Bill reminders', 'Settle-up suggestions'],
+    shot: '/media/screenshots/budgets.png',
+    note: ['Groceries this month', 'On track'],
+  },
+  {
+    id: 'salaried',
+    icon: 'badge',
+    label: 'Salaried professionals',
+    title: 'From payday to payday, with fewer surprises.',
+    body: 'Your salary lands in one account, the credit card bill arrives in another, and a car or phone installment sits in between. WalletTrails puts them in one total and tells you what the rest of the month looks like.',
+    month: [
+      ['Payday', 'Salary is recurring income, so expected and actual money line up in your report.'],
+      ['Card', 'A credit card wallet tracks what you owe, your limit, and the statement and due days.'],
+      ['Bank alerts', 'On Android, a bank SMS can become a draft. You approve it instead of retyping it.'],
+    ],
+    features: ['Recurring salary', 'Credit card wallets', 'Bank SMS drafts', 'Trai voice entries'],
+    shot: '/media/screenshots/dashboard.png',
+    note: ['What you have', 'Across all wallets'],
+  },
+  {
+    id: 'students',
+    icon: 'book',
+    label: 'Students',
+    title: 'Make pocket money and part-time pay last the month.',
+    body: 'An allowance, some tuition income, and cash for the canteen add up quickly. WalletTrails keeps it simple: a few wallets, a budget for food and transport, and a record of who owes whom.',
+    month: [
+      ['Allowance', 'Monthly pocket money is recurring income. Tutoring or gig pay is one-time income.'],
+      ['Budgets', 'Food, transport, and outings each get a limit, so you see the month before it runs out.'],
+      ['Friends', 'Lend or borrow with a friend and WalletTrails keeps the balance between you.'],
+    ],
+    features: ['Cash and mobile wallets', 'Category budgets', 'Lend and borrow', 'Works offline'],
+    shot: '/media/screenshots/report.png',
+    note: ['Your month', 'Expected vs actual'],
+  },
+  {
+    id: 'travelers',
+    icon: 'plane',
+    label: 'Travelers & groups',
+    title: 'Spend in dirhams. Keep your books in rupees.',
+    body: 'Travel Mode lets you enter amounts in the local currency while your wallets stay in PKR. For a group trip, an event ledger shows contributions, who paid for what, and how to settle up at the end.',
+    month: [
+      ['Travel Mode', 'Turn it on for AED, use the live rate or the one the exchange booth gave you, and log spending as usual.'],
+      ['Group trip', 'Create a closeable event ledger, invite friends with a code, and add shared costs as you go.'],
+      ['Settle up', 'When the trip ends, WalletTrails suggests who should pay whom so the group is even.'],
+    ],
+    features: ['Travel Mode', 'Event ledgers', 'Equal-split suggestions', 'Works offline'],
+    shot: '/media/screenshots/travel_mode.png',
+    note: ['1 AED = 75.62 PKR', 'Live rate'],
+  },
+]
+
+function UseCases() {
+  const [activeId, setActiveId] = useState(personas[0].id)
+  const index = personas.findIndex((persona) => persona.id === activeId)
+  const persona = personas[index]
+
+  const onKeyDown = (event) => {
+    const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0
+    if (!step) return
+    event.preventDefault()
+    const next = personas[(index + step + personas.length) % personas.length]
+    setActiveId(next.id)
+    document.getElementById(`uc-tab-${next.id}`)?.focus()
+  }
+
   return (
-    <section className="freelancers" id="freelancers">
+    <section className="uc" id="use-cases">
       <div className="shell">
-        <Reveal className="heading split">
-          <div>
-            <span className="eyebrow">Built for freelancers</span>
-            <h2>Your work is flexible.<br />Your money can still feel <em>steady.</em></h2>
-          </div>
-          <p>Clients, platforms, and tools scatter a freelancer’s money. WalletTrails gathers wallets, income streams, subscriptions, and bills so you can plan the month without a spreadsheet.</p>
+        <Reveal className="heading center">
+          <span className="eyebrow">Use cases</span>
+          <h2>Built for the way<br /><em>you</em> handle money.</h2>
+          <p>Everyone’s month looks different. Pick the one closest to yours and see how WalletTrails fits in.</p>
         </Reveal>
-        <div className="fl-grid">
-          {cards.map(([icon, tone, title, body, points]) => (
-            <Reveal className={`fl-card fl-card--${tone}`} key={title}>
-              <span className={`ficon ${tone}`}><Icon name={icon} size={21} /></span>
-              <h3>{title}</h3>
-              <p>{body}</p>
-              <ul>{points.map((point) => <li key={point}>{point}</li>)}</ul>
-            </Reveal>
-          ))}
-        </div>
-        <Reveal className="fl-strip">
-          {[['Several wallets', 'Cash, bank, and payouts in one total'], ['Several incomes', 'Retainers, projects, and advances'], ['Several bills', 'Tools, rent, and client dues'], ['One month view', 'Reports and a simple forecast']].map(([title, hint]) => (
-            <article key={title}><b>{title}</b><span>{hint}</span></article>
-          ))}
+        <Reveal className="uc-tabs">
+          <div role="tablist" aria-label="Who uses WalletTrails" onKeyDown={onKeyDown}>
+            {personas.map((item) => (
+              <button
+                type="button"
+                role="tab"
+                key={item.id}
+                id={`uc-tab-${item.id}`}
+                aria-selected={item.id === activeId}
+                aria-controls="uc-panel"
+                tabIndex={item.id === activeId ? 0 : -1}
+                className={item.id === activeId ? 'is-active' : undefined}
+                onClick={() => setActiveId(item.id)}
+              >
+                <Icon name={item.icon} size={18} />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </Reveal>
+        <Reveal>
+          <div className="uc-panel" id="uc-panel" role="tabpanel" aria-labelledby={`uc-tab-${persona.id}`} key={persona.id}>
+            <div className="uc-copy">
+              <small>For {persona.label.toLowerCase()}</small>
+              <h3>{persona.title}</h3>
+              <p>{persona.body}</p>
+              <ol className="uc-month">
+                {persona.month.map(([step, copy]) => (
+                  <li key={step}><b>{step}</b><span>{copy}</span></li>
+                ))}
+              </ol>
+              <div className="uc-features" aria-label="Features you will use">
+                {persona.features.map((feature) => <span key={feature}><Icon name="check" size={14} />{feature}</span>)}
+              </div>
+              <a className="button" href="#download">Get WalletTrails <Icon name="arrow" size={16} /></a>
+            </div>
+            <div className="uc-visual">
+              <div className="uc-glow" aria-hidden="true" />
+              <div className="uc-phone"><img src={persona.shot} alt={`WalletTrails screen for ${persona.label.toLowerCase()}`} loading="lazy" /></div>
+              <div className="uc-note"><span><Icon name={persona.icon} size={16} /></span><p><small>{persona.note[0]}</small><b>{persona.note[1]}</b></p></div>
+            </div>
+          </div>
         </Reveal>
       </div>
     </section>
   )
 }
 
-function UseCases() {
-  return <section className="use-cases"><div className="shell"><Reveal className="heading center"><span className="eyebrow">Made for everyday life</span><h2>One calm place for the<br /><em>ways you manage money.</em></h2><p>WalletTrails is shaped around practical moments, not complicated finance jargon.</p></Reveal><div className="case-grid"><Reveal className="case-card"><span className="case-icon solo">⌂</span><small>FOR YOU</small><h3>Keep everyday money in view.</h3><p>See cash and bank wallets together, log spending in a few taps—or approve a bank SMS draft—and understand where your month is going.</p><ul><li>Total balance across your wallets</li><li>Quick entry, or opt-in bank SMS auto-detect</li><li>Private amount masking when needed</li></ul></Reveal><Reveal className="case-card"><span className="case-icon work">↗</span><small>FOR YOUR WORK</small><h3>Make client income easier to follow.</h3><p>Track monthly retainers, one-time jobs, advances, and payment plans without losing sight of what remains.</p><ul><li>Recurring and one-time income sources</li><li>Record received payments as they happen</li><li>Forecast the month ahead</li></ul></Reveal><Reveal className="case-card"><span className="case-icon home">♧</span><small>FOR YOUR PEOPLE</small><h3>Share costs without sharing everything.</h3><p>Create a Household for a home, event, or trip while each member keeps their own private money private.</p><ul><li>Invite by code or secure link</li><li>Ongoing or closeable event ledgers</li><li>Equal-split suggestions for the group</li></ul></Reveal></div></div></section>
-}
-
 const faqs = [
-  ['Is WalletTrails useful if I freelance?', 'Yes. You can keep several wallets in one total, record more than one income source (retainers, one-off jobs, advances, and payments in parts), and track bills such as international subscriptions, rent, and money still owed to you. Reports and a simple forecast help you see the month without a spreadsheet.'],
+  ['Who is WalletTrails for?', 'Anyone whose money moves through more than one place. Freelancers track client income, advances, and payments in parts. Creators follow brand deals, subscriptions, and gear installments. Home managers run a shared household ledger and budgets. Salaried people, students, and travelers use wallets, bills, budgets, and Travel Mode. Start with one wallet and add the rest only when you need it.'],
   ['Can I use WalletTrails without an internet connection?', 'Yes. Personal wallets and recent transactions can be available from your local cache, and personal income, expense, and transfer entries can be queued offline. They sync when your device is online again. Shared Household changes intentionally need an internet connection.'],
   ['Can other Household members see my bank balance?', 'No. Household members see only entries added to the shared Household ledger, including who paid a shared item. Your personal wallets, income, loans, and unrelated transactions stay private to your account.'],
   ['What can WalletTrails remind me about?', 'You can set reminders around monthly costs, loans, installments, and money you expect to receive. Reminder lead times can include three days before, one day before, and the due day.'],
@@ -273,7 +400,7 @@ function AboutSection() {
 function App() {
   const [menu, setMenu] = useState(false)
   const [tour, setTour] = useState(false)
-  const [active, setActive] = useState('home')
+  const [active, setActive] = useState('')
   useEffect(() => { const observer = new IntersectionObserver((entries) => entries.forEach((entry) => entry.isIntersecting && entry.target.classList.add('visible')), { threshold: 0.12 }); document.querySelectorAll('.reveal').forEach((item) => observer.observe(item)); return () => observer.disconnect() }, [])
   useEffect(() => { document.body.style.overflow = tour ? 'hidden' : ''; return () => { document.body.style.overflow = '' } }, [tour])
   useEffect(() => {
@@ -290,7 +417,7 @@ function App() {
         })
         .filter(Boolean)
         .sort((a, b) => a.top - b.top)
-      let current = ordered[0]?.id || ids[0]
+      let current = ''
       for (const item of ordered) {
         if (item.top <= y) current = item.id
       }
@@ -314,17 +441,16 @@ function App() {
     <section className="trust"><div className="shell"><p>ONE SIMPLE HOME FOR THE FINANCIAL THINGS THAT MATTER</p><div><span>Personal money</span><i /><span>Freelance work</span><i /><span>Shared living</span><i /><span>Bank SMS drafts</span></div></div></section>
     <section className="showcase" id="preview"><div className="shell"><Reveal className="heading center"><span className="eyebrow">A look inside</span><h2>Clear money moments,<br /><em>beautifully connected.</em></h2><p>From a quick expense to your monthly picture, every detail is designed to feel simple and human.</p></Reveal><div className="showcase-grid"><Reveal className="overview"><header><span>◔</span><p><small>Monthly overview</small><b>September 2026</b></p><i>•••</i></header><div className="total"><small>You have spent</small><b>Rs. 42,780</b><span>of Rs. 55,000 planned</span></div><div className="donut-content"><div className="donut"><span><b>78%</b><small>used</small></span></div><div>{[['Food & dining', 'Rs. 15,200', 'blue'], ['Home & bills', 'Rs. 12,500', 'purple'], ['Travel', 'Rs. 6,750', 'orange'], ['Other', 'Rs. 8,330', 'gray']].map(([label, amount, tone]) => <p className="legend" key={label}><i className={tone} />{label}<b>{amount}</b></p>)}</div></div><footer>Spending by category <a>See details →</a></footer></Reveal><Reveal className="tour-card"><div className="tour-art"><div /><button onClick={() => setTour(true)} aria-label="Play product tour"><Icon name="play" size={18} /></button><span>01:00</span></div><article><small>PRODUCT TOUR</small><h3>Your day, in one minute.</h3><p>See how WalletTrails helps you capture expenses, approve a bank SMS, and stay on course.</p><button onClick={() => setTour(true)}>Play video →</button></article></Reveal><Reveal className="quick-card"><span className="ficon purple">⇄</span><small>BANK SMS IN</small><h3>Drafts you approve.</h3><p>Opt in on Android. Eligible bank alerts become a suggestion—not a silent post.</p><div>SMS <i>→</i> Approve</div></Reveal><Reveal className="people-card"><span className="people"><i>H</i><i>S</i><i>M</i></span><small>SHARED SPENDING</small><h3>Fairness without the maths.</h3><p>Split household expenses and keep everyone in the loop.</p><a href="#features">↗</a></Reveal></div></div></section>
     <section className="features shell" id="features"><Reveal className="heading split"><div><span className="eyebrow">Everything in reach</span><h2>Less money stress.<br /><em>More clarity.</em></h2></div><p>Helpful tools for understanding each rupee—without making personal finance feel like work.</p></Reveal><div className="feature-grid">{productFeatures.map(([icon, title, text, tone], index) => <Reveal className="feature" key={title}><span className={`ficon ${tone}`}><Icon name={icon} size={21} /></span><i>{String(index + 1).padStart(2, '0')}</i><h3>{title}</h3><p>{text}</p></Reveal>)}</div></section>
+    <UseCases />
     <ProductDepth />
     <TraiSection />
     <ScreenshotGallery />
-    <Freelancers />
-    <UseCases />
     <AboutSection />
     <section className="how" id="how"><div className="shell"><Reveal className="heading center"><span className="eyebrow">Simple from the start</span><h2>How it <em>works.</em></h2><p>Start with the money you already have, capture the moments that matter—by hand or from a bank SMS—and let WalletTrails make the month easier to understand.</p></Reveal><div className="how-flow">{[["↓", 'Get WalletTrails', 'Download the Android app and create your private WalletTrails account. Your money starts with you.'], ['♙', 'Add your wallets', 'Add your cash and bank wallets with their opening balances. You will see one clear total straight away.'], ['✓', 'Follow every rupee', 'Log income, expenses, and transfers—or opt in so a bank SMS becomes a draft you approve. Use reports, reminders, privacy lock, and Household when you need them.']].map(([symbol, title, body], index) => <Reveal className="how-step" key={title}><span className={`how-step__icon how-step__icon--${index + 1}`}>{symbol}</span><span className="how-step__number">0{index + 1}</span><h3>{title}</h3><p>{body}</p>{index < 2 && <i className="how-connector" aria-hidden="true">···</i>}</Reveal>)}</div><Reveal className="how-callout"><span>✦</span><p><b>Start small.</b> Add one wallet, log an expense, or approve a detected bank message. The clearer picture follows naturally.</p><a href="#download">Get the app <Icon name="arrow" size={16} /></a></Reveal></div>    </section>
     <FAQSection />
     <SupportSection />
     <section className="download shell" id="download"><Reveal><span className="eyebrow light">Ready when you are</span><h2>Start following<br />every <em>rupee.</em></h2><p>Take the first small step towards feeling more at ease with your money.</p><div className="dl-actions"><a className="playstore" href="#home"><i>▶</i><span><small>GET IT ON</small><b>Google Play</b></span></a><a className="button white" href="#home">Explore WalletTrails <Icon name="arrow" size={16} /></a></div></Reveal><div className="mini-phone"><i /><p>WalletTrails</p><article><small>Available balance</small><b>Rs. 86,420</b></article><span /><span /><span /><strong>+</strong></div></section>
-  </main><footer><div className="shell foot-main"><Logo inverse /><p>Follow every rupee. Feel more free.</p><nav><a href="#screenshots">Screenshots</a><a href="#features">Features</a><a href="#freelancers">Freelancers</a><a href="#about">About</a><a href="#how">How it works</a><a href="/privacy.html">Privacy</a></nav></div><div className="shell foot-bottom"><span>© 2026 WalletTrails. Made for everyday money.</span><a href="#home">Back to top ↑</a></div></footer>{tour && <TourModal onClose={() => setTour(false)} />}</>
+  </main><footer><div className="shell foot-main"><Logo inverse /><p>Follow every rupee. Feel more free.</p><nav><a href="#screenshots">Screenshots</a><a href="#features">Features</a><a href="#use-cases">Use cases</a><a href="#about">About</a><a href="#how">How it works</a><a href="/privacy.html">Privacy</a></nav></div><div className="shell foot-bottom"><span>© 2026 WalletTrails. Made for everyday money.</span><a href="#home">Back to top ↑</a></div></footer>{tour && <TourModal onClose={() => setTour(false)} />}</>
 }
 function TourModal({ onClose }) { return <div className="modal" role="dialog" aria-modal="true" aria-label="WalletTrails product tour"><button className="backdrop" onClick={onClose} aria-label="Close tour" /><article><button className="x" onClick={onClose} aria-label="Close"><Icon name="close" /></button><Logo inverse /><small>PRODUCT TOUR · 01:00</small><div><span><Icon name="plus" size={30} /></span><h2>Track it as it happens.</h2><p>Log a spend, or approve a bank SMS draft. Every rupee has a place.</p></div><nav><i /><i /><i /></nav></article></div> }
 export default App
