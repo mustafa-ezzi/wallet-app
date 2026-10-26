@@ -1,23 +1,43 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import type { ColumnDef } from '@tanstack/react-table'
+import { BellRing, Copy, Eye, FlaskConical, MoreHorizontal, RefreshCw, Send, Trash2, X } from 'lucide-react'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import type { OpsCampaign } from '../api'
+import { PushPreview } from '../components/PushPreview'
 import {
-  cancelCampaign,
-  createCampaign,
-  deleteCampaign,
-  estimateCampaignAudience,
-  fetchCampaigns,
-  sendCampaign,
-  type CampaignEstimate,
-  type OpsCampaign,
-} from '../api'
-
-const AUDIENCES = [
-  { value: 'all', label: 'All opted-in with a device' },
-  { value: 'android', label: 'Android only' },
-  { value: 'inactive_7d', label: 'Inactive 7d+' },
-  { value: 'inactive_30d', label: 'Inactive 30d+' },
-  { value: 'inactive_90d', label: 'Inactive 90d+' },
-]
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  ConfirmDialog,
+  DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  Select,
+  Skeleton,
+  Textarea,
+  toast,
+} from '../components/ui'
+import { formatDateTime, formatRelative } from '../lib/format'
+import { apiErrorMessage } from '../lib/queryClient'
+import { AUDIENCES, audienceLabel, campaignStatus } from '../lib/status'
+import {
+  useCampaignEstimate,
+  useCampaigns,
+  useCancelCampaign,
+  useCreateCampaign,
+  useDeleteCampaign,
+  useSendCampaign,
+} from '../queries'
 
 const ROUTES = [
   { value: '', label: 'Open app (default)' },
@@ -51,8 +71,8 @@ const TEMPLATES = [
   {
     id: 'reengage_90d',
     label: 'Win-back 90d',
-    body: 'Your wallets are still here when you are ready. Open WalletTrails anytime.',
     title: 'Still keeping your rupees?',
+    body: 'Your wallets are still here when you are ready. Open WalletTrails anytime.',
     audience: 'inactive_90d',
     route: 'home',
   },
@@ -66,351 +86,385 @@ const TEMPLATES = [
   },
 ]
 
-function statusBadge(status: string) {
-  if (status === 'sent') return <span className="badge ok">{status}</span>
-  if (status === 'failed' || status === 'cancelled') return <span className="badge danger">{status}</span>
-  if (status === 'scheduled' || status === 'sending') return <span className="badge warn">{status}</span>
-  return <span className="badge">{status}</span>
+const TITLE_MAX = 120
+const BODY_MAX = 400
+
+type Draft = { title: string; body: string; audience: string; route: string; schedule: string }
+const EMPTY_DRAFT: Draft = { title: '', body: '', audience: 'all', route: '', schedule: '' }
+
+type PendingAction = { kind: 'send' | 'delete'; campaign: OpsCampaign } | null
+
+const canSend = (c: OpsCampaign) => ['draft', 'scheduled', 'failed', 'sending'].includes(c.status)
+const isRetry = (c: OpsCampaign) => c.status === 'failed' || c.status === 'sending'
+
+function Counter({ value, max }: { value: number; max: number }) {
+  return <span className={value > max * 0.9 ? 'text-warn' : 'text-subtle'}>{`${value}/${max}`}</span>
 }
 
 export function CampaignsPage() {
-  const [rows, setRows] = useState<OpsCampaign[]>([])
-  const [count, setCount] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const navigate = useNavigate()
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
+  const [pending, setPending] = useState<PendingAction>(null)
+  const campaigns = useCampaigns({ page_size: 50 })
+  const estimate = useCampaignEstimate(draft.audience)
+  const createCampaign = useCreateCampaign()
+  const sendCampaign = useSendCampaign()
+  const cancelCampaign = useCancelCampaign()
+  const deleteCampaign = useDeleteCampaign()
+  const rows = campaigns.data?.results ?? []
+  const est = estimate.isError ? null : estimate.data
+  const limitReached = est ? est.campaigns_sent_today >= est.max_campaigns_per_day : false
 
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [audience, setAudience] = useState('all')
-  const [route, setRoute] = useState('')
-  const [estimate, setEstimate] = useState<CampaignEstimate | null>(null)
+  const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((d) => ({ ...d, [key]: value }))
 
-  async function load() {
-    setError(null)
-    try {
-      const data = await fetchCampaigns({ page_size: 50 })
-      setRows(data.results)
-      setCount(data.count)
-    } catch {
-      setError('Failed to load campaigns.')
-    }
-  }
-
-  useEffect(() => {
-    void load()
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const est = await estimateCampaignAudience(audience)
-        if (!cancelled) setEstimate(est)
-      } catch {
-        if (!cancelled) setEstimate(null)
+  function onCreate() {
+    let scheduled_at: string | null = null
+    if (draft.schedule) {
+      const when = new Date(draft.schedule)
+      if (Number.isNaN(when.getTime()) || when <= new Date()) {
+        toast.error('Pick a time in the future, or leave the schedule empty.')
+        return
       }
-    })()
-    return () => {
-      cancelled = true
+      scheduled_at = when.toISOString()
     }
-  }, [audience])
+    createCampaign.mutate(
+      {
+        title: draft.title.trim(),
+        body: draft.body.trim(),
+        audience: draft.audience,
+        data: draft.route ? { route: draft.route } : {},
+        scheduled_at,
+      },
+      {
+        onSuccess: (c) => {
+          setDraft(EMPTY_DRAFT)
+          toast.success(
+            scheduled_at ? `Campaign #${c.id} scheduled for ${formatDateTime(c.scheduled_at)}.` : `Draft #${c.id} saved. Dry run it, then send.`,
+          )
+        },
+        onError: (err) => toast.error(apiErrorMessage(err, 'Could not save the campaign.')),
+      },
+    )
+  }
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    try {
-      const campaign = await createCampaign({
-        title: title.trim(),
-        body: body.trim(),
-        audience,
-        data: route ? { route } : {},
+  function dryRun(c: OpsCampaign) {
+    sendCampaign.mutate(
+      { id: c.id, dry_run: true },
+      {
+        onSuccess: (r) => toast.info(`Dry run #${c.id}: about ${r.users ?? 0} users on ${r.tokens ?? 0} devices would get it.`),
+        onError: (err) => toast.error(apiErrorMessage(err, 'Dry run failed.')),
+      },
+    )
+  }
+
+  function duplicate(c: OpsCampaign) {
+    setDraft({
+      title: c.title,
+      body: c.body,
+      audience: c.audience,
+      route: String((c.data as { route?: string })?.route || ''),
+      schedule: '',
+    })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    toast.info(`Copied #${c.id} into the composer.`)
+  }
+
+  function confirmPending() {
+    if (!pending) return
+    const { kind, campaign } = pending
+    if (kind === 'send') {
+      sendCampaign.mutate(
+        { id: campaign.id, confirm: true },
+        {
+          onSuccess: (r) => {
+            if (r.ok) toast.success(`${isRetry(campaign) ? 'Retried' : 'Sent'} #${campaign.id}: ${r.sent_ok} delivered, ${r.sent_failed} failed.`)
+            else toast.error(`Send failed: ${r.detail || 'unknown error'}`)
+            setPending(null)
+          },
+          onError: (err) => toast.error(apiErrorMessage(err, 'Send failed.')),
+        },
+      )
+    } else {
+      deleteCampaign.mutate(campaign.id, {
+        onSuccess: () => {
+          toast.success(`Deleted campaign #${campaign.id}.`)
+          setPending(null)
+        },
+        onError: (err) => toast.error(apiErrorMessage(err, 'Delete failed.')),
       })
-      setTitle('')
-      setBody('')
-      setMessage(`Draft #${campaign.id} created. Review estimate, then Send.`)
-      await load()
-    } catch {
-      setError('Could not create campaign.')
-    } finally {
-      setBusy(false)
     }
   }
 
-  async function onDryRun(id: number) {
-    setBusy(true)
-    setError(null)
-    try {
-      const result = await sendCampaign(id, { dry_run: true })
-      setMessage(
-        `Dry run #${id}: ~${result.users ?? 0} users / ${result.tokens ?? 0} devices would be notified.`,
-      )
-    } catch {
-      setError('Dry run failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const columns: ColumnDef<OpsCampaign>[] = [
+    {
+      id: 'campaign',
+      header: 'Campaign',
+      accessorKey: 'title',
+      cell: ({ row }) => (
+        <div className="max-w-[340px] min-w-[220px] whitespace-normal">
+          <div className="font-semibold text-fg">
+            <span className="text-subtle">#{row.original.id}</span> {row.original.title}
+          </div>
+          <div className="line-clamp-1 text-xs text-muted">{row.original.body}</div>
+        </div>
+      ),
+    },
+    { id: 'audience', header: 'Audience', accessorFn: (c) => audienceLabel(c.audience) },
+    {
+      id: 'status',
+      header: 'Status',
+      accessorKey: 'status',
+      cell: ({ row }) => {
+        const s = campaignStatus(row.original.status)
+        return (
+          <div>
+            <Badge tone={s.tone} dot>
+              {s.label}
+            </Badge>
+            {row.original.status === 'scheduled' && row.original.scheduled_at ? (
+              <div className="mt-1 text-xs text-subtle">{formatDateTime(row.original.scheduled_at)}</div>
+            ) : null}
+          </div>
+        )
+      },
+    },
+    { id: 'estimate', header: 'Estimate', accessorKey: 'recipient_estimate', cell: ({ getValue }) => <span className="tabular">{getValue<number>()}</span> },
+    {
+      id: 'results',
+      header: 'Results',
+      accessorFn: (c) => c.sent_ok,
+      cell: ({ row }) =>
+        row.original.status === 'sent' || row.original.status === 'failed' ? (
+          <span className="tabular">
+            <span className="text-primary">{row.original.sent_ok} ok</span> · <span className={row.original.sent_failed ? 'text-danger' : 'text-subtle'}>{row.original.sent_failed} failed</span>
+          </span>
+        ) : (
+          <span className="text-subtle">—</span>
+        ),
+    },
+    {
+      id: 'created',
+      header: 'Created',
+      accessorFn: (c) => c.created_at ?? '',
+      cell: ({ row }) => <span className="text-muted">{formatRelative(row.original.created_at)}</span>,
+    },
+    {
+      id: 'actions',
+      header: () => <span className="sr-only">Actions</span>,
+      enableSorting: false,
+      cell: ({ row }) => {
+        const c = row.original
+        return (
+          <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" aria-label={`Actions for campaign ${c.id}`}>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => navigate(`/campaigns/${c.id}`)}>
+                  <Eye /> View results
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => duplicate(c)}>
+                  <Copy /> Duplicate
+                </DropdownMenuItem>
+                {canSend(c) ? (
+                  <>
+                    <DropdownMenuItem onSelect={() => dryRun(c)}>
+                      <FlaskConical /> Dry run
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setPending({ kind: 'send', campaign: c })}>
+                      <Send /> {isRetry(c) ? 'Retry send' : 'Send now'}
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+                {c.status === 'draft' || c.status === 'scheduled' ? (
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      cancelCampaign.mutate(c.id, {
+                        onSuccess: () => toast.success(`Cancelled #${c.id}.`),
+                        onError: (err) => toast.error(apiErrorMessage(err, 'Cancel failed.')),
+                      })
+                    }
+                  >
+                    <X /> Cancel
+                  </DropdownMenuItem>
+                ) : null}
+                {c.status !== 'sending' ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-danger [&_svg]:text-danger" onSelect={() => setPending({ kind: 'delete', campaign: c })}>
+                      <Trash2 /> Delete
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )
+      },
+    },
+  ]
 
-  async function onSend(id: number) {
-    const row = rows.find((c) => c.id === id)
-    const retry = row?.status === 'failed' || row?.status === 'sending'
-    const ok = window.confirm(
-      retry
-        ? 'Retry this failed push now? This cannot be undone.'
-        : 'Send this push to all matching opted-in users now? This cannot be undone.',
-    )
-    if (!ok) return
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    try {
-      const result = await sendCampaign(id, { confirm: true })
-      setMessage(
-        result.ok
-          ? `${retry ? 'Retried' : 'Sent'} #${id}: ${result.sent_ok} ok, ${result.sent_failed} failed.`
-          : `Send failed: ${result.detail || 'unknown error'}`,
-      )
-      await load()
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : 'Send failed.')
-      await load()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function onCancel(id: number) {
-    setBusy(true)
-    try {
-      await cancelCampaign(id)
-      await load()
-    } catch {
-      setError('Cancel failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function onDelete(id: number) {
-    const ok = window.confirm(
-      `Delete campaign #${id}? This removes it and its delivery records permanently.`,
-    )
-    if (!ok) return
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    try {
-      await deleteCampaign(id)
-      setMessage(`Deleted campaign #${id}.`)
-      await load()
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : 'Delete failed.')
-    } finally {
-      setBusy(false)
-    }
-  }
+  const valid = draft.title.trim() && draft.body.trim()
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <h1>Notifications</h1>
-          <p>Broadcast updates to opted-in users · max {estimate?.max_campaigns_per_day ?? 20}/day</p>
-        </div>
-        <button className="btn" type="button" onClick={() => void load()}>
-          Refresh
-        </button>
+      <PageHeader
+        title="Notifications"
+        description={`Push broadcasts to opted-in users · limit ${est?.max_campaigns_per_day ?? 20} per day`}
+        actions={
+          <Button onClick={() => void campaigns.refetch()} loading={campaigns.isFetching && !campaigns.isPending}>
+            {campaigns.isFetching && !campaigns.isPending ? null : <RefreshCw />}
+            Refresh
+          </Button>
+        }
+      />
+
+      <div className="mb-6 grid gap-4 xl:grid-cols-[1fr_340px]">
+        <Card>
+          <CardHeader title="Compose" description="Start from a template or write your own." />
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {TEMPLATES.map((t) => (
+                <Button
+                  key={t.id}
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setDraft({ title: t.title, body: t.body, audience: t.audience, route: t.route, schedule: '' })}
+                >
+                  {t.label}
+                </Button>
+              ))}
+            </div>
+            <Field label="Title" hint={<Counter value={draft.title.length} max={TITLE_MAX} />}>
+              <Input value={draft.title} maxLength={TITLE_MAX} onChange={(e) => set('title', e.target.value)} placeholder="WalletTrails update" />
+            </Field>
+            <Field label="Message" hint={<Counter value={draft.body.length} max={BODY_MAX} />}>
+              <Textarea
+                value={draft.body}
+                maxLength={BODY_MAX}
+                rows={3}
+                onChange={(e) => set('body', e.target.value)}
+                placeholder="Widgets are sharper — open the app to sync."
+              />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Audience">
+                <Select value={draft.audience} onChange={(e) => set('audience', e.target.value)}>
+                  {AUDIENCES.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Tap opens">
+                <Select value={draft.route} onChange={(e) => set('route', e.target.value)}>
+                  {ROUTES.map((r) => (
+                    <option key={r.value || 'default'} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Schedule" hint="Leave empty to save a draft.">
+                <Input type="datetime-local" value={draft.schedule} onChange={(e) => set('schedule', e.target.value)} />
+              </Field>
+            </div>
+          </CardContent>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3.5">
+            <div className="text-[13px] text-muted" aria-live="polite">
+              {estimate.isPending ? (
+                <Skeleton className="h-4 w-56" />
+              ) : est ? (
+                <>
+                  Reaches about <strong className="text-fg tabular">{est.users}</strong> users on{' '}
+                  <strong className="text-fg tabular">{est.tokens}</strong> devices · {est.campaigns_sent_today}/{est.max_campaigns_per_day} sent
+                  today
+                </>
+              ) : (
+                'Audience estimate unavailable.'
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" disabled={!valid && !draft.schedule} onClick={() => setDraft(EMPTY_DRAFT)}>
+                Clear
+              </Button>
+              <Button variant="primary" disabled={!valid} loading={createCampaign.isPending} onClick={onCreate}>
+                {draft.schedule ? 'Schedule' : 'Save draft'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+        <Card className="flex flex-col items-center justify-center p-6">
+          <PushPreview title={draft.title} body={draft.body} />
+        </Card>
       </div>
 
-      {error ? <p className="error">{error}</p> : null}
-      {message ? <p className="note">{message}</p> : null}
+      {limitReached ? (
+        <Alert tone="warn" className="mb-4">
+          Today's limit of {est?.max_campaigns_per_day} campaigns is reached. New sends will be refused until tomorrow.
+        </Alert>
+      ) : null}
+      {est && est.tokens === 0 ? (
+        <Alert tone="info" className="mb-4" title="No devices to reach yet">
+          Only users with a registered push token and product updates turned on get broadcasts. Install a native build with
+          Firebase, then link the device under Settings. See <code>mobile/android-push-notifications-firebase-setup.md</code>.
+        </Alert>
+      ) : null}
 
-      <form className="card" onSubmit={onCreate} style={{ marginBottom: 20 }}>
-        <div className="label" style={{ marginBottom: 12 }}>
-          Compose campaign
-        </div>
-        <div className="toolbar" style={{ marginBottom: 12 }}>
-          {TEMPLATES.map((t) => (
-            <button
-              key={t.id}
-              className="btn"
-              type="button"
-              onClick={() => {
-                setTitle(t.title)
-                setBody(t.body)
-                setAudience(t.audience)
-                setRoute(t.route)
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="field">
-          <label htmlFor="title">Title</label>
-          <input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={120}
-            required
-            placeholder="WalletTrails update"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="body">Body</label>
-          <input
-            id="body"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            maxLength={400}
-            required
-            placeholder="Widgets are sharper — open the app to sync."
-          />
-        </div>
-        <div className="toolbar" style={{ marginBottom: 0 }}>
-          <select value={audience} onChange={(e) => setAudience(e.target.value)}>
-            {AUDIENCES.map((a) => (
-              <option key={a.value} value={a.value}>
-                {a.label}
-              </option>
-            ))}
-          </select>
-          <select value={route} onChange={(e) => setRoute(e.target.value)}>
-            {ROUTES.map((r) => (
-              <option key={r.value || 'default'} value={r.value}>
-                Tap opens: {r.label}
-              </option>
-            ))}
-          </select>
-          <button className="btn primary" type="submit" disabled={busy}>
-            Save draft
-          </button>
-        </div>
-        {estimate ? (
-          <p className="muted" style={{ margin: '12px 0 0', fontSize: '0.9rem' }}>
-            Audience estimate: <strong>{estimate.users}</strong> users / {estimate.tokens} devices · sent
-            today {estimate.campaigns_sent_today}/{estimate.max_campaigns_per_day}
-          </p>
-        ) : null}
-      </form>
-
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Campaign</th>
-              <th>Audience</th>
-              <th>Status</th>
-              <th>Estimate</th>
-              <th>Results</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="muted">
-                  No campaigns yet ({count}).
-                </td>
-              </tr>
-            ) : (
-              rows.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <Link to={`/campaigns/${c.id}`}>#{c.id}</Link>
-                  </td>
-                  <td>
-                    <strong>{c.title}</strong>
-                    <div className="muted" style={{ fontSize: '0.8rem', maxWidth: 280, whiteSpace: 'normal' }}>
-                      {c.body}
-                    </div>
-                  </td>
-                  <td>{c.audience}</td>
-                  <td>{statusBadge(c.status)}</td>
-                  <td>{c.recipient_estimate}</td>
-                  <td>
-                    {c.status === 'sent' || c.status === 'failed'
-                      ? `${c.sent_ok} ok / ${c.sent_failed} fail`
-                      : '—'}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <Link className="btn" to={`/campaigns/${c.id}`}>
-                        View
-                      </Link>
-                      <button
-                        className="btn"
-                        type="button"
-                        disabled={busy}
-                        onClick={() => {
-                          setTitle(c.title)
-                          setBody(c.body)
-                          setAudience(c.audience)
-                          setRoute(String((c.data as { route?: string })?.route || ''))
-                          setMessage(`Copied #${c.id} into the compose form — edit if needed, then Save draft.`)
-                          window.scrollTo({ top: 0, behavior: 'smooth' })
-                        }}
-                      >
-                        Duplicate
-                      </button>
-                      {(c.status === 'draft' || c.status === 'scheduled' || c.status === 'failed' || c.status === 'sending') && (
-                        <>
-                          <button className="btn" type="button" disabled={busy} onClick={() => void onDryRun(c.id)}>
-                            Dry run
-                          </button>
-                          <button
-                            className="btn primary"
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void onSend(c.id)}
-                          >
-                            {c.status === 'failed' || c.status === 'sending' ? 'Retry' : 'Send'}
-                          </button>
-                        </>
-                      )}
-                      {(c.status === 'draft' || c.status === 'scheduled') && (
-                        <button className="btn danger" type="button" disabled={busy} onClick={() => void onCancel(c.id)}>
-                          Cancel
-                        </button>
-                      )}
-                      {c.status !== 'sending' && (
-                        <button
-                          className="btn danger"
-                          type="button"
-                          disabled={busy}
-                          onClick={() => void onDelete(c.id)}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                    {c.status === 'failed' && c.last_error ? (
-                      <div className="muted" style={{ fontSize: '0.75rem', marginTop: 6, maxWidth: 260, whiteSpace: 'normal' }}>
-                        {c.last_error}
-                      </div>
-                    ) : null}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <p className="note">
-        Only users with a registered Expo push token and <strong>product updates</strong> enabled in the app
-        receive broadcasts. Due-date reminders are separate.
-        If estimate is <strong>0 devices</strong>, nobody has linked push yet — install a native EAS APK
-        (with Firebase FCM), then Settings → <em>Link this device for push</em>. See{' '}
-        <code>mobile/android-push-notifications-firebase-setup.md</code>.
+      <h2 className="mb-3 text-[15px] font-semibold text-fg">Campaigns</h2>
+      <DataTable
+        caption="Push campaigns"
+        columns={columns}
+        data={rows}
+        loading={campaigns.isPending}
+        getRowId={(c) => String(c.id)}
+        onRowClick={(c) => navigate(`/campaigns/${c.id}`)}
+        empty={<EmptyState icon={BellRing} title="No campaigns yet" description="Compose one above to get started." />}
+        mobileCard={(c) => {
+          const s = campaignStatus(c.status)
+          return (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate font-semibold text-fg">{c.title}</span>
+                <Badge tone={s.tone}>{s.label}</Badge>
+              </div>
+              <div className="line-clamp-2 text-xs text-muted">{c.body}</div>
+              <div className="text-xs text-subtle">
+                {audienceLabel(c.audience)} · {c.status === 'sent' ? `${c.sent_ok} delivered` : `~${c.recipient_estimate} users`}
+              </div>
+            </div>
+          )
+        }}
+      />
+      <p className="mt-4 text-xs text-subtle">
+        Due-date reminders are separate from broadcasts. <Link to="/audit" className="font-semibold hover:text-primary">Audit log</Link>{' '}
+        records every send.
       </p>
+
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={
+          pending?.kind === 'delete'
+            ? `Delete campaign #${pending.campaign.id}?`
+            : pending && isRetry(pending.campaign)
+              ? `Retry campaign #${pending.campaign.id}?`
+              : `Send campaign #${pending?.campaign.id}?`
+        }
+        description={
+          pending?.kind === 'delete'
+            ? 'This removes it and its delivery records permanently.'
+            : `“${pending?.campaign.title}” goes to ${audienceLabel(pending?.campaign.audience ?? '')}. This cannot be undone.`
+        }
+        confirmLabel={pending?.kind === 'delete' ? 'Delete' : 'Send now'}
+        tone={pending?.kind === 'delete' ? 'danger' : 'primary'}
+        loading={sendCampaign.isPending || deleteCampaign.isPending}
+        onConfirm={confirmPending}
+      />
     </div>
   )
 }

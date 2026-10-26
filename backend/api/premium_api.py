@@ -329,6 +329,10 @@ class OpsPremiumListView(APIView):
         if product:
             qs = qs.filter(product_id=product)
 
+        user_id = (request.query_params.get('user_id') or '').strip()
+        if user_id.isdigit():
+            qs = qs.filter(user_id=int(user_id))
+
         paginator = OpsPagination()
         page = paginator.paginate_queryset(qs, request)
         return paginator.get_paginated_response([serialize_entitlement(e) for e in page])

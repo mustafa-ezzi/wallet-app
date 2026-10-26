@@ -1,0 +1,212 @@
+import { createHotContext as __vite__createHotContext } from "/@vite/client";import.meta.hot = __vite__createHotContext("/@fs/D:\\My-Wallet\\frontend-admin\\src\\components\\ui\\Dialog.tsx");import __vite__cjsImport0_react_jsxDevRuntime from "/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=3c7d6b1a"; const Fragment = __vite__cjsImport0_react_jsxDevRuntime["Fragment"]; const jsxDEV = __vite__cjsImport0_react_jsxDevRuntime["jsxDEV"];
+import * as RefreshRuntime from "/@react-refresh";
+const inWebWorker = typeof WorkerGlobalScope !== "undefined" && self instanceof WorkerGlobalScope;
+let prevRefreshReg;
+let prevRefreshSig;
+if (import.meta.hot && !inWebWorker) {
+  if (!window.$RefreshReg$) {
+    throw new Error(
+      "@vitejs/plugin-react can't detect preamble. Something is wrong."
+    );
+  }
+  prevRefreshReg = window.$RefreshReg$;
+  prevRefreshSig = window.$RefreshSig$;
+  window.$RefreshReg$ = RefreshRuntime.getRefreshReg("D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx");
+  window.$RefreshSig$ = RefreshRuntime.createSignatureFunctionForTransform;
+}
+import * as RadixDialog from "/node_modules/.vite/deps/@radix-ui_react-dialog.js?v=7cccda4a";
+import { X } from "/node_modules/.vite/deps/lucide-react.js?v=7def501c";
+import __vite__cjsImport5_react from "/node_modules/.vite/deps/react.js?v=3c7d6b1a"; const forwardRef = __vite__cjsImport5_react["forwardRef"];
+import { cn } from "/src/lib/cn.ts";
+import { Button } from "/src/components/ui/Button.tsx";
+export const Dialog = RadixDialog.Root;
+export const DialogTrigger = RadixDialog.Trigger;
+export const DialogClose = RadixDialog.Close;
+export const DialogOverlay = forwardRef(_c = function DialogOverlay2({ className, ...props }, ref) {
+  return /* @__PURE__ */ jsxDEV(
+    RadixDialog.Overlay,
+    {
+      ref,
+      className: cn("fixed inset-0 z-50 bg-overlay backdrop-blur-[2px] data-[state=open]:animate-fade-in", className),
+      ...props
+    },
+    void 0,
+    false,
+    {
+      fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+      lineNumber: 32,
+      columnNumber: 5
+    },
+    this
+  );
+});
+_c2 = DialogOverlay;
+export function DialogContent({
+  title,
+  description,
+  children,
+  footer,
+  className,
+  hideClose = false
+}) {
+  return /* @__PURE__ */ jsxDEV(RadixDialog.Portal, { children: [
+    /* @__PURE__ */ jsxDEV(DialogOverlay, {}, void 0, false, {
+      fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+      lineNumber: 57,
+      columnNumber: 7
+    }, this),
+    /* @__PURE__ */ jsxDEV(
+      RadixDialog.Content,
+      {
+        className: cn(
+          "fixed top-1/2 left-1/2 z-50 w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2",
+          "max-h-[calc(100vh-48px)] overflow-auto rounded-2xl border border-border bg-surface shadow-pop",
+          "data-[state=open]:animate-pop-in focus:outline-none",
+          className
+        ),
+        children: [
+          /* @__PURE__ */ jsxDEV("div", { className: "flex items-start justify-between gap-4 px-6 pt-5", children: [
+            /* @__PURE__ */ jsxDEV("div", { children: [
+              /* @__PURE__ */ jsxDEV(RadixDialog.Title, { className: "text-lg font-semibold text-fg", children: title }, void 0, false, {
+                fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+                lineNumber: 68,
+                columnNumber: 13
+              }, this),
+              description ? /* @__PURE__ */ jsxDEV(RadixDialog.Description, { className: "mt-1 text-sm text-muted", children: description }, void 0, false, {
+                fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+                lineNumber: 70,
+                columnNumber: 13
+              }, this) : /* @__PURE__ */ jsxDEV(RadixDialog.Description, { className: "sr-only", children: typeof title === "string" ? title : "Dialog" }, void 0, false, {
+                fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+                lineNumber: 72,
+                columnNumber: 13
+              }, this)
+            ] }, void 0, true, {
+              fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+              lineNumber: 67,
+              columnNumber: 11
+            }, this),
+            hideClose ? null : /* @__PURE__ */ jsxDEV(RadixDialog.Close, { asChild: true, children: /* @__PURE__ */ jsxDEV(Button, { variant: "ghost", size: "icon-sm", "aria-label": "Close", className: "-mr-2", children: /* @__PURE__ */ jsxDEV(X, {}, void 0, false, {
+              fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+              lineNumber: 78,
+              columnNumber: 17
+            }, this) }, void 0, false, {
+              fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+              lineNumber: 77,
+              columnNumber: 15
+            }, this) }, void 0, false, {
+              fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+              lineNumber: 76,
+              columnNumber: 11
+            }, this)
+          ] }, void 0, true, {
+            fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+            lineNumber: 66,
+            columnNumber: 9
+          }, this),
+          children ? /* @__PURE__ */ jsxDEV("div", { className: "px-6 py-4 text-sm text-fg", children }, void 0, false, {
+            fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+            lineNumber: 83,
+            columnNumber: 21
+          }, this) : /* @__PURE__ */ jsxDEV("div", { className: "h-4" }, void 0, false, {
+            fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+            lineNumber: 83,
+            columnNumber: 83
+          }, this),
+          footer ? /* @__PURE__ */ jsxDEV("div", { className: "flex flex-wrap justify-end gap-2 border-t border-border bg-surface-2/60 px-6 py-3.5", children: footer }, void 0, false, {
+            fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+            lineNumber: 85,
+            columnNumber: 9
+          }, this) : null
+        ]
+      },
+      void 0,
+      true,
+      {
+        fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+        lineNumber: 58,
+        columnNumber: 7
+      },
+      this
+    )
+  ] }, void 0, true, {
+    fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+    lineNumber: 56,
+    columnNumber: 5
+  }, this);
+}
+_c3 = DialogContent;
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  tone = "primary",
+  loading = false,
+  onConfirm,
+  children
+}) {
+  return /* @__PURE__ */ jsxDEV(Dialog, { open, onOpenChange, children: /* @__PURE__ */ jsxDEV(
+    DialogContent,
+    {
+      title,
+      description,
+      footer: /* @__PURE__ */ jsxDEV(Fragment, { children: [
+        /* @__PURE__ */ jsxDEV(DialogClose, { asChild: true, children: /* @__PURE__ */ jsxDEV(Button, { variant: "secondary", disabled: loading, children: "Cancel" }, void 0, false, {
+          fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+          lineNumber: 122,
+          columnNumber: 15
+        }, this) }, void 0, false, {
+          fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+          lineNumber: 121,
+          columnNumber: 13
+        }, this),
+        /* @__PURE__ */ jsxDEV(Button, { variant: tone === "danger" ? "danger" : "primary", loading, onClick: onConfirm, children: confirmLabel }, void 0, false, {
+          fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+          lineNumber: 126,
+          columnNumber: 13
+        }, this)
+      ] }, void 0, true, {
+        fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+        lineNumber: 120,
+        columnNumber: 9
+      }, this),
+      children
+    },
+    void 0,
+    false,
+    {
+      fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+      lineNumber: 116,
+      columnNumber: 7
+    },
+    this
+  ) }, void 0, false, {
+    fileName: "D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx",
+    lineNumber: 115,
+    columnNumber: 5
+  }, this);
+}
+_c4 = ConfirmDialog;
+var _c, _c2, _c3, _c4;
+$RefreshReg$(_c, "DialogOverlay$forwardRef");
+$RefreshReg$(_c2, "DialogOverlay");
+$RefreshReg$(_c3, "DialogContent");
+$RefreshReg$(_c4, "ConfirmDialog");
+if (import.meta.hot && !inWebWorker) {
+  window.$RefreshReg$ = prevRefreshReg;
+  window.$RefreshSig$ = prevRefreshSig;
+}
+if (import.meta.hot && !inWebWorker) {
+  RefreshRuntime.__hmr_import(import.meta.url).then((currentExports) => {
+    RefreshRuntime.registerExportsForReactRefresh("D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx", currentExports);
+    import.meta.hot.accept((nextExports) => {
+      if (!nextExports) return;
+      const invalidateMessage = RefreshRuntime.validateRefreshBoundaryAndEnqueueUpdate("D:/My-Wallet/frontend-admin/src/components/ui/Dialog.tsx", currentExports, nextExports);
+      if (invalidateMessage) import.meta.hot.invalidate(invalidateMessage);
+    });
+  });
+}
+
+//# sourceMappingURL=data:application/json;base64,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QztBQUFBQSxFQUNBVjtBQVdGLEdBQUc7QUFDRCxTQUNFLHVCQUFDLFVBQU8sTUFBWSxjQUNsQjtBQUFBLElBQUM7QUFBQTtBQUFBLE1BQ0M7QUFBQSxNQUNBO0FBQUEsTUFDQSxRQUNFLG1DQUNFO0FBQUEsK0JBQUMsZUFBWSxTQUFPLE1BQ2xCLGlDQUFDLFVBQU8sU0FBUSxhQUFZLFVBQVVTLFNBQVMsc0JBQS9DO0FBQUE7QUFBQTtBQUFBO0FBQUEsZUFFQSxLQUhGO0FBQUE7QUFBQTtBQUFBO0FBQUEsZUFJQTtBQUFBLFFBQ0EsdUJBQUMsVUFBTyxTQUFTRCxTQUFTLFdBQVcsV0FBVyxXQUFXLFNBQWtCLFNBQVNFLFdBQ25GSCwwQkFESDtBQUFBO0FBQUE7QUFBQTtBQUFBLGVBRUE7QUFBQSxXQVJGO0FBQUE7QUFBQTtBQUFBO0FBQUEsYUFTQTtBQUFBLE1BR0RQO0FBQUFBO0FBQUFBLElBaEJIO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7QUFBQSxFQWlCQSxLQWxCRjtBQUFBO0FBQUE7QUFBQTtBQUFBLFNBbUJBO0FBRUo7QUFBQ1csTUEzQ2VQO0FBQWEsSUFBQVosSUFBQUksS0FBQU8sS0FBQVE7QUFBQSxhQUFBbkIsSUFBQTtBQUFBLGFBQUFJLEtBQUE7QUFBQSxhQUFBTyxLQUFBO0FBQUEsYUFBQVEsS0FBQSIsIm5hbWVzIjpbIlJhZGl4RGlhbG9nIiwiWCIsImZvcndhcmRSZWYiLCJjbiIsIkJ1dHRvbiIsIkRpYWxvZyIsIlJvb3QiLCJEaWFsb2dUcmlnZ2VyIiwiVHJpZ2dlciIsIkRpYWxvZ0Nsb3NlIiwiQ2xvc2UiLCJEaWFsb2dPdmVybGF5IiwiX2MiLCJjbGFzc05hbWUiLCJwcm9wcyIsInJlZiIsIl9jMiIsIkRpYWxvZ0NvbnRlbnQiLCJ0aXRsZSIsImRlc2NyaXB0aW9uIiwiY2hpbGRyZW4iLCJmb290ZXIiLCJoaWRlQ2xvc2UiLCJfYzMiLCJDb25maXJtRGlhbG9nIiwib3BlbiIsIm9uT3BlbkNoYW5nZSIsImNvbmZpcm1MYWJlbCIsInRvbmUiLCJsb2FkaW5nIiwib25Db25maXJtIiwiX2M0Il0sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIkRpYWxvZy50c3giXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0ICogYXMgUmFkaXhEaWFsb2cgZnJvbSAnQHJhZGl4LXVpL3JlYWN0LWRpYWxvZydcclxuaW1wb3J0IHsgWCB9IGZyb20gJ2x1Y2lkZS1yZWFjdCdcclxuaW1wb3J0IHsgZm9yd2FyZFJlZiwgdHlwZSBSZWFjdE5vZGUgfSBmcm9tICdyZWFjdCdcclxuaW1wb3J0IHsgY24gfSBmcm9tICcuLi8uLi9saWIvY24nXHJcbmltcG9ydCB7IEJ1dHRvbiB9IGZyb20gJy4vQnV0dG9uJ1xyXG5cclxuZXhwb3J0IGNvbnN0IERpYWxvZyA9IFJhZGl4RGlhbG9nLlJvb3RcclxuZXhwb3J0IGNvbnN0IERpYWxvZ1RyaWdnZXIgPSBSYWRpeERpYWxvZy5UcmlnZ2VyXHJcbmV4cG9ydCBjb25zdCBEaWFsb2dDbG9zZSA9IFJhZGl4RGlhbG9nLkNsb3NlXHJcblxyXG5leHBvcnQgY29uc3QgRGlhbG9nT3ZlcmxheSA9IGZvcndhcmRSZWY8SFRNTERpdkVsZW1lbnQsIHsgY2xhc3NOYW1lPzogc3RyaW5nIH0+KGZ1bmN0aW9uIERpYWxvZ092ZXJsYXkoeyBjbGFzc05hbWUsIC4uLnByb3BzIH0sIHJlZikge1xyXG4gIHJldHVybiAoXHJcbiAgICA8UmFkaXhEaWFsb2cuT3ZlcmxheVxyXG4gICAgICByZWY9e3JlZn1cclxuICAgICAgY2xhc3NOYW1lPXtjbignZml4ZWQgaW5zZXQtMCB6LTUwIGJnLW92ZXJsYXkgYmFja2Ryb3AtYmx1ci1bMnB4XSBkYXRhLVtzdGF0ZT1vcGVuXTphbmltYXRlLWZhZGUtaW4nLCBjbGFzc05hbWUpfVxyXG4gICAgICB7Li4ucHJvcHN9XHJcbiAgICAvPlxyXG4gIClcclxufSlcclxuXHJcbmV4cG9ydCBmdW5jdGlvbiBEaWFsb2dDb250ZW50KHtcclxuICB0aXRsZSxcclxuICBkZXNjcmlwdGlvbixcclxuICBjaGlsZHJlbixcclxuICBmb290ZXIsXHJcbiAgY2xhc3NOYW1lLFxyXG4gIGhpZGVDbG9zZSA9IGZhbHNlLFxyXG59OiB7XHJcbiAgdGl0bGU6IFJlYWN0Tm9kZVxyXG4gIGRlc2NyaXB0aW9uPzogUmVhY3ROb2RlXHJcbiAgY2hpbGRyZW4/OiBSZWFjdE5vZGVcclxuICBmb290ZXI/OiBSZWFjdE5vZGVcclxuICBjbGFzc05hbWU/OiBzdHJpbmdcclxuICBoaWRlQ2xvc2U/OiBib29sZWFuXHJcbn0pIHtcclxuICByZXR1cm4gKFxyXG4gICAgPFJhZGl4RGlhbG9nLlBvcnRhbD5cclxuICAgICAgPERpYWxvZ092ZXJsYXkgLz5cclxuICAgICAgPFJhZGl4RGlhbG9nLkNvbnRlbnRcclxuICAgICAgICBjbGFzc05hbWU9e2NuKFxyXG4gICAgICAgICAgJ2ZpeGVkIHRvcC0xLzIgbGVmdC0xLzIgei01MCB3LVttaW4oNTIwcHgsY2FsYygxMDB2dy0zMnB4KSldIC10cmFuc2xhdGUteC0xLzIgLXRyYW5zbGF0ZS15LTEvMicsXHJcbiAgICAgICAgICAnbWF4LWgtW2NhbGMoMTAwdmgtNDhweCldIG92ZXJmbG93LWF1dG8gcm91bmRlZC0yeGwgYm9yZGVyIGJvcmRlci1ib3JkZXIgYmctc3VyZmFjZSBzaGFkb3ctcG9wJyxcclxuICAgICAgICAgICdkYXRhLVtzdGF0ZT1vcGVuXTphbmltYXRlLXBvcC1pbiBmb2N1czpvdXRsaW5lLW5vbmUnLFxyXG4gICAgICAgICAgY2xhc3NOYW1lLFxyXG4gICAgICAgICl9XHJcbiAgICAgID5cclxuICAgICAgICA8ZGl2IGNsYXNzTmFtZT1cImZsZXggaXRlbXMtc3RhcnQganVzdGlmeS1iZXR3ZWVuIGdhcC00IHB4LTYgcHQtNVwiPlxyXG4gICAgICAgICAgPGRpdj5cclxuICAgICAgICAgICAgPFJhZGl4RGlhbG9nLlRpdGxlIGNsYXNzTmFtZT1cInRleHQtbGcgZm9udC1zZW1pYm9sZCB0ZXh0LWZnXCI+e3RpdGxlfTwvUmFkaXhEaWFsb2cuVGl0bGU+XHJcbiAgICAgICAgICAgIHtkZXNjcmlwdGlvbiA/IChcclxuICAgICAgICAgICAgICA8UmFkaXhEaWFsb2cuRGVzY3JpcHRpb24gY2xhc3NOYW1lPVwibXQtMSB0ZXh0LXNtIHRleHQtbXV0ZWRcIj57ZGVzY3JpcHRpb259PC9SYWRpeERpYWxvZy5EZXNjcmlwdGlvbj5cclxuICAgICAgICAgICAgKSA6IChcclxuICAgICAgICAgICAgICA8UmFkaXhEaWFsb2cuRGVzY3JpcHRpb24gY2xhc3NOYW1lPVwic3Itb25seVwiPnt0eXBlb2YgdGl0bGUgPT09ICdzdHJpbmcnID8gdGl0bGUgOiAnRGlhbG9nJ308L1JhZGl4RGlhbG9nLkRlc2NyaXB0aW9uPlxyXG4gICAgICAgICAgICApfVxyXG4gICAgICAgICAgPC9kaXY+XHJcbiAgICAgICAgICB7aGlkZUNsb3NlID8gbnVsbCA6IChcclxuICAgICAgICAgICAgPFJhZGl4RGlhbG9nLkNsb3NlIGFzQ2hpbGQ+XHJcbiAgICAgICAgICAgICAgPEJ1dHRvbiB2YXJpYW50PVwiZ2hvc3RcIiBzaXplPVwiaWNvbi1zbVwiIGFyaWEtbGFiZWw9XCJDbG9zZVwiIGNsYXNzTmFtZT1cIi1tci0yXCI+XHJcbiAgICAgICAgICAgICAgICA8WCAvPlxyXG4gICAgICAgICAgICAgIDwvQnV0dG9uPlxyXG4gICAgICAgICAgICA8L1JhZGl4RGlhbG9nLkNsb3NlPlxyXG4gICAgICAgICAgKX1cclxuICAgICAgICA8L2Rpdj5cclxuICAgICAgICB7Y2hpbGRyZW4gPyA8ZGl2IGNsYXNzTmFtZT1cInB4LTYgcHktNCB0ZXh0LXNtIHRleHQtZmdcIj57Y2hpbGRyZW59PC9kaXY+IDogPGRpdiBjbGFzc05hbWU9XCJoLTRcIiAvPn1cclxuICAgICAgICB7Zm9vdGVyID8gKFxyXG4gICAgICAgICAgPGRpdiBjbGFzc05hbWU9XCJmbGV4IGZsZXgtd3JhcCBqdXN0aWZ5LWVuZCBnYXAtMiBib3JkZXItdCBib3JkZXItYm9yZGVyIGJnLXN1cmZhY2UtMi82MCBweC02IHB5LTMuNVwiPntmb290ZXJ9PC9kaXY+XHJcbiAgICAgICAgKSA6IG51bGx9XHJcbiAgICAgIDwvUmFkaXhEaWFsb2cuQ29udGVudD5cclxuICAgIDwvUmFkaXhEaWFsb2cuUG9ydGFsPlxyXG4gIClcclxufVxyXG5cclxuLyoqIENvbnRyb2xsZWQgeWVzL25vIGRpYWxvZyBmb3IgZGVzdHJ1Y3RpdmUgb3IgaXJyZXZlcnNpYmxlIGFjdGlvbnMuICovXHJcbmV4cG9ydCBmdW5jdGlvbiBDb25maXJtRGlhbG9nKHtcclxuICBvcGVuLFxyXG4gIG9uT3BlbkNoYW5nZSxcclxuICB0aXRsZSxcclxuICBkZXNjcmlwdGlvbixcclxuICBjb25maXJtTGFiZWwgPSAnQ29uZmlybScsXHJcbiAgdG9uZSA9ICdwcmltYXJ5JyxcclxuICBsb2FkaW5nID0gZmFsc2UsXHJcbiAgb25Db25maXJtLFxyXG4gIGNoaWxkcmVuLFxyXG59OiB7XHJcbiAgb3BlbjogYm9vbGVhblxyXG4gIG9uT3BlbkNoYW5nZTogKG9wZW46IGJvb2xlYW4pID0+IHZvaWRcclxuICB0aXRsZTogUmVhY3ROb2RlXHJcbiAgZGVzY3JpcHRpb24/OiBSZWFjdE5vZGVcclxuICBjb25maXJtTGFiZWw/OiBzdHJpbmdcclxuICB0b25lPzogJ3ByaW1hcnknIHwgJ2RhbmdlcidcclxuICBsb2FkaW5nPzogYm9vbGVhblxyXG4gIG9uQ29uZmlybTogKCkgPT4gdm9pZFxyXG4gIGNoaWxkcmVuPzogUmVhY3ROb2RlXHJcbn0pIHtcclxuICByZXR1cm4gKFxyXG4gICAgPERpYWxvZyBvcGVuPXtvcGVufSBvbk9wZW5DaGFuZ2U9e29uT3BlbkNoYW5nZX0+XHJcbiAgICAgIDxEaWFsb2dDb250ZW50XHJcbiAgICAgICAgdGl0bGU9e3RpdGxlfVxyXG4gICAgICAgIGRlc2NyaXB0aW9uPXtkZXNjcmlwdGlvbn1cclxuICAgICAgICBmb290ZXI9e1xyXG4gICAgICAgICAgPD5cclxuICAgICAgICAgICAgPERpYWxvZ0Nsb3NlIGFzQ2hpbGQ+XHJcbiAgICAgICAgICAgICAgPEJ1dHRvbiB2YXJpYW50PVwic2Vjb25kYXJ5XCIgZGlzYWJsZWQ9e2xvYWRpbmd9PlxyXG4gICAgICAgICAgICAgICAgQ2FuY2VsXHJcbiAgICAgICAgICAgICAgPC9CdXR0b24+XHJcbiAgICAgICAgICAgIDwvRGlhbG9nQ2xvc2U+XHJcbiAgICAgICAgICAgIDxCdXR0b24gdmFyaWFudD17dG9uZSA9PT0gJ2RhbmdlcicgPyAnZGFuZ2VyJyA6ICdwcmltYXJ5J30gbG9hZGluZz17bG9hZGluZ30gb25DbGljaz17b25Db25maXJtfT5cclxuICAgICAgICAgICAgICB7Y29uZmlybUxhYmVsfVxyXG4gICAgICAgICAgICA8L0J1dHRvbj5cclxuICAgICAgICAgIDwvPlxyXG4gICAgICAgIH1cclxuICAgICAgPlxyXG4gICAgICAgIHtjaGlsZHJlbn1cclxuICAgICAgPC9EaWFsb2dDb250ZW50PlxyXG4gICAgPC9EaWFsb2c+XHJcbiAgKVxyXG59XHJcbiJdLCJmaWxlIjoiRDovTXktV2FsbGV0L2Zyb250ZW5kLWFkbWluL3NyYy9jb21wb25lbnRzL3VpL0RpYWxvZy50c3gifQ==

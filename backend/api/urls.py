@@ -7,6 +7,7 @@ from . import password_reset_api
 from . import google_auth_api
 from . import categories_api
 from . import ops_api
+from . import ops_dashboard_api
 from . import ops_campaigns_api
 from . import support_api
 from . import premium_api
@@ -105,6 +106,8 @@ urlpatterns = [
     # Ops panel (staff only)
     path('ops/me/', ops_api.OpsMeView.as_view(), name='ops-me'),
     path('ops/dashboard/', ops_api.OpsDashboardView.as_view(), name='ops-dashboard'),
+    path('ops/dashboard/summary/', ops_dashboard_api.OpsDashboardSummaryView.as_view(), name='ops-dashboard-summary'),
+    path('ops/reports/analytics/', ops_dashboard_api.OpsAnalyticsReportView.as_view(), name='ops-reports-analytics'),
     path('ops/users/', ops_api.OpsUserListView.as_view(), name='ops-users'),
     path('ops/users/refresh-inactivity/', ops_api.OpsRefreshInactivityView.as_view(), name='ops-refresh-inactivity'),
     path('ops/users/export/', phase5_api.OpsUsersExportView.as_view(), name='ops-users-export'),

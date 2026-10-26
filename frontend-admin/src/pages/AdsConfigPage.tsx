@@ -1,265 +1,416 @@
-import { useEffect, useState } from 'react'
-import { fetchOpsConfig, patchOpsConfig, type OpsRemoteConfig } from '../api'
+import { CircleAlert, OctagonX, RotateCcw, Save } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { OpsRemoteConfig } from '../api'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Input,
+  PageHeader,
+  Skeleton,
+  Switch,
+  Textarea,
+  toast,
+} from '../components/ui'
+import { cn } from '../lib/cn'
+import { formatDateTime } from '../lib/format'
+import { apiErrorMessage } from '../lib/queryClient'
+import { useOpsConfig, usePatchOpsConfig } from '../queries'
+
+type Form = {
+  ads_enabled: boolean
+  banner_enabled: boolean
+  interstitial_enabled: boolean
+  rewarded_enabled: boolean
+  premium_hides_ads: boolean
+  android_banner_unit: string
+  android_interstitial_unit: string
+  android_rewarded_unit: string
+  show_after_sessions: string
+  interstitial_min_interval_sec: string
+  countries: string
+  test_device_ids: string
+  min_supported_version: string
+  store_url: string
+  maintenance_message: string
+  support_whatsapp: string
+  feature_flags: string
+}
+
+const LABELS: Record<keyof Form, string> = {
+  ads_enabled: 'Ads master switch',
+  banner_enabled: 'Banner ads',
+  interstitial_enabled: 'Interstitial ads',
+  rewarded_enabled: 'Rewarded ads',
+  premium_hides_ads: 'Premium hides ads',
+  android_banner_unit: 'Banner unit ID',
+  android_interstitial_unit: 'Interstitial unit ID',
+  android_rewarded_unit: 'Rewarded unit ID',
+  show_after_sessions: 'Show after N sessions',
+  interstitial_min_interval_sec: 'Interstitial min interval',
+  countries: 'Countries',
+  test_device_ids: 'Test device IDs',
+  min_supported_version: 'Min supported version',
+  store_url: 'Store URL',
+  maintenance_message: 'Maintenance message',
+  support_whatsapp: 'WhatsApp support',
+  feature_flags: 'Feature flags',
+}
+
+function fromConfig(cfg: OpsRemoteConfig): Form {
+  const r = cfg.raw
+  return {
+    ads_enabled: r.ads_enabled,
+    banner_enabled: r.banner_enabled,
+    interstitial_enabled: r.interstitial_enabled,
+    rewarded_enabled: r.rewarded_enabled,
+    premium_hides_ads: r.premium_hides_ads,
+    android_banner_unit: r.android_banner_unit || '',
+    android_interstitial_unit: r.android_interstitial_unit || '',
+    android_rewarded_unit: r.android_rewarded_unit || '',
+    show_after_sessions: String(r.show_after_sessions ?? 3),
+    interstitial_min_interval_sec: String(r.interstitial_min_interval_sec ?? 180),
+    countries: (r.countries || []).join(','),
+    test_device_ids: (r.test_device_ids || []).join(','),
+    min_supported_version: r.min_supported_version || '',
+    store_url: r.store_url || '',
+    maintenance_message: r.maintenance_message || '',
+    support_whatsapp: r.support_whatsapp || '',
+    feature_flags: JSON.stringify(r.feature_flags || {}, null, 2),
+  }
+}
+
+function normalize(key: keyof Form, value: Form[keyof Form]): string {
+  if (typeof value === 'boolean') return value ? 'On' : 'Off'
+  if (key === 'feature_flags') {
+    try {
+      return JSON.stringify(JSON.parse(value || '{}'))
+    } catch {
+      return value
+    }
+  }
+  if (key === 'countries' || key === 'test_device_ids') {
+    return value
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(', ')
+  }
+  return value.trim()
+}
+
+function parseFlags(text: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(text || '{}') as unknown
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
+function ToggleRow({ label, hint, checked, onChange, changed }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void; changed: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <div>
+        <div className="flex items-center gap-2 text-sm font-semibold text-fg">
+          {label}
+          {changed ? <Badge tone="warn">Changed</Badge> : null}
+        </div>
+        {hint ? <div className="text-xs text-muted">{hint}</div> : null}
+      </div>
+      <Switch label={label} checked={checked} onCheckedChange={onChange} />
+    </div>
+  )
+}
+
+function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHeader title={title} description={description} />
+      <CardContent>{children}</CardContent>
+    </Card>
+  )
+}
 
 export function AdsConfigPage() {
-  const [cfg, setCfg] = useState<OpsRemoteConfig | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  const [adsEnabled, setAdsEnabled] = useState(true)
-  const [banner, setBanner] = useState(true)
-  const [interstitial, setInterstitial] = useState(false)
-  const [rewarded, setRewarded] = useState(false)
-  const [premiumHides, setPremiumHides] = useState(true)
-  const [bannerUnit, setBannerUnit] = useState('')
-  const [interstitialUnit, setInterstitialUnit] = useState('')
-  const [rewardedUnit, setRewardedUnit] = useState('')
-  const [showAfter, setShowAfter] = useState('3')
-  const [intervalSec, setIntervalSec] = useState('180')
-  const [countries, setCountries] = useState('PK')
-  const [testDevices, setTestDevices] = useState('')
-  const [minVersion, setMinVersion] = useState('')
-  const [storeUrl, setStoreUrl] = useState('')
-  const [maintenance, setMaintenance] = useState('')
-  const [whatsapp, setWhatsapp] = useState('')
-  const [flagsJson, setFlagsJson] = useState('{}')
-
-  function applyForm(data: OpsRemoteConfig) {
-    const r = data.raw
-    setAdsEnabled(r.ads_enabled)
-    setBanner(r.banner_enabled)
-    setInterstitial(r.interstitial_enabled)
-    setRewarded(r.rewarded_enabled)
-    setPremiumHides(r.premium_hides_ads)
-    setBannerUnit(r.android_banner_unit || '')
-    setInterstitialUnit(r.android_interstitial_unit || '')
-    setRewardedUnit(r.android_rewarded_unit || '')
-    setShowAfter(String(r.show_after_sessions ?? 3))
-    setIntervalSec(String(r.interstitial_min_interval_sec ?? 180))
-    setCountries((r.countries || []).join(','))
-    setTestDevices((r.test_device_ids || []).join(','))
-    setMinVersion(r.min_supported_version || '')
-    setStoreUrl(r.store_url || '')
-    setMaintenance(r.maintenance_message || '')
-    setWhatsapp(r.support_whatsapp || '')
-    setFlagsJson(JSON.stringify(r.feature_flags || {}, null, 2))
-  }
-
-  async function load() {
-    setError(null)
-    try {
-      const data = await fetchOpsConfig()
-      setCfg(data)
-      applyForm(data)
-    } catch {
-      setError('Failed to load ads config.')
-    }
-  }
+  const configQuery = useOpsConfig()
+  const patch = usePatchOpsConfig()
+  const cfg = configQuery.data
+  const [form, setForm] = useState<Form | null>(null)
+  const [saved, setSaved] = useState<Form | null>(null)
+  const [version, setVersion] = useState<string | null | undefined>(undefined)
+  const [reviewing, setReviewing] = useState(false)
+  const [killing, setKilling] = useState(false)
 
   useEffect(() => {
-    void load()
-  }, [])
+    if (cfg && cfg.updated_at !== version) {
+      const next = fromConfig(cfg)
+      setForm(next)
+      setSaved(next)
+      setVersion(cfg.updated_at)
+    }
+  }, [cfg, version])
 
-  async function onSave(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    setSaved(null)
-    let feature_flags: Record<string, unknown> = {}
-    try {
-      feature_flags = JSON.parse(flagsJson || '{}') as Record<string, unknown>
-      if (!feature_flags || typeof feature_flags !== 'object' || Array.isArray(feature_flags)) {
-        throw new Error('not object')
-      }
-    } catch {
-      setError('Feature flags must be valid JSON object.')
-      setBusy(false)
-      return
-    }
-    try {
-      const data = await patchOpsConfig({
-        ads_enabled: adsEnabled,
-        banner_enabled: banner,
-        interstitial_enabled: interstitial,
-        rewarded_enabled: rewarded,
-        premium_hides_ads: premiumHides,
-        android_banner_unit: bannerUnit.trim(),
-        android_interstitial_unit: interstitialUnit.trim(),
-        android_rewarded_unit: rewardedUnit.trim(),
-        show_after_sessions: Number(showAfter) || 0,
-        interstitial_min_interval_sec: Number(intervalSec) || 0,
-        countries,
-        test_device_ids: testDevices,
-        min_supported_version: minVersion.trim(),
-        store_url: storeUrl.trim(),
-        maintenance_message: maintenance.trim(),
-        support_whatsapp: whatsapp.trim(),
-        feature_flags,
-      })
-      setCfg(data)
-      applyForm(data)
-      setSaved('Saved. Apps pick this up on next config fetch.')
-    } catch {
-      setError('Save failed.')
-    } finally {
-      setBusy(false)
-    }
+  const changes = useMemo(() => {
+    if (!form || !saved) return []
+    return (Object.keys(LABELS) as (keyof Form)[])
+      .filter((key) => normalize(key, form[key]) !== normalize(key, saved[key]))
+      .map((key) => ({ key, label: LABELS[key], from: normalize(key, saved[key]), to: normalize(key, form[key]) }))
+  }, [form, saved])
+  const changedKeys = new Set(changes.map((c) => c.key))
+  const flagsInvalid = form ? parseFlags(form.feature_flags) === null : false
+
+  function set<K extends keyof Form>(key: K, value: Form[K]) {
+    setForm((f) => (f ? { ...f, [key]: value } : f))
   }
 
-  async function killSwitch() {
-    if (!window.confirm('Disable ALL ads immediately?')) return
-    setBusy(true)
-    try {
-      const data = await patchOpsConfig({ ads_enabled: false })
-      setCfg(data)
-      applyForm(data)
-      setSaved('Ads kill switch ON — ads_enabled=false.')
-    } catch {
-      setError('Kill switch failed.')
-    } finally {
-      setBusy(false)
+  function onSaved(data: OpsRemoteConfig, message: string) {
+    const next = fromConfig(data)
+    setForm(next)
+    setSaved(next)
+    setVersion(data.updated_at)
+    toast.success(message)
+  }
+
+  function save() {
+    if (!form) return
+    const feature_flags = parseFlags(form.feature_flags)
+    if (!feature_flags) {
+      toast.error('Feature flags must be a JSON object.')
+      return
     }
+    patch.mutate(
+      {
+        ads_enabled: form.ads_enabled,
+        banner_enabled: form.banner_enabled,
+        interstitial_enabled: form.interstitial_enabled,
+        rewarded_enabled: form.rewarded_enabled,
+        premium_hides_ads: form.premium_hides_ads,
+        android_banner_unit: form.android_banner_unit.trim(),
+        android_interstitial_unit: form.android_interstitial_unit.trim(),
+        android_rewarded_unit: form.android_rewarded_unit.trim(),
+        show_after_sessions: Number(form.show_after_sessions) || 0,
+        interstitial_min_interval_sec: Number(form.interstitial_min_interval_sec) || 0,
+        countries: form.countries,
+        test_device_ids: form.test_device_ids,
+        min_supported_version: form.min_supported_version.trim(),
+        store_url: form.store_url.trim(),
+        maintenance_message: form.maintenance_message.trim(),
+        support_whatsapp: form.support_whatsapp.trim(),
+        feature_flags,
+      },
+      {
+        onSuccess: (data) => {
+          setReviewing(false)
+          onSaved(data, 'Saved. Apps pick this up on their next config fetch.')
+        },
+        onError: (err) => toast.error(apiErrorMessage(err, 'Save failed.')),
+      },
+    )
+  }
+
+  function killAds() {
+    patch.mutate(
+      { ads_enabled: false },
+      {
+        onSuccess: (data) => {
+          setKilling(false)
+          onSaved(data, 'Kill switch on — ads are disabled for everyone.')
+        },
+        onError: (err) => toast.error(apiErrorMessage(err, 'Kill switch failed.')),
+      },
+    )
+  }
+
+  if (configQuery.isError && !cfg) {
+    return (
+      <>
+        <PageHeader title="Ads & Config" />
+        <Card>
+          <EmptyState icon={CircleAlert} title="Couldn't load remote config" action={<Button onClick={() => void configQuery.refetch()}>Try again</Button>} />
+        </Card>
+      </>
+    )
   }
 
   return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1>Ads & Config</h1>
-          <p>Remote AdMob kill switch, unit IDs, and premium hides ads.</p>
+    <div className="pb-24">
+      <PageHeader
+        title="Ads & Config"
+        description="Remote AdMob controls, app gate and feature flags — apps read this on launch."
+        actions={
+          <Button variant="danger" disabled={!cfg || !form?.ads_enabled} onClick={() => setKilling(true)}>
+            <OctagonX />
+            Kill all ads
+          </Button>
+        }
+      />
+
+      {!form || !cfg ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-56 rounded-2xl" />
+          ))}
         </div>
-        <button className="btn" type="button" disabled={busy} onClick={() => void killSwitch()}>
-          Kill all ads
-        </button>
-      </div>
-
-      {error ? <p className="error">{error}</p> : null}
-      {saved ? <p className="note">{saved}</p> : null}
-
-      {!cfg ? (
-        <p className="muted">Loading…</p>
       ) : (
-        <form onSubmit={(e) => void onSave(e)}>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Ad toggles</h2>
-            <label className="check">
-              <input type="checkbox" checked={adsEnabled} onChange={(e) => setAdsEnabled(e.target.checked)} />
-              Ads master enabled
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={banner} onChange={(e) => setBanner(e.target.checked)} />
-              Banner
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={interstitial} onChange={(e) => setInterstitial(e.target.checked)} />
-              Interstitial
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={rewarded} onChange={(e) => setRewarded(e.target.checked)} />
-              Rewarded
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={premiumHides} onChange={(e) => setPremiumHides(e.target.checked)} />
-              Premium users never see ads
-            </label>
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-muted">
+            Ads right now:
+            {cfg.ads.effective_show_ads ? <Badge tone="success" dot>Showing</Badge> : <Badge tone="danger" dot>Off</Badge>}
+            {cfg.updated_at ? (
+              <span className="text-xs text-subtle">
+                · last saved {formatDateTime(cfg.updated_at)}
+                {cfg.raw.updated_by_username ? ` by @${cfg.raw.updated_by_username}` : ''}
+              </span>
+            ) : null}
           </div>
 
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Android unit IDs</h2>
-            <p className="muted" style={{ marginTop: 0 }}>
-              Leave blank to use Google sample (test) units.
-            </p>
-            <label>
-              Banner
-              <input value={bannerUnit} onChange={(e) => setBannerUnit(e.target.value)} placeholder="ca-app-pub-…/…" />
-            </label>
-            <label>
-              Interstitial
-              <input
-                value={interstitialUnit}
-                onChange={(e) => setInterstitialUnit(e.target.value)}
-                placeholder="ca-app-pub-…/…"
-              />
-            </label>
-            <label>
-              Rewarded
-              <input value={rewardedUnit} onChange={(e) => setRewardedUnit(e.target.value)} placeholder="ca-app-pub-…/…" />
-            </label>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Section title="Ad toggles" description="The master switch overrides everything below it.">
+              <div className="divide-y divide-border">
+                <ToggleRow label={LABELS.ads_enabled} checked={form.ads_enabled} onChange={(v) => set('ads_enabled', v)} changed={changedKeys.has('ads_enabled')} />
+                <ToggleRow label={LABELS.banner_enabled} checked={form.banner_enabled} onChange={(v) => set('banner_enabled', v)} changed={changedKeys.has('banner_enabled')} />
+                <ToggleRow
+                  label={LABELS.interstitial_enabled}
+                  checked={form.interstitial_enabled}
+                  onChange={(v) => set('interstitial_enabled', v)}
+                  changed={changedKeys.has('interstitial_enabled')}
+                />
+                <ToggleRow label={LABELS.rewarded_enabled} checked={form.rewarded_enabled} onChange={(v) => set('rewarded_enabled', v)} changed={changedKeys.has('rewarded_enabled')} />
+                <ToggleRow
+                  label="Premium users never see ads"
+                  checked={form.premium_hides_ads}
+                  onChange={(v) => set('premium_hides_ads', v)}
+                  changed={changedKeys.has('premium_hides_ads')}
+                />
+              </div>
+            </Section>
+
+            <Section title="Android unit IDs" description="Leave blank to use Google's sample test units.">
+              <div className="space-y-4">
+                {(['android_banner_unit', 'android_interstitial_unit', 'android_rewarded_unit'] as const).map((key) => (
+                  <Field key={key} label={LABELS[key]}>
+                    <Input className={cn('font-mono text-[13px]', changedKeys.has(key) && 'border-warn')} value={form[key]} onChange={(e) => set(key, e.target.value)} placeholder="ca-app-pub-…/…" />
+                  </Field>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="Rules">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={LABELS.show_after_sessions}>
+                  <Input type="number" min={0} className={cn(changedKeys.has('show_after_sessions') && 'border-warn')} value={form.show_after_sessions} onChange={(e) => set('show_after_sessions', e.target.value)} />
+                </Field>
+                <Field label="Interstitial min interval (seconds)">
+                  <Input
+                    type="number"
+                    min={0}
+                    className={cn(changedKeys.has('interstitial_min_interval_sec') && 'border-warn')}
+                    value={form.interstitial_min_interval_sec}
+                    onChange={(e) => set('interstitial_min_interval_sec', e.target.value)}
+                  />
+                </Field>
+                <Field label={LABELS.countries} hint="Comma separated, e.g. PK">
+                  <Input className={cn(changedKeys.has('countries') && 'border-warn')} value={form.countries} onChange={(e) => set('countries', e.target.value)} />
+                </Field>
+                <Field label={LABELS.test_device_ids} hint="Comma separated">
+                  <Input className={cn(changedKeys.has('test_device_ids') && 'border-warn')} value={form.test_device_ids} onChange={(e) => set('test_device_ids', e.target.value)} />
+                </Field>
+              </div>
+            </Section>
+
+            <Section title="App gate and support">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={LABELS.min_supported_version}>
+                  <Input className={cn(changedKeys.has('min_supported_version') && 'border-warn')} value={form.min_supported_version} onChange={(e) => set('min_supported_version', e.target.value)} placeholder="1.0.0" />
+                </Field>
+                <Field label="WhatsApp support" hint="Digits or a wa.me link">
+                  <Input className={cn(changedKeys.has('support_whatsapp') && 'border-warn')} value={form.support_whatsapp} onChange={(e) => set('support_whatsapp', e.target.value)} placeholder="923001234567" />
+                </Field>
+                <Field label={LABELS.store_url} className="sm:col-span-2">
+                  <Input className={cn(changedKeys.has('store_url') && 'border-warn')} value={form.store_url} onChange={(e) => set('store_url', e.target.value)} placeholder="https://play.google.com/…" />
+                </Field>
+                <Field label={LABELS.maintenance_message} hint="Shown in the app when set." className="sm:col-span-2">
+                  <Input className={cn(changedKeys.has('maintenance_message') && 'border-warn')} value={form.maintenance_message} onChange={(e) => set('maintenance_message', e.target.value)} />
+                </Field>
+              </div>
+            </Section>
+
+            <Section title="Feature flags" description="A JSON object the apps read as-is.">
+              <Field label="Flags (JSON)" error={flagsInvalid ? 'Must be a valid JSON object.' : undefined}>
+                <Textarea rows={8} className="font-mono text-[13px]" value={form.feature_flags} onChange={(e) => set('feature_flags', e.target.value)} spellCheck={false} />
+              </Field>
+            </Section>
           </div>
 
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>Rules</h2>
-            <label>
-              Show after N sessions
-              <input type="number" min={0} value={showAfter} onChange={(e) => setShowAfter(e.target.value)} />
-            </label>
-            <label>
-              Interstitial min interval (sec)
-              <input type="number" min={0} value={intervalSec} onChange={(e) => setIntervalSec(e.target.value)} />
-            </label>
-            <label>
-              Countries (comma, e.g. PK)
-              <input value={countries} onChange={(e) => setCountries(e.target.value)} />
-            </label>
-            <label>
-              Test device IDs (comma)
-              <input value={testDevices} onChange={(e) => setTestDevices(e.target.value)} />
-            </label>
-          </div>
-
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h2 style={{ margin: '0 0 12px', fontSize: 16 }}>App gate & support</h2>
-            <label>
-              Min supported version
-              <input value={minVersion} onChange={(e) => setMinVersion(e.target.value)} placeholder="1.0.0" />
-            </label>
-            <label>
-              Store URL
-              <input value={storeUrl} onChange={(e) => setStoreUrl(e.target.value)} placeholder="https://play.google.com/…" />
-            </label>
-            <label>
-              Maintenance message
-              <input value={maintenance} onChange={(e) => setMaintenance(e.target.value)} />
-            </label>
-            <label>
-              WhatsApp support (digits or wa.me URL)
-              <input
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="923001234567"
-              />
-            </label>
-            <label>
-              Feature flags (JSON)
-              <textarea
-                value={flagsJson}
-                onChange={(e) => setFlagsJson(e.target.value)}
-                rows={6}
-                style={{
-                  width: '100%',
-                  fontFamily: 'var(--mono)',
-                  background: 'var(--bg-elev)',
-                  border: '1px solid var(--line)',
-                  color: 'var(--text)',
-                  borderRadius: 10,
-                  padding: 10,
-                }}
-              />
-            </label>
-          </div>
-
-          <button className="btn primary" type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Save config'}
-          </button>
-          {cfg.updated_at ? (
-            <p className="muted" style={{ marginTop: 12 }}>
-              Last updated {new Date(cfg.updated_at).toLocaleString()}
-              {cfg.raw.updated_by_username ? ` by @${cfg.raw.updated_by_username}` : ''}
-            </p>
+          {changes.length > 0 ? (
+            <div className="fixed inset-x-0 bottom-4 z-30 flex justify-center px-4 lg:pl-[264px]">
+              <div className="flex w-full max-w-2xl flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-pop animate-pop-in">
+                <span className="text-sm font-semibold text-fg">
+                  {changes.length} unsaved {changes.length === 1 ? 'change' : 'changes'}
+                </span>
+                <div className="ml-auto flex gap-2">
+                  <Button variant="ghost" onClick={() => setForm(saved)}>
+                    <RotateCcw />
+                    Discard
+                  </Button>
+                  <Button variant="primary" disabled={flagsInvalid} onClick={() => setReviewing(true)}>
+                    <Save />
+                    Review and save
+                  </Button>
+                </div>
+              </div>
+            </div>
           ) : null}
-        </form>
+        </>
       )}
+
+      <ConfirmDialog
+        open={reviewing}
+        onOpenChange={setReviewing}
+        title="Save remote config?"
+        description="Every app picks these up on its next config fetch."
+        confirmLabel="Save changes"
+        loading={patch.isPending}
+        onConfirm={save}
+      >
+        <ul className="divide-y divide-border rounded-xl border border-border">
+          {changes.map((c) => (
+            <li key={c.key} className="px-3 py-2.5">
+              <div className="text-xs font-semibold text-muted">{c.label}</div>
+              <div className="mt-1 grid grid-cols-[1fr_auto_1fr] items-start gap-2 text-[13px]">
+                <span className="break-all text-subtle line-through">{c.from || 'empty'}</span>
+                <span className="text-subtle" aria-label="changes to">
+                  →
+                </span>
+                <span className="font-semibold break-all text-fg">{c.to || 'empty'}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+        {changedKeys.has('ads_enabled') && !form?.ads_enabled ? (
+          <Alert tone="warn" className="mt-3">
+            This turns off all ads for every user.
+          </Alert>
+        ) : null}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={killing}
+        onOpenChange={setKilling}
+        title="Disable all ads now?"
+        description="Sets the ads master switch off for every user, right away. Other unsaved edits are discarded."
+        confirmLabel="Kill all ads"
+        tone="danger"
+        loading={patch.isPending}
+        onConfirm={killAds}
+      />
     </div>
   )
 }

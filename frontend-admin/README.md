@@ -1,6 +1,15 @@
-# WalletTrails Ops (Phase 0–1)
+# WalletTrails Ops
 
 Staff-only console: hosted users + dashboard metrics. **Never** shows wallets, balances, or transactions.
+
+Redesign roadmap: [`docs/research/admin-panel-redesign-and-ecosystem.md`](../docs/research/admin-panel-redesign-and-ecosystem.md) (Phase 1 — design system + shell — is in place).
+
+## UI stack
+
+- Tailwind CSS v4 with light/dark tokens in `src/styles/index.css` (`data-theme` on `<html>`); old page classes live in `src/styles/legacy.css` until Phase 2 rebuilds those pages.
+- Components in `src/components/ui` (Radix primitives, Lucide icons, Recharts, TanStack Table, sonner). Browse them at `/ui`.
+- Shell in `src/layout` — grouped sidebar, top bar with date range + theme toggle, Ctrl/⌘ K command palette.
+- Server state through TanStack Query hooks in `src/queries.ts`; forms use React Hook Form + Zod.
 
 ## Run locally
 

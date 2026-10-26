@@ -14,6 +14,7 @@ import {
   loginOps,
   type OpsMe,
 } from './api'
+import { queryClient } from './lib/queryClient'
 
 type AuthState = {
   user: OpsMe | null
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     clearOpsTokens()
+    queryClient.clear()
     setUser(null)
   }, [])
 

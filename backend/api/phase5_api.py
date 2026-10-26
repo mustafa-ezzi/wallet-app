@@ -210,6 +210,10 @@ class OpsAuditListView(APIView):
         action = (request.query_params.get('action') or '').strip()
         if action:
             qs = qs.filter(action__icontains=action)
+        target_type = (request.query_params.get('target_type') or '').strip()
+        target_id = (request.query_params.get('target_id') or '').strip()
+        if target_type and target_id:
+            qs = qs.filter(target_type=target_type, target_id=target_id)
         q = (request.query_params.get('q') or '').strip()
         if q:
             qs = qs.filter(

@@ -83,6 +83,108 @@ export type OpsDashboard = {
   generated_at: string
 }
 
+export type SummaryCounts = {
+  signups: number
+  active_users: number
+  records_created: number
+  support_opened: number
+  premium_started: number
+  campaigns_sent: number
+}
+
+export type AttentionItem = {
+  kind: 'support' | 'purchase' | 'campaign'
+  id: number
+  title: string
+  detail: string
+  tone: 'danger' | 'warn' | 'info'
+  at: string | null
+  to: string
+}
+
+export type OpsDashboardSummary = {
+  range: { from: string; to: string; days: number; previous_from: string | null; previous_to: string | null }
+  current: SummaryCounts
+  previous: SummaryCounts | null
+  series: { date: string; signups: number; active_users: number; records_created: number }[]
+  snapshot: {
+    total_users: number
+    active_7d: number
+    suspended: number
+    users_with_push: number
+    premium_live: number
+    support_open: number
+    support_waiting_ops: number
+    inactivity: { none: number; '7d': number; '30d': number; '90d': number; unflagged: number }
+    platforms: { android: number; ios: number; web: number; other: number }
+  }
+  needs_attention: {
+    counts: { support: number; purchases: number; campaigns: number }
+    items: AttentionItem[]
+  }
+  generated_at: string
+}
+
+type CountWindow = { total: number; new: number; previous_new: number }
+type Growth = { current: number; previous: number; absolute_change: number; percent_change: number | null }
+
+/** analytics_agent report as served by Ops — money fields are removed server-side. */
+export type AnalyticsReport = {
+  generated_at: string
+  schedule: { cron: string; timezone: string }
+  period: {
+    timezone: string
+    days: number
+    start: string
+    end: string
+    previous_start: string
+    previous_end: string
+    label: string
+  }
+  metrics: {
+    records: Record<string, CountWindow>
+    users: {
+      active_1d: number
+      active_7d: number
+      active_30d: number
+      suspended: number
+      onboarding_complete: number
+      onboarding_incomplete: number
+      new_24h: number
+      new_7d: number
+      inactivity: Record<string, number>
+      premium_live: number
+      push_tokens: number
+      users_with_push: number
+    }
+    activity: {
+      daily: { date: string; transactions: number; signups: number }[]
+      weekly: { week: string; transactions: number; signups: number }[]
+      monthly: { month: string; transactions: number; signups: number }[]
+    }
+    growth: Record<string, Growth>
+    breakdowns: Record<string, Record<string, number>>
+    support: { open: number; waiting_ops: number; waiting_user: number }
+    households: { total: number; memberships_by_status: Record<string, number> }
+    budgets: { current_month: number; overall_caps_current_month: number }
+    features: { travel_mode_enabled: number; bank_sms_settings_enabled: number }
+  }
+  trends: {
+    anomaly_rule: string
+    direction: Record<string, 'up' | 'down' | 'flat'>
+    anomalies: {
+      date: string
+      metric: string
+      value: number
+      baseline_mean: number
+      z_score: number | null
+      direction: 'high' | 'low'
+    }[]
+  }
+  insights: { source: 'llm' | 'rules'; summary: string; highlights: string[] }
+  status: { state: 'ok' | 'partial'; read_only: boolean; warnings: string[] }
+}
+
 export type OpsUser = {
   id: number
   username: string
@@ -145,6 +247,16 @@ export async function fetchOpsMe() {
 
 export async function fetchOpsDashboard() {
   const { data } = await opsApi.get<OpsDashboard>('/ops/dashboard/')
+  return data
+}
+
+export async function fetchDashboardSummary(params: { from: string; to: string; compare?: number }) {
+  const { data } = await opsApi.get<OpsDashboardSummary>('/ops/dashboard/summary/', { params })
+  return data
+}
+
+export async function fetchAnalyticsReport() {
+  const { data } = await opsApi.get<AnalyticsReport>('/ops/reports/analytics/')
   return data
 }
 

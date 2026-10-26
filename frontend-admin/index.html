@@ -4,7 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#0f2a20" />
     <title>WalletTrails Ops</title>
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem('wallettrails_ops_theme') === 'dark' ? 'dark' : 'light'
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light'
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

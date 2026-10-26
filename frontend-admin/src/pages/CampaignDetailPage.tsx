@@ -1,216 +1,248 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { deleteCampaign, fetchCampaign, sendCampaign, type OpsCampaign } from '../api'
+import type { ColumnDef } from '@tanstack/react-table'
+import { BellRing, CircleCheck, CircleX, Send, SkipForward, Trash2, Users } from 'lucide-react'
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import type { OpsCampaign } from '../api'
+import { PushPreview } from '../components/PushPreview'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  ConfirmDialog,
+  DataTable,
+  DetailList,
+  EmptyState,
+  PageHeader,
+  Skeleton,
+  StackedBar,
+  StatCard,
+  toast,
+} from '../components/ui'
+import { formatDateTime } from '../lib/format'
+import { apiErrorMessage } from '../lib/queryClient'
+import { audienceLabel, campaignStatus, deliveryStatus } from '../lib/status'
+import { useCampaign, useDeleteCampaign, useSendCampaign } from '../queries'
+
+type Delivery = NonNullable<OpsCampaign['deliveries']>[number]
+
+const deliveryColumns: ColumnDef<Delivery>[] = [
+  {
+    id: 'user',
+    header: 'User',
+    accessorFn: (d) => d.username || d.email,
+    cell: ({ row }) => (
+      <div>
+        <div className="font-semibold text-fg">{row.original.username || row.original.email || `User #${row.original.user_id}`}</div>
+        {row.original.email && row.original.username !== row.original.email ? (
+          <div className="text-xs text-muted">{row.original.email}</div>
+        ) : null}
+      </div>
+    ),
+  },
+  { id: 'platform', header: 'Platform', accessorKey: 'platform' },
+  {
+    id: 'status',
+    header: 'Status',
+    accessorKey: 'status',
+    cell: ({ getValue }) => {
+      const s = deliveryStatus(getValue<string>())
+      return <Badge tone={s.tone}>{s.label}</Badge>
+    },
+  },
+  {
+    id: 'error',
+    header: 'Error',
+    accessorKey: 'error',
+    cell: ({ getValue }) => <span className="block max-w-[360px] text-xs whitespace-normal text-muted">{getValue<string>() || '—'}</span>,
+  },
+]
 
 export function CampaignDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const campaignId = Number(id)
-  const [campaign, setCampaign] = useState<OpsCampaign | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const query = useCampaign(campaignId)
+  const sendCampaign = useSendCampaign()
+  const deleteCampaign = useDeleteCampaign()
+  const [pending, setPending] = useState<'send' | 'delete' | null>(null)
+  const campaign = query.data
 
-  async function load() {
-    if (!Number.isFinite(campaignId)) return
-    try {
-      const data = await fetchCampaign(campaignId)
-      setCampaign(data)
-      setError(null)
-    } catch {
-      setError('Campaign not found.')
-    }
+  if (query.isError) {
+    return (
+      <>
+        <PageHeader title={`Campaign #${id}`} back={{ to: '/campaigns', label: 'Notifications' }} />
+        <Card>
+          <EmptyState icon={BellRing} title="Campaign not found" />
+        </Card>
+      </>
+    )
+  }
+  if (!campaign) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-80" />
+        <Skeleton className="h-72" />
+      </div>
+    )
   }
 
-  useEffect(() => {
-    void load()
-  }, [campaignId])
+  const status = campaignStatus(campaign.status)
+  const retry = campaign.status === 'failed' || campaign.status === 'sending'
+  const canSend = ['draft', 'scheduled', 'failed', 'sending'].includes(campaign.status)
+  const summary = campaign.deliveries_summary
+  const route = String((campaign.data as { route?: string })?.route || '') || 'Open app'
 
-  async function onRetry() {
-    if (!campaign) return
-    const ok = window.confirm('Retry sending this push now?')
-    if (!ok) return
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    try {
-      const result = await sendCampaign(campaign.id, { confirm: true })
-      setMessage(
-        result.ok
-          ? `Sent: ${result.sent_ok} ok, ${result.sent_failed} failed.`
-          : `Send failed: ${result.detail || 'unknown error'}`,
+  function confirm() {
+    if (pending === 'send') {
+      sendCampaign.mutate(
+        { id: campaignId, confirm: true },
+        {
+          onSuccess: (r) => {
+            if (r.ok) toast.success(`Sent: ${r.sent_ok} delivered, ${r.sent_failed} failed.`)
+            else toast.error(`Send failed: ${r.detail || 'unknown error'}`)
+            setPending(null)
+          },
+          onError: (err) => toast.error(apiErrorMessage(err, 'Send failed.')),
+        },
       )
-      await load()
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : 'Send failed.')
-      await load()
-    } finally {
-      setBusy(false)
+    } else if (pending === 'delete') {
+      deleteCampaign.mutate(campaignId, {
+        onSuccess: () => {
+          toast.success(`Deleted campaign #${campaignId}.`)
+          navigate('/campaigns')
+        },
+        onError: (err) => toast.error(apiErrorMessage(err, 'Delete failed.')),
+      })
     }
   }
-
-  async function onDelete() {
-    if (!campaign) return
-    const ok = window.confirm(
-      `Delete campaign #${campaign.id}? This removes it and its delivery records permanently.`,
-    )
-    if (!ok) return
-    setBusy(true)
-    setError(null)
-    setMessage(null)
-    try {
-      await deleteCampaign(campaign.id)
-      navigate('/campaigns')
-    } catch (err: unknown) {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(typeof detail === 'string' ? detail : 'Delete failed.')
-      setBusy(false)
-    }
-  }
-
-  const canRetry =
-    campaign && (
-      campaign.status === 'failed'
-      || campaign.status === 'draft'
-      || campaign.status === 'scheduled'
-      || campaign.status === 'sending'
-    )
-  const canDelete = Boolean(campaign)
 
   return (
     <div>
-      <div className="page-head">
-        <div>
-          <p className="muted" style={{ margin: 0 }}>
-            <Link to="/campaigns">← Notifications</Link>
-          </p>
-          <h1>{campaign ? campaign.title : `Campaign #${id}`}</h1>
-          <p>Delivery summary — no user finance data.</p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {canRetry ? (
-            <button className="btn primary" type="button" disabled={busy} onClick={() => void onRetry()}>
-              {campaign?.status === 'failed' || campaign?.status === 'sending' ? 'Retry send' : 'Send now'}
-            </button>
-          ) : null}
-          {canDelete ? (
-            <button className="btn danger" type="button" disabled={busy} onClick={() => void onDelete()}>
-              Delete
-            </button>
-          ) : null}
-        </div>
-      </div>
-      {error ? <p className="error">{error}</p> : null}
-      {message ? <p className="note">{message}</p> : null}
-      {!campaign ? (
-        <p className="muted">Loading…</p>
-      ) : (
-        <div className="detail-grid">
-          <div className="kv">
-            <div className="k">Status</div>
-            <div className="v">{campaign.status}</div>
-          </div>
-          <div className="kv">
-            <div className="k">Audience</div>
-            <div className="v">{campaign.audience}</div>
-          </div>
-          <div className="kv">
-            <div className="k">Body</div>
-            <div className="v">{campaign.body}</div>
-          </div>
-          <div className="kv">
-            <div className="k">Deep link</div>
-            <div className="v">{String((campaign.data as { route?: string })?.route || '—')}</div>
-          </div>
-          <div className="kv">
-            <div className="k">Estimate (users)</div>
-            <div className="v">{campaign.recipient_estimate}</div>
-          </div>
-          <div className="kv">
-            <div className="k">Sent ok / failed</div>
-            <div className="v">
-              {campaign.sent_ok} / {campaign.sent_failed}
-            </div>
-          </div>
-          <div className="kv">
-            <div className="k">Deliveries</div>
-            <div className="v">
-              {campaign.deliveries_summary
-                ? `ok ${campaign.deliveries_summary.ok} · fail ${campaign.deliveries_summary.failed} · skip ${campaign.deliveries_summary.skipped}`
-                : '—'}
-            </div>
-          </div>
-          <div className="kv">
-            <div className="k">Created</div>
-            <div className="v">
-              {campaign.created_at ? new Date(campaign.created_at).toLocaleString() : '—'}
-              {campaign.created_by_username ? ` · @${campaign.created_by_username}` : ''}
-            </div>
-          </div>
-          {campaign.last_error ? (
-            <div className="kv">
-              <div className="k">Last error</div>
-              <div className="v">{campaign.last_error}</div>
-            </div>
-          ) : null}
-        </div>
-      )}
-      {campaign?.deliveries && campaign.deliveries.length > 0 ? (
-        <div style={{ marginTop: 24 }}>
-          <h2 style={{ fontSize: '1.05rem', marginBottom: 10 }}>Who got it</h2>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Platform</th>
-                  <th>Status</th>
-                  <th>Error</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaign.deliveries.map((d) => (
-                  <tr key={d.id}>
-                    <td>
-                      <strong>{d.username || d.email || `user #${d.user_id}`}</strong>
-                      {d.email && d.username !== d.email ? (
-                        <div className="muted" style={{ fontSize: '0.8rem' }}>{d.email}</div>
-                      ) : null}
-                    </td>
-                    <td>{d.platform}</td>
-                    <td>
-                      <span
-                        className={
-                          d.status === 'ok'
-                            ? 'badge ok'
-                            : d.status === 'failed'
-                              ? 'badge danger'
-                              : 'badge'
-                        }
-                      >
-                        {d.status}
-                      </span>
-                    </td>
-                    <td style={{ maxWidth: 360, whiteSpace: 'normal', fontSize: '0.82rem' }}>
-                      {d.error || '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {(campaign.deliveries.filter((d) => d.status === 'failed').length > 0) ? (
-            <p className="muted" style={{ marginTop: 10 }}>
-              Failed:{' '}
-              {campaign.deliveries
-                .filter((d) => d.status === 'failed')
-                .map((d) => d.username || d.email || `#${d.user_id}`)
-                .join(', ')}
-            </p>
-          ) : null}
-        </div>
+      <PageHeader
+        back={{ to: '/campaigns', label: 'Notifications' }}
+        title={campaign.title}
+        description={`Campaign #${campaign.id} · delivery summary — no user finance data`}
+        actions={
+          <>
+            {canSend ? (
+              <Button variant="primary" onClick={() => setPending('send')}>
+                <Send />
+                {retry ? 'Retry send' : 'Send now'}
+              </Button>
+            ) : null}
+            {campaign.status !== 'sending' ? (
+              <Button variant="danger-soft" onClick={() => setPending('delete')}>
+                <Trash2 />
+                Delete
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+
+      {campaign.last_error ? (
+        <Alert tone="danger" title="Last error" className="mb-4">
+          {campaign.last_error}
+        </Alert>
       ) : null}
+
+      <section aria-label="Delivery numbers" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard label="Estimated users" value={campaign.recipient_estimate} icon={Users} />
+        <StatCard label="Delivered" value={summary?.ok ?? campaign.sent_ok} icon={CircleCheck} />
+        <StatCard label="Failed" value={summary?.failed ?? campaign.sent_failed} icon={CircleX} />
+        <StatCard label="Skipped" value={summary?.skipped ?? 0} icon={SkipForward} hint={summary?.pending ? `${summary.pending} pending` : undefined} />
+      </section>
+
+      <div className="mb-6 grid gap-4 xl:grid-cols-[1fr_340px]">
+        <div className="space-y-4">
+          <Card>
+            <CardHeader title="Details" />
+            <CardContent>
+              <DetailList
+                items={[
+                  {
+                    label: 'Status',
+                    value: (
+                      <Badge tone={status.tone} dot>
+                        {status.label}
+                      </Badge>
+                    ),
+                  },
+                  { label: 'Audience', value: audienceLabel(campaign.audience) },
+                  { label: 'Tap opens', value: route },
+                  { label: 'Scheduled', value: formatDateTime(campaign.scheduled_at) },
+                  { label: 'Sent', value: formatDateTime(campaign.sent_at) },
+                  {
+                    label: 'Created',
+                    value: `${formatDateTime(campaign.created_at)}${campaign.created_by_username ? ` · @${campaign.created_by_username}` : ''}`,
+                  },
+                ]}
+              />
+            </CardContent>
+          </Card>
+          {summary ? (
+            <Card>
+              <CardHeader title="Delivery results" description="Per device token." />
+              <CardContent>
+                <StackedBar
+                  label="Deliveries by result"
+                  segments={[
+                    { label: 'Delivered', value: summary.ok, color: 'var(--chart-1)' },
+                    { label: 'Failed', value: summary.failed, color: 'var(--danger-solid)' },
+                    { label: 'Skipped', value: summary.skipped, color: 'var(--border-strong)' },
+                    { label: 'Pending', value: summary.pending, color: 'var(--chart-3)' },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+        <Card className="flex items-center justify-center p-6">
+          <PushPreview title={campaign.title} body={campaign.body} when={campaign.sent_at ? formatDateTime(campaign.sent_at) : 'now'} />
+        </Card>
+      </div>
+
+      <h2 className="mb-3 text-[15px] font-semibold text-fg">Who got it</h2>
+      <DataTable
+        caption="Deliveries"
+        columns={deliveryColumns}
+        data={campaign.deliveries ?? []}
+        getRowId={(d) => String(d.id)}
+        empty={<EmptyState icon={BellRing} title="No deliveries yet" description="Recipients appear here after the campaign is sent." />}
+        mobileCard={(d) => {
+          const s = deliveryStatus(d.status)
+          return (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate font-semibold text-fg">{d.username || d.email || `User #${d.user_id}`}</span>
+                <Badge tone={s.tone}>{s.label}</Badge>
+              </div>
+              <div className="text-xs text-muted">
+                {d.platform}
+                {d.error ? ` · ${d.error}` : ''}
+              </div>
+            </div>
+          )
+        }}
+      />
+
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={pending === 'delete' ? `Delete campaign #${campaign.id}?` : retry ? 'Retry this campaign?' : 'Send this campaign now?'}
+        description={
+          pending === 'delete'
+            ? 'This removes it and its delivery records permanently.'
+            : `It goes to ${audienceLabel(campaign.audience)}. This cannot be undone.`
+        }
+        confirmLabel={pending === 'delete' ? 'Delete' : 'Send now'}
+        tone={pending === 'delete' ? 'danger' : 'primary'}
+        loading={sendCampaign.isPending || deleteCampaign.isPending}
+        onConfirm={confirm}
+      />
     </div>
   )
 }

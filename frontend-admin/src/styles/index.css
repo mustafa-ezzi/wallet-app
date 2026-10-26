@@ -1,0 +1,238 @@
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * Design tokens. Components read these through the Tailwind colour names
+ * mapped in @theme below, so switching data-theme on <html> re-skins everything.
+ * Text/background pairs are chosen to meet WCAG AA (4.5:1) in both themes.
+ */
+:root {
+  color-scheme: light;
+
+  --bg: #f3f7f5;
+  --surface: #ffffff;
+  --surface-2: #eef5f1;
+  --surface-3: #e2ede7;
+  --border: #d8e6de;
+  --border-strong: #bfd3c8;
+  --text: #0f1f18;
+  --text-muted: #44604f;
+  --text-subtle: #5b7568;
+
+  --primary: #047857;
+  --primary-solid: #047857;
+  --primary-solid-hover: #065f46;
+  --on-primary: #ffffff;
+  --primary-soft: #e3f3ea;
+  --primary-soft-fg: #065f46;
+  --brand: #059669;
+
+  --danger: #b42318;
+  --danger-solid: #c0262d;
+  --danger-soft: #fdecec;
+  --danger-soft-fg: #9b1c1c;
+  --warn: #92400e;
+  --warn-soft: #fdf1d6;
+  --warn-soft-fg: #854d0e;
+  --info: #1d4ed8;
+  --info-soft: #e7eefe;
+  --info-soft-fg: #1e40af;
+
+  --sidebar: #0f2a20;
+  --sidebar-fg: #d9ebe1;
+  --sidebar-muted: #9cbcad;
+  --sidebar-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-active: rgba(52, 211, 153, 0.14);
+  --sidebar-accent: #34d399;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  --ring: #059669;
+  --overlay: rgba(8, 20, 15, 0.45);
+  --elev-card: 0 1px 2px rgba(15, 31, 24, 0.04), 0 4px 14px rgba(15, 31, 24, 0.05);
+  --elev-pop: 0 12px 40px rgba(15, 31, 24, 0.16);
+
+  --chart-1: #059669;
+  --chart-2: #0d9488;
+  --chart-3: #e0913c;
+  --chart-4: #6366f1;
+  --chart-grid: #e3ece7;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #08130e;
+  --surface: #0f1d17;
+  --surface-2: #14261e;
+  --surface-3: #1b3127;
+  --border: #233a2f;
+  --border-strong: #31503f;
+  --text: #e6f1eb;
+  --text-muted: #a6c0b3;
+  --text-subtle: #8aa597;
+
+  --primary: #4ade9a;
+  --primary-solid: #22c58b;
+  --primary-solid-hover: #3fd69d;
+  --on-primary: #04150e;
+  --primary-soft: rgba(52, 211, 153, 0.14);
+  --primary-soft-fg: #7ceab8;
+  --brand: #34d399;
+
+  --danger: #fda4a4;
+  --danger-solid: #f87171;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --danger-soft-fg: #fecaca;
+  --warn: #fcd34d;
+  --warn-soft: rgba(245, 158, 11, 0.15);
+  --warn-soft-fg: #fde68a;
+  --info: #93b4fd;
+  --info-soft: rgba(96, 165, 250, 0.15);
+  --info-soft-fg: #bfd3fe;
+
+  --sidebar: #060f0b;
+  --sidebar-fg: #d9ebe1;
+  --sidebar-muted: #93b3a4;
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+  --sidebar-active: rgba(52, 211, 153, 0.13);
+  --sidebar-accent: #34d399;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+
+  --ring: #34d399;
+  --overlay: rgba(0, 0, 0, 0.6);
+  --elev-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --elev-pop: 0 16px 48px rgba(0, 0, 0, 0.5);
+
+  --chart-1: #34d399;
+  --chart-2: #2dd4bf;
+  --chart-3: #f5b25c;
+  --chart-4: #a5b4fc;
+  --chart-grid: #1f352a;
+}
+
+@theme {
+  --font-sans: 'DM Sans Variable', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Outfit Variable', 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', ui-monospace, Consolas, monospace;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+
+  --color-primary: var(--primary);
+  --color-primary-solid: var(--primary-solid);
+  --color-primary-solid-hover: var(--primary-solid-hover);
+  --color-on-primary: var(--on-primary);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-fg: var(--primary-soft-fg);
+  --color-brand: var(--brand);
+
+  --color-danger: var(--danger);
+  --color-danger-solid: var(--danger-solid);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-soft-fg: var(--danger-soft-fg);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-soft-fg: var(--warn-soft-fg);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-soft-fg: var(--info-soft-fg);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+
+  --shadow-card: var(--elev-card);
+  --shadow-pop: var(--elev-pop);
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-pop-in: pop-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in-right: slide-in-right 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-in-left: slide-in-left 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes pop-in {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes slide-in-right {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes slide-in-left {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--brand) 25%, transparent);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

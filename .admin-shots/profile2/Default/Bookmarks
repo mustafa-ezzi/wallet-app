@@ -1,0 +1,258 @@
+{
+   "checksum": "6ee912968d6283f2dac2820b5db87128",
+   "roots": {
+      "bookmark_bar": {
+         "children": [ {
+            "children": [ {
+               "children": [ {
+                  "date_added": "13307101564944541",
+                  "date_last_used": "0",
+                  "guid": "7783a416-1836-46b4-81f9-ae0e5a8d0898",
+                  "id": "12",
+                  "name": "2,500+ JavaScript Practice Challenges // Edabit",
+                  "show_icon": false,
+                  "source": "sync",
+                  "type": "url",
+                  "url": "https://edabit.com/challenges/javascript",
+                  "visit_count": 0
+               }, {
+                  "date_added": "13307453814787425",
+                  "date_last_used": "0",
+                  "guid": "f9a48bd4-d1e3-4024-a335-e2cf553c6a3b",
+                  "id": "13",
+                  "name": "Material Design Icons",
+                  "show_icon": false,
+                  "source": "sync",
+                  "type": "url",
+                  "url": "https://pictogrammers.github.io/@mdi/font/3.6.95/",
+                  "visit_count": 0
+               }, {
+                  "date_added": "13308387220169980",
+                  "date_last_used": "0",
+                  "guid": "9afd2bf0-3228-4b58-8ebf-264bc6c45210",
+                  "id": "14",
+                  "name": "Wedding List - Google Sheets",
+                  "show_icon": false,
+                  "source": "sync",
+                  "type": "url",
+                  "url": "https://docs.google.com/spreadsheets/d/1R6S-D_FJ9xykZaiQzGDz1iVESCiCwamkyAbr1-cfcAo/edit#gid=0",
+                  "visit_count": 0
+               }, {
+                  "date_added": "13309127351161042",
+                  "date_last_used": "0",
+                  "guid": "1d64c43b-cdc4-4038-83a7-0e22de54e522",
+                  "id": "15",
+                  "name": "eBravo | Movies | All Random",
+                  "show_icon": false,
+                  "source": "sync",
+                  "type": "url",
+                  "url": "http://www.ebravo.pk/classic/movies",
+                  "visit_count": 0
+               } ],
+               "date_added": "13377689933695878",
+               "date_last_used": "0",
+               "date_modified": "13377689933695878",
+               "guid": "e9d5cda6-0595-4bdd-b365-d506e9c92b3f",
+               "id": "11",
+               "name": "Javascript",
+               "source": "unknown",
+               "type": "folder"
+            }, {
+               "date_added": "13377470231762241",
+               "date_last_used": "0",
+               "guid": "55e99445-428c-468b-b042-48baaf8c4a10",
+               "id": "16",
+               "name": "",
+               "show_icon": false,
+               "source": "sync",
+               "type": "url",
+               "url": "https://www.youtube.com/",
+               "visit_count": 0
+            } ],
+            "date_added": "13377689933695325",
+            "date_last_used": "0",
+            "date_modified": "13377689933695325",
+            "guid": "a6d7b2d8-82bd-49ae-853b-d99c5890828c",
+            "id": "10",
+            "name": "Frontend Roadmap",
+            "source": "unknown",
+            "type": "folder"
+         }, {
+            "date_added": "13317814517397215",
+            "date_last_used": "0",
+            "guid": "2b613cb0-a3b7-480b-bdc8-89c1e19603b8",
+            "id": "17",
+            "name": "localhost / 127.0.0.1 / flaskdb / students | phpMyAdmin 5.2.0",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "http://localhost/phpmyadmin/index.php?route=/sql&pos=0&db=flaskdb&table=students",
+            "visit_count": 0
+         }, {
+            "date_added": "13331411276922223",
+            "date_last_used": "0",
+            "guid": "5e229021-d4f5-4f62-9283-974c41642ecf",
+            "id": "18",
+            "name": "You must be logged in to view this page!! | Get Free Instagram Likes",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://igfollower.net/tools/send-follower/Munira_collection53?gonderim=true",
+            "visit_count": 0
+         }, {
+            "date_added": "13347458109277575",
+            "date_last_used": "0",
+            "guid": "43634ed8-3d86-4120-a470-14522dcedac0",
+            "id": "19",
+            "name": "chat GPT",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://chat.openai.com/c/8d7b4ae7-9d92-4590-a60f-51be65f455d3",
+            "visit_count": 0
+         }, {
+            "date_added": "13361027256881290",
+            "date_last_used": "0",
+            "guid": "5eccf2ef-6a99-40be-ae25-6aa8727e6edb",
+            "id": "20",
+            "name": "Auction Pro",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "http://localhost:5173/category",
+            "visit_count": 0
+         }, {
+            "date_added": "13362643101108604",
+            "date_last_used": "0",
+            "guid": "62d104c0-50be-489e-aec9-83cdb2690682",
+            "id": "21",
+            "name": "alazam-erp deployed",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "http://18.214.163.100/",
+            "visit_count": 0
+         }, {
+            "date_added": "13367403354752777",
+            "date_last_used": "0",
+            "guid": "40039424-2ac5-4813-a16f-6cd261941eaa",
+            "id": "22",
+            "name": "alazam local 51275",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "http://localhost:51275/dashboard",
+            "visit_count": 0
+         }, {
+            "date_added": "13368519947417691",
+            "date_last_used": "0",
+            "guid": "e207cef7-86a9-44af-9e2d-1629abbd5544",
+            "id": "23",
+            "name": "mustafa erp deployed",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "http://13.202.18.65/dashboard",
+            "visit_count": 0
+         }, {
+            "date_added": "13372874599029649",
+            "date_last_used": "0",
+            "guid": "42b7c4f8-4c1d-4916-9cd0-9544dce85b9b",
+            "id": "24",
+            "name": "Birthday Card",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://birthday.mewtru.com/",
+            "visit_count": 0
+         }, {
+            "date_added": "13377470670112696",
+            "date_last_used": "0",
+            "guid": "b6a74275-5024-4442-9177-be194631bc00",
+            "id": "25",
+            "name": "Watcho | Money Heist - Season 05 Episode 06",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "http://watcho.pk/videopreview-18196.html",
+            "visit_count": 0
+         } ],
+         "date_added": "13437505998714672",
+         "date_last_used": "0",
+         "date_modified": "13377470670112696",
+         "guid": "0bc5d13f-2cba-5d74-951f-3f233fe6c908",
+         "id": "1",
+         "name": "Favorites bar",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "other": {
+         "children": [ {
+            "date_added": "13339762758076241",
+            "date_last_used": "0",
+            "guid": "289ddd42-29d6-4b35-a25d-dc0d309d2d01",
+            "id": "7",
+            "name": "(1) Inbox • Chats",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.instagram.com/direct/inbox/?next=%2Fdirect%2Ft%2F17850027398827530%2F",
+            "visit_count": 0
+         }, {
+            "date_added": "13342641939367666",
+            "date_last_used": "0",
+            "guid": "39dec3b7-be54-4be3-b629-b0aab160ae5f",
+            "id": "8",
+            "name": "(2227) YouTube",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://www.youtube.com/",
+            "visit_count": 0
+         }, {
+            "date_added": "13342644070404434",
+            "date_last_used": "0",
+            "guid": "2e04caee-353f-42bb-811d-9ba9501b7320",
+            "id": "9",
+            "name": "Snapchat",
+            "show_icon": false,
+            "source": "sync",
+            "type": "url",
+            "url": "https://web.snapchat.com/?web_client_id=97b29ac7-a21c-4f41-b2e0-5518bf4d6e3d",
+            "visit_count": 0
+         } ],
+         "date_added": "13437505998714672",
+         "date_last_used": "0",
+         "date_modified": "13342644070404434",
+         "guid": "82b081ec-3dd3-529c-8475-ab6c344590dd",
+         "id": "2",
+         "name": "Other favorites",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "synced": {
+         "children": [  ],
+         "date_added": "13437505998714672",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "4cf2e351-0e85-532b-bb37-df045d8f8d0f",
+         "id": "3",
+         "name": "Mobile favorites",
+         "source": "unknown",
+         "type": "folder"
+      },
+      "workspaces_v2": {
+         "children": [  ],
+         "date_added": "13437505998714672",
+         "date_last_used": "0",
+         "date_modified": "0",
+         "guid": "75aa6670-344f-549d-b742-660f029506ab",
+         "id": "5",
+         "name": "Workspaces",
+         "source": "unknown",
+         "type": "folder"
+      }
+   },
+   "sync_metadata": "CkEKHgiIgQISCJQDC3mhAQAAKg4QABgBIAAoBTAAOABAABIAKhhORFNRV0x2Skp3ZzVjSlVleUw4ZW9BPT1IA6AGDBKtAQgZEqgBChwyb0tvVlk2a3pVaDNVRFlMRHhmNFJCVzVNajQ9EiRiNmE3NDI3NS01MDI0LTQ0NDItOTE3Ny1iZTE5NDYzMWJjMDAYACAAKAAw+YG6wIwzOI6foqq5MkCOn6KquTJKHDB1bUpoK212RWNkcVhYd080UGVOZFBreGR0QT1aHyId/0UwcnFuQUREUU1jUUJKOU0zNUFjbkNHTHczST1lSjUzoMI+AmAFEq0BCBgSqAEKHFl3MjJTVkFXVHRxYjlCdzRlbnFNeS9TRm9tND0SJDQyYjdjNGY4LTRjMWQtNDkxNi05Y2QwLTk1NDRkY2U4NWI5YhgAIAAoADD8gbrAjDM46p+iqrkyQOqfoqq5MkocQkJ1bnBNL0lLbzFuakRRenVQbytOSDN6UVljPVofIh3+ZVRoRzBDSTBDQllvNFp5TFJTMUZQV2N3R2FrPWUKsRUrwj4CYAUSrQEIFhKoAQocTEs1d1kxNXZQbnVUdkdZWDBoV2tsUVNBQ0hVPRIkNDAwMzk0MjQtMmFjNS00ODEzLWExNmYtNmNkMjYxOTQxZWFhGAAgACgAMP2BusCMMzi7iKKquTJAu4iiqrkyShw0VjBNd083S0UxREVjQ3N3MmNEVG42NDRKZHM9Wh8iHfs3QWM3MzRIZCtxQ2R5d2hTcmUvOW5DLzZVaVU9ZRrXehzCPgJgBRKtAQgUEqgBChxPWWgvNFhjWnFoNUNRQjhVdU9PenZielhrQXc9EiQ1ZWNjZjJlZi02YTk5LTQwYmUtYWUyNS02YWE4NzI3ZTZlZGIYACAAKAAw+IG6wIwzOMafoqq5MkDGn6KquTJKHHBHa3RrN205clJIUTIzRzUrOWZQcFZ4ckhLZz1aHyId7kJQMXlRUG5CdUh0TmNOTG9UQ1RGNDhoZlROcz1lofmI6MI+AmAFEq0BCBISqAEKHG9oOHRNem5JcFkrejJhSzFNMTJrRkp4Y1g3az0SJDVlMjI5MDIxLWQ0ZjUtNGY2Mi05MjgzLTk3NGM0MTY0MmVjZhgAIAAoADCPlaKquTI4iaCiqrkyQImgoqq5MkocVG9XSmJNem1aQW9vZTg3dU9seFhwLzlKbmJvPVofIh25UFB3eVpRQ2tXRGJEdG1Qa1EyZmJjMnQ3TU1NPWUAAAAAwj4CYAUSrAEIERKnAQocWEIrT1U1T1IvZ3QwT3VtZHdGRnZsS0piN2dFPRIkMmI2MTNjYjAtYTNiNy00ODBiLWJkYzgtODljMWUxOTYwM2I4GAAgACgAMPaBusCMMzjynqKquTJA8p6iqrkyShxMblFua05ncmhCOTh5M2NLZDFRNVoyOTl3aWc9Wh4iHHJha2lNdjRkTUdUTkJDM0VYVFNyNWU4Rm5CWT1lpy12ksI+AmAFEqwBCBASpwEKHGRRejZ0OU0wa2U5SXY4Z0UvWGtFZURKL21pYz0SJDU1ZTk5NDQ1LTQyOGMtNDY4Yi1iMDQyLTQ4YmFhZjhjNGExMBgAIAAoADCHlaKquTI4pJ6iqrkyQKSeoqq5MkocZ0dGZWwvV1NPRWVHaFkwbXJtK2ZLVWlwem00PVoeIhxlaDd1bEZmaGh3RS8yQ3dZSyttaTZBR2djcTg9ZXucQRrCPgJgBRKsAQgLEqcBChxuVGc4VTRVV1gzcitTYmFxSStycGdIR0JqZEU9EiRlOWQ1Y2RhNi0wNTk1LTRiZGQtYjM2NS1kNTA2ZTljOTJiM2YYACAAKAAwgpWiqrkyOJydoqq5MkCcnaKquTJKHHp3dUlFSDNiaVhFcUpaZ0cyZk4xeFlVNGFQUT1aHiIcYm05dXF0WDM2eFB0ZWord0FJZDlUZ0x3eHdrPWUAAAAAwj4CYAASrQEIDxKoAQocOHExWXRjeTF5VDA4N0kyd2NmcU52eHc3ZmNnPRIkMWQ2NGM0M2ItY2RjNC00MDM4LTgzYTctMGUyMmRlNTRlNTIyGAAgACgAMIaVoqq5MjiJnqKquTJAiZ6iqrkyShwxVU0rNUJabzdoK1BTL09mYjhSWmtsWVhhUWc9Wh8iHelkcXBnUnhPd0hXQTJoZURhTkJPVElJZk1jOWc9ZUQwiTLCPgJgBRKtAQgNEqgBChx6QTEzTGo2UVBCQ08rMHVRZm96VWVMVHQxcFU9EiRmOWE0OGJkNC1kMWUzLTQwMjQtYTMzNS1lMmNmNTUzYzZhM2IYACAAKAAwhJWiqrkyONOdoqq5MkDTnaKquTJKHDlqelpLaTlEVTFHUnkyaTl1Z2ZFR0JORHVTVT1aHyIdpzdrWDM0M2x5UTVLbWJUVWx2T1U4c3ZyVkRNaz1lAAAAAMI+AmAFEqwBCAoSpwEKHDJCM25MRVVTL2M4RytOeXZBQVg2WDZJUDBZQT0SJGE2ZDdiMmQ4LTgyYmQtNDlhZS04NTNiLWQ5OWM1ODkwODI4YxgAIAAoADCBlaKquTI4gZ2iqrkyQIGdoqq5MkocSytjeGhJcWtxazg0M1NMdlYzNWh0R24rUUtvPVoeIhxaeXFGOGdReWJrSTJqc1BSZExDaTZ5d3ZSZ1U9ZQAAAADCPgJgABKtAQgXEqgBChxDZ013TUkwc3JhWVJBY1lQanZIc1R4WlVUb2c9EiRlMjA3Y2VmNy04NmE5LTQ0YWYtOWUyZC0xNjI5YWJiZDU1NDQYACAAKAAw+oG6wIwzONeeoqq5MkDXnqKquTJKHGpuL0R2WEkzcWV5enExdzZwY2RMeHRMZkNDOD1aHyId/TcxWWc0WHg0VDAzT0hPOUkvTUlXZFA0S1hMWT1lEWfjJsI+AmAFEowBCAEShwEKHHl4Si82ZnZrZWNyN2twNUVRekI0dFdMcGRiRT0SJGVlOThiNzczLTdiYmEtNTUyYy04OWJlLTgyYjkzYmJiOGZjMRgAIAAoADDpwdT/4DE4sMnU/+AxQLDJ1P/gMUocYVJDV0xnaEY5YjVJbnFLSUR2dUovanZRa0ZjPWUAAAAAwj4CYAASrQEICRKoAQocYjlYZ0piVUhDdmxWVFd0YlN1WFM5RzlYamU4PRIkMmUwNGNhZWUtMzUzZi00MmJiLTgxMWQtOWJhOTUwMWI3MzIwGAAgACgAMIiVoqq5Mji+nqKquTJAvp6iqrkyShxKenJ4bTRKLzU4bXpyNm8zMWppZXVZK2llSkk9Wh8iHahLUS9LeFcxTmtreVFRNXdxZmZEM1h4WjJQTmM9ZajxwxPCPgJgBRKtAQgVEqgBChxWekRDTE1nRDYzSTRONFRxMTRjcUpJZjJsMEk9EiQ2MmQxMDRjMC01MGJlLTQ4OWUtYWVjOS04M2NkYjI2OTA2ODIYACAAKAAw94G6wIwzOKigoqq5MkCooKKquTJKHGdEbUVyZjJNZ0p0QVJiVFRCSG1USzNQem1tVT1aHyId91pzemlqSnpORnRkVU92eUVSMFdjekRzOXk0Zz1lGtd6HMI+AmAFEqwBCAgSpwEKHHR2S2tQNVpkNjArbGdsZHk5RVp0MmgrMzhrST0SJDM5ZGVjM2I3LWJlNTQtNGJlMy1iNjI5LWIwYWFiMTYwYWU1ZhgAIAAoADD9haKquTI4loiiqrkyQJaIoqq5MkocelhBdGpObENHVlRWa2tjcHBsRGdDNDlVdldVPVoeIhxQblBvZGxyZzlFM0FUTVFyLzFlNEdKcm1wSDA9ZXucQRrCPgJgBRKtAQgOEqgBChxjcDRvWTR0anY3Rmp6c2QzMnlBdEwzMEgzSTg9EiQ5YWZkMmJmMC0zMjI4LTRiNTgtOGViZi0yNjRiYzZjNDUyMTAYACAAKAAwhZWiqrkyOO6doqq5MkDunaKquTJKHEk5ZFl2a3Z2ZnBXL0FlZkN3V0hoZFVFV1JVdz1aHyId00JtNVgwM1BZVzJnMkcrV1NaS3FpUmJCeGpZQT1lBP/aVcI+AmAFEowBCAIShwEKHFljU1RvbnZFU1B3cUNzNEwyY3JWaHY2OEw5OD0SJGQwZDZlMGFiLTA2M2UtNTRmOC05MWRjLTNlNGNkZTQ1OWIxNBgAIAAoADDqwdT/4DE47cnU/+AxQO3J1P/gMUocb1BWa2h3QlJiVjY1S0NXUjIrSU9OSFdvT3U4PWUAAAAAwj4CYAASjAEIBRKHAQocd1JCclpMKzZQQTlhdktnak5QN0pYRExjZnZzPRIkMmY1NzM0MzctMjc1ZC01MDYyLWI1NzYtZTcwM2MyZTVjNGU1GAAgACgAMIm9+sOkMzj3vvrDpDNA9776w6QzShxubXg2NXNRRHZ4SThUZ0VlditBK250dG9TbjQ9ZQAAAADCPgJgABKsAQgMEqcBChxCcFhnbVU4SStSS3RZVTdJOHkvSHByTzZFWEE9EiQ3NzgzYTQxNi0xODM2LTQ2YjQtODFmOS1hZTBlNWE4ZDA4OTgYACAAKAAwg5WiqrkyOLedoqq5MkC3naKquTJKHEo0UkZvRU5CbE5hSVlTeW54WVNGSXJBRkYvaz1aHiIcTnh3R3dtb05tN0FxV1F2T2pyR3pGZno0eGpVPWUy80Q0wj4CYAUSrAEIBxKnAQocYlRnM2p3eHZBMm9wQy9xN1JGQ1Z3V0xmTlc0PRIkMjg5ZGRkNDItMjlkNi00YjM1LWEyNWQtZGMwZDMwOWQyZDAxGAAgACgAMPyFoqq5Mjj3h6KquTJA94eiqrkyShxoaHVFNjNaV1hhejVacVVJcFNLMVdHNUE3Unc9Wh4iHEpYZUZIVTE0MmlaOFFUdlNNREFLYzFMZjNPND1l0ase48I+AmAFEq0BCBMSqAEKHHBkVVR0a1lNSGRSZmh2dFBNUWVtbzZLcEVadz0SJDQzNjM0ZWQ4LTNkODYtNDEyMC1hNDcwLTE0NTIyZGNlZGFjMBgAIAAoADD7gbrAjDM4qJ+iqrkyQKifoqq5MkocWDc0QVJrcjZsd2RxL05DS0dWWWtFa2F1c2trPVofIh3cWlVvNWxWMlZtUEFadFJsZGtPbndwbGJ6cDRFPWWnOZTewj4CYAUSjAEIAxKHAQocbmpnRHU4OGVDcnZYcDg2cEQ3ZkhHY3FGcDg4PRIkNWQwNTBlNTUtMDZlMy01YzJjLTg4NmYtMjY2NGYzZjBkNTRmGAAgACgAMO/B1P/gMTjgytT/4DFA4MrU/+AxShx5ek5CMDFjbjU0QTdjUlUwdVQrL1BnbVR0VW89ZQAAAADCPgJgADAAOAA=",
+   "version": 1
+}

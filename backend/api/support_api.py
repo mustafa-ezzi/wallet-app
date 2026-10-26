@@ -187,6 +187,9 @@ class OpsSupportListView(APIView):
         category = (request.query_params.get('category') or '').strip().lower()
         if category:
             qs = qs.filter(category=category)
+        user_id = (request.query_params.get('user_id') or '').strip()
+        if user_id.isdigit():
+            qs = qs.filter(user_id=int(user_id))
         q = (request.query_params.get('q') or '').strip()
         if q:
             from django.db.models import Q
