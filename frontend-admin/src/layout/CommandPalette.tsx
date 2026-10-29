@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 import { DialogOverlay } from '../components/ui/Dialog'
 import { useTheme } from '../lib/theme'
-import { NAV_GROUPS } from './nav'
+import { visibleNavGroups } from './nav'
 
 function PaletteItem({
   value,
@@ -44,7 +44,8 @@ const groupClass =
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+  const groups = visibleNavGroups(user?.capabilities)
   const { theme, toggleTheme } = useTheme()
   const [search, setSearch] = useState('')
 
@@ -97,7 +98,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 </Command.Group>
               ) : null}
 
-              {NAV_GROUPS.map((group) => {
+              {groups.map((group) => {
                 const items = group.items.filter((item) => !item.soon)
                 if (items.length === 0) return null
                 return (

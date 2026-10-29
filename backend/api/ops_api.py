@@ -32,7 +32,7 @@ from .models import (
     UserOpsMeta,
 )
 from .ops_audit import log_ops_action
-from .ops_permissions import IsOpsStaff
+from .ops_permissions import IsOpsStaff, ops
 from .entitlements import premium_summary
 
 
@@ -150,19 +150,13 @@ class OpsMeView(APIView):
 
     def get(self, request):
         u = request.user
-        return Response({
-            'id': u.id,
-            'username': u.username,
-            'email': u.email or '',
-            'first_name': u.first_name or '',
-            'last_name': u.last_name or '',
-            'is_staff': u.is_staff,
-            'is_superuser': u.is_superuser,
-        })
+        from integrations.views import me_payload
+
+        return Response(me_payload(u))
 
 
 class OpsDashboardView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('dashboard.read')]
 
     def get(self, request):
         now = timezone.now()
@@ -236,7 +230,7 @@ class OpsDashboardView(APIView):
 
 
 class OpsUserListView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('users.read')]
 
     def get(self, request):
         from .expo_push import prune_stale_device_tokens
@@ -364,7 +358,7 @@ class OpsUserListView(APIView):
 
 
 class OpsUserDetailView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('users.read')]
 
     def get(self, request, user_id: int):
         try:
@@ -408,7 +402,7 @@ class OpsUserDetailView(APIView):
 
 
 class OpsUserSuspendView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('users.write')]
 
     def post(self, request, user_id: int):
         try:
@@ -446,7 +440,7 @@ class OpsUserSuspendView(APIView):
 
 
 class OpsUserUnsuspendView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('users.write')]
 
     def post(self, request, user_id: int):
         try:
@@ -549,7 +543,7 @@ def purge_user_completely(user: User) -> dict:
 class OpsUserDeleteView(APIView):
     """Hard-delete a hosted user and all linked personal data."""
 
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('users.delete')]
 
     def post(self, request, user_id: int):
         try:
@@ -610,7 +604,7 @@ class OpsUserDeleteView(APIView):
 class OpsRefreshInactivityView(APIView):
     """Recompute inactivity_tier flags for all users (flag only — never delete)."""
 
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('users.write')]
 
     def post(self, request):
         updated = 0

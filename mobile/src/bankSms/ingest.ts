@@ -53,7 +53,7 @@ export type IngestMeta = {
 }
 
 function guessKindFromBody(text: string): BankSmsKind {
-  if (/\breceived\b|\bcredited\b|\bincoming\b|\bdeposited\b/i.test(text)) return 'income'
+  if (/\bsent you\b|\bpaid you\b|\breceived\b|\bcredited\b|\bincoming\b|\bdeposited\b/i.test(text)) return 'income'
   if (/\breversed?\b/i.test(text)) return 'reversal'
   if (/\batm\b|\bwithdraw/i.test(text)) return 'atm'
   return 'expense'
@@ -152,7 +152,9 @@ export async function ingestBankSmsBody(
     const id = res.data.id
     const kind = res.data.kind
     // Already approved (cross-source TID dedupe) — do not create a second transaction.
-    if ((res.data as { status?: string }).status === 'approved') {
+    const importStatus = (res.data as { status?: string }).status
+    // Already saved or dismissed — do not create a second transaction.
+    if (importStatus === 'approved' || importStatus === 'rejected') {
       return { ok: true, id, kind }
     }
     const autoOn = await getBankSmsAutoApprove()

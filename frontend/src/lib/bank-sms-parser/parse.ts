@@ -173,6 +173,10 @@ export function isCardPayment(
 }
 
 function parseCounterparty(text: string): string | null {
+  const sentYou = text.match(/\b([A-Za-z][A-Za-z0-9.'-]{1,40})\s+sent you\b/i)
+  if (sentYou && !/^(has|have|just|money|payment)$/i.test(sentYou[1].trim())) {
+    return sentYou[1].trim()
+  }
   const sent = text.match(/\bsent to\s+([A-Z0-9 .'-]{2,40}?)(?:\s+PK|\s+as\s+|\s+on\s+)/i)
   if (sent) return sent[1].trim()
   const recv = text.match(/\breceived from\s+([A-Z0-9 .'-]{2,40}?)(?:\s+AC|\s+PK|\s+as\s+|\s+on\s+)/i)
@@ -310,6 +314,8 @@ function classify(text: string, tid: string | null): { kind: BankSmsKind; reason
     || /\byou have received\b/i.test(t)
     || /\byou\s+received\b/i.test(t)
     || /\bmoney\s+received\b/i.test(t)
+    || /\bsent you\b/i.test(t)
+    || /\bpaid you\b/i.test(t)
     || /\bincoming\s+payment\b/i.test(t)
     || /\bhas been credited\b/i.test(t)
     || /\bcredited to\b/i.test(t)

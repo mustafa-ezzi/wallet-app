@@ -100,3 +100,11 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth outside AuthProvider')
   return ctx
 }
+
+/** Missing capabilities means an older session payload; allow until /ops/me refreshes. */
+export function useCan(capability: string) {
+  const { user } = useAuth()
+  if (!user) return false
+  if (!user.capabilities) return true
+  return user.capabilities.includes(capability)
+}

@@ -71,12 +71,35 @@ const BANK_TEXT_HINTS: { re: RegExp; label: string }[] = [
   { re: /\bbank\s*islami\b|\bbsbl\b/i, label: 'BankIslami' },
 ]
 
+/** OEM / sideload builds sometimes ship a package id that is not in the exact map. */
+function labelFromPackageId(packageName: string): string | null {
+  const p = packageName.toLowerCase()
+  if (p.includes('sadapay')) return 'SadaPay'
+  if (p.includes('nayapay')) return 'NayaPay'
+  if (p.includes('jazzcash') || p.includes('mobilinkcustomer')) return 'JazzCash'
+  if (p.includes('easypaisa') || p.includes('telenor.phoenix')) return 'Easypaisa'
+  if (p.includes('meezan')) return 'Meezan'
+  return null
+}
+
+function hintFromPackageId(packageName: string): string | null {
+  const label = labelFromPackageId(packageName)
+  if (label === 'SadaPay') return 'sadapay'
+  if (label === 'NayaPay') return 'nayapay'
+  if (label === 'JazzCash') return 'jazzcash'
+  if (label === 'Easypaisa') return 'easypaisa'
+  if (label === 'Meezan') return 'meezan'
+  return null
+}
+
 export function bankLabelForPackage(packageName: string): string | null {
-  return BANK_NOTIFICATION_APPS[packageName] ?? null
+  if (!packageName) return null
+  return BANK_NOTIFICATION_APPS[packageName] ?? labelFromPackageId(packageName)
 }
 
 export function bankHintForPackage(packageName: string): string | null {
-  return PACKAGE_TO_HINT[packageName] ?? null
+  if (!packageName) return null
+  return PACKAGE_TO_HINT[packageName] ?? hintFromPackageId(packageName)
 }
 
 export function bankLabelFromText(blob: string): string | null {
@@ -117,7 +140,7 @@ export function isBankishNotification(n: NotifLike): boolean {
     return false
   }
 
-  const knownPkg = Boolean(BANK_NOTIFICATION_APPS[pkg])
+  const knownPkg = Boolean(bankLabelForPackage(pkg))
   const knownText = Boolean(bankLabelFromText(blob))
   const moneyish =
     /\bpkr\b|\brs\.?\b|\b₨\b|\breceived\b|\bsent\b|\bpaid\b|\bspent\b|\bpayment\b|\bdebited\b|\bcredited\b|\bwithdraw|\btransfer|\braast\b|\bbank\s*alert\b|\bbalance\b|\btransaction\b/i.test(

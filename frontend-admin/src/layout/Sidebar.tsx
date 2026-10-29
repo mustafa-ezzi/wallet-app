@@ -3,8 +3,9 @@ import { NavLink } from 'react-router-dom'
 import walletTrailsLogo from '../assets/wallettrail-logo.png'
 import { Tooltip } from '../components/ui'
 import { cn } from '../lib/cn'
+import { useAuth } from '../AuthContext'
 import { useDashboard } from '../queries'
-import { NAV_GROUPS, type NavItem } from './nav'
+import { visibleNavGroups, type NavItem } from './nav'
 
 function NavEntry({
   item,
@@ -108,6 +109,8 @@ export function Sidebar({
   className?: string
 }) {
   const dashboard = useDashboard()
+  const { user } = useAuth()
+  const groups = visibleNavGroups(user?.capabilities)
   const needsReply = dashboard.data?.support?.waiting_ops ?? 0
 
   return (
@@ -134,7 +137,7 @@ export function Sidebar({
         aria-label="Main"
         className="flex-1 overflow-y-auto px-3 pb-4 [scrollbar-color:rgba(255,255,255,0.14)_transparent] [scrollbar-width:thin]"
       >
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.label} className="mt-4 first:mt-1">
             {collapsed ? (
               <div className="mx-auto mb-2 h-px w-6 bg-sidebar-border" aria-hidden />

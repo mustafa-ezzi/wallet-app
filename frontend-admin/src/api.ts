@@ -1,4 +1,4 @@
-import axios from 'axios'
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 
 function normalizeApiRoot(raw: string | undefined): string {
   const value = (raw ?? '').trim().replace(/\/$/, '')
@@ -26,6 +26,40 @@ opsApi.interceptors.request.use((config) => {
   return config
 })
 
+let refreshPromise: Promise<string | null> | null = null
+
+async function refreshAccess(): Promise<string | null> {
+  const refresh = localStorage.getItem(REFRESH_KEY)
+  if (!refresh) return null
+  try {
+    const { data } = await axios.post<{ access: string }>(`${API_BASE}/ops/auth/refresh/`, { refresh })
+    localStorage.setItem(TOKEN_KEY, data.access)
+    return data.access
+  } catch {
+    clearOpsTokens()
+    return null
+  }
+}
+
+opsApi.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    const original = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined
+    const url = String(original?.url || '')
+    if (error.response?.status !== 401 || !original || original._retry || url.includes('/ops/auth/')) {
+      return Promise.reject(error)
+    }
+    original._retry = true
+    refreshPromise ??= refreshAccess().finally(() => {
+      refreshPromise = null
+    })
+    const access = await refreshPromise
+    if (!access) return Promise.reject(error)
+    original.headers.Authorization = `Bearer ${access}`
+    return opsApi(original)
+  },
+)
+
 export function getStoredAccessToken() {
   return localStorage.getItem(TOKEN_KEY)
 }
@@ -40,6 +74,8 @@ export function clearOpsTokens() {
   localStorage.removeItem(REFRESH_KEY)
 }
 
+export type OpsRole = 'owner' | 'admin' | 'support' | 'marketing' | 'viewer'
+
 export type OpsMe = {
   id: number
   username: string
@@ -48,6 +84,8 @@ export type OpsMe = {
   last_name: string
   is_staff: boolean
   is_superuser: boolean
+  role?: OpsRole
+  capabilities?: string[]
 }
 
 export type OpsDashboard = {
@@ -226,7 +264,7 @@ export type Paginated<T> = {
 }
 
 export async function loginOps(username: string, password: string): Promise<OpsMe> {
-  const { data } = await opsApi.post<{ access: string; refresh: string }>('/auth/login/', {
+  const { data } = await opsApi.post<{ access: string; refresh: string }>('/ops/auth/login/', {
     username,
     password,
   })
@@ -242,6 +280,72 @@ export async function loginOps(username: string, password: string): Promise<OpsM
 
 export async function fetchOpsMe() {
   const { data } = await opsApi.get<OpsMe>('/ops/me/')
+  return data
+}
+
+export type TeamMember = {
+  id: number
+  username: string
+  email: string
+  role: OpsRole
+  is_superuser: boolean
+}
+
+export async function fetchTeam() {
+  const { data } = await opsApi.get<{ results: TeamMember[] }>('/ops/team/')
+  return data.results
+}
+
+export async function saveTeamMember(payload: { username: string; email?: string; role: OpsRole; password?: string }) {
+  const { data } = await opsApi.post<TeamMember>('/ops/team/', payload)
+  return data
+}
+
+export async function setTeamRole(userId: number, role: OpsRole) {
+  const { data } = await opsApi.patch<TeamMember>(`/ops/team/${userId}/`, { role })
+  return data
+}
+
+export async function revokeTeamMember(userId: number) {
+  await opsApi.post(`/ops/team/${userId}/`)
+}
+
+export type IntegrationCard = {
+  provider: 'ga4' | 'instagram' | 'facebook' | 'linkedin'
+  label: string
+  id: number | null
+  status: 'not_setup' | 'connected' | 'needs_reconnect' | 'error'
+  display_name: string
+  external_id: string
+  token_expires_at: string | null
+  last_sync_at: string | null
+  last_error: string
+  connected_at: string | null
+  scopes: string[]
+}
+
+export async function fetchIntegrations() {
+  const { data } = await opsApi.get<{ results: IntegrationCard[] }>('/ops/integrations/')
+  return data.results
+}
+
+export async function connectIntegration(provider: string) {
+  const { data } = await opsApi.post<{ detail: string }>(`/ops/integrations/${provider}/connect/`)
+  return data
+}
+
+export async function syncIntegration(id: number) {
+  const { data } = await opsApi.post<IntegrationCard & { rows_written?: number }>(`/ops/integrations/${id}/sync/`)
+  return data
+}
+
+export async function disconnectIntegration(id: number) {
+  const { data } = await opsApi.post<IntegrationCard>(`/ops/integrations/${id}/disconnect/`)
+  return data
+}
+
+export async function uploadLinkedInRows(rows: { metric: string; date: string; value: number }[]) {
+  const { data } = await opsApi.post<IntegrationCard & { rows_written?: number }>('/ops/integrations/linkedin/upload/', { rows })
   return data
 }
 

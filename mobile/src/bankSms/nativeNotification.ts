@@ -34,6 +34,12 @@ type ListenerApi = {
   ) => { remove: () => void }
   /** Returns + clears native SharedPreferences queue (background catch-up). */
   drainQueuedNotifications?: () => NotificationPayload[] | Promise<NotificationPayload[]>
+  /** Ask Android to bind the listener again after it was dropped. */
+  requestListenerRebind?: () => void
+  /** Read bank alerts still showing in the shade. */
+  syncActiveNotifications?: () => void | Promise<void>
+  /** Remember a notification key so later shade catch-up does not import it twice. */
+  markNotificationSeen?: (key: string) => void
 }
 
 function loadNative(): ListenerApi | null {
@@ -137,6 +143,36 @@ export function subscribeWalletNotifications(
 }
 
 /**
+ * Rebind the listener and pull bank alerts that arrived while it was unbound.
+ * Safe to call on every foreground — already-imported keys are skipped natively.
+ */
+export async function catchUpWalletNotifications(): Promise<void> {
+  const mod = loadNative()
+  if (!mod) return
+  try {
+    mod.requestListenerRebind?.()
+  } catch {
+    /* ignore */
+  }
+  try {
+    await Promise.resolve(mod.syncActiveNotifications?.())
+  } catch {
+    /* ignore */
+  }
+}
+
+export function markWalletNotificationHandled(key?: string): void {
+  if (!key) return
+  const mod = loadNative()
+  if (!mod?.markNotificationSeen) return
+  try {
+    mod.markNotificationSeen(key)
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * Drain notifications captured while JS was frozen/killed.
  * Call on AppState active and when enabling bank-app listening.
  */
@@ -154,8 +190,9 @@ export async function drainQueuedWalletNotifications(): Promise<NotificationPayl
 
 /** Ingest any queued bank notifications (dedupe happens server-side). */
 export async function processQueuedWalletNotifications(
-  ingest: (body: string, meta: NotificationPayload) => Promise<void>,
+  ingest: (body: string, meta: NotificationPayload) => Promise<boolean>,
 ): Promise<number> {
+  await catchUpWalletNotifications()
   const queued = await drainQueuedWalletNotifications()
   let n = 0
   for (const event of queued) {
@@ -163,8 +200,11 @@ export async function processQueuedWalletNotifications(
       if (!isBankishNotification(event)) continue
       const body = bodyFromWalletNotification(event)
       if (!body) continue
-      await ingest(body, event)
-      n += 1
+      const ok = await ingest(body, event)
+      if (ok) {
+        markWalletNotificationHandled(event.key)
+        n += 1
+      }
     } catch {
       /* continue next */
     }

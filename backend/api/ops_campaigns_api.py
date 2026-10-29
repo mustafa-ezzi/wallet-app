@@ -14,7 +14,7 @@ from .campaign_push import (
 )
 from .models import PushCampaign
 from .ops_audit import log_ops_action
-from .ops_permissions import IsOpsStaff
+from .ops_permissions import ops
 from .ops_api import OpsPagination
 
 
@@ -66,7 +66,7 @@ def _normalize_data(raw) -> dict:
 
 
 class OpsCampaignListCreateView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops({'GET': 'campaigns.read', 'POST': 'campaigns.write'})]
 
     def get(self, request):
         qs = PushCampaign.objects.select_related('created_by').all()
@@ -125,7 +125,7 @@ class OpsCampaignListCreateView(APIView):
 
 
 class OpsCampaignDetailView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops({'GET': 'campaigns.read', 'DELETE': 'campaigns.write'})]
 
     def get(self, request, campaign_id: int):
         try:
@@ -192,7 +192,7 @@ class OpsCampaignDetailView(APIView):
 
 
 class OpsCampaignEstimateView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('campaigns.read')]
 
     def get(self, request):
         audience = (request.query_params.get('audience') or PushCampaign.AUDIENCE_ALL).strip()
@@ -209,7 +209,7 @@ class OpsCampaignEstimateView(APIView):
 
 
 class OpsCampaignSendView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('campaigns.write')]
 
     def post(self, request, campaign_id: int):
         try:
@@ -247,7 +247,7 @@ class OpsCampaignSendView(APIView):
 
 
 class OpsCampaignCancelView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('campaigns.write')]
 
     def post(self, request, campaign_id: int):
         try:

@@ -28,7 +28,7 @@ from .entitlements import (
 from .models import Entitlement, PurchaseEvent
 from .ops_audit import log_ops_action
 from .ops_api import OpsPagination
-from .ops_permissions import IsOpsStaff
+from .ops_permissions import ops
 
 
 VALID_PRODUCTS = {
@@ -295,7 +295,7 @@ class PremiumVerifyView(APIView):
 
 
 class OpsPremiumListView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('premium.read')]
 
     def get(self, request):
         qs = (
@@ -339,7 +339,7 @@ class OpsPremiumListView(APIView):
 
 
 class OpsPremiumStatsView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('premium.read')]
 
     def get(self, request):
         now = timezone.now()
@@ -362,7 +362,7 @@ class OpsPremiumStatsView(APIView):
 
 
 class OpsPremiumGrantView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('premium.write')]
 
     def post(self, request):
         user_id = request.data.get('user_id')
@@ -427,7 +427,7 @@ class OpsPremiumGrantView(APIView):
 
 
 class OpsPremiumRevokeView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('premium.write')]
 
     def post(self, request, entitlement_id: int):
         try:
@@ -451,7 +451,7 @@ class OpsPremiumRevokeView(APIView):
 class OpsPurchaseQueueView(APIView):
     """Failed / unprocessed Play verifies for support."""
 
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('premium.read')]
 
     def get(self, request):
         qs = (

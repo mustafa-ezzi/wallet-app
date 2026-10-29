@@ -14,7 +14,7 @@ from rest_framework.views import APIView
 from .expo_push import send_expo_push
 from .models import DeviceToken, SupportMessage, SupportThread
 from .ops_audit import log_ops_action
-from .ops_permissions import IsOpsStaff
+from .ops_permissions import ops
 from .ops_api import OpsPagination
 
 
@@ -177,7 +177,7 @@ class SupportThreadReplyView(APIView):
 # ── Ops ───────────────────────────────────────────────────────────────────────
 
 class OpsSupportListView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('support.read')]
 
     def get(self, request):
         qs = SupportThread.objects.select_related('user').order_by('-updated_at')
@@ -205,7 +205,7 @@ class OpsSupportListView(APIView):
 
 
 class OpsSupportDetailView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('support.read')]
 
     def get(self, request, thread_id: int):
         try:
@@ -216,7 +216,7 @@ class OpsSupportDetailView(APIView):
 
 
 class OpsSupportReplyView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('support.write')]
 
     def post(self, request, thread_id: int):
         try:
@@ -263,7 +263,7 @@ class OpsSupportReplyView(APIView):
 
 
 class OpsSupportStatusView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('support.write')]
 
     def post(self, request, thread_id: int):
         try:

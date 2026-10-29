@@ -603,9 +603,17 @@ class BankSmsImportViewSet(viewsets.ModelViewSet):
         if not fingerprint:
             return Response({'detail': 'fingerprint is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        existing = BankSmsImport.objects.filter(
-            user=request.user, fingerprint=fingerprint, status=BankSmsImport.STATUS_PENDING,
-        ).first()
+        recent_cut = timezone.now() - timedelta(days=14)
+        existing = (
+            BankSmsImport.objects.filter(user=request.user, fingerprint=fingerprint)
+            .filter(
+                Q(status=BankSmsImport.STATUS_PENDING)
+                | Q(status=BankSmsImport.STATUS_APPROVED, created_at__gte=recent_cut)
+                | Q(status=BankSmsImport.STATUS_REJECTED, created_at__gte=recent_cut)
+            )
+            .order_by('-id')
+            .first()
+        )
         if existing:
             return Response(BankSmsImportSerializer(existing).data, status=status.HTTP_200_OK)
 

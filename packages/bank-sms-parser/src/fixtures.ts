@@ -138,6 +138,30 @@ export const FIXTURE_SMS: FixtureSms[] = [
     expectedAmount: 250,
     text: 'Payment of PKR 250 successful',
   },
+  {
+    id: 'nayapay-off-it-goes',
+    label: 'NayaPay outgoing witty push',
+    bank: 'nayapay',
+    expectedKind: 'expense',
+    expectedAmount: 40,
+    text: "NayaPay\nOff it goes\nRs. 40 sent to Mustafa. Your wallet's seen better days.",
+  },
+  {
+    id: 'sadapay-money-received',
+    label: 'SadaPay money received push',
+    bank: 'sadapay',
+    expectedKind: 'income',
+    expectedAmount: 40,
+    text: 'SadaPay\nMoney Received\nMUSTAFA sent you PKR 40',
+  },
+  {
+    id: 'sadapay-sent-you-only',
+    label: 'SadaPay sent-you line without Money Received title',
+    bank: 'sadapay',
+    expectedKind: 'income',
+    expectedAmount: 40,
+    text: 'SadaPay\nMUSTAFA sent you PKR 40',
+  },
 
   // ── ATM keyword variants ─────────────────────────────────────────────────
   {

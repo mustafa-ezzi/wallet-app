@@ -11,7 +11,10 @@ import {
   fetchCampaign,
   fetchCampaigns,
   fetchDashboardSummary,
+  disconnectIntegration,
   fetchEntitlements,
+  fetchIntegrations,
+  fetchTeam,
   fetchOpsConfig,
   fetchOpsDashboard,
   fetchOpsUser,
@@ -25,9 +28,14 @@ import {
   patchOpsConfig,
   patchPromo,
   refreshInactivityFlags,
+  revokeTeamMember,
   replySupportThread,
   revokePremium,
+  saveTeamMember,
   sendCampaign,
+  setTeamRole,
+  syncIntegration,
+  uploadLinkedInRows,
   setSupportStatus,
   suspendOpsUser,
   unsuspendOpsUser,
@@ -66,6 +74,8 @@ export const queryKeys = {
   promosAll: ['promos'] as const,
   promos: (params: Params) => ['promos', clean(params)] as const,
   audit: (params: Params) => ['audit', clean(params)] as const,
+  team: ['team'] as const,
+  integrations: ['integrations'] as const,
 }
 
 // Dashboard
@@ -326,6 +336,62 @@ export function usePatchPromo() {
 }
 
 // Audit
+
+export function useTeam() {
+  return useQuery({ queryKey: queryKeys.team, queryFn: fetchTeam })
+}
+
+export function useSaveTeamMember() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: saveTeamMember,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.team }),
+  })
+}
+
+export function useSetTeamRole() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, role }: { userId: number; role: Parameters<typeof setTeamRole>[1] }) => setTeamRole(userId, role),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.team }),
+  })
+}
+
+export function useRevokeTeamMember() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: revokeTeamMember,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.team }),
+  })
+}
+
+export function useIntegrations() {
+  return useQuery({ queryKey: queryKeys.integrations, queryFn: fetchIntegrations })
+}
+
+export function useSyncIntegration() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: syncIntegration,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.integrations }),
+  })
+}
+
+export function useDisconnectIntegration() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: disconnectIntegration,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.integrations }),
+  })
+}
+
+export function useUploadLinkedIn() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: uploadLinkedInRows,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.integrations }),
+  })
+}
 
 export function useAuditLog(params: Params) {
   return useQuery({

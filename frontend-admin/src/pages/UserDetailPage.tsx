@@ -2,6 +2,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { Ban, Crown, LifeBuoy, ScrollText, ShieldCheck, Smartphone, Trash2, UserCheck, UserRound } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useCan } from '../AuthContext'
 import type { OpsAuditRow, OpsEntitlement, OpsUser, SupportThread } from '../api'
 import {
   Alert,
@@ -156,6 +157,8 @@ export function UserDetailPage() {
   const user = userQuery.data
   const [confirmSuspend, setConfirmSuspend] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const canWriteUsers = useCan('users.write')
+  const canDeleteUsers = useCan('users.delete')
   const entitlements = useEntitlements({ user_id: userId, page_size: 20 })
   const audit = useAuditLog({ target_type: 'user', target_id: userId, page_size: 25 })
 
@@ -197,18 +200,22 @@ export function UserDetailPage() {
         description={`@${user.username} · hosted profile summary — no ledger access`}
         actions={
           <>
-            <Button
-              variant={user.suspended ? 'primary' : 'danger-soft'}
-              disabled={protectedAccount}
-              onClick={() => setConfirmSuspend(true)}
-            >
-              {user.suspended ? <UserCheck /> : <Ban />}
-              {user.suspended ? 'Unsuspend' : 'Suspend'}
-            </Button>
-            <Button variant="danger" disabled={protectedAccount} onClick={() => setConfirmDelete(true)}>
-              <Trash2 />
-              Delete
-            </Button>
+            {canWriteUsers ? (
+              <Button
+                variant={user.suspended ? 'primary' : 'danger-soft'}
+                disabled={protectedAccount}
+                onClick={() => setConfirmSuspend(true)}
+              >
+                {user.suspended ? <UserCheck /> : <Ban />}
+                {user.suspended ? 'Unsuspend' : 'Suspend'}
+              </Button>
+            ) : null}
+            {canDeleteUsers ? (
+              <Button variant="danger" disabled={protectedAccount} onClick={() => setConfirmDelete(true)}>
+                <Trash2 />
+                Delete
+              </Button>
+            ) : null}
           </>
         }
       />

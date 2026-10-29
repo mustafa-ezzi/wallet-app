@@ -63,6 +63,28 @@ class BankSmsImportTests(TestCase):
         self.assertEqual(a.data['id'], b.data['id'])
         self.assertEqual(BankSmsImport.objects.filter(user=self.user).count(), 1)
 
+    def test_dedupe_approved_fingerprint(self):
+        payload = {
+            'kind': 'income',
+            'amount': '40',
+            'fingerprint': 'fp_approved_same',
+            'suggested_account_id': self.bank.id,
+        }
+        created = self.client.post('/api/bank-sms-imports/', payload, format='json')
+        self.assertEqual(created.status_code, 201, created.data)
+        approved = self.client.post(
+            f"/api/bank-sms-imports/{created.data['id']}/approve/", {}, format='json',
+        )
+        self.assertEqual(approved.status_code, 200, approved.data)
+        again = self.client.post('/api/bank-sms-imports/', payload, format='json')
+        self.assertEqual(again.status_code, 200, again.data)
+        self.assertEqual(again.data['id'], created.data['id'])
+        self.assertEqual(again.data['status'], 'approved')
+        self.assertEqual(
+            BankSmsImport.objects.filter(user=self.user, fingerprint='fp_approved_same').count(),
+            1,
+        )
+
     def test_approve_expense(self):
         created = self.client.post('/api/bank-sms-imports/', {
             'kind': 'expense',

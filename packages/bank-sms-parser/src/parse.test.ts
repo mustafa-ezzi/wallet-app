@@ -34,6 +34,23 @@ describe('parseBankSms — product samples', () => {
     expect(p.tid).toBe('633081')
   })
 
+  it('reads SadaPay money received as income from the sender', () => {
+    const p = parseBankSms('SadaPay\nMoney Received\nMUSTAFA sent you PKR 40')
+    expect(p.ignore).toBe(false)
+    expect(p.ok).toBe(true)
+    expect(p.kind).toBe('income')
+    expect(p.amount).toBe(40)
+    expect(p.bankHint).toBe('sadapay')
+    expect(p.counterparty).toMatch(/MUSTAFA/i)
+  })
+
+  it('does not treat SadaPay "sent you" as money out', () => {
+    const p = parseBankSms('SadaPay\nMUSTAFA sent you PKR 40')
+    expect(p.kind).toBe('income')
+    expect(p.amount).toBe(40)
+    expect(p.counterparty).toMatch(/MUSTAFA/i)
+  })
+
   it('classifies received as income', () => {
     const f = FIXTURE_SMS.find((x) => x.id === 'product-raast-received')!
     const p = parseBankSms(f.text)

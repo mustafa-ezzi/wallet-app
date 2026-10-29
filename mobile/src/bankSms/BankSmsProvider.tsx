@@ -25,6 +25,7 @@ import {
   getNotificationListenerGranted,
   isBankNotificationNativeAvailable,
   openNotificationListenerSettings,
+  markWalletNotificationHandled,
   processQueuedWalletNotifications,
   subscribeWalletNotifications,
 } from './nativeNotification'
@@ -136,13 +137,15 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
         void getSmsPermissionGranted().then(setPermissionGranted)
         // Catch bank notifications received while JS was frozen / app closed.
         const wantNotifs = notifEnabled || enabled
-        if (user && wantNotifs && notifPermissionGranted && notifNativeAvailable) {
+        const grantedNow = getNotificationListenerGranted()
+        if (user && wantNotifs && grantedNow && notifNativeAvailable) {
           void processQueuedWalletNotifications(async (body, meta) => {
             const r = await ingestBankSmsBody(body, 'notification', {
               packageName: meta.packageName,
               appName: meta.appName,
             })
             if (r.ok) void refreshPending()
+            return r.ok
           })
         }
       }
@@ -180,14 +183,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       return undefined
     }
     applyWalletNotificationAllowlist()
-    // Drain anything captured while backgrounded before attaching live listener.
-    void processQueuedWalletNotifications(async (body, meta) => {
-      const r = await ingestBankSmsBody(body, 'notification', {
-        packageName: meta.packageName,
-        appName: meta.appName,
-      })
-      if (r.ok) void refreshPending()
-    })
+    // Subscribe first so a rebind that emits while we catch up is not dropped.
     const unsub = subscribeWalletNotifications((body, meta) => {
       void ingestBankSmsBody(body, 'notification', {
         packageName: meta.packageName,
@@ -196,8 +192,19 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
         if (__DEV__) {
           console.log('[WalletTrails notif ingest]', r.ok ? r.kind : r.reason, meta.packageName)
         }
-        if (r.ok) void refreshPending()
+        if (r.ok) {
+          markWalletNotificationHandled(meta.key)
+          void refreshPending()
+        }
       })
+    })
+    void processQueuedWalletNotifications(async (body, meta) => {
+      const r = await ingestBankSmsBody(body, 'notification', {
+        packageName: meta.packageName,
+        appName: meta.appName,
+      })
+      if (r.ok) void refreshPending()
+      return r.ok
     })
     return () => {
       unsub()

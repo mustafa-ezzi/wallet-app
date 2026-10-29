@@ -15,7 +15,7 @@
       "package": "com.wallettrails.android",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#04333b",
+        "backgroundColor": "#07010f",
         "foregroundImage": "./assets/images/wallettrail-logo.png"
       },
       "permissions": [
@@ -47,7 +47,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/wallettrail-logo.png",
+          "icon": "./assets/images/wallettrail-notification-icon.png",
           "color": "#047857",
           "defaultChannel": "wallettrails-due-reminders"
         }

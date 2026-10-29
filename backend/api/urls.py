@@ -20,6 +20,7 @@ from . import people_linked_api
 from . import bank_sms_api
 from . import budgets_api
 from . import bot_api
+from integrations import views as integrations_views
 
 router = DefaultRouter()
 router.register('categories', categories_api.UserCategoryViewSet, basename='category')
@@ -103,7 +104,10 @@ urlpatterns = [
     path('jobs/people-proposal-nudges/', devices_api.PeopleProposalNudgesJobView.as_view(), name='jobs-people-proposal-nudges'),
     path('jobs/push-campaigns/', devices_api.PushCampaignsJobView.as_view(), name='jobs-push-campaigns'),
     path('jobs/refresh-inactivity/', devices_api.RefreshInactivityJobView.as_view(), name='jobs-refresh-inactivity'),
+    path('jobs/sync-integrations/', integrations_views.SyncIntegrationsJobView.as_view(), name='jobs-sync-integrations'),
     # Ops panel (staff only)
+    path('ops/auth/login/', integrations_views.OpsLoginView.as_view(), name='ops-auth-login'),
+    path('ops/auth/refresh/', integrations_views.OpsRefreshView.as_view(), name='ops-auth-refresh'),
     path('ops/me/', ops_api.OpsMeView.as_view(), name='ops-me'),
     path('ops/dashboard/', ops_api.OpsDashboardView.as_view(), name='ops-dashboard'),
     path('ops/dashboard/summary/', ops_dashboard_api.OpsDashboardSummaryView.as_view(), name='ops-dashboard-summary'),
@@ -141,6 +145,14 @@ urlpatterns = [
     path('ops/promos/', phase5_api.OpsPromoListCreateView.as_view(), name='ops-promos'),
     path('ops/promos/<int:promo_id>/', phase5_api.OpsPromoDetailView.as_view(), name='ops-promo-detail'),
     path('ops/audit/', phase5_api.OpsAuditListView.as_view(), name='ops-audit'),
+    path('ops/team/', integrations_views.OpsTeamListCreateView.as_view(), name='ops-team'),
+    path('ops/team/<int:user_id>/', integrations_views.OpsTeamDetailView.as_view(), name='ops-team-detail'),
+    path('ops/integrations/', integrations_views.OpsIntegrationListView.as_view(), name='ops-integrations'),
+    path('ops/integrations/linkedin/upload/', integrations_views.OpsLinkedInUploadView.as_view(), name='ops-integrations-linkedin-upload'),
+    path('ops/integrations/<str:provider>/connect/', integrations_views.OpsIntegrationConnectView.as_view(), name='ops-integrations-connect'),
+    path('ops/integrations/<str:provider>/callback/', integrations_views.OpsIntegrationCallbackView.as_view(), name='ops-integrations-callback'),
+    path('ops/integrations/<int:account_id>/sync/', integrations_views.OpsIntegrationSyncView.as_view(), name='ops-integrations-sync'),
+    path('ops/integrations/<int:account_id>/disconnect/', integrations_views.OpsIntegrationDisconnectView.as_view(), name='ops-integrations-disconnect'),
     # Remote ads / feature config
     path('config/', remote_config_api.AppConfigView.as_view(), name='app-config'),
     path('ops/config/', remote_config_api.OpsConfigView.as_view(), name='ops-config'),

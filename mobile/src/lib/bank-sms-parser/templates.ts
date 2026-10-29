@@ -60,15 +60,15 @@ export const BANK_TEMPLATES: BankTemplate[] = [
   {
     hint: 'nayapay',
     rules: [
-      { re: /\byou\s+received\b|\breceived\b|\bcredited\b|\bincoming\b/i, kind: 'income', confidence: 0.92, reason: 'nayapay:in' },
-      { re: /\byou\s+paid\b|\byou\s+sent\b|\byou\s+spent\b|\bpaid\b|\bsent\b|\bspent\b|\bpayment\b/i, kind: 'expense', confidence: 0.92, reason: 'nayapay:out' },
+      { re: /\bsent you\b|\bpaid you\b|\byou\s+received\b|\bmoney\s+received\b|\breceived\b|\bcredited\b|\bincoming\b/i, kind: 'income', confidence: 0.93, reason: 'nayapay:in' },
+      { re: /\bmoney\s+sent\b|\byou\s+paid\b|\byou\s+sent\b|\byou\s+spent\b|\bsent to\b|\bpaid\b|\bspent\b|\bpayment\b/i, kind: 'expense', confidence: 0.92, reason: 'nayapay:out' },
     ],
   },
   {
     hint: 'sadapay',
     rules: [
-      { re: /\byou\s+received\b|\breceived\b|\bcredited\b|\bincoming\b/i, kind: 'income', confidence: 0.92, reason: 'sadapay:in' },
-      { re: /\byou\s+paid\b|\byou\s+sent\b|\byou\s+spent\b|\bpaid\b|\bsent\b|\bspent\b|\bpayment\b/i, kind: 'expense', confidence: 0.92, reason: 'sadapay:out' },
+      { re: /\bsent you\b|\bpaid you\b|\byou\s+received\b|\bmoney\s+received\b|\breceived\b|\bcredited\b|\bincoming\b/i, kind: 'income', confidence: 0.93, reason: 'sadapay:in' },
+      { re: /\bmoney\s+sent\b|\byou\s+paid\b|\byou\s+sent\b|\byou\s+spent\b|\bsent to\b|\bpaid\b|\bspent\b|\bpayment\b/i, kind: 'expense', confidence: 0.92, reason: 'sadapay:out' },
     ],
   },
   {

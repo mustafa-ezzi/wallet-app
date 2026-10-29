@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 
 from .models import AppRemoteConfig
 from .ops_audit import log_ops_action
-from .ops_permissions import IsOpsStaff
+from .ops_permissions import ops
 from .entitlements import user_is_premium
 
 
@@ -95,7 +95,7 @@ class AppConfigView(APIView):
 
 
 class OpsConfigView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops({'GET': 'config.read', 'PATCH': 'config.write'})]
 
     def get(self, request):
         return Response(serialize_ops_config(AppRemoteConfig.get_solo()))

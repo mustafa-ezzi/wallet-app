@@ -1,15 +1,24 @@
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-index 77e247a..8a4e5e2 100644
+index 77e247a..45df27a 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-@@ -3,19 +3,21 @@ package expo.modules.androidnotificationlistenerservice
- import android.service.notification.NotificationListenerService
- import android.service.notification.StatusBarNotification
+@@ -1,68 +1,159 @@
+ package expo.modules.androidnotificationlistenerservice
+ 
+-import android.service.notification.NotificationListenerService
+-import android.service.notification.StatusBarNotification
  import android.app.Notification
+-import android.graphics.drawable.Drawable
++import android.content.ComponentName
 +import android.content.Context
- import android.graphics.drawable.Drawable
  import android.graphics.Bitmap
  import android.graphics.Canvas
++import android.graphics.drawable.Drawable
++import android.os.Build
++import android.os.Bundle
++import android.service.notification.NotificationListenerService
++import android.service.notification.StatusBarNotification
++import android.widget.RemoteViews
 +import org.json.JSONArray
 +import org.json.JSONObject
  import java.io.File
@@ -18,80 +27,169 @@ index 77e247a..8a4e5e2 100644
  
  class ExpoNotificationListenerService : NotificationListenerService() {
      private var lastNotificationKey: String? = null
++    private var lastSignature: String? = null
      private var lastNotificationTime: Long = 0
  
++    override fun onListenerConnected() {
++        super.onListenerConnected()
++        instance = this
++        try {
++            syncActiveNotifications()
++        } catch (e: Exception) {
++            e.printStackTrace()
++        }
++    }
++
++    override fun onListenerDisconnected() {
++        if (instance === this) instance = null
++        // Android unbinds this service after the app sits idle. Ask to be bound again
++        // so bank alerts keep arriving without the user opening the app.
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
++            try {
++                requestRebind(ComponentName(this, ExpoNotificationListenerService::class.java))
++            } catch (e: Exception) {
++                e.printStackTrace()
++            }
++        }
++    }
++
++    override fun onDestroy() {
++        if (instance === this) instance = null
++        super.onDestroy()
++    }
++
      override fun onNotificationPosted(sbn: StatusBarNotification) {
 -        val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance() ?: return
--        
-         val packageManager = applicationContext.packageManager
++        handlePosted(sbn, fromSync = false)
++    }
+ 
+-        val packageManager = applicationContext.packageManager
++    /** Notifications still in the shade that were posted while this service was unbound. */
++    fun syncActiveNotifications() {
++        val active = try {
++            activeNotifications
++        } catch (e: Exception) {
++            e.printStackTrace()
++            null
++        } ?: return
++        val now = System.currentTimeMillis()
++        for (sbn in active) {
++            if (now - sbn.postTime > MAX_CATCHUP_AGE_MS) continue
++            handlePosted(sbn, fromSync = true)
++        }
++    }
++
++    private fun handlePosted(sbn: StatusBarNotification, fromSync: Boolean) {
          try {
-             val applicationInfo = packageManager.getApplicationInfo(sbn.packageName, 0)
-@@ -32,7 +34,9 @@ class ExpoNotificationListenerService : NotificationListenerService() {
-                 null
+-            val applicationInfo = packageManager.getApplicationInfo(sbn.packageName, 0)
++            val key = sbn.key ?: "${sbn.packageName}|${sbn.id}|${sbn.postTime}"
++            if (fromSync && hasSeen(applicationContext, key)) return
+ 
+-            val iconPath = try {
+-                val appIcon = applicationInfo.loadIcon(packageManager)
+-                if (appIcon != null) {
+-                    saveAppIconToStorage(appIcon, sbn.packageName)
++            val packageManager = applicationContext.packageManager
++            val applicationInfo = try {
++                packageManager.getApplicationInfo(sbn.packageName, 0)
++            } catch (e: Exception) {
++                null
++            }
++            val appName = try {
++                if (applicationInfo != null) {
++                    packageManager.getApplicationLabel(applicationInfo)?.toString() ?: ""
+                 } else {
+-                    null
++                    ""
+                 }
+             } catch (e: Exception) {
+-                e.printStackTrace()
+-                null
++                ""
              }
  
 -            if (!moduleInstance.isPackageAllowed(sbn.packageName)) {
++            val notification = sbn.notification ?: return
++            // Cheap extras first. RemoteViews reflection is only for a known bank/wallet
++            // whose amount is missing from the standard title/text fields.
++            var extracted = extractContent(notification, includeRemote = false)
++            var blob = listOf(appName, extracted.title, extracted.text)
++                .filter { it.isNotBlank() }
++                .joinToString(" ")
++            if (!isKnownBank(sbn.packageName, blob)) return
++            if (!hasMoneySignal(blob)) {
++                extracted = extractContent(notification, includeRemote = true)
++                blob = listOf(appName, extracted.title, extracted.text)
++                    .filter { it.isNotBlank() }
++                    .joinToString(" ")
++                if (!hasMoneySignal(blob)) return
++            }
++
 +            val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance()
-+            // When JS module isn't loaded yet, still accept (allow-all) and buffer.
 +            if (moduleInstance != null && !moduleInstance.isPackageAllowed(sbn.packageName)) {
                  return
              }
  
-@@ -48,12 +52,34 @@ class ExpoNotificationListenerService : NotificationListenerService() {
-             val notification = sbn.notification
-             val extras = notification.extras
+-            // Delete duplicate notification
++            val signature = "${extracted.title}|${extracted.text}"
+             val currentTime = System.currentTimeMillis()
+-            if (sbn.key == lastNotificationKey && currentTime - lastNotificationTime < 500) {
++            // Same key can update within a few hundred ms (placeholder, then the amount).
++            // Drop only an identical repeat, not a richer update.
++            if (
++                !fromSync
++                && sbn.key == lastNotificationKey
++                && signature == lastSignature
++                && currentTime - lastNotificationTime < 500
++            ) {
+                 return
+             }
+-            
+             lastNotificationKey = sbn.key
++            lastSignature = signature
+             lastNotificationTime = currentTime
  
-+            val textLines = try {
-+                val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
-+                lines?.mapNotNull { it?.toString()?.trim()?.takeIf { s -> s.isNotEmpty() } }?.joinToString("\n") ?: ""
+-            val notification = sbn.notification
+-            val extras = notification.extras
++            val iconPath = try {
++                val appIcon = applicationInfo?.loadIcon(packageManager)
++                if (appIcon != null) saveAppIconToStorage(appIcon, sbn.packageName) else null
 +            } catch (e: Exception) {
-+                ""
++                null
 +            }
-+
-+            val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
-+            val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-+            val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
-+            // Prefer the richest body; fall back to text lines for custom layouts
-+            val effectiveBig = when {
-+                bigText.isNotBlank() -> bigText
-+                textLines.isNotBlank() && textLines.length > text.length -> textLines
-+                else -> bigText
-+            }
-+            val effectiveText = when {
-+                text.isNotBlank() -> text
-+                textLines.isNotBlank() -> textLines
-+                else -> ""
-+            }
-+
+ 
              val notificationData = mapOf(
                  "packageName" to sbn.packageName,
                  "id" to sbn.id,
 -                "title" to (extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""),
 -                "text" to (extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""),
 -                "bigText" to (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""),
-+                "title" to title,
-+                "text" to effectiveText,
-+                "bigText" to effectiveBig,
-                 "subText" to (extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""),
-                 "summaryText" to (extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString() ?: ""),
+-                "subText" to (extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString() ?: ""),
+-                "summaryText" to (extras.getCharSequence(Notification.EXTRA_SUMMARY_TEXT)?.toString() ?: ""),
++                "title" to extracted.title,
++                "text" to extracted.text,
++                "bigText" to extracted.bigText,
++                "subText" to extracted.subText,
++                "summaryText" to extracted.summaryText,
                  "postTime" to sbn.postTime,
-@@ -62,7 +88,14 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+-                "key" to sbn.key,
+-                "appName" to (packageManager.getApplicationLabel(applicationInfo)?.toString() ?: ""),
++                "key" to key,
++                "appName" to appName,
                  "appIconPath" to (iconPath ?: "")
              )
  
 -            ExpoAndroidNotificationListenerServiceModule.getInstance()?.emitNotificationEvent(notificationData)
-+            // Always persist — JS may be frozen/killed while this service still receives posts.
 +            persistNotification(applicationContext, notificationData)
 +            bufferedNotifications.add(notificationData)
-+            if (bufferedNotifications.size > 40) {
++            if (bufferedNotifications.size > 80) {
 +                bufferedNotifications.removeAt(0)
 +            }
-+
 +            moduleInstance?.emitNotificationEvent(notificationData)
          } catch (e: Exception) {
              e.printStackTrace()
          }
-@@ -72,28 +105,23 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -72,28 +163,23 @@ class ExpoNotificationListenerService : NotificationListenerService() {
          if (drawable == null) return null
  
          try {
@@ -121,7 +219,7 @@ index 77e247a..8a4e5e2 100644
              FileOutputStream(file).use { out ->
                  bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
              }
-@@ -105,13 +133,69 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+@@ -105,13 +191,284 @@ class ExpoNotificationListenerService : NotificationListenerService() {
          }
      }
  
@@ -129,12 +227,173 @@ index 77e247a..8a4e5e2 100644
 -    private fun shouldUpdateIcon(packageName: String): Boolean {
 -        val iconFile = File(applicationContext.filesDir, "icons/app_icon_${packageName}.png")
 -        if (!iconFile.exists()) return true
++    private data class Extracted(
++        val title: String,
++        val text: String,
++        val bigText: String,
++        val subText: String,
++        val summaryText: String,
++    )
++
++    private fun extractContent(notification: Notification, includeRemote: Boolean): Extracted {
++        val extras = notification.extras ?: Bundle()
++        val title = charSeq(extras, Notification.EXTRA_TITLE)
++            .ifBlank { charSeq(extras, Notification.EXTRA_TITLE_BIG) }
++            .ifBlank { charSeq(extras, Notification.EXTRA_CONVERSATION_TITLE) }
++        val text = charSeq(extras, Notification.EXTRA_TEXT)
++        val bigText = charSeq(extras, Notification.EXTRA_BIG_TEXT)
++        val subText = charSeq(extras, Notification.EXTRA_SUB_TEXT)
++        val summaryText = charSeq(extras, Notification.EXTRA_SUMMARY_TEXT)
++        val infoText = charSeq(extras, Notification.EXTRA_INFO_TEXT)
++        val conversation = charSeq(extras, Notification.EXTRA_CONVERSATION_TITLE)
++        val textLines = charSeqArray(extras, Notification.EXTRA_TEXT_LINES)
++        val messages = messagingLines(extras)
++        val remote = if (includeRemote) remoteViewLines(notification) else ""
++        val ticker = notification.tickerText?.toString()?.trim().orEmpty()
+ 
+-        // Update icon if last modified time is more than a week ago
+-        val weekInMillis = 7 * 24 * 60 * 60 * 1000L
+-        return System.currentTimeMillis() - iconFile.lastModified() > weekInMillis
++        val body = uniqueLines(
++            listOf(text, bigText, textLines, subText, summaryText, infoText, conversation, messages, remote, ticker),
++        ).joinToString("\n")
++        val effectiveBig = when {
++            bigText.isNotBlank() -> bigText
++            body.length > text.length -> body
++            else -> bigText
++        }
++        return Extracted(
++            title = title,
++            text = if (body.isNotBlank()) body else text,
++            bigText = effectiveBig,
++            subText = subText,
++            summaryText = summaryText,
++        )
+     }
++
++    private fun charSeq(extras: Bundle, key: String): String {
++        return try {
++            extras.getCharSequence(key)?.toString()?.trim().orEmpty()
++        } catch (e: Exception) {
++            ""
++        }
++    }
++
++    private fun charSeqArray(extras: Bundle, key: String): String {
++        return try {
++            val lines = extras.getCharSequenceArray(key) ?: return ""
++            lines.mapNotNull { it?.toString()?.trim()?.takeIf { s -> s.isNotEmpty() } }
++                .joinToString("\n")
++        } catch (e: Exception) {
++            ""
++        }
++    }
++
++    /** MessagingStyle puts "MUSTAFA sent you PKR 40" in extras, not EXTRA_TEXT. */
++    @Suppress("DEPRECATION")
++    private fun messagingLines(extras: Bundle): String {
++        val keys = mutableListOf(Notification.EXTRA_MESSAGES)
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++            keys.add(Notification.EXTRA_HISTORIC_MESSAGES)
++        }
++        val lines = ArrayList<String>()
++        for (key in keys) {
++            val arr = try {
++                extras.getParcelableArray(key)
++            } catch (e: Exception) {
++                null
++            } ?: continue
++            for (item in arr) {
++                val bundle = item as? Bundle ?: continue
++                val sender = bundle.getCharSequence("sender")?.toString()?.trim().orEmpty()
++                val text = bundle.getCharSequence("text")?.toString()?.trim().orEmpty()
++                val line = listOf(sender, text).filter { it.isNotEmpty() }.joinToString(" ")
++                if (line.isNotEmpty()) lines.add(line)
++            }
++        }
++        return lines.joinToString("\n")
++    }
++
++    /** Custom notification layouts keep the visible sentence in RemoteViews actions. */
++    private fun remoteViewLines(notification: Notification): String {
++        val views = listOfNotNull(
++            notification.contentView,
++            notification.bigContentView,
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) notification.headsUpContentView else null,
++        )
++        val lines = ArrayList<String>()
++        for (rv in views) {
++            lines.addAll(textsFromRemoteViews(rv))
++        }
++        return lines.joinToString("\n")
++    }
++
++    @Suppress("UNCHECKED_CAST")
++    private fun textsFromRemoteViews(views: RemoteViews): List<String> {
++        val out = ArrayList<String>()
++        try {
++            val actionsField = RemoteViews::class.java.getDeclaredField("mActions")
++            actionsField.isAccessible = true
++            val actions = actionsField.get(views) as? List<*> ?: return out
++            for (action in actions) {
++                if (action == null) continue
++                val cls = action.javaClass
++                val methodField = cls.declaredFields.firstOrNull { it.name == "methodName" } ?: continue
++                methodField.isAccessible = true
++                if (methodField.get(action) != "setText") continue
++                val valueField = cls.declaredFields.firstOrNull { it.name == "value" } ?: continue
++                valueField.isAccessible = true
++                val value = valueField.get(action)?.toString()?.trim().orEmpty()
++                if (value.isNotEmpty()) out.add(value)
++            }
++        } catch (e: Exception) {
++            // Framework field names differ on some OEM builds. Standard extras still apply.
++        }
++        return out
++    }
++
++    private fun uniqueLines(parts: List<String>): List<String> {
++        val out = ArrayList<String>()
++        for (part in parts) {
++            for (raw in part.split('\n')) {
++                val line = raw.trim()
++                if (line.isEmpty()) continue
++                if (out.any { it.equals(line, ignoreCase = true) }) continue
++                out.add(line)
++            }
++        }
++        return out
++    }
++
 +    companion object {
 +        private const val PREFS = "wallettrails_notif_queue"
 +        private const val KEY = "queue"
++        private const val SEEN = "seen_keys"
++        private const val MAX_CATCHUP_AGE_MS = 72L * 60L * 60L * 1000L
++        private val queueLock = Any()
 +
-+        /** In-memory buffer (also mirrored to SharedPreferences). */
++        @Volatile
++        var instance: ExpoNotificationListenerService? = null
++
 +        val bufferedNotifications: CopyOnWriteArrayList<Map<String, Any>> = CopyOnWriteArrayList()
++
++        fun requestRebind(context: Context) {
++            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
++            try {
++                val cn = ComponentName(context, ExpoNotificationListenerService::class.java)
++                NotificationListenerService.requestRebind(cn)
++            } catch (e: Exception) {
++                e.printStackTrace()
++            }
++        }
++
++        fun syncActiveFromConnectedService() {
++            try {
++                instance?.syncActiveNotifications()
++            } catch (e: Exception) {
++                e.printStackTrace()
++            }
++        }
 +
 +        fun drainBuffered(): List<Map<String, Any>> {
 +            val copy = bufferedNotifications.toList()
@@ -143,63 +402,117 @@ index 77e247a..8a4e5e2 100644
 +        }
 +
 +        fun persistNotification(context: Context, data: Map<String, Any>) {
-+            try {
-+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-+                val arr = JSONArray(prefs.getString(KEY, "[]") ?: "[]")
-+                val obj = JSONObject()
-+                for ((k, v) in data) {
-+                    obj.put(k, v)
++            synchronized(queueLock) {
++                try {
++                    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                    val arr = JSONArray(prefs.getString(KEY, "[]") ?: "[]")
++                    val obj = JSONObject()
++                    for ((k, v) in data) {
++                        obj.put(k, v)
++                    }
++                    arr.put(obj)
++                    while (arr.length() > 80) {
++                        arr.remove(0)
++                    }
++                    prefs.edit().putString(KEY, arr.toString()).commit()
++                } catch (e: Exception) {
++                    e.printStackTrace()
 +                }
-+                arr.put(obj)
-+                // Cap queue size
-+                while (arr.length() > 40) {
-+                    arr.remove(0)
-+                }
-+                prefs.edit().putString(KEY, arr.toString()).apply()
-+            } catch (e: Exception) {
-+                e.printStackTrace()
 +            }
 +        }
- 
--        // Update icon if last modified time is more than a week ago
--        val weekInMillis = 7 * 24 * 60 * 60 * 1000L
--        return System.currentTimeMillis() - iconFile.lastModified() > weekInMillis
++
++        fun hasSeen(context: Context, key: String): Boolean {
++            if (key.isBlank()) return false
++            synchronized(queueLock) {
++                return try {
++                    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                    val arr = JSONArray(prefs.getString(SEEN, "[]") ?: "[]")
++                    for (i in 0 until arr.length()) {
++                        if (arr.optString(i) == key) return true
++                    }
++                    false
++                } catch (e: Exception) {
++                    false
++                }
++            }
++        }
++
++        fun markSeen(context: Context, key: String) {
++            if (key.isBlank()) return
++            synchronized(queueLock) {
++                try {
++                    val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                    val arr = JSONArray(prefs.getString(SEEN, "[]") ?: "[]")
++                    for (i in 0 until arr.length()) {
++                        if (arr.optString(i) == key) return
++                    }
++                    arr.put(key)
++                    while (arr.length() > 300) {
++                        arr.remove(0)
++                    }
++                    prefs.edit().putString(SEEN, arr.toString()).commit()
++                } catch (e: Exception) {
++                    e.printStackTrace()
++                }
++            }
++        }
++
 +        fun drainPersisted(context: Context?): List<Map<String, Any>> {
 +            val out = mutableListOf<Map<String, Any>>()
-+            out.addAll(drainBuffered())
-+            if (context == null) return out
-+            try {
-+                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-+                val raw = prefs.getString(KEY, "[]") ?: "[]"
-+                prefs.edit().putString(KEY, "[]").apply()
-+                val arr = JSONArray(raw)
-+                for (i in 0 until arr.length()) {
-+                    val obj = arr.getJSONObject(i)
-+                    val map = mutableMapOf<String, Any>()
-+                    val keys = obj.keys()
-+                    while (keys.hasNext()) {
-+                        val k = keys.next()
-+                        map[k] = obj.get(k)
++            synchronized(queueLock) {
++                out.addAll(drainBuffered())
++                if (context != null) {
++                    try {
++                        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                        val raw = prefs.getString(KEY, "[]") ?: "[]"
++                        prefs.edit().putString(KEY, "[]").commit()
++                        val arr = JSONArray(raw)
++                        for (i in 0 until arr.length()) {
++                            val obj = arr.getJSONObject(i)
++                            val map = mutableMapOf<String, Any>()
++                            val keys = obj.keys()
++                            while (keys.hasNext()) {
++                                val k = keys.next()
++                                map[k] = obj.get(k)
++                            }
++                            out.add(map)
++                        }
++                    } catch (e: Exception) {
++                        e.printStackTrace()
 +                    }
-+                    out.add(map)
-+                }
-+            } catch (e: Exception) {
-+                e.printStackTrace()
-+            }
-+            // Dedupe by notification key when present
-+            val seen = HashSet<String>()
-+            return out.filter { item ->
-+                val key = (item["key"] as? String) ?: "${item["packageName"]}|${item["id"]}|${item["postTime"]}"
-+                if (seen.contains(key)) false else {
-+                    seen.add(key)
-+                    true
 +                }
 +            }
++            // Last copy of a key wins so an updated notification body replaces the placeholder.
++            val byKey = LinkedHashMap<String, Map<String, Any>>()
++            for (item in out) {
++                val key = (item["key"] as? String)?.takeIf { it.isNotBlank() }
++                    ?: "${item["packageName"]}|${item["id"]}|${item["postTime"]}"
++                byKey[key] = item
++            }
++            return byKey.values.toList()
 +        }
-     }
++    }
++}
++
++private val BANKISH = Regex(
++    "sadapay|nayapay|meezan|jazzcash|jazz\\s*cash|easypaisa|easy\\s*paisa|mobilinkcustomer|telenor\\.phoenix|\\bhbl\\b|habib|\\bubl\\b|\\bmcb\\b|alfalah|allied|faysal|bank\\s*islami|bankislami|ambitwiz|bi\\.digitalbanking|app\\.com\\.brd",
++    RegexOption.IGNORE_CASE,
++)
++
++private val MONEYISH = Regex(
++    "pkr|\\brs\\.?\\b|₨|received|\\bsent\\b|\\bpaid\\b|\\bspent\\b|debited|credited|withdraw|transfer|raast|\\bbalance\\b|\\bpayment\\b",
++    RegexOption.IGNORE_CASE,
++)
++
++private fun isKnownBank(packageName: String, blob: String): Boolean {
++    return BANKISH.containsMatchIn("$packageName $blob")
++}
++
++private fun hasMoneySignal(blob: String): Boolean {
++    return blob.isNotBlank() && (MONEYISH.containsMatchIn(blob) || blob.any { it.isDigit() })
  }
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
-index 8c92037..085b3b0 100644
+index 8c92037..b6e24e2 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
 @@ -2,11 +2,8 @@ package expo.modules.androidnotificationlistenerservice
@@ -226,7 +539,7 @@ index 8c92037..085b3b0 100644
                  pendingNotifications.forEach { notification ->
                      sendEvent("onNotificationReceived", notification)
                  }
-@@ -54,6 +55,12 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+@@ -54,6 +55,32 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
          Function("setAllowedPackages") { packages: List<String> ->
              allowedPackages = packages.toSet()
          }
@@ -236,10 +549,30 @@ index 8c92037..085b3b0 100644
 +            val context = appContext.reactContext
 +            ExpoNotificationListenerService.drainPersisted(context)
 +        }
++
++        /** Ask Android to bind the listener again after it was dropped. */
++        Function("requestListenerRebind") {
++            val context = appContext.reactContext ?: return@Function Unit
++            ExpoNotificationListenerService.requestRebind(context)
++            Unit
++        }
++
++        /** Read bank alerts still in the shade (posted while the listener was unbound). */
++        Function("syncActiveNotifications") {
++            ExpoNotificationListenerService.syncActiveFromConnectedService()
++            Unit
++        }
++
++        /** Skip a shade notification on later catch-up once JS ingested it. */
++        Function("markNotificationSeen") { key: String ->
++            val context = appContext.reactContext ?: return@Function Unit
++            ExpoNotificationListenerService.markSeen(context, key)
++            Unit
++        }
      }
  
      companion object {
-@@ -88,5 +95,3 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+@@ -88,5 +115,3 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
          return allowedPackages.isEmpty() || allowedPackages.contains(packageName)
      }
  }

@@ -19,7 +19,7 @@ from .entitlements import premium_summary, serialize_entitlement
 from .models import AdminAuditLog, Entitlement, PromoCode, PromoRedemption
 from .ops_api import OpsPagination, _serialize_user
 from .ops_audit import log_ops_action
-from .ops_permissions import IsOpsStaff
+from .ops_permissions import ops
 from django.contrib.auth.models import User
 
 
@@ -96,7 +96,7 @@ class PremiumRedeemView(APIView):
 
 
 class OpsPromoListCreateView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops({'GET': 'promos.read', 'POST': 'promos.write'})]
 
     def get(self, request):
         qs = PromoCode.objects.select_related('created_by').all()
@@ -156,7 +156,7 @@ class OpsPromoListCreateView(APIView):
 
 
 class OpsPromoDetailView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('promos.write')]
 
     def patch(self, request, promo_id: int):
         try:
@@ -203,7 +203,7 @@ class OpsPromoDetailView(APIView):
 
 
 class OpsAuditListView(APIView):
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('audit.read')]
 
     def get(self, request):
         qs = AdminAuditLog.objects.select_related('actor').all()
@@ -243,7 +243,7 @@ class OpsAuditListView(APIView):
 class OpsUsersExportView(APIView):
     """CSV of hosted users — safe columns only (no balances / ledger)."""
 
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('users.export')]
 
     def get(self, request):
         from .models import DeviceToken, Transaction, Entitlement as Ent

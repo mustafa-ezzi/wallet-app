@@ -30,7 +30,7 @@ from .models import (
     Transaction,
     UserOpsMeta,
 )
-from .ops_permissions import IsOpsStaff
+from .ops_permissions import ops
 
 MAX_RANGE_DAYS = 366
 DEFAULT_RANGE_DAYS = 30
@@ -232,7 +232,7 @@ def _needs_attention(now) -> dict:
 class OpsDashboardSummaryView(APIView):
     """GET ?from=YYYY-MM-DD&to=YYYY-MM-DD&compare=1 — Command Center KPIs, series and to-dos."""
 
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('dashboard.read')]
 
     def get(self, request):
         start, end, error = parse_range(request.query_params)
@@ -311,7 +311,7 @@ def counts_only_report(report: dict) -> dict:
 class OpsAnalyticsReportView(APIView):
     """GET — latest analytics_agent report, counts only."""
 
-    permission_classes = [IsOpsStaff]
+    permission_classes = [ops('analytics.read')]
 
     def get(self, request):
         for path in _report_candidates():
