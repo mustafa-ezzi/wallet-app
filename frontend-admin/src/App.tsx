@@ -25,6 +25,8 @@ const SupportPage = page(() => import('./pages/SupportPage'), 'SupportPage')
 const AuditPage = page(() => import('./pages/AuditPage'), 'AuditPage')
 const AnalyticsReportPage = page(() => import('./pages/AnalyticsReportPage'), 'AnalyticsReportPage')
 const IntegrationsPage = page(() => import('./pages/IntegrationsPage'), 'IntegrationsPage')
+const WebsitePage = page(() => import('./pages/WebsitePage'), 'WebsitePage')
+const LinksPage = page(() => import('./pages/LinksPage'), 'LinksPage')
 const TeamPage = page(() => import('./pages/TeamPage'), 'TeamPage')
 const UiKitPage = lazy(() => import('./pages/UiKitPage'))
 
@@ -74,6 +76,8 @@ export default function App() {
                     <Route path="ads" element={<Lazy><AdsConfigPage /></Lazy>} />
                     <Route path="support/:id?" element={<Lazy><SupportPage /></Lazy>} />
                     <Route path="audit" element={<Lazy><AuditPage /></Lazy>} />
+                    <Route path="growth/website" element={<Lazy><WebsitePage /></Lazy>} />
+                    <Route path="growth/links" element={<Lazy><LinksPage /></Lazy>} />
                     <Route path="system/integrations" element={<Lazy><IntegrationsPage /></Lazy>} />
                     <Route path="system/team" element={<Lazy><TeamPage /></Lazy>} />
                     <Route path="insights/report" element={<Lazy><AnalyticsReportPage /></Lazy>} />

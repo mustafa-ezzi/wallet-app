@@ -3,6 +3,7 @@ import {
   cancelCampaign,
   createCampaign,
   createPromo,
+  createTrackedLink,
   deleteCampaign,
   deleteOpsUser,
   estimateCampaignAudience,
@@ -15,6 +16,9 @@ import {
   fetchEntitlements,
   fetchIntegrations,
   fetchTeam,
+  fetchTrackedLinks,
+  fetchWebsite,
+  fetchWebsiteRealtime,
   fetchOpsConfig,
   fetchOpsDashboard,
   fetchOpsUser,
@@ -76,6 +80,9 @@ export const queryKeys = {
   audit: (params: Params) => ['audit', clean(params)] as const,
   team: ['team'] as const,
   integrations: ['integrations'] as const,
+  website: (params: Params) => ['growth', 'website', clean(params)] as const,
+  websiteRealtime: ['growth', 'website', 'realtime'] as const,
+  links: ['growth', 'links'] as const,
 }
 
 // Dashboard
@@ -373,7 +380,42 @@ export function useSyncIntegration() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: syncIntegration,
-    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.integrations }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.integrations })
+      void qc.invalidateQueries({ queryKey: ['growth'] })
+    },
+  })
+}
+
+export function useWebsiteSummary(range: DateRange, enabled = true) {
+  const params = rangeParams(range)
+  return useQuery({
+    queryKey: queryKeys.website(params),
+    queryFn: () => fetchWebsite(params),
+    enabled,
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useWebsiteRealtime(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.websiteRealtime,
+    queryFn: fetchWebsiteRealtime,
+    enabled,
+    staleTime: 60_000,
+    refetchInterval: 15 * 60_000,
+  })
+}
+
+export function useTrackedLinks() {
+  return useQuery({ queryKey: queryKeys.links, queryFn: fetchTrackedLinks })
+}
+
+export function useCreateTrackedLink() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: createTrackedLink,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.links }),
   })
 }
 

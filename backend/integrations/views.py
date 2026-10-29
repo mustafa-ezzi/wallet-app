@@ -252,8 +252,25 @@ class OpsIntegrationConnectView(APIView):
     def post(self, request, provider: str):
         if provider not in PROVIDER_KEYS:
             return Response({'detail': 'Unknown provider.'}, status=status.HTTP_404_NOT_FOUND)
-        adapter = get_adapter(provider)
         state = issue_oauth_state(request.user.id, provider)
+        if provider == IntegrationAccount.PROVIDER_GA4:
+            from .ga4 import configuration_error, connect_ga4
+
+            error = configuration_error()
+            if error:
+                detail = error if error != 'Not set up' else 'Not set up. Add this provider’s credentials on the server before connecting.'
+                return Response({'detail': detail, 'state': state}, status=status.HTTP_400_BAD_REQUEST)
+            account = connect_ga4(request.user)
+            log_ops_action(
+                actor=request.user,
+                action='integration.connect',
+                target_type='integration',
+                target_id=account.id,
+                meta={'provider': 'ga4'},
+                request=request,
+            )
+            return Response(_card(provider, dict(PROVIDERS).get(provider, provider), account))
+        adapter = get_adapter(provider)
         if adapter is None or not adapter.configured():
             return Response(
                 {'detail': 'Not set up. Add this provider’s credentials on the server before connecting.', 'state': state},

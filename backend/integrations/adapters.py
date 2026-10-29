@@ -92,7 +92,6 @@ def write_metric_rows(account: IntegrationAccount, rows: list[dict]) -> int:
 
 def _install_placeholders() -> None:
     specs = (
-        ('ga4', ('GA4_PROPERTY_ID', 'GA4_SERVICE_ACCOUNT_JSON')),
         ('instagram', ('META_APP_ID', 'META_APP_SECRET')),
         ('facebook', ('META_APP_ID', 'META_APP_SECRET')),
         ('linkedin', ('LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET')),
@@ -103,3 +102,12 @@ def _install_placeholders() -> None:
 
 
 _install_placeholders()
+
+
+def _install_ga4() -> None:
+    from .ga4 import Ga4Adapter
+
+    register_adapter(Ga4Adapter())
+
+
+_install_ga4()

@@ -37,7 +37,12 @@ export function IntegrationsPage() {
   async function connect(provider: string) {
     try {
       const result = await connectIntegration(provider)
-      toast.info(result.detail || 'Not set up.')
+      if (result.status === 'connected' || result.status === 'needs_reconnect') {
+        toast.success(`${result.label} is connected.`)
+        void integrations.refetch()
+      } else {
+        toast.info(result.detail || 'Not set up.')
+      }
     } catch (err) {
       toast.error(apiErrorMessage(err, 'This provider is not set up yet.'))
     }
@@ -68,7 +73,7 @@ export function IntegrationsPage() {
     <>
       <PageHeader
         title="Integrations"
-        description="Website and social accounts. Tokens stay on the server. Nothing here is connected until its credentials are set."
+        description="GA4 uses a service account on the server. Social providers stay off until their app credentials are set. Tokens are never shown."
       />
 
       {integrations.isPending ? (

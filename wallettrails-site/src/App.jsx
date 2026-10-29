@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ConsentBanner, track } from './analytics'
 import './screenshots.css'
 import './reference-sections.css'
 import './brand.css'
@@ -264,8 +265,13 @@ function UseCases() {
     if (!step) return
     event.preventDefault()
     const next = personas[(index + step + personas.length) % personas.length]
-    setActiveId(next.id)
+    choose(next.id)
     document.getElementById(`uc-tab-${next.id}`)?.focus()
+  }
+
+  const choose = (id) => {
+    setActiveId(id)
+    track('use_case_tab', { persona: id })
   }
 
   return (
@@ -288,7 +294,7 @@ function UseCases() {
                 aria-controls="uc-panel"
                 tabIndex={item.id === activeId ? 0 : -1}
                 className={item.id === activeId ? 'is-active' : undefined}
-                onClick={() => setActiveId(item.id)}
+                onClick={() => choose(item.id)}
               >
                 <Icon name={item.icon} size={18} />
                 <span>{item.label}</span>
@@ -431,9 +437,31 @@ function App() {
     sync()
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('hashchange', sync)
+    const onClick = (event) => {
+      const el = event.target.closest('a, button')
+      if (!el) return
+      const href = el.getAttribute('href') || ''
+      const text = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80)
+      if (href === '#download' || el.classList.contains('playstore')) {
+        track('get_app_click', { link_text: text })
+        return
+      }
+      if (href === '#support') track('support_click', { link_text: text })
+    }
+    const onToggle = (event) => {
+      const details = event.target
+      if (details.tagName === 'DETAILS' && details.open && details.closest('#faqs')) {
+        const question = (details.querySelector('summary')?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 120)
+        track('faq_open', { question })
+      }
+    }
+    document.addEventListener('click', onClick)
+    document.addEventListener('toggle', onToggle, true)
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('hashchange', sync)
+      document.removeEventListener('click', onClick)
+      document.removeEventListener('toggle', onToggle, true)
     }
   }, [])
   return <><Header menu={menu} setMenu={setMenu} active={active} setActive={setActive} /><main>
@@ -450,7 +478,7 @@ function App() {
     <FAQSection />
     <SupportSection />
     <section className="download shell" id="download"><Reveal><span className="eyebrow light">Ready when you are</span><h2>Start following<br />every <em>rupee.</em></h2><p>Take the first small step towards feeling more at ease with your money.</p><div className="dl-actions"><a className="playstore" href="#home"><i>▶</i><span><small>GET IT ON</small><b>Google Play</b></span></a><a className="button white" href="#home">Explore WalletTrails <Icon name="arrow" size={16} /></a></div></Reveal><div className="mini-phone"><i /><p>WalletTrails</p><article><small>Available balance</small><b>Rs. 86,420</b></article><span /><span /><span /><strong>+</strong></div></section>
-  </main><footer><div className="shell foot-main"><Logo inverse /><p>Follow every rupee. Feel more free.</p><nav><a href="#screenshots">Screenshots</a><a href="#features">Features</a><a href="#use-cases">Use cases</a><a href="#about">About</a><a href="#how">How it works</a><a href="/privacy.html">Privacy</a></nav></div><div className="shell foot-bottom"><span>© 2026 WalletTrails. Made for everyday money.</span><a href="#home">Back to top ↑</a></div></footer>{tour && <TourModal onClose={() => setTour(false)} />}</>
+  </main><footer><div className="shell foot-main"><Logo inverse /><p>Follow every rupee. Feel more free.</p><nav><a href="#screenshots">Screenshots</a><a href="#features">Features</a><a href="#use-cases">Use cases</a><a href="#about">About</a><a href="#how">How it works</a><a href="/privacy.html">Privacy</a></nav></div><div className="shell foot-bottom"><span>© 2026 WalletTrails. Made for everyday money.</span><a href="#home">Back to top ↑</a></div></footer>{tour && <TourModal onClose={() => setTour(false)} />}<ConsentBanner /></>
 }
 function TourModal({ onClose }) { return <div className="modal" role="dialog" aria-modal="true" aria-label="WalletTrails product tour"><button className="backdrop" onClick={onClose} aria-label="Close tour" /><article><button className="x" onClick={onClose} aria-label="Close"><Icon name="close" /></button><Logo inverse /><small>PRODUCT TOUR · 01:00</small><div><span><Icon name="plus" size={30} /></span><h2>Track it as it happens.</h2><p>Log a spend, or approve a bank SMS draft. Every rupee has a place.</p></div><nav><i /><i /><i /></nav></article></div> }
 export default App

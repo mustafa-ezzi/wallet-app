@@ -197,7 +197,8 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CRON_SECRET = os.environ.get('CRON_SECRET', '')
 
 # Ops integrations. Tokens are encrypted at rest. Set a real Fernet key in production.
-# GA4_PROPERTY_ID, GA4_SERVICE_ACCOUNT_JSON, META_APP_ID, META_APP_SECRET,
+# GA4_PROPERTY_ID is the numeric property id. The G- measurement id belongs on the website
+# as VITE_GA_MEASUREMENT_ID. GA4_SERVICE_ACCOUNT_JSON, META_APP_ID, META_APP_SECRET,
 # META_GRAPH_VERSION, META_SYSTEM_USER_TOKEN, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET,
 # LINKEDIN_API_VERSION, OPS_OAUTH_REDIRECT_BASE — read by the adapters, never committed.
 INTEGRATIONS_ENCRYPTION_KEY = os.environ.get('INTEGRATIONS_ENCRYPTION_KEY', '').strip()

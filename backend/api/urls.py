@@ -20,6 +20,7 @@ from . import people_linked_api
 from . import bank_sms_api
 from . import budgets_api
 from . import bot_api
+from integrations import growth as growth_views
 from integrations import views as integrations_views
 
 router = DefaultRouter()
@@ -153,6 +154,9 @@ urlpatterns = [
     path('ops/integrations/<str:provider>/callback/', integrations_views.OpsIntegrationCallbackView.as_view(), name='ops-integrations-callback'),
     path('ops/integrations/<int:account_id>/sync/', integrations_views.OpsIntegrationSyncView.as_view(), name='ops-integrations-sync'),
     path('ops/integrations/<int:account_id>/disconnect/', integrations_views.OpsIntegrationDisconnectView.as_view(), name='ops-integrations-disconnect'),
+    path('ops/growth/website/', growth_views.OpsWebsiteView.as_view(), name='ops-growth-website'),
+    path('ops/growth/website/realtime/', growth_views.OpsWebsiteRealtimeView.as_view(), name='ops-growth-website-realtime'),
+    path('ops/links/', growth_views.OpsTrackedLinksView.as_view(), name='ops-links'),
     # Remote ads / feature config
     path('config/', remote_config_api.AppConfigView.as_view(), name='app-config'),
     path('ops/config/', remote_config_api.OpsConfigView.as_view(), name='ops-config'),

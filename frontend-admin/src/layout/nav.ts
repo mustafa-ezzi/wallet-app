@@ -51,10 +51,10 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Growth',
     items: [
-      { label: 'Website', to: '/growth/website', icon: Globe, soon: true, capability: 'growth.read' },
+      { label: 'Website', to: '/growth/website', icon: Globe, capability: 'growth.read', keywords: ['ga4', 'visitors', 'analytics'] },
       { label: 'Social', to: '/growth/social', icon: Share2, soon: true, capability: 'growth.read' },
       { label: 'Content calendar', to: '/growth/calendar', icon: CalendarDays, soon: true, capability: 'growth.read' },
-      { label: 'Campaign links', to: '/growth/links', icon: Link2, soon: true, capability: 'growth.read' },
+      { label: 'Campaign links', to: '/growth/links', icon: Link2, capability: 'growth.read', keywords: ['utm', 'links'] },
     ],
   },
   {

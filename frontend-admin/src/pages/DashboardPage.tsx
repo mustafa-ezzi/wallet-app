@@ -5,7 +5,9 @@ import {
   CircleCheck,
   Crown,
   FilePlus2,
+  Globe,
   LifeBuoy,
+  MousePointerClick,
   MessageCircleWarning,
   RefreshCw,
   Sparkles,
@@ -32,9 +34,10 @@ import {
   toast,
 } from '../components/ui'
 import { cn } from '../lib/cn'
+import { useCan } from '../AuthContext'
 import { formatRange, useDateRange } from '../lib/dateRange'
 import { formatDateTime, formatRelative, shortDay } from '../lib/format'
-import { useAnalyticsReport, useDashboardSummary, useRefreshInactivity } from '../queries'
+import { useAnalyticsReport, useDashboardSummary, useRefreshInactivity, useWebsiteSummary } from '../queries'
 
 type Kpi = {
   label: string
@@ -215,6 +218,44 @@ function LatestInsights() {
   )
 }
 
+function WebsiteCards() {
+  const can = useCan('growth.read')
+  const { range } = useDateRange()
+  const website = useWebsiteSummary(range, can)
+  if (!can) return null
+  const totals = website.data?.totals
+  const previous = range.compare ? website.data?.previous : undefined
+  const hint = website.data && !website.data.configured ? 'Connect GA4 under Integrations, then sync' : undefined
+  return (
+    <section aria-label="Website" className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold tracking-wide text-subtle uppercase">Website</p>
+        <Link to="/growth/website" className="text-xs font-semibold text-primary">
+          Website report
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard
+          label="Website visitors"
+          icon={Globe}
+          value={website.isPending ? undefined : website.isError ? undefined : totals?.users ?? 0}
+          previous={previous?.users}
+          loading={website.isPending}
+          hint={website.isError ? 'Website report unavailable' : hint}
+        />
+        <StatCard
+          label="Get the app clicks"
+          icon={MousePointerClick}
+          value={website.isPending ? undefined : website.isError ? undefined : totals?.get_app_clicks ?? 0}
+          previous={previous?.get_app_clicks}
+          loading={website.isPending}
+          hint={hint}
+        />
+      </div>
+    </section>
+  )
+}
+
 export function DashboardPage() {
   const { range } = useDateRange()
   const summary = useDashboardSummary(range)
@@ -281,6 +322,8 @@ export function DashboardPage() {
               />
             ))}
           </section>
+
+          <WebsiteCards />
 
           <div className="grid gap-4 xl:grid-cols-3">
             <ChartCard

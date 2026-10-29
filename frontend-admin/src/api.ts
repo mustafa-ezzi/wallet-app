@@ -330,7 +330,7 @@ export async function fetchIntegrations() {
 }
 
 export async function connectIntegration(provider: string) {
-  const { data } = await opsApi.post<{ detail: string }>(`/ops/integrations/${provider}/connect/`)
+  const { data } = await opsApi.post<IntegrationCard & { detail?: string }>(`/ops/integrations/${provider}/connect/`)
   return data
 }
 
@@ -762,4 +762,77 @@ export async function downloadUsersCsv(params?: Record<string, string | undefine
   a.download = 'wallettrails_users.csv'
   a.click()
   URL.revokeObjectURL(url)
+}
+
+export type WebsiteTotals = {
+  users: number
+  new_users: number
+  sessions: number
+  engaged_sessions: number
+  engagement_rate: number
+  avg_engagement_seconds: number
+  get_app_clicks: number
+}
+
+export type WebsiteReport = {
+  configured: boolean
+  status: string
+  last_sync_at: string | null
+  last_error: string
+  from: string
+  to: string
+  totals: WebsiteTotals
+  previous: WebsiteTotals | null
+  series: { date: string; users: number; new_users: number; sessions: number; get_app_clicks: number }[]
+  pages: { label: string; value: number }[]
+  sources: { label: string; value: number }[]
+  countries: { label: string; value: number }[]
+  devices: { label: string; value: number }[]
+  events: { label: string; value: number }[]
+}
+
+export type WebsiteRealtime = {
+  configured: boolean
+  active_users: number | null
+  cached: boolean
+  detail?: string
+}
+
+export async function fetchWebsite(params: { from: string; to: string; compare?: number }) {
+  const { data } = await opsApi.get<WebsiteReport>('/ops/growth/website/', { params })
+  return data
+}
+
+export async function fetchWebsiteRealtime() {
+  const { data } = await opsApi.get<WebsiteRealtime>('/ops/growth/website/realtime/')
+  return data
+}
+
+export type TrackedLinkRow = {
+  id: number
+  label: string
+  destination: string
+  utm_source: string
+  utm_medium: string
+  utm_campaign: string
+  utm_content: string
+  url: string
+  created_at: string
+}
+
+export async function fetchTrackedLinks() {
+  const { data } = await opsApi.get<{ results: TrackedLinkRow[] }>('/ops/links/')
+  return data.results
+}
+
+export async function createTrackedLink(payload: {
+  label: string
+  destination: string
+  utm_source?: string
+  utm_medium?: string
+  utm_campaign?: string
+  utm_content?: string
+}) {
+  const { data } = await opsApi.post<TrackedLinkRow>('/ops/links/', payload)
+  return data
 }
