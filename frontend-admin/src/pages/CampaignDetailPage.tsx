@@ -171,7 +171,7 @@ export function CampaignDetailPage() {
                       </Badge>
                     ),
                   },
-                  { label: 'Audience', value: audienceLabel(campaign.audience) },
+                  { label: 'Audience', value: audienceLabel(campaign.audience, campaign.target_username) },
                   { label: 'Tap opens', value: route },
                   { label: 'Scheduled', value: formatDateTime(campaign.scheduled_at) },
                   { label: 'Sent', value: formatDateTime(campaign.sent_at) },
@@ -236,7 +236,7 @@ export function CampaignDetailPage() {
         description={
           pending === 'delete'
             ? 'This removes it and its delivery records permanently.'
-            : `It goes to ${audienceLabel(campaign.audience)}. This cannot be undone.`
+            : `It goes to ${audienceLabel(campaign.audience, campaign.target_username)}. This cannot be undone.`
         }
         confirmLabel={pending === 'delete' ? 'Delete' : 'Send now'}
         tone={pending === 'delete' ? 'danger' : 'primary'}

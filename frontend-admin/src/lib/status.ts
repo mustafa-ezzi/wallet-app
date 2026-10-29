@@ -69,8 +69,12 @@ export const AUDIENCES = [
   { value: 'inactive_7d', label: 'Inactive 7d+' },
   { value: 'inactive_30d', label: 'Inactive 30d+' },
   { value: 'inactive_90d', label: 'Inactive 90d+' },
+  { value: 'user', label: 'One user' },
 ]
-export const audienceLabel = (value: string) => AUDIENCES.find((a) => a.value === value)?.label ?? value
+export const audienceLabel = (value: string, username?: string | null) => {
+  if (value === 'user') return username ? `Just @${username}` : 'One user'
+  return AUDIENCES.find((a) => a.value === value)?.label ?? value
+}
 
 export const SUPPORT_CATEGORIES: Record<string, string> = {
   billing: 'Billing / Premium',

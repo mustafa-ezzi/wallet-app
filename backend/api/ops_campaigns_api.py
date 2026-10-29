@@ -1,5 +1,7 @@
 """Ops API for broadcast push campaigns (Phase 2)."""
 
+from django.contrib.auth.models import User
+from django.db.models import Count, Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import status
@@ -25,6 +27,8 @@ def _serialize_campaign(c: PushCampaign) -> dict:
         'body': c.body,
         'data': c.data or {},
         'audience': c.audience,
+        'target_user_id': c.target_user_id,
+        'target_username': c.target_user.username if c.target_user_id and c.target_user else None,
         'status': c.status,
         'scheduled_at': c.scheduled_at.isoformat() if c.scheduled_at else None,
         'sent_at': c.sent_at.isoformat() if c.sent_at else None,
@@ -69,7 +73,7 @@ class OpsCampaignListCreateView(APIView):
     permission_classes = [ops({'GET': 'campaigns.read', 'POST': 'campaigns.write'})]
 
     def get(self, request):
-        qs = PushCampaign.objects.select_related('created_by').all()
+        qs = PushCampaign.objects.select_related('created_by', 'target_user').all()
         status_f = (request.query_params.get('status') or '').strip().lower()
         if status_f:
             qs = qs.filter(status=status_f)
@@ -83,6 +87,13 @@ class OpsCampaignListCreateView(APIView):
         audience = (request.data.get('audience') or PushCampaign.AUDIENCE_ALL).strip()
         if audience not in dict(PushCampaign.AUDIENCE_CHOICES):
             return Response({'detail': 'Invalid audience.'}, status=status.HTTP_400_BAD_REQUEST)
+        target_user = None
+        if audience == PushCampaign.AUDIENCE_USER:
+            raw_id = request.data.get('user_id')
+            try:
+                target_user = User.objects.get(pk=int(raw_id), is_active=True)
+            except (TypeError, ValueError, User.DoesNotExist):
+                return Response({'detail': 'Pick a user for this notification.'}, status=status.HTTP_400_BAD_REQUEST)
         if not title or not body:
             return Response({'detail': 'title and body are required.'}, status=status.HTTP_400_BAD_REQUEST)
         if len(title) > 120 or len(body) > 400:
@@ -102,12 +113,13 @@ class OpsCampaignListCreateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        estimate = estimate_recipients(audience)
+        estimate = estimate_recipients(audience, target_user.id if target_user else None)
         campaign = PushCampaign.objects.create(
             title=title,
             body=body,
             data=_normalize_data(request.data.get('data')),
             audience=audience,
+            target_user=target_user,
             status=PushCampaign.STATUS_SCHEDULED if scheduled_at else PushCampaign.STATUS_DRAFT,
             scheduled_at=scheduled_at,
             created_by=request.user,
@@ -118,7 +130,7 @@ class OpsCampaignListCreateView(APIView):
             action='campaign.create',
             target_type='push_campaign',
             target_id=campaign.id,
-            meta={'audience': audience, 'estimate_users': estimate['users']},
+            meta={'audience': audience, 'estimate_users': estimate['users'], 'user_id': target_user.id if target_user else None},
             request=request,
         )
         return Response(_serialize_campaign(campaign), status=status.HTTP_201_CREATED)
@@ -129,7 +141,7 @@ class OpsCampaignDetailView(APIView):
 
     def get(self, request, campaign_id: int):
         try:
-            c = PushCampaign.objects.select_related('created_by').get(pk=campaign_id)
+            c = PushCampaign.objects.select_related('created_by', 'target_user').get(pk=campaign_id)
         except PushCampaign.DoesNotExist:
             return Response({'detail': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
         data = _serialize_campaign(c)
@@ -191,6 +203,34 @@ class OpsCampaignDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class OpsCampaignRecipientSearchView(APIView):
+    """Username or email lookup for a one-user notification. No money data."""
+
+    permission_classes = [ops('campaigns.read')]
+
+    def get(self, request):
+        q = (request.query_params.get('q') or '').strip()
+        if len(q) < 2:
+            return Response({'results': []})
+        rows = (
+            User.objects.filter(is_active=True)
+            .filter(Q(username__icontains=q) | Q(email__icontains=q))
+            .annotate(device_count=Count('device_tokens'))
+            .order_by('username')[:8]
+        )
+        return Response({
+            'results': [
+                {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'has_push': user.device_count > 0,
+                }
+                for user in rows
+            ],
+        })
+
+
 class OpsCampaignEstimateView(APIView):
     permission_classes = [ops('campaigns.read')]
 
@@ -198,7 +238,12 @@ class OpsCampaignEstimateView(APIView):
         audience = (request.query_params.get('audience') or PushCampaign.AUDIENCE_ALL).strip()
         if audience not in dict(PushCampaign.AUDIENCE_CHOICES):
             return Response({'detail': 'Invalid audience.'}, status=status.HTTP_400_BAD_REQUEST)
-        est = estimate_recipients(audience)
+        user_id = None
+        if audience == PushCampaign.AUDIENCE_USER:
+            raw_id = (request.query_params.get('user_id') or '').strip()
+            if raw_id.isdigit():
+                user_id = int(raw_id)
+        est = estimate_recipients(audience, user_id)
         return Response({
             'audience': audience,
             'users': est['users'],

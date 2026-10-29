@@ -32,6 +32,7 @@ import { apiErrorMessage } from '../lib/queryClient'
 import { AUDIENCES, audienceLabel, campaignStatus } from '../lib/status'
 import {
   useCampaignEstimate,
+  useCampaignRecipients,
   useCampaigns,
   useCancelCampaign,
   useCreateCampaign,
@@ -89,8 +90,8 @@ const TEMPLATES = [
 const TITLE_MAX = 120
 const BODY_MAX = 400
 
-type Draft = { title: string; body: string; audience: string; route: string; schedule: string }
-const EMPTY_DRAFT: Draft = { title: '', body: '', audience: 'all', route: '', schedule: '' }
+type Draft = { title: string; body: string; audience: string; route: string; schedule: string; userId: number | null; userLabel: string }
+const EMPTY_DRAFT: Draft = { title: '', body: '', audience: 'all', route: '', schedule: '', userId: null, userLabel: '' }
 
 type PendingAction = { kind: 'send' | 'delete'; campaign: OpsCampaign } | null
 
@@ -104,9 +105,11 @@ function Counter({ value, max }: { value: number; max: number }) {
 export function CampaignsPage() {
   const navigate = useNavigate()
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
+  const [userQuery, setUserQuery] = useState('')
   const [pending, setPending] = useState<PendingAction>(null)
   const campaigns = useCampaigns({ page_size: 50 })
-  const estimate = useCampaignEstimate(draft.audience)
+  const recipients = useCampaignRecipients(draft.audience === 'user' ? userQuery : '')
+  const estimate = useCampaignEstimate(draft.audience, draft.userId ?? undefined)
   const createCampaign = useCreateCampaign()
   const sendCampaign = useSendCampaign()
   const cancelCampaign = useCancelCampaign()
@@ -132,12 +135,14 @@ export function CampaignsPage() {
         title: draft.title.trim(),
         body: draft.body.trim(),
         audience: draft.audience,
+        user_id: draft.audience === 'user' ? draft.userId ?? undefined : undefined,
         data: draft.route ? { route: draft.route } : {},
         scheduled_at,
       },
       {
         onSuccess: (c) => {
           setDraft(EMPTY_DRAFT)
+          setUserQuery('')
           toast.success(
             scheduled_at ? `Campaign #${c.id} scheduled for ${formatDateTime(c.scheduled_at)}.` : `Draft #${c.id} saved. Dry run it, then send.`,
           )
@@ -164,7 +169,10 @@ export function CampaignsPage() {
       audience: c.audience,
       route: String((c.data as { route?: string })?.route || ''),
       schedule: '',
+      userId: c.target_user_id,
+      userLabel: c.target_username ?? '',
     })
+    setUserQuery(c.target_username ?? '')
     window.scrollTo({ top: 0, behavior: 'smooth' })
     toast.info(`Copied #${c.id} into the composer.`)
   }
@@ -209,7 +217,7 @@ export function CampaignsPage() {
         </div>
       ),
     },
-    { id: 'audience', header: 'Audience', accessorFn: (c) => audienceLabel(c.audience) },
+    { id: 'audience', header: 'Audience', accessorFn: (c) => audienceLabel(c.audience, c.target_username) },
     {
       id: 'status',
       header: 'Status',
@@ -307,7 +315,7 @@ export function CampaignsPage() {
     },
   ]
 
-  const valid = draft.title.trim() && draft.body.trim()
+  const valid = Boolean(draft.title.trim() && draft.body.trim() && (draft.audience !== 'user' || draft.userId))
 
   return (
     <div>
@@ -332,7 +340,10 @@ export function CampaignsPage() {
                   key={t.id}
                   size="sm"
                   variant="secondary"
-                  onClick={() => setDraft({ title: t.title, body: t.body, audience: t.audience, route: t.route, schedule: '' })}
+                  onClick={() => {
+                    setDraft({ title: t.title, body: t.body, audience: t.audience, route: t.route, schedule: '', userId: null, userLabel: '' })
+                    setUserQuery('')
+                  }}
                 >
                   {t.label}
                 </Button>
@@ -352,7 +363,17 @@ export function CampaignsPage() {
             </Field>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Audience">
-                <Select value={draft.audience} onChange={(e) => set('audience', e.target.value)}>
+                <Select
+                  value={draft.audience}
+                  onChange={(e) => {
+                    set('audience', e.target.value)
+                    if (e.target.value !== 'user') {
+                      set('userId', null)
+                      set('userLabel', '')
+                      setUserQuery('')
+                    }
+                  }}
+                >
                   {AUDIENCES.map((a) => (
                     <option key={a.value} value={a.value}>
                       {a.label}
@@ -373,6 +394,53 @@ export function CampaignsPage() {
                 <Input type="datetime-local" value={draft.schedule} onChange={(e) => set('schedule', e.target.value)} />
               </Field>
             </div>
+            {draft.audience === 'user' ? (
+              <Field label="User" hint="Search by username or email. They still need a linked device and product updates turned on.">
+                <div className="space-y-2">
+                  <Input
+                    value={userQuery}
+                    onChange={(e) => {
+                      setUserQuery(e.target.value)
+                      set('userId', null)
+                      set('userLabel', '')
+                    }}
+                    placeholder="username or email"
+                    aria-label="Find a user"
+                  />
+                  {draft.userId ? (
+                    <p className="text-[13px] font-semibold text-fg">Sending to @{draft.userLabel}</p>
+                  ) : userQuery.trim().length >= 2 ? (
+                    <ul className="overflow-hidden rounded-xl border border-border">
+                      {(recipients.data ?? []).length === 0 ? (
+                        <li className="px-3 py-2 text-[13px] text-muted">{recipients.isPending ? 'Searching…' : 'No matching users.'}</li>
+                      ) : (
+                        recipients.data?.map((user) => (
+                          <li key={user.id}>
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-surface-2"
+                              onClick={() => {
+                                set('userId', user.id)
+                                set('userLabel', user.username)
+                                setUserQuery(user.username)
+                              }}
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate font-semibold text-fg">@{user.username}</span>
+                                <span className="block truncate text-xs text-muted">{user.email || 'No email'}</span>
+                              </span>
+                              <span className="shrink-0 text-xs text-subtle">{user.has_push ? 'Device linked' : 'No device'}</span>
+                            </button>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  ) : (
+                    <p className="text-[13px] text-muted">Type at least two letters, then pick the person.</p>
+                  )}
+                </div>
+              </Field>
+            ) : null}
           </CardContent>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3.5">
             <div className="text-[13px] text-muted" aria-live="polite">
@@ -389,7 +457,7 @@ export function CampaignsPage() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button variant="ghost" disabled={!valid && !draft.schedule} onClick={() => setDraft(EMPTY_DRAFT)}>
+              <Button variant="ghost" disabled={!valid && !draft.schedule} onClick={() => { setDraft(EMPTY_DRAFT); setUserQuery('') }}>
                 Clear
               </Button>
               <Button variant="primary" disabled={!valid} loading={createCampaign.isPending} onClick={onCreate}>
@@ -408,7 +476,11 @@ export function CampaignsPage() {
           Today's limit of {est?.max_campaigns_per_day} campaigns is reached. New sends will be refused until tomorrow.
         </Alert>
       ) : null}
-      {est && est.tokens === 0 ? (
+      {draft.audience === 'user' && draft.userId && est && est.tokens === 0 ? (
+        <Alert tone="info" className="mb-4" title="This user cannot receive a push yet">
+          @{draft.userLabel} has no linked device, or product updates are turned off. They need a native build, then Settings → Link this device for push.
+        </Alert>
+      ) : est && est.tokens === 0 ? (
         <Alert tone="info" className="mb-4" title="No devices to reach yet">
           Only users with a registered push token and product updates turned on get broadcasts. Install a native build with
           Firebase, then link the device under Settings. See <code>mobile/android-push-notifications-firebase-setup.md</code>.
@@ -434,7 +506,7 @@ export function CampaignsPage() {
               </div>
               <div className="line-clamp-2 text-xs text-muted">{c.body}</div>
               <div className="text-xs text-subtle">
-                {audienceLabel(c.audience)} · {c.status === 'sent' ? `${c.sent_ok} delivered` : `~${c.recipient_estimate} users`}
+                {audienceLabel(c.audience, c.target_username)} · {c.status === 'sent' ? `${c.sent_ok} delivered` : `~${c.recipient_estimate} users`}
               </div>
             </div>
           )
@@ -458,7 +530,7 @@ export function CampaignsPage() {
         description={
           pending?.kind === 'delete'
             ? 'This removes it and its delivery records permanently.'
-            : `“${pending?.campaign.title}” goes to ${audienceLabel(pending?.campaign.audience ?? '')}. This cannot be undone.`
+            : `“${pending?.campaign.title}” goes to ${audienceLabel(pending?.campaign.audience ?? '', pending?.campaign.target_username)}. This cannot be undone.`
         }
         confirmLabel={pending?.kind === 'delete' ? 'Delete' : 'Send now'}
         tone={pending?.kind === 'delete' ? 'danger' : 'primary'}

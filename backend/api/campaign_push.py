@@ -28,7 +28,7 @@ EXPO_BATCH = 80
 CHANNEL_ID = 'wallettrails-updates'
 
 
-def audience_device_queryset(audience: str) -> QuerySet[DeviceToken]:
+def audience_device_queryset(audience: str, user_id: int | None = None) -> QuerySet[DeviceToken]:
     qs = (
         DeviceToken.objects
         .select_related('user', 'user__ops_meta', 'user__notification_pref')
@@ -59,14 +59,18 @@ def audience_device_queryset(audience: str) -> QuerySet[DeviceToken]:
         )
     elif audience == PushCampaign.AUDIENCE_INACTIVE_90D:
         qs = qs.filter(user__ops_meta__inactivity_tier=UserOpsMeta.INACTIVITY_90D)
+    elif audience == PushCampaign.AUDIENCE_USER:
+        if not user_id:
+            return qs.none()
+        qs = qs.filter(user_id=user_id)
     # AUDIENCE_ALL → no extra filter
 
     return qs.order_by('user_id', '-updated_at')
 
 
-def estimate_recipients(audience: str) -> dict:
+def estimate_recipients(audience: str, user_id: int | None = None) -> dict:
     """Unique users + device token count for an audience."""
-    qs = audience_device_queryset(audience)
+    qs = audience_device_queryset(audience, user_id)
     tokens = qs.count()
     users = qs.values('user_id').distinct().count()
     return {'users': users, 'tokens': tokens}
@@ -113,9 +117,9 @@ def send_campaign(campaign: PushCampaign, *, dry_run: bool = False) -> dict:
         }
 
     prune_stale_device_tokens()
-    devices = list(audience_device_queryset(campaign.audience))
+    devices = list(audience_device_queryset(campaign.audience, campaign.target_user_id))
     # Prefer latest token per user when multiple — still notify all devices
-    estimate = estimate_recipients(campaign.audience)
+    estimate = estimate_recipients(campaign.audience, campaign.target_user_id)
     campaign.recipient_estimate = estimate['users']
     campaign.save(update_fields=['recipient_estimate', 'updated_at'])
 

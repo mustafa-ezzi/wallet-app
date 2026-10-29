@@ -948,12 +948,14 @@ class PushCampaign(models.Model):
     AUDIENCE_INACTIVE_7D = 'inactive_7d'
     AUDIENCE_INACTIVE_30D = 'inactive_30d'
     AUDIENCE_INACTIVE_90D = 'inactive_90d'
+    AUDIENCE_USER = 'user'
     AUDIENCE_CHOICES = [
         (AUDIENCE_ALL, 'All opted-in users with a device'),
         (AUDIENCE_ANDROID, 'Android only'),
         (AUDIENCE_INACTIVE_7D, 'Inactive 7d+'),
         (AUDIENCE_INACTIVE_30D, 'Inactive 30d+'),
         (AUDIENCE_INACTIVE_90D, 'Inactive 90d+'),
+        (AUDIENCE_USER, 'One user'),
     ]
 
     STATUS_DRAFT = 'draft'
@@ -975,6 +977,9 @@ class PushCampaign(models.Model):
     body = models.CharField(max_length=400)
     data = models.JSONField(default=dict, blank=True)  # e.g. {"route": "/(tabs)/settings"}
     audience = models.CharField(max_length=32, choices=AUDIENCE_CHOICES, default=AUDIENCE_ALL)
+    target_user = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name='push_campaigns_targeted',
+    )
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
     created_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name='push_campaigns_created',

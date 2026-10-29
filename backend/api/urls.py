@@ -122,6 +122,7 @@ urlpatterns = [
     path('ops/users/<int:user_id>/delete/', ops_api.OpsUserDeleteView.as_view(), name='ops-user-delete'),
     path('ops/campaigns/', ops_campaigns_api.OpsCampaignListCreateView.as_view(), name='ops-campaigns'),
     path('ops/campaigns/estimate/', ops_campaigns_api.OpsCampaignEstimateView.as_view(), name='ops-campaigns-estimate'),
+    path('ops/campaigns/recipients/', ops_campaigns_api.OpsCampaignRecipientSearchView.as_view(), name='ops-campaigns-recipients'),
     path('ops/campaigns/<int:campaign_id>/', ops_campaigns_api.OpsCampaignDetailView.as_view(), name='ops-campaign-detail'),
     path('ops/campaigns/<int:campaign_id>/send/', ops_campaigns_api.OpsCampaignSendView.as_view(), name='ops-campaign-send'),
     path('ops/campaigns/<int:campaign_id>/cancel/', ops_campaigns_api.OpsCampaignCancelView.as_view(), name='ops-campaign-cancel'),

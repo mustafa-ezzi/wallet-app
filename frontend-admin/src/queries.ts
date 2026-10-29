@@ -7,6 +7,7 @@ import {
   deleteCampaign,
   deleteOpsUser,
   estimateCampaignAudience,
+  searchCampaignRecipients,
   fetchAnalyticsReport,
   fetchAuditLog,
   fetchCampaign,
@@ -66,7 +67,7 @@ export const queryKeys = {
   campaigns: (params: Params) => ['campaigns', clean(params)] as const,
   campaignsAll: ['campaigns'] as const,
   campaign: (id: number) => ['campaign', id] as const,
-  campaignEstimate: (audience: string) => ['campaign-estimate', audience] as const,
+  campaignEstimate: (audience: string, userId?: number) => ['campaign-estimate', audience, userId ?? null] as const,
   supportThreads: (params: Params) => ['support', clean(params)] as const,
   supportAll: ['support'] as const,
   supportThread: (id: number) => ['support-thread', id] as const,
@@ -173,11 +174,20 @@ export function useCampaign(id: number) {
   })
 }
 
-export function useCampaignEstimate(audience: string) {
+export function useCampaignEstimate(audience: string, userId?: number) {
   return useQuery({
-    queryKey: queryKeys.campaignEstimate(audience),
-    queryFn: () => estimateCampaignAudience(audience),
+    queryKey: queryKeys.campaignEstimate(audience, userId),
+    queryFn: () => estimateCampaignAudience(audience, userId),
     placeholderData: keepPreviousData,
+  })
+}
+
+export function useCampaignRecipients(q: string) {
+  const query = q.trim()
+  return useQuery({
+    queryKey: ['campaign-recipients', query],
+    queryFn: () => searchCampaignRecipients(query),
+    enabled: query.length >= 2,
   })
 }
 

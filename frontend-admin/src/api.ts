@@ -413,6 +413,8 @@ export type OpsCampaign = {
   body: string
   data: Record<string, unknown>
   audience: string
+  target_user_id: number | null
+  target_username: string | null
   status: string
   scheduled_at: string | null
   sent_at: string | null
@@ -463,6 +465,7 @@ export async function createCampaign(payload: {
   title: string
   body: string
   audience: string
+  user_id?: number
   data?: { route?: string }
   scheduled_at?: string | null
 }) {
@@ -470,9 +473,21 @@ export async function createCampaign(payload: {
   return data
 }
 
-export async function estimateCampaignAudience(audience: string) {
+export type CampaignRecipient = {
+  id: number
+  username: string
+  email: string
+  has_push: boolean
+}
+
+export async function searchCampaignRecipients(q: string) {
+  const { data } = await opsApi.get<{ results: CampaignRecipient[] }>('/ops/campaigns/recipients/', { params: { q } })
+  return data.results
+}
+
+export async function estimateCampaignAudience(audience: string, userId?: number) {
   const { data } = await opsApi.get<CampaignEstimate>('/ops/campaigns/estimate/', {
-    params: { audience },
+    params: { audience, user_id: audience === 'user' ? userId : undefined },
   })
   return data
 }
