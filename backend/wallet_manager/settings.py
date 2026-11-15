@@ -196,6 +196,9 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # Daily due-reminder cron (POST /api/jobs/due-reminders/)
 CRON_SECRET = os.environ.get('CRON_SECRET', '')
 
+# Google Form webhook secret (POST /api/webhooks/google-form/); falls back to CRON_SECRET if unset
+GOOGLE_FORM_WEBHOOK_SECRET = os.environ.get('GOOGLE_FORM_WEBHOOK_SECRET', '').strip()
+
 # Ops integrations. Tokens are encrypted at rest. Set a real Fernet key in production.
 # GA4_PROPERTY_ID is the numeric property id. The G- measurement id belongs on the website
 # as VITE_GA_MEASUREMENT_ID. GA4_SERVICE_ACCOUNT_JSON, META_APP_ID, META_APP_SECRET,

@@ -5,8 +5,9 @@
 **Plans:** **Free → Plus → Pro** (strictly nested: each paid tier includes everything below it)  
 **Related docs:** `docs/research/revenue-ads-in-app-purchases-and-play-store-launch.md` (pricing & launch), `docs/research/ai-bot-turns-typed-sentences-into-expenses-and-income.md` (Trai), `docs/research/trai-site-section-for-lovable.md` (what Trai may claim), `docs/wallettrails-full-product-guide.md` (features)  
 **Ads:** unused. Older notes in `docs/research/google-adsense-websites-and-admob-in-the-app.md` are not part of these packages.  
-**Reviewed:** 17 October 2026  
-**Status:** Research for how we define packages and how we **enforce** them so Free cannot use Plus/Pro, and Plus cannot use Pro.
+**Reviewed:** 14 November 2026  
+**Simple list:** `docs/PACKAGES_FREE_PLUS_PRO.md`  
+**Status:** Packages below match features that exist in the app today. Enforcement (so Free cannot use Plus or Pro) is still the work in §5–§7. Open-banking import is not in the app and is not part of a package.
 
 ---
 
@@ -46,39 +47,36 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 
 ### 3.1 Side-by-side
 
+Features below are in the app now. Caps are the package rules. They are not all enforced on the server yet.
+
 | Feature | Free | Plus | Pro |
 | --- | --- | --- | --- |
-| Account, login, multi-account switch | Yes | Yes | Yes |
-| Add income / expense / transfer | Unlimited | Unlimited | Unlimited |
-| Privacy lock / hide amounts | Yes | Yes | Yes |
-| Offline personal entries (mobile) | Yes | Yes | Yes |
-| Bill reminders (local + push) | Yes | Yes | Yes |
-| Personal wallets (bank / cash / card) | **2** | Unlimited | Unlimited |
-| Active income sources | **2** | Unlimited | Unlimited |
-| Active bills / payables / receivables (combined) | **3** | Unlimited | Unlimited |
-| Category budgets / overall monthly cap | **1** per month | Unlimited + copy previous month | Unlimited + copy |
-| Custom categories | Cap (~10) | Unlimited | Unlimited |
-| Reports | This month + **1** previous | Full history | Full history |
-| Forecast (expected in/out) | Basic this month | Full | Full + extras when built |
-| CSV export (personal / household) | No | Yes | Yes |
-| PDF export / report packs | No | No | Yes |
-| Household | **1** group, **≤3** members, **1** ongoing ledger, **no** event ledgers | Full (events, close-event, more members, CSV) | Same as Plus |
-| People (lend/borrow links) | **1** linked person | Unlimited | Unlimited |
-| Themes / appearance | Default only | All themes | All themes |
-| Home-screen widgets (extra) | Basic / none | Unlocked | Unlocked |
-| **Trai typed chat** (expense, income, bill, wallet, person, budget, and “how was my month?”) | No | **Yes** — type only, daily cap (e.g. **30**/day) | Yes, higher daily cap (e.g. **120**/day) |
-| **Trai voice** (mic, spoken “yes, save it”, hands-free follow-ups) | No | No | **Yes** |
-| **“Hey Trai”** wake while the Android app is open | No | No | **Yes** |
-| Trai on the web | No | Type only | Type + tap the mic once. **No** wake word |
-| Bank SMS / notification **paste or share** (manual) | Limited taste (e.g. **15** lifetime approvals) | Higher cap (e.g. **80**/month) | Unlimited / generous |
-| Always-on SMS / notification **inbox** + auto-detect queue | No | No | **Yes** (Android where OS/policy allow) |
-| Wallet aliases, kind overrides, transfer type, smart matching | Basic / manual | Manual + remember on approve | Full inbox + rules |
-| Travel Mode (foreign amount + home books) | No (or short trial) | No | **Yes** |
-| Future open-banking / statement file import | No | No | Pro, **region-gated** when live |
-| Ads (AdMob / AdSense) | **Unused** | **Unused** | **Unused** |
-| Support | Standard | Standard+ | Priority |
-| Logged-in devices | **2** | **5** | **8** (reasonable cap) |
-| Trial | — | 7 days | 7–14 days |
+| Account (email or Google), password reset | Yes | Yes | Yes |
+| Add income, expense, transfer (includes calculator) | Unlimited | Unlimited | Unlimited |
+| Privacy lock (hide amounts, biometrics or PIN, screenshot block) | Yes | Yes | Yes |
+| Offline personal entries (phone) | Yes | Yes | Yes |
+| Bill and due reminders (on device and push) | Yes | Yes | Yes |
+| Wallets: bank, cash, credit card | **2** | Unlimited | Unlimited |
+| Income sources (salary, contract, one-time, installments) | **2** active | Unlimited | Unlimited |
+| Bills, loans you owe, and money owed to you | **3** active, combined | Unlimited | Unlimited |
+| Budgets (a category, or one cap for the month) | **1** per month | Unlimited, including copy last month | Unlimited, including copy last month |
+| Custom categories | About **10** | Unlimited | Unlimited |
+| Reports and forecast | This month and **1** previous month | Full history | Full history |
+| CSV export (personal and household) | No | Yes | Yes |
+| PDF export | No | No | Yes |
+| Household | **1** group, up to **3** members, **1** ongoing ledger. No event ledger | Events, close an event, more members, shared pot and split | Same as Plus |
+| People (lend and borrow) | **1** linked person | Unlimited | Unlimited |
+| Themes | Default only | All themes | All themes |
+| Home-screen balance widget | No | Yes | Yes |
+| Trai by typing | No | Yes, about **30** messages a day | Yes, about **120** messages a day |
+| Trai voice, spoken “yes, save it”, hands-free follow-ups | No | No | Yes |
+| “Hey Trai” while the Android app is open | No | No | Yes |
+| Trai on the web | No | Typing only | Typing, plus tap the mic once. No wake word |
+| Paste or share a bank message, then approve it | About **15** approvals, ever | About **80** a month | Generous |
+| Always-on bank SMS / notification inbox | No | No | Yes, on Android where the phone allows it |
+| Travel Mode | No | No | Yes |
+| Help & Support | Yes | Yes | Yes |
+| Ads | None | None | None |
 
 ### 3.2 Free — “Follow every rupee”
 
@@ -86,16 +84,16 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 
 **Included**
 
-- Up to **2** personal wallets (e.g. 1 bank + 1 cash).
-- Unlimited manual transactions.
-- Income, bills/loans, budgets with **small caps** (see table).
-- Dashboard, basic forecast, privacy, reminders.
-- **1** Household (ongoing only, ≤3 members) and **1** People link — growth features stay free at entry.
-- Manual paste/share of a bank SMS **with a lifetime approval cap** (taste of automation).
+- Up to **2** wallets (bank, cash, or credit card).
+- Unlimited manual transactions, including the calculator on the add screen.
+- Income, bills, loans, and budgets within the caps in the table.
+- Dashboard, this month plus one previous month, a basic forecast, privacy, and reminders.
+- **1** Household (ongoing ledger only, up to 3 members) and **1** People link.
+- Paste or share a bank message, with a small lifetime approval cap.
 
 **Not included**
 
-- 3rd wallet, unlimited budgets, Household event ledgers, CSV/PDF, themes pack, always-on import inbox, Travel Mode, Trai.
+- A 3rd wallet, unlimited budgets, Household event ledgers, CSV or PDF, extra themes, the home-screen widget, the always-on bank inbox, Travel Mode, and Trai.
 
 ### 3.3 Plus — “Household & clarity”
 
@@ -111,10 +109,9 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 **Not included (Pro-only)**
 
 - Trai voice, hands-free follow-ups, and “Hey Trai”.
-- Always-on bank SMS / notification auto-inbox.
-- Travel Mode (including “turn on travel mode” said to Trai).
-- PDF packs / advanced exports.
-- Future bank-aggregator sync / AI receipt scan (when built).
+- Always-on bank SMS / notification inbox.
+- Travel Mode.
+- PDF export.
 
 ### 3.4 Pro — “Automation”
 
@@ -125,7 +122,7 @@ Naming note: older docs and code say **Premium**. Treat **Pro = Premium**. Publi
 - Unlimited / generous import approvals, aliases, kind overrides, transfer detection.
 - Travel Mode.
 - PDF export and priority support.
-- Early access to paid betas; later **region-gated** bank sync.
+- Bank-statement import and live bank sync are not in the app, so they are not part of Pro.
 
 ### 3.5 Trai — typed on Plus, spoken on Pro
 
@@ -447,7 +444,7 @@ Play regional pricing applies; website copy: “Prices vary by country and tax.�
 | What does Free get? | Real tracker + small caps + entry Household/People |
 | What does Plus unlock? | Unlimited organization, Household power, CSV, **Trai by typing** |
 | Ads? | **Unused** on Free, Plus, and Pro. Not a reason to upgrade |
-| What does Pro unlock? | Automation (SMS inbox), Travel, PDF, **Trai voice and “Hey Trai”**, future bank sync |
+| What does Pro unlock? | Bank-message inbox, Travel Mode, PDF, **Trai voice and “Hey Trai”** |
 | How do we stop Free from using Plus/Pro? | **Server plan rank + feature gates + caps**; UI is secondary |
 | How do we stop Plus from using Pro? | Same gates with `required_plan: "pro"` |
 | How do users get a package? | Play Billing → verify → `Entitlement` → clients refresh plan |

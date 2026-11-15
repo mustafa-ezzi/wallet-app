@@ -1,14 +1,15 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import {
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
-  type DimensionValue,
+  type KeyboardEvent,
   type ViewStyle,
 } from 'react-native'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
@@ -42,9 +43,37 @@ type Props = {
 }
 
 /**
+ * Full keyboard height. This sheet is a fullscreen modal, so Android does not
+ * shrink it when the activity window resizes — the sheet has to move itself.
+ */
+function keyboardOverlap(e: KeyboardEvent): number {
+  return Math.max(0, Math.round(e.endCoordinates.height))
+}
+
+function useKeyboardOverlap(active: boolean): number {
+  const [lift, setLift] = useState(0)
+  useEffect(() => {
+    if (!active) {
+      setLift(0)
+      return
+    }
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const show = Keyboard.addListener(showEvent, (e) => setLift(keyboardOverlap(e)))
+    const hide = Keyboard.addListener(hideEvent, () => setLift(0))
+    return () => {
+      show.remove()
+      hide.remove()
+    }
+  }, [active])
+  return lift
+}
+
+/**
  * Shared popup shell — bottom sheet by default with handle, header,
  * safe-area padding, and a soft elevated card.
  * Tap outside (dimmed backdrop) dismisses unless dismissOnBackdrop={false}.
+ * The sheet sits above the keyboard and the form scrolls so fields stay reachable.
  */
 export function AppSheet({
   visible,
@@ -62,16 +91,25 @@ export function AppSheet({
 }: Props) {
   const colors = useColors()
   const insets = useSafeAreaInsets()
+  const { height: windowHeight } = useWindowDimensions()
+  const keyboardLift = useKeyboardOverlap(visible)
+  const [chromeHeight, setChromeHeight] = useState(0)
   const bottom = Math.max(insets.bottom, spacing.md)
   const isBottom = placement === 'bottom'
   const handleColor = colors.borderStrong ?? colors.border
+  const topGap = Math.max(insets.top, spacing.md) + spacing.sm
+  const sheetPadBottom = isBottom ? (keyboardLift > 0 ? spacing.sm : bottom) : spacing.lg
+  const available = Math.max(220, windowHeight - keyboardLift - topGap)
+  const sheetMax = Math.min(Math.round(windowHeight * maxHeightRatio), available)
+  const bodyMax = Math.max(120, sheetMax - chromeHeight - sheetPadBottom)
 
   const body = scroll ? (
     <ScrollView
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
+      nestedScrollEnabled
       contentContainerStyle={[styles.bodyPad, contentStyle]}
-      style={styles.scroll}
+      style={[styles.scroll, { maxHeight: bodyMax }]}
     >
       {children}
     </ScrollView>
@@ -96,9 +134,12 @@ export function AppSheet({
           accessibilityRole={dismissOnBackdrop ? 'button' : undefined}
           accessibilityLabel={dismissOnBackdrop ? 'Dismiss' : undefined}
         />
-        <KeyboardAvoidingView
-          style={[styles.kav, isBottom ? styles.rootBottom : styles.rootCenter]}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <View
+          style={[
+            styles.kav,
+            isBottom ? styles.rootBottom : styles.rootCenter,
+            !isBottom && keyboardLift > 0 ? { paddingBottom: keyboardLift } : null,
+          ]}
           pointerEvents="box-none"
         >
           <View
@@ -108,45 +149,53 @@ export function AppSheet({
               {
                 backgroundColor: colors.surface,
                 borderColor: colors.border,
-                maxHeight: `${Math.round(maxHeightRatio * 100)}%` as DimensionValue,
-                paddingBottom: isBottom ? bottom : spacing.lg,
+                maxHeight: sheetMax,
+                marginBottom: isBottom ? keyboardLift : 0,
+                paddingBottom: sheetPadBottom,
               },
               iosShadow,
               sheetStyle,
             ]}
           >
-            {isBottom ? (
-              <View style={styles.handleRow}>
-                <View style={[styles.handle, { backgroundColor: handleColor }]} />
-              </View>
-            ) : null}
+            <View
+              onLayout={(e) => {
+                const next = Math.round(e.nativeEvent.layout.height)
+                setChromeHeight((prev) => (prev === next ? prev : next))
+              }}
+            >
+              {isBottom ? (
+                <View style={styles.handleRow}>
+                  <View style={[styles.handle, { backgroundColor: handleColor }]} />
+                </View>
+              ) : null}
 
-            <View style={styles.header}>
-              <View style={styles.headerText}>
-                <Text style={[styles.title, { color: colors.primaryDark }]} numberOfLines={2}>
-                  {title}
-                </Text>
-                {subtitle ? (
-                  <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={3}>
-                    {subtitle}
+              <View style={styles.header}>
+                <View style={styles.headerText}>
+                  <Text style={[styles.title, { color: colors.primaryDark }]} numberOfLines={2}>
+                    {title}
                   </Text>
+                  {subtitle ? (
+                    <Text style={[styles.subtitle, { color: colors.textMuted }]} numberOfLines={3}>
+                      {subtitle}
+                    </Text>
+                  ) : null}
+                </View>
+                {!hideClose ? (
+                  <BouncyPressable
+                    onPress={onClose}
+                    style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
+                    accessibilityLabel="Close"
+                  >
+                    <FontAwesome name="times" size={14} color={colors.textSecondary} />
+                  </BouncyPressable>
                 ) : null}
               </View>
-              {!hideClose ? (
-                <BouncyPressable
-                  onPress={onClose}
-                  style={[styles.closeBtn, { backgroundColor: colors.surfaceMuted, borderColor: colors.border }]}
-                  accessibilityLabel="Close"
-                >
-                  <FontAwesome name="times" size={14} color={colors.textSecondary} />
-                </BouncyPressable>
-              ) : null}
-            </View>
 
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            </View>
             {body}
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   )
@@ -224,7 +273,7 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     marginHorizontal: spacing.lg,
   },
-  scroll: { flexGrow: 0 },
+  scroll: { flexGrow: 0, flexShrink: 1 },
   bodyPad: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,

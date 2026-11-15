@@ -13,6 +13,7 @@ from . import support_api
 from . import premium_api
 from . import remote_config_api
 from . import phase5_api
+from . import feedback_api
 from . import health
 
 from . import travel_people_api
@@ -106,6 +107,7 @@ urlpatterns = [
     path('jobs/push-campaigns/', devices_api.PushCampaignsJobView.as_view(), name='jobs-push-campaigns'),
     path('jobs/refresh-inactivity/', devices_api.RefreshInactivityJobView.as_view(), name='jobs-refresh-inactivity'),
     path('jobs/sync-integrations/', integrations_views.SyncIntegrationsJobView.as_view(), name='jobs-sync-integrations'),
+    path('webhooks/google-form/', feedback_api.GoogleFormWebhookView.as_view(), name='webhooks-google-form'),
     # Ops panel (staff only)
     path('ops/auth/login/', integrations_views.OpsLoginView.as_view(), name='ops-auth-login'),
     path('ops/auth/refresh/', integrations_views.OpsRefreshView.as_view(), name='ops-auth-refresh'),
@@ -113,6 +115,8 @@ urlpatterns = [
     path('ops/dashboard/', ops_api.OpsDashboardView.as_view(), name='ops-dashboard'),
     path('ops/dashboard/summary/', ops_dashboard_api.OpsDashboardSummaryView.as_view(), name='ops-dashboard-summary'),
     path('ops/reports/analytics/', ops_dashboard_api.OpsAnalyticsReportView.as_view(), name='ops-reports-analytics'),
+    path('ops/feedback/', feedback_api.OpsFeedbackListView.as_view(), name='ops-feedback'),
+    path('ops/feedback/<int:feedback_id>/', feedback_api.OpsFeedbackDetailView.as_view(), name='ops-feedback-detail'),
     path('ops/users/', ops_api.OpsUserListView.as_view(), name='ops-users'),
     path('ops/users/refresh-inactivity/', ops_api.OpsRefreshInactivityView.as_view(), name='ops-refresh-inactivity'),
     path('ops/users/export/', phase5_api.OpsUsersExportView.as_view(), name='ops-users-export'),

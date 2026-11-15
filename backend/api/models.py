@@ -1732,3 +1732,49 @@ class BotDailyUsage(models.Model):
 
     def __str__(self):
         return f'BotDailyUsage({self.user_id} {self.day} {self.count})'
+
+
+class TesterFeedback(models.Model):
+    """Beta tester feedback ingested from Google Forms (webhook or manual/sync)."""
+
+    STATUS_NEW = 'new'
+    STATUS_REVIEWED = 'reviewed'
+    STATUS_RESOLVED = 'resolved'
+    STATUS_CHOICES = [
+        (STATUS_NEW, 'New'),
+        (STATUS_REVIEWED, 'Reviewed'),
+        (STATUS_RESOLVED, 'Resolved'),
+    ]
+
+    external_id = models.CharField(max_length=128, unique=True, null=True, blank=True)
+    source = models.CharField(max_length=32, default='google_form')
+    submitted_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    platform = models.CharField(max_length=120, blank=True, default='')
+    ease_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    discovery_level = models.CharField(max_length=120, blank=True, default='')
+    features_tried = models.JSONField(default=list, blank=True)
+    trai_experience = models.CharField(max_length=255, blank=True, default='')
+    price_range = models.CharField(max_length=120, blank=True, default='')
+    favorite_feature = models.TextField(blank=True, default='')
+    bugs_or_confusion = models.TextField(blank=True, default='')
+    improvement_idea = models.TextField(blank=True, default='')
+    recommend_score = models.PositiveSmallIntegerField(null=True, blank=True)
+    contact = models.CharField(max_length=255, blank=True, default='')
+
+    raw_answers = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_NEW, db_index=True)
+    staff_note = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-submitted_at', '-id']
+        indexes = [
+            models.Index(fields=['status', '-submitted_at'], name='feedback_status_sub_idx'),
+        ]
+
+    def __str__(self):
+        return f'TesterFeedback({self.id}, {self.platform or "unknown"}, {self.status})'
+

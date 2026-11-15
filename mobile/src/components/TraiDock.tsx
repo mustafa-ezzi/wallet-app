@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'expo-router'
 import {
   Animated,
+  DeviceEventEmitter,
   Image,
   Keyboard,
   Platform,
@@ -18,12 +19,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { accountsApi, botApi, type BotTurnResult } from '@/src/api/client'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { subscribeTraiAsk } from '@/src/lib/traiLaunch'
-import { handsFreeAfter, stopHandsFree, voiceErrorLine } from '@/src/lib/traiVoice'
+import { anythingElse, declineAnother, handsFreeAfter, stopHandsFree, voiceErrorLine } from '@/src/lib/traiVoice'
+import { wakeCommand } from '@/src/lib/traiWake'
 import { useReminders } from '@/src/notifications'
 import { usePrivacyLock } from '@/src/privacy/PrivacyLockContext'
 import { isThemeId } from '@/src/theme/colors'
 import { useColors, useTheme } from '@/src/theme/ThemeContext'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
+import { FORCE_TRAI_GUIDE_EVENT } from './TraiGuide'
 
 type MicButton = typeof import('./TraiMicButton').TraiMicButton
 type WakeListener = typeof import('./TraiWakeListener').TraiWakeListener
@@ -172,6 +175,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
   const stopVoiceRef = useRef<() => void>(() => {})
   const sendRef = useRef<(raw: string) => void>(() => {})
   const handsFreeRef = useRef(false)
+  const offerAnotherRef = useRef(false)
   const lingerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stageLift = useRef(new Animated.Value(0)).current
   const clearLinger = () => {
@@ -179,6 +183,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
     lingerTimer.current = null
   }
   const endHandsFree = (holdReply = false) => {
+    offerAnotherRef.current = false
     handsFreeRef.current = false
     setHandsFree(false)
     setText('')
@@ -192,6 +197,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
     }
   }
   const beginHandsFree = () => {
+    offerAnotherRef.current = false
     clearLinger()
     setLinger(false)
     setPreview(false)
@@ -229,7 +235,9 @@ export function TraiDock({ bottom }: { bottom: number }) {
   }
 
   const applyResult = (data: BotTurnResult) => {
-    if (handsFreeRef.current && !handsFreeAfter(data)) endHandsFree(true)
+    const followUp = handsFreeRef.current && !handsFreeAfter(data)
+    offerAnotherRef.current = followUp
+    const say = (text: string) => (followUp ? anythingElse(text) : text)
     const action = data.action
     if (data.saved && action?.action === 'set_theme' && isThemeId(action.theme)) void setThemeId(action.theme)
     if (data.saved && action?.action === 'set_travel') void refreshTravel()
@@ -252,6 +260,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
         travel: '/travel-mode',
       }[action.page || ''] as '/(tabs)' | '/(tabs)/wallets' | '/(tabs)/budgets' | '/(tabs)/bills' | '/(tabs)/reports' | '/(tabs)/settings' | '/travel-mode' | undefined
       if (path) {
+        offerAnotherRef.current = false
         endHandsFree()
         setOpen(false)
         router.push(path)
@@ -260,13 +269,13 @@ export function TraiDock({ bottom }: { bottom: number }) {
     const reply = data.reply || data.detail || ''
     if (data.saved) {
       setDraft(null)
-      push({ role: 'trai', text: reply || 'Saved.' })
+      push({ role: 'trai', text: say(reply || 'Saved.') })
       bumpRefresh()
       return
     }
     const lines = readLines(action)
     if (lines) {
-      push({ role: 'trai', text: reply, read: lines })
+      push({ role: 'trai', text: say(reply), read: lines })
       return
     }
     const writing = Boolean(action && data.draft_id && action.action !== 'ask' && action.action !== 'refuse')
@@ -284,7 +293,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
       return
     }
     if (/^Cancelled\./.test(reply)) setDraft(null)
-    push({ role: 'trai', text: reply, ask: action?.action === 'ask' })
+    push({ role: 'trai', text: say(reply), ask: action?.action === 'ask' })
   }
 
   turnsRef.current = turns
@@ -302,9 +311,28 @@ export function TraiDock({ bottom }: { bottom: number }) {
     return [...earlier, message].join('. ').slice(0, 500)
   }
 
+  const takeVoice = (message: string) => {
+    if (stopHandsFree(message)) {
+      offerAnotherRef.current = false
+      endHandsFree()
+      return
+    }
+    const woken = wakeCommand(message)
+    const command = woken === null ? message : woken
+    if (!command) return
+    if (offerAnotherRef.current && declineAnother(command)) {
+      offerAnotherRef.current = false
+      push({ role: 'trai', text: "Okay. I'll be here when you need me." })
+      endHandsFree(true)
+      return
+    }
+    void send(command)
+  }
+
   const send = async (raw: string) => {
     const message = raw.trim()
     if (!message || busy) return
+    offerAnotherRef.current = false
     stopVoiceRef.current()
     setListening(false)
     setText('')
@@ -507,13 +535,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
               ink={colors.text}
               muted={colors.textMuted}
               hints={wallets.map(wallet => wallet.name)}
-              onTranscript={message => {
-                if (stopHandsFree(message)) {
-                  endHandsFree()
-                  return
-                }
-                void send(message)
-              }}
+              onTranscript={takeVoice}
               onPartial={setText}
               onNotice={line => push({ role: 'trai', text: line })}
               onStop={hold => endHandsFree(Boolean(hold))}
@@ -565,7 +587,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
       ) : null}
       {TraiWakeListener ? (
         <TraiWakeListener
-          paused={open || handsFree || linger || preview}
+          paused={open || handsFree || preview}
           onArmed={setWakeArmed}
           onWake={command => {
             beginHandsFree()
@@ -607,13 +629,7 @@ export function TraiDock({ bottom }: { bottom: number }) {
               ink={colors.text}
               muted={colors.textMuted}
               hints={wallets.map(wallet => wallet.name)}
-              onTranscript={message => {
-                if (stopHandsFree(message)) {
-                  endHandsFree()
-                  return
-                }
-                void send(message)
-              }}
+              onTranscript={takeVoice}
               onPartial={setText}
               onNotice={line => push({ role: 'trai', text: line })}
               onStop={hold => endHandsFree(Boolean(hold))}
@@ -622,6 +638,15 @@ export function TraiDock({ bottom }: { bottom: number }) {
         </View>
       ) : null}
       {wakeArmed && !open && !stageOn ? <View pointerEvents="none" style={[styles.wakeRing, { bottom: bottom - 6 }]} /> : null}
+      {__DEV__ ? (
+        <Pressable
+          style={[styles.previewBtn, { bottom: bottom + (Platform.OS === 'web' ? 108 : 64), backgroundColor: colors.primaryDark }]}
+          onPress={() => DeviceEventEmitter.emit(FORCE_TRAI_GUIDE_EVENT)}
+          accessibilityLabel="Preview the Trai guide"
+        >
+          <Text style={styles.previewLabel}>Test guide</Text>
+        </Pressable>
+      ) : null}
       {Platform.OS === 'web' ? (
         <Pressable
           style={[styles.previewBtn, { bottom: bottom + 64, backgroundColor: colors.primary }]}

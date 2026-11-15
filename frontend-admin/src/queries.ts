@@ -5,6 +5,7 @@ import {
   createPromo,
   createTrackedLink,
   deleteCampaign,
+  deleteFeedback,
   deleteOpsUser,
   estimateCampaignAudience,
   searchCampaignRecipients,
@@ -15,6 +16,7 @@ import {
   fetchDashboardSummary,
   disconnectIntegration,
   fetchEntitlements,
+  fetchFeedback,
   fetchIntegrations,
   fetchTeam,
   fetchTrackedLinks,
@@ -40,6 +42,7 @@ import {
   sendCampaign,
   setTeamRole,
   syncIntegration,
+  updateFeedback,
   uploadLinkedInRows,
   setSupportStatus,
   suspendOpsUser,
@@ -84,6 +87,8 @@ export const queryKeys = {
   website: (params: Params) => ['growth', 'website', clean(params)] as const,
   websiteRealtime: ['growth', 'website', 'realtime'] as const,
   links: ['growth', 'links'] as const,
+  feedbackAll: ['feedback'] as const,
+  feedback: (params: Params) => ['feedback', clean(params)] as const,
 }
 
 // Dashboard
@@ -452,3 +457,29 @@ export function useAuditLog(params: Params) {
     placeholderData: keepPreviousData,
   })
 }
+
+export function useFeedback(params: Params) {
+  return useQuery({
+    queryKey: queryKeys.feedback(params),
+    queryFn: () => fetchFeedback(clean(params)),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useUpdateFeedback() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...payload }: { id: number; status?: 'new' | 'reviewed' | 'resolved'; staff_note?: string }) =>
+      updateFeedback(id, payload),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.feedbackAll }),
+  })
+}
+
+export function useDeleteFeedback() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: deleteFeedback,
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.feedbackAll }),
+  })
+}
+

@@ -9,6 +9,7 @@ import { FloatingIslandTabBar } from '@/src/components/FloatingIslandTabBar'
 import { OfflineBanner } from '@/src/offline'
 import { AmountUnlockSheet } from '@/src/privacy/AmountUnlockSheet'
 import { BudgetsWhatsNewDialog } from '@/src/components/BudgetsWhatsNewDialog'
+import { TraiGuide } from '@/src/components/TraiGuide'
 import { RatingPrompt } from '@/src/rating'
 import { useColors } from '@/src/theme/ThemeContext'
 
@@ -77,6 +78,7 @@ function TabsShell() {
         />
       ) : null}
       {user ? <TraiDock bottom={78 + Math.max(insets.bottom - 8, 0)} /> : null}
+      {user ? <TraiGuide bottom={78 + Math.max(insets.bottom - 8, 0)} /> : null}
 
       <AmountUnlockSheet />
       {user ? <BudgetsWhatsNewDialog /> : null}

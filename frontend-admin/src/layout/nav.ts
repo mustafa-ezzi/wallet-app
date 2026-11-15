@@ -2,6 +2,7 @@ import {
   BellRing,
   CalendarDays,
   ChartColumn,
+  ClipboardList,
   Crown,
   Globe,
   LayoutDashboard,
@@ -59,7 +60,10 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     label: 'Insights',
-    items: [{ label: 'Analytics report', to: '/insights/report', icon: ChartColumn, capability: 'analytics.read', keywords: ['analytics', 'trends', 'insights'] }],
+    items: [
+      { label: 'Analytics report', to: '/insights/report', icon: ChartColumn, capability: 'analytics.read', keywords: ['analytics', 'trends', 'insights'] },
+      { label: 'Tester feedback', to: '/insights/feedback', icon: ClipboardList, capability: 'feedback.read', keywords: ['google form', 'survey', 'testers', 'trai', 'pricing'] },
+    ],
   },
   {
     label: 'System',

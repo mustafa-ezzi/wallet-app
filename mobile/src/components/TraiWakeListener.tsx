@@ -23,6 +23,7 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
   const pendingWake = useRef<string | null>(null)
   const heardWake = useRef<string | null>(null)
   const handed = useRef(false)
+  const holdForEnd = useRef(false)
   const quietTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const restartTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   pausedRef.current = paused
@@ -107,12 +108,26 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
     }, 400)
   }
 
+  const resumeAfterRecognizerStops = () => {
+    if (!holdForEnd.current || !shouldListen.current || pausedRef.current) return
+    holdForEnd.current = false
+    clearRestart()
+    schedule()
+  }
+
   useSpeechRecognitionEvent('start', () => {
+    // The conversation uses the same recognizer. Ignore its start while wake is paused,
+    // or the next Hey Trai thinks the microphone is still busy and never arms.
+    if (pausedRef.current || !shouldListen.current || holdForEnd.current) return
     recognizing.current = true
     onArmedRef.current(true)
   })
   useSpeechRecognitionEvent('end', () => {
     recognizing.current = false
+    if (holdForEnd.current) {
+      resumeAfterRecognizerStops()
+      return
+    }
     const command = pendingWake.current ?? heardWake.current
     if (command !== null && !pausedRef.current) {
       deliverWake(command)
@@ -122,6 +137,10 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
   })
   useSpeechRecognitionEvent('error', (event) => {
     recognizing.current = false
+    if (holdForEnd.current) {
+      resumeAfterRecognizerStops()
+      return
+    }
     if (event.error === 'aborted') return
     if (event.error === 'not-allowed' || event.error === 'service-not-allowed' || event.error === 'language-not-supported') {
       denied.current = true
@@ -132,7 +151,7 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
     if (shouldListen.current && !pausedRef.current) schedule()
   })
   useSpeechRecognitionEvent('result', (event) => {
-    if (pausedRef.current || !shouldListen.current || pendingWake.current !== null) return
+    if (pausedRef.current || !shouldListen.current || holdForEnd.current || pendingWake.current !== null) return
     const command = wakeCommand(event.results?.[0]?.transcript || '')
     if (command === null) {
       heardWake.current = null
@@ -167,18 +186,43 @@ export function TraiWakeListener({ paused, onArmed, onWake }: Props) {
   useEffect(() => {
     const sync = (state: string) => {
       const foreground = state === 'active'
-      const active = foreground && !paused && !denied.current
+      const active = foreground && !pausedRef.current && !denied.current
       shouldListen.current = active
-      if (active) void arm()
-      else halt(!foreground)
+      if (!active) {
+        holdForEnd.current = false
+        halt(!foreground)
+        return
+      }
+      // The conversation just aborted this same recognizer. Start only after it has ended.
+      pendingWake.current = null
+      heardWake.current = null
+      handed.current = false
+      recognizing.current = false
+      holdForEnd.current = true
+      try {
+        ExpoSpeechRecognitionModule.abort()
+      } catch {
+        holdForEnd.current = false
+        void arm()
+        return
+      }
+      clearRestart()
+      restartTimer.current = setTimeout(() => {
+        if (!holdForEnd.current || !shouldListen.current || pausedRef.current) return
+        holdForEnd.current = false
+        void arm()
+      }, 700)
     }
     sync(AppState.currentState)
     const sub = AppState.addEventListener('change', sync)
     return () => {
       sub.remove()
       shouldListen.current = false
+      holdForEnd.current = false
+      clearRestart()
       // Hands-free already owns the microphone. Aborting here cuts off the sentence after "Hey Trai".
-      halt(!pausedRef.current)
+      if (!pausedRef.current) halt(true)
+      else onArmedRef.current(false)
     }
   }, [paused])
 

@@ -27,6 +27,8 @@ CAPABILITIES = (
     'campaigns.write',
     'support.read',
     'support.write',
+    'feedback.read',
+    'feedback.write',
     'config.read',
     'config.write',
     'audit.read',
@@ -44,6 +46,8 @@ _SUPPORT = frozenset({
     'users.read',
     'support.read',
     'support.write',
+    'feedback.read',
+    'feedback.write',
     'audit.read',
 })
 _MARKETING = frozenset({
@@ -55,8 +59,9 @@ _MARKETING = frozenset({
     'promos.write',
     'campaigns.read',
     'campaigns.write',
+    'feedback.read',
 })
-_VIEWER = frozenset({'dashboard.read', 'analytics.read', 'growth.read'})
+_VIEWER = frozenset({'dashboard.read', 'analytics.read', 'growth.read', 'feedback.read'})
 
 ROLE_CAPABILITIES = {
     ROLE_OWNER: _ALL,

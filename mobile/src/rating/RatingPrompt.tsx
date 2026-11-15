@@ -16,6 +16,7 @@ import { PrimaryButton } from '@/src/components/ui'
 import api from '@/src/api/client'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
+import { hasSeenTraiGuide } from '@/src/features/traiGuide'
 import { track } from '@/src/lib/analytics'
 import {
   markRatingDismissed,
@@ -65,7 +66,7 @@ export function RatingPrompt() {
     const t = setTimeout(() => {
       void (async () => {
         const { shouldShowPrompt } = await recordAppOpen()
-        if (cancelled || !shouldShowPrompt) return
+        if (cancelled || !shouldShowPrompt || !(await hasSeenTraiGuide())) return
         await openPrompt()
       })()
     }, 1800)

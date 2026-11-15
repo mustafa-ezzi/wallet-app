@@ -17,6 +17,20 @@ export function stopHandsFree(transcript: string): boolean {
   return /^(?:stop listening|stop|never mind|nevermind|that is enough|thats enough)$/.test(text)
 }
 
+/** After a finished voice task, these answers mean Trai should sleep. */
+export function declineAnother(transcript: string): boolean {
+  const text = transcript.replace(/[.!?]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
+  return /^(?:no|no thanks|no thank you|no thankyou|nah|nope|nothing|nothing else|that is all|thats all|that is it|thats it|i am good|im good|all good|all done|thanks|thank you)$/.test(text)
+}
+
+/** Spoken line after a task is done, while the microphone stays open. */
+export function anythingElse(reply: string): string {
+  const text = reply.replace(/\s+/g, ' ').trim()
+  const base = (text || 'Done.').replace(/[.?!]\s*$/, '')
+  if (/anything else\??$/i.test(base)) return base.endsWith('?') ? base : `${base}?`
+  return `${base}. Anything else?`
+}
+
 export function voiceErrorLine(code: string): string | null {
   if (code === 'aborted') return null
   if (code === 'not-allowed') return 'The microphone stayed off. Typing still works.'

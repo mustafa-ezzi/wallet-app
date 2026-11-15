@@ -434,6 +434,7 @@ export default function IncomeScreen() {
         }}
         title={receiveOpen ? `Record received — ${receiveOpen.name}` : 'Record received'}
         subtitle="Choose the wallet this payment went into."
+        scroll
       >
         <ErrorBanner message={error} />
         <Field label="Amount" value={receiveAmount} onChangeText={setReceiveAmount} keyboardType="decimal-pad" />

@@ -24,6 +24,7 @@ const AdsConfigPage = page(() => import('./pages/AdsConfigPage'), 'AdsConfigPage
 const SupportPage = page(() => import('./pages/SupportPage'), 'SupportPage')
 const AuditPage = page(() => import('./pages/AuditPage'), 'AuditPage')
 const AnalyticsReportPage = page(() => import('./pages/AnalyticsReportPage'), 'AnalyticsReportPage')
+const FeedbackPage = page(() => import('./pages/FeedbackPage'), 'FeedbackPage')
 const IntegrationsPage = page(() => import('./pages/IntegrationsPage'), 'IntegrationsPage')
 const WebsitePage = page(() => import('./pages/WebsitePage'), 'WebsitePage')
 const LinksPage = page(() => import('./pages/LinksPage'), 'LinksPage')
@@ -81,6 +82,7 @@ export default function App() {
                     <Route path="system/integrations" element={<Lazy><IntegrationsPage /></Lazy>} />
                     <Route path="system/team" element={<Lazy><TeamPage /></Lazy>} />
                     <Route path="insights/report" element={<Lazy><AnalyticsReportPage /></Lazy>} />
+                    <Route path="insights/feedback" element={<Lazy><FeedbackPage /></Lazy>} />
                     <Route path="ui" element={<Lazy><UiKitPage /></Lazy>} />
                   </Route>
                   <Route path="*" element={<Navigate to="/" replace />} />

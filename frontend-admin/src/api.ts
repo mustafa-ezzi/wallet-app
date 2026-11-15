@@ -851,3 +851,70 @@ export async function createTrackedLink(payload: {
   const { data } = await opsApi.post<TrackedLinkRow>('/ops/links/', payload)
   return data
 }
+
+export type FeedbackStatus = 'new' | 'reviewed' | 'resolved'
+
+export type TesterFeedbackItem = {
+  id: number
+  external_id: string | null
+  source: string
+  submitted_at: string | null
+  platform: string
+  ease_score: number | null
+  discovery_level: string
+  features_tried: string[]
+  trai_experience: string
+  price_range: string
+  favorite_feature: string
+  bugs_or_confusion: string
+  improvement_idea: string
+  recommend_score: number | null
+  contact: string
+  raw_answers: Record<string, unknown>
+  status: FeedbackStatus
+  staff_note: string
+  created_at: string | null
+  updated_at: string | null
+}
+
+export type FeedbackCountRow = { label: string; count: number }
+
+export type FeedbackSummary = {
+  total: number
+  new_count: number
+  avg_ease: number | null
+  avg_recommend: number | null
+  price_ranges: FeedbackCountRow[]
+  platforms: FeedbackCountRow[]
+  discovery_levels: FeedbackCountRow[]
+  trai_experiences: FeedbackCountRow[]
+  features_tried: FeedbackCountRow[]
+}
+
+export type FeedbackResponse = Paginated<TesterFeedbackItem> & {
+  summary: FeedbackSummary
+}
+
+export async function fetchFeedback(params?: Record<string, string | number | undefined>) {
+  const { data } = await opsApi.get<FeedbackResponse>('/ops/feedback/', { params })
+  return data
+}
+
+export async function updateFeedback(
+  id: number,
+  payload: { status?: FeedbackStatus; staff_note?: string },
+) {
+  const { data } = await opsApi.patch<TesterFeedbackItem>(`/ops/feedback/${id}/`, payload)
+  return data
+}
+
+export async function deleteFeedback(id: number) {
+  await opsApi.delete(`/ops/feedback/${id}/`)
+}
+
+export function feedbackWebhookUrl() {
+  const base = opsApi.defaults.baseURL || '/api'
+  if (/^https?:\/\//i.test(base)) return `${base}/webhooks/google-form/`
+  return `${window.location.origin}${base}/webhooks/google-form/`
+}
+

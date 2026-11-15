@@ -975,13 +975,13 @@ export default function HouseholdScreen() {
         ) : null}
       </ScrollView>
 
-      <AppSheet visible={createOpen} onClose={() => setCreateOpen(false)} title="Create household">
+      <AppSheet visible={createOpen} onClose={() => setCreateOpen(false)} title="Create household" scroll>
         <ErrorBanner message={error} />
         <Field label="Name" value={hhName} onChangeText={setHhName} placeholder="Home" autoCapitalize="words" />
         <PrimaryButton title="Create" onPress={() => void createHousehold()} loading={busy} />
       </AppSheet>
 
-      <AppSheet visible={joinOpen} onClose={() => setJoinOpen(false)} title="Join with code">
+      <AppSheet visible={joinOpen} onClose={() => setJoinOpen(false)} title="Join with code" scroll>
         <ErrorBanner message={error} />
         <Field
           label="Invite code"
@@ -997,7 +997,7 @@ export default function HouseholdScreen() {
         ) : null}
       </AppSheet>
 
-      <AppSheet visible={ledgerOpen} onClose={() => setLedgerOpen(false)} title="New ledger">
+      <AppSheet visible={ledgerOpen} onClose={() => setLedgerOpen(false)} title="New ledger" scroll>
         <Field
           label="Name"
           value={ledgerForm.name}
@@ -1101,7 +1101,7 @@ export default function HouseholdScreen() {
         <PrimaryButton title="Add expense" onPress={() => void addExpense()} loading={busy} />
       </AppSheet>
 
-      <AppSheet visible={editHhOpen} onClose={() => setEditHhOpen(false)} title="Edit household">
+      <AppSheet visible={editHhOpen} onClose={() => setEditHhOpen(false)} title="Edit household" scroll>
         <ErrorBanner message={error} />
         <Field
           label="Name"
@@ -1161,7 +1161,7 @@ export default function HouseholdScreen() {
         <PrimaryButton title="Done" onPress={() => setInviteOpen(false)} />
       </AppSheet>
 
-      <AppSheet visible={contribOpen} onClose={() => setContribOpen(false)} title="Contribute to pot">
+      <AppSheet visible={contribOpen} onClose={() => setContribOpen(false)} title="Contribute to pot" scroll>
         <Field label="Amount" value={contribForm.amount} onChangeText={(t) => setContribForm((f) => ({ ...f, amount: t }))} keyboardType="decimal-pad" />
         <Field label="Notes" value={contribForm.notes} onChangeText={(t) => setContribForm((f) => ({ ...f, notes: t }))} />
         <PrimaryButton title="Add contribution" onPress={() => void addContribution()} loading={busy} />

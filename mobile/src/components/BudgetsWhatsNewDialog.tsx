@@ -5,6 +5,7 @@ import { router } from 'expo-router'
 import { AppSheet } from '@/src/components/AppSheet'
 import { PrimaryButton } from '@/src/components/ui'
 import { markBudgetsFeatureSeen, shouldShowBudgetsWhatsNew } from '@/src/features/budgetsAnnounce'
+import { hasSeenTraiGuide } from '@/src/features/traiGuide'
 import { track } from '@/src/lib/analytics'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography, type ColorTokens } from '@/src/theme/colors'
@@ -22,7 +23,7 @@ export function BudgetsWhatsNewDialog() {
     let cancelled = false
     const t = setTimeout(() => {
       void (async () => {
-        if (!(await shouldShowBudgetsWhatsNew()) || cancelled) return
+        if (!(await hasSeenTraiGuide()) || !(await shouldShowBudgetsWhatsNew()) || cancelled) return
         track('feature_whats_new_shown', { feature: 'budgets_v1' })
         setVisible(true)
       })()

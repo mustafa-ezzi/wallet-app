@@ -354,6 +354,7 @@ export default function BudgetsScreen() {
             : `Budget · ${editing?.label || ''}`
         }
         subtitle={`Spent this month: ${money.fmt(editing?.spent ?? 0)}`}
+        scroll
       >
         <ErrorBanner message={error} />
         <Field
