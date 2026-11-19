@@ -14,6 +14,7 @@ from . import premium_api
 from . import remote_config_api
 from . import phase5_api
 from . import feedback_api
+from . import payment_slips_api
 from . import health
 
 from . import travel_people_api
@@ -53,6 +54,9 @@ urlpatterns = [
     path('bot/message/', bot_api.BotMessageView.as_view(), name='bot-message'),
     path('bot/confirm/', bot_api.BotConfirmView.as_view(), name='bot-confirm'),
     path('forecast/<int:year>/<int:month>/', views.ForecastView.as_view(), name='forecast'),
+    path('payables/<int:pk>/payments/', payment_slips_api.PayablePaymentsView.as_view(), name='payable-payments'),
+    path('receivables/<int:pk>/payments/', payment_slips_api.ReceivablePaymentsView.as_view(), name='receivable-payments'),
+    path('projects/<int:pk>/payments/', payment_slips_api.ProjectPaymentsView.as_view(), name='project-payments'),
     path('budgets/', budgets_api.BudgetsView.as_view(), name='budgets'),
     path('budgets/copy-from-previous/', budgets_api.BudgetCopyPreviousView.as_view(), name='budgets-copy'),
     path('budgets/<int:pk>/', budgets_api.BudgetDetailView.as_view(), name='budget-detail'),

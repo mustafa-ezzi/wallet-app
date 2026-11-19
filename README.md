@@ -82,3 +82,7 @@ Set backend vars: `SECRET_KEY`, `DEBUG=False`, `DATABASE_URL`, `FRONTEND_URL`
 Set frontend vars: `VITE_API_URL` (backend public URL, no trailing slash), and optionally `VITE_POSTHOG_KEY` + `VITE_POSTHOG_HOST` for product analytics (see `posthawk.md`).
 
 See backend `Procfile` for migrate + gunicorn start.
+
+## Author
+
+Built by **Mustafa Moiz** — [LinkedIn](https://www.linkedin.com/in/mustafa-moiz-5a0466273/)

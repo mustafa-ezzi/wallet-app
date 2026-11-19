@@ -419,14 +419,18 @@ class ReceivableInstallment(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-    @property
-    def amount_received(self) -> float:
+    def payment_transactions(self):
+        """Income rows counted as received. Payment slips must use this same set."""
         qs = self.transactions.filter(type='income')
         if self.linked_project_id:
             qs = Transaction.objects.filter(type='income').filter(
                 Q(pk__in=qs.values('pk')) | Q(linked_project_id=self.linked_project_id)
             ).distinct()
-        return _sum_amounts(qs)
+        return qs
+
+    @property
+    def amount_received(self) -> float:
+        return _sum_amounts(self.payment_transactions())
 
     @property
     def remaining_amount(self):
@@ -454,9 +458,13 @@ class PayableInstallment(models.Model):
     class Meta:
         ordering = ['-created_at']
 
+    def payment_transactions(self):
+        """Expense rows counted as paid. Payment slips must use this same set."""
+        return self.transactions.filter(type='expense')
+
     @property
     def amount_paid(self) -> float:
-        return _sum_amounts(self.transactions.filter(type='expense'))
+        return _sum_amounts(self.payment_transactions())
 
     @property
     def remaining_amount(self):
