@@ -17,6 +17,8 @@ import { getAskSlipAfterPayment, setAskSlipAfterPayment } from './promptPrefs'
 import { shareOrCopySlipMessage } from './shareMessage'
 import { shareSlipPdf } from './shareSlipPdf'
 import { buildSlipData } from './slipData'
+import { getSlipTemplateId, setSlipTemplateId } from './templatePrefs'
+import { DEFAULT_SLIP_TEMPLATE_ID, SLIP_TEMPLATES } from './templates'
 import { slipDate, slipLabels } from './templates/shared'
 import type { SlipData, SlipHistoryResponse, SlipKind } from './types'
 
@@ -246,6 +248,7 @@ function SlipSheet({
   const [sharing, setSharing] = useState(false)
   const [messageBusy, setMessageBusy] = useState(false)
   const [messageHint, setMessageHint] = useState('')
+  const [templateId, setTemplateId] = useState(DEFAULT_SLIP_TEMPLATE_ID)
 
   const load = useCallback(async () => {
     if (!target) return
@@ -279,9 +282,16 @@ function SlipSheet({
       const profileName = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim()
       setName(saved || profileName || user?.username || '')
     })
+    void getSlipTemplateId().then(setTemplateId)
     // Reload only when a different record is opened.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target?.kind, target?.id])
+
+  const pickTemplate = (id: string) => {
+    setTemplateId(id)
+    void setSlipTemplateId(id)
+    track('slip_template_selected', { template: id })
+  }
 
   const slipFromHistory = (): SlipData | null => {
     if (!history || !target) return null
@@ -302,10 +312,10 @@ function SlipSheet({
     try {
       const data = slipFromHistory()
       if (!data) return
-      track('slip_generated', { kind: target.kind, rows: data.payments.length })
-      await shareSlipPdf(data)
+      track('slip_generated', { kind: target.kind, rows: data.payments.length, template: templateId })
+      await shareSlipPdf(data, templateId)
       if (data.preparedBy && data.preparedBy !== 'WalletTrails user') void saveName(data.preparedBy)
-      track('slip_shared', { kind: target.kind, rows: data.payments.length })
+      track('slip_shared', { kind: target.kind, rows: data.payments.length, template: templateId })
       if (Platform.OS !== 'web') {
         setMessageHint('PDF ready. Tip: tap Share message to send the Play Store link with it.')
       }
@@ -401,6 +411,30 @@ function SlipSheet({
                 )
               })
             )}
+          </View>
+
+          <Text style={[styles.pickerLabel, { color: colors.textMuted }]}>Template</Text>
+          <View style={styles.pickerRow}>
+            {SLIP_TEMPLATES.map((t) => {
+              const active = t.id === templateId
+              return (
+                <Pressable
+                  key={t.id}
+                  onPress={() => pickTemplate(t.id)}
+                  style={[
+                    styles.pickerChip,
+                    {
+                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.primary : colors.surface,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.pickerChipText, { color: active ? '#fff' : colors.textSecondary }]}>
+                    {t.label}
+                  </Text>
+                </Pressable>
+              )
+            })}
           </View>
 
           <Field
@@ -508,4 +542,19 @@ const styles = StyleSheet.create({
   checkMark: { color: '#fff', fontSize: 13, fontWeight: '800' },
   dontAskText: { flex: 1, fontSize: typography.caption, lineHeight: 18 },
   hint: { fontSize: typography.caption, lineHeight: 18, marginTop: spacing.sm, textAlign: 'center' },
+  pickerLabel: {
+    fontSize: typography.label,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+  },
+  pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  pickerChip: {
+    borderWidth: 1,
+    borderRadius: radii.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  pickerChipText: { fontWeight: '800', fontSize: typography.body },
 })

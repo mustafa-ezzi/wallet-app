@@ -1,7 +1,9 @@
 import type { SlipTemplate } from '../types'
 import { classicTemplate } from './classic'
+import { minimalTemplate } from './minimal'
+import { receiptTemplate } from './receipt'
 
-export const SLIP_TEMPLATES: SlipTemplate[] = [classicTemplate]
+export const SLIP_TEMPLATES: SlipTemplate[] = [classicTemplate, minimalTemplate, receiptTemplate]
 
 export const DEFAULT_SLIP_TEMPLATE_ID = classicTemplate.id
 

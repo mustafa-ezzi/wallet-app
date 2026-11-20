@@ -2,6 +2,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { classicTemplate } from '../templates/classic.ts'
+import { minimalTemplate } from '../templates/minimal.ts'
+import { receiptTemplate } from '../templates/receipt.ts'
+import { getSlipTemplate, SLIP_TEMPLATES } from '../templates/index.ts'
 import { slipDate, slipMoney } from '../templates/shared.ts'
 import { buildSlipData, buildSlipNumber, buildSlipShareMessage, DEFAULT_STORE_URL, slipFileName } from '../slipData.ts'
 
@@ -173,4 +176,34 @@ test('share message uses paid/received wording and store link', () => {
   const owed = buildSlipShareMessage(render(history({ kind: 'receivable', direction: 'owed', name: 'Ali' }), { storeUrl: 'https://example.com/app' }).data)
   assert.match(owed, /^Payment receipt for Ali — Rs 30,000 received, Rs 90,000 remaining\./)
   assert.ok(owed.includes('Generated with WalletTrails: https://example.com/app'))
+})
+
+test('template registry includes Classic, Minimal, and Receipt', () => {
+  assert.deepEqual(SLIP_TEMPLATES.map((t) => t.id), ['classic', 'minimal', 'receipt'])
+  assert.equal(getSlipTemplate('minimal').id, 'minimal')
+  assert.equal(getSlipTemplate('receipt').id, 'receipt')
+  assert.equal(getSlipTemplate('missing').id, 'classic')
+})
+
+test('minimal and receipt templates escape names and show totals', () => {
+  const data = render(history({ name: '<Ali & Sons>' })).data
+  for (const tmpl of [minimalTemplate, receiptTemplate]) {
+    const html = tmpl.render(data)
+    assert.ok(html.includes('&lt;Ali &amp; Sons&gt;'))
+    assert.ok(!html.includes('<Ali & Sons>'))
+    assert.match(html, /Rs 30,000/)
+    assert.match(html, /Rs 90,000/)
+    assert.match(html, /Generated with WalletTrails/)
+    assert.match(html, /Payment Slip/)
+  }
+})
+
+test('receipt template uses ticket layout; minimal has no teal header bar', () => {
+  const data = render(history()).data
+  const receipt = receiptTemplate.render(data)
+  assert.match(receipt, /class="ticket"/)
+  assert.match(receipt, /Courier New/)
+  const minimal = minimalTemplate.render(data)
+  assert.doesNotMatch(minimal, /background: #04333b/)
+  assert.match(minimal, /Georgia/)
 })

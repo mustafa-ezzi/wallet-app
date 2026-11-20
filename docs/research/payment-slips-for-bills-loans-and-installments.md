@@ -410,6 +410,17 @@ Add the same **Slip** button on the web Bills page (`frontend/src/pages/Expenses
 - Add a template picker on the slip sheet; remember the last choice on the device.
 - Slips are Pro only (Phase 0), so every template is part of Pro.
 
+**Status: built (21 November 2026).**
+
+- Templates (mobile + web):
+  - **Classic** — teal branded sheet (v1)
+  - **Minimal** — Georgia/serif, black rules, no teal blocks
+  - **Receipt** — narrow dashed ticket, monospace “thermal” look
+- Registry: `SLIP_TEMPLATES` in `templates/index.ts`. Adding a template is one new file + one registry line.
+- Picker on the slip sheet / web modal; last choice saved as `wallettrails_slip_template_id`.
+- Analytics: `slip_template_selected`, and `template` on `slip_generated` / `slip_shared`.
+- Urdu/bilingual left for a later pass (needs copy review).
+
 ---
 
 ## 5. Summary

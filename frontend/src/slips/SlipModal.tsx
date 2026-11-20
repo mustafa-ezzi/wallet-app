@@ -7,9 +7,11 @@ import { fmt } from '../utils/format'
 import { SLIP_LOGO_DATA_URI } from './logo'
 import { printHtml } from './printHtml'
 import { buildSlipData, buildSlipShareMessage, DEFAULT_STORE_URL, slipFileName } from './slipData'
-import { getSlipTemplate } from './templates'
+import { getSlipTemplate, SLIP_TEMPLATES } from './templates'
 import { slipDate, slipLabels } from './templates/shared'
 import type { SlipHistoryResponse, SlipKind } from './types'
+
+const TEMPLATE_KEY = 'wallettrails_slip_template_id'
 
 export type SlipTarget = {
   kind: SlipKind
@@ -52,6 +54,7 @@ export function SlipModal({ target, onClose }: Props) {
   const [hint, setHint] = useState('')
   const [proOnly, setProOnly] = useState(false)
   const [storeUrl, setStoreUrl] = useState(DEFAULT_STORE_URL)
+  const [templateId, setTemplateId] = useState(() => getSlipTemplate(localStorage.getItem(TEMPLATE_KEY)).id)
 
   useEffect(() => {
     if (!target) {
@@ -115,12 +118,12 @@ export function SlipModal({ target, onClose }: Props) {
         storeUrl,
         highlightTransactionId: target.highlightTransactionId ?? null,
       })
-      const html = getSlipTemplate().render(data)
+      const html = getSlipTemplate(templateId).render(data)
       const fileName = slipFileName(data.counterparty, data.generatedAt)
-      track('slip_generated', { kind: target.kind, rows: data.payments.length, surface: 'web' })
+      track('slip_generated', { kind: target.kind, rows: data.payments.length, surface: 'web', template: templateId })
       await printHtml(html, fileName)
       if (preparedBy) localStorage.setItem(NAME_KEY, preparedBy)
-      track('slip_shared', { kind: target.kind, rows: data.payments.length, surface: 'web' })
+      track('slip_shared', { kind: target.kind, rows: data.payments.length, surface: 'web', template: templateId })
       setHint('Use Save as PDF in the print dialog.')
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not open the print dialog.'))
@@ -259,6 +262,32 @@ export function SlipModal({ target, onClose }: Props) {
                       )
                     })
                   )}
+                </div>
+
+                <div>
+                  <div className="text-muted" style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '0.4rem' }}>
+                    Template
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+                    {SLIP_TEMPLATES.map((t) => {
+                      const active = t.id === templateId
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          className={active ? 'btn-primary' : 'btn-glass'}
+                          style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+                          onClick={() => {
+                            setTemplateId(t.id)
+                            localStorage.setItem(TEMPLATE_KEY, t.id)
+                            track('slip_template_selected', { template: t.id, surface: 'web' })
+                          }}
+                        >
+                          {t.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 <label style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.8rem' }}>

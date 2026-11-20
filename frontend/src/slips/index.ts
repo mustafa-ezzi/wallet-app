@@ -8,4 +8,7 @@ export {
 } from './slipData'
 export { printHtml } from './printHtml'
 export { DEFAULT_SLIP_TEMPLATE_ID, getSlipTemplate, SLIP_TEMPLATES } from './templates'
+export { classicTemplate } from './templates/classic'
+export { minimalTemplate } from './templates/minimal'
+export { receiptTemplate } from './templates/receipt'
 export type { SlipData, SlipDirection, SlipHistoryResponse, SlipKind, SlipPayment, SlipTemplate } from './types'
