@@ -63,6 +63,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "test:slips": "node --experimental-strip-types --no-warnings --import ./scripts/ts-resolve.mjs --test src/slips/__tests__/slips.test.mjs",
+    "test:detected-tx": "node --experimental-strip-types --no-warnings --import ./scripts/ts-resolve.mjs --test src/notifications/__tests__/detectedTransactionCopy.test.mjs",
     "slips:samples": "node --experimental-strip-types --no-warnings --import ./scripts/ts-resolve.mjs scripts/slip-samples.mjs"
   },
   "private": true

@@ -5,6 +5,7 @@ import { fmt, toMoney } from '@/src/utils/format'
 import { track } from '@/src/lib/analytics'
 import { getPrivacyEnabled } from '@/src/privacy/storage'
 import { getReminderPrefs, leadDaysFromPrefs } from './storage'
+import { DETECTED_TX_CHANNEL_ID } from './detectedTransactionCopy'
 
 const CHANNEL_ID = 'WalletTrails-due-reminders'
 export const REMINDER_CATEGORY = 'WalletTrails_due'
@@ -83,6 +84,11 @@ export async function ensureAndroidChannel(): Promise<void> {
     name: 'Product updates',
     importance: Notifications.AndroidImportance.DEFAULT,
     description: 'WalletTrails news and product updates',
+  })
+  await Notifications.setNotificationChannelAsync(DETECTED_TX_CHANNEL_ID, {
+    name: 'Transaction alerts',
+    importance: Notifications.AndroidImportance.HIGH,
+    description: 'Asks you to approve a detected transaction and keep your records',
   })
 }
 

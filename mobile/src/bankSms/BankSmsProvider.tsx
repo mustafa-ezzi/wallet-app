@@ -10,6 +10,7 @@ import {
 import { AppState, Platform } from 'react-native'
 import { useAuth } from '@/src/context/AuthContext'
 import { bankSmsApi } from '@/src/api/client'
+import { dismissDetectedTransactionBanner } from '@/src/notifications/detectedTransaction'
 import { ingestBankSmsBody } from './ingest'
 import {
   getSmsPermissionGranted,
@@ -92,6 +93,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       const res = await bankSmsApi.list({ status: 'pending' })
       const rows = Array.isArray(res.data) ? res.data : []
       setPendingCount(rows.length)
+      if (rows.length === 0) void dismissDetectedTransactionBanner()
     } catch {
       /* offline */
     } finally {

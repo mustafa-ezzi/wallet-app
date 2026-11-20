@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router'
 import { useAuth } from '@/src/context/AuthContext'
 import { track } from '@/src/lib/analytics'
 import type { Account, Payable, Receivable, RecurringExpense } from '@/src/api/types'
+import { claimDetectedTxResponse } from './detectedTransaction'
 import {
   getPermissionStatus,
   requestReminderPermission,
@@ -93,7 +94,34 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (Platform.OS === 'web') return
 
+    const openDetected = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data as {
+        type?: string
+        kind?: string
+        source?: string
+        importId?: number | string
+      }
+      if (data?.type !== 'bank_sms_review') return false
+      const key = response.notification.request.identifier
+      void (async () => {
+        const fresh = await claimDetectedTxResponse(key)
+        if (!fresh) return
+        track('detected_tx_notification_opened', {
+          kind: typeof data.kind === 'string' ? data.kind : 'unknown',
+          source: typeof data.source === 'string' ? data.source : 'unknown',
+        })
+        const importId = Number(data.importId)
+        if (Number.isFinite(importId) && importId > 0) {
+          router.push(`/bank-sms?focus=${importId}` as never)
+        } else {
+          router.push('/bank-sms' as never)
+        }
+      })()
+      return true
+    }
+
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      if (openDetected(response)) return
       const data = response.notification.request.content.data as
         | (ReminderData & { type?: string; route?: string; screen?: string; thread_id?: number })
         | undefined
@@ -153,6 +181,10 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
         router.push(`/(tabs)/bills${q}` as never)
       }
     })
+    void Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) openDetected(response)
+    })
+
     return () => sub.remove()
   }, [router])
 

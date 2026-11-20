@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
   BANK_SMS_UX,
@@ -27,6 +27,13 @@ import {
   type WalletLike,
 } from '@/src/lib/bank-sms-parser'
 import { DateField, SelectField } from '@/src/components/SelectFields'
+import {
+  dismissDetectedTransactionBanner,
+  getDetectedTxAlertsEnabled,
+  notifyDetectedTransaction,
+  setDetectedTxAlertsEnabled,
+} from '@/src/notifications/detectedTransaction'
+import { getPermissionStatus, requestReminderPermission } from '@/src/notifications/schedule'
 import { AppSheet } from '@/src/components/AppSheet'
 import { ErrorBanner, PrimaryButton } from '@/src/components/ui'
 import {
@@ -99,6 +106,7 @@ function draftFromRow(row: BankSmsImportRow): ApproveDraft {
 
 export default function BankSmsScreen() {
   const router = useRouter()
+  const params = useLocalSearchParams<{ focus?: string }>()
   const insets = useSafeAreaInsets()
   const colors = useColors()
   const styles = useMemo(() => makeStyles(colors), [colors])
@@ -135,6 +143,9 @@ export default function BankSmsScreen() {
   const [busy, setBusy] = useState(false)
   const [notifDisclosureOpen, setNotifDisclosureOpen] = useState(false)
   const notifDisclosureResolve = useRef<((ok: boolean) => void) | null>(null)
+  const [detectAlertsOn, setDetectAlertsOn] = useState(true)
+  const [detectAlertsPerm, setDetectAlertsPerm] = useState<'granted' | 'denied' | 'undetermined'>('undetermined')
+  const focusedImport = useRef<number | null>(null)
 
   useEffect(() => {
     registerNotifAccessDisclosureGate(
@@ -229,6 +240,13 @@ export default function BankSmsScreen() {
     void loadSettings()
     void loadBooks()
   }, [loadWallets, loadPending, loadSettings, loadBooks])
+
+  useEffect(() => {
+    void (async () => {
+      setDetectAlertsOn(await getDetectedTxAlertsEnabled())
+      setDetectAlertsPerm(await getPermissionStatus())
+    })()
+  }, [])
 
   const banks = useMemo(() => wallets.filter((w) => w.type === 'bank'), [wallets])
   const cards = useMemo(() => wallets.filter((w) => w.type === 'credit_card'), [wallets])
@@ -360,7 +378,25 @@ export default function BankSmsScreen() {
       })
       setPendingId(res.data.id)
       setDraft(draftFromRow(res.data))
-      await loadPending()
+      let pendingCount = 1
+      try {
+        const listed = await bankSmsApi.list({ status: 'pending' })
+        const rows = Array.isArray(listed.data) ? listed.data : []
+        setPending(rows)
+        pendingCount = Math.max(1, rows.length)
+      } catch {
+        await loadPending()
+      }
+      const stillPending = res.data.status !== 'approved' && res.data.status !== 'rejected'
+      if (res.status === 201 && stillPending) {
+        void notifyDetectedTransaction({
+          id: res.data.id,
+          kind: res.data.kind,
+          amount: res.data.amount,
+          pendingCount,
+          source: 'paste',
+        })
+      }
       let msg = `Saved to pending (#${res.data.id}). Approve here or on web.`
       if (needsManualTypePick(p)) msg += ' Low confidence — confirm the type before approving.'
       setOkMsg(msg)
@@ -412,6 +448,17 @@ export default function BankSmsScreen() {
     if (acct) setAliasWalletId(String(acct))
     void loadPeopleHint(row.counterparty)
   }
+
+  useEffect(() => {
+    const raw = Array.isArray(params.focus) ? params.focus[0] : params.focus
+    const id = Number(raw)
+    if (!Number.isFinite(id) || id <= 0) return
+    if (focusedImport.current === id) return
+    const row = pending.find((r) => r.id === id)
+    if (!row) return
+    focusedImport.current = id
+    openPending(row)
+  }, [params.focus, pending])
 
   const patchDraft = (patch: Partial<ApproveDraft>) => {
     setDraft((prev) => (prev ? { ...prev, ...patch } : prev))
@@ -523,6 +570,7 @@ export default function BankSmsScreen() {
         + (rememberW ? ' · wallet remembered' : '')
         + (rememberK ? ' · type saved' : ''),
       )
+      void dismissDetectedTransactionBanner(id)
       await refreshBooksAfterAction()
     } catch (err) {
       if (isAlreadyHandledError(err)) {
@@ -554,6 +602,7 @@ export default function BankSmsScreen() {
     try {
       await bankSmsApi.reject(id)
       setOkMsg(`Rejected #${id}.`)
+      void dismissDetectedTransactionBanner(id)
       await refreshBooksAfterAction()
     } catch (err) {
       if (isAlreadyHandledError(err)) {
@@ -641,6 +690,7 @@ export default function BankSmsScreen() {
     try {
       const res = await bankSmsApi.batchApprove({ ids })
       const errN = res.data.errors?.length || 0
+      if (res.data.approved.length > 0) void dismissDetectedTransactionBanner()
       setOkMsg(`Batch approved ${res.data.approved.length}${errN ? ` · ${errN} failed` : ''}.`)
       if (errN) setError(res.data.errors.map((e) => `#${e.id}: ${e.detail}`).join(' · '))
       await refreshBooksAfterAction()
@@ -661,6 +711,7 @@ export default function BankSmsScreen() {
     if (pendingId && ids.includes(pendingId)) clearReviewForm()
     try {
       const res = await bankSmsApi.batchReject({ ids })
+      if (res.data.rejected_count > 0) void dismissDetectedTransactionBanner()
       setOkMsg(`Rejected ${res.data.rejected_count} item(s).`)
       await refreshBooksAfterAction()
     } catch (err) {

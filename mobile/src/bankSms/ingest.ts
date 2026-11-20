@@ -10,6 +10,7 @@ import {
   type WalletLike,
 } from '@/src/lib/bank-sms-parser'
 import { accountsApi, asList, bankSmsApi } from '@/src/api/client'
+import { notifyDetectedTransaction } from '@/src/notifications/detectedTransaction'
 import { getBankSmsAutoApprove } from './storage'
 import { bankHintForPackage, bankLabelFromText } from './walletApps'
 
@@ -44,12 +45,22 @@ async function loadSettings(): Promise<{
 }
 
 export type IngestResult =
-  | { ok: true; id: number; kind: string }
+  | { ok: true; id: number; kind: string; created: boolean; pending: boolean }
   | { ok: false; reason: string }
 
 export type IngestMeta = {
   packageName?: string
   appName?: string
+}
+
+async function countPending(): Promise<number> {
+  try {
+    const res = await bankSmsApi.list({ status: 'pending' })
+    const rows = Array.isArray(res.data) ? res.data : []
+    return Math.max(1, rows.length)
+  } catch {
+    return 1
+  }
 }
 
 function guessKindFromBody(text: string): BankSmsKind {
@@ -151,11 +162,12 @@ export async function ingestBankSmsBody(
 
     const id = res.data.id
     const kind = res.data.kind
+    const created = res.status === 201
     // Already approved (cross-source TID dedupe) — do not create a second transaction.
     const importStatus = (res.data as { status?: string }).status
     // Already saved or dismissed — do not create a second transaction.
     if (importStatus === 'approved' || importStatus === 'rejected') {
-      return { ok: true, id, kind }
+      return { ok: true, id, kind, created: false, pending: false }
     }
     const autoOn = await getBankSmsAutoApprove()
     const canAuto =
@@ -164,6 +176,7 @@ export async function ingestBankSmsBody(
       && Boolean(bankId)
       && !needsManualTypePick(parsed)
 
+    let pending = true
     if (canAuto && bankId) {
       try {
         await bankSmsApi.approve(id, {
@@ -178,12 +191,30 @@ export async function ingestBankSmsBody(
           create_cash: draft.kind === 'atm' && !draft.recordAtmAsExpense && !cashId,
           create_cash_name: draft.createCashNamed || 'Cash',
         })
+        pending = false
       } catch {
         // Leave pending for inbox review if approve fails.
       }
     }
 
-    return { ok: true, id, kind }
+    // 201 + still pending only. A 200 is a duplicate and stays quiet.
+    // Auto-approve success stays quiet too.
+    if (created && pending) {
+      try {
+        const pendingCount = await countPending()
+        await notifyDetectedTransaction({
+          id,
+          kind,
+          amount: draft.amount,
+          pendingCount,
+          source,
+        })
+      } catch {
+        /* the draft is saved; the banner is best-effort */
+      }
+    }
+
+    return { ok: true, id, kind, created, pending }
   } catch (err: unknown) {
     const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
     return { ok: false, reason: typeof detail === 'string' ? detail : 'create-failed' }
