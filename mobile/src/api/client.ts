@@ -7,6 +7,7 @@ import {
   setTokens,
   upsertActiveSession,
 } from './authStorage'
+import type { SlipHistoryResponse } from '@/src/slips/types'
 
 /** Always-on fallback so a misconfigured EAS build never points at invalid.local. */
 const PRODUCTION_API_ROOT = 'https://tranquil-radiance-production.up.railway.app'
@@ -378,6 +379,12 @@ export const receivablesApi = {
   create: (data: object) => api.post('/receivables/', data),
   update: (id: number, data: object) => api.patch(`/receivables/${id}/`, data),
   remove: (id: number) => api.delete(`/receivables/${id}/`),
+}
+
+export const slipsApi = {
+  payable: (id: number) => api.get<SlipHistoryResponse>(`/payables/${id}/payments/`),
+  receivable: (id: number) => api.get<SlipHistoryResponse>(`/receivables/${id}/payments/`),
+  project: (id: number) => api.get<SlipHistoryResponse>(`/projects/${id}/payments/`),
 }
 
 export const forecastApi = {

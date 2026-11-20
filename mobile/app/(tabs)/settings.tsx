@@ -35,6 +35,7 @@ import { useRemoteConfig } from '@/src/config/RemoteConfigContext'
 import { radii, spacing, typography } from '@/src/theme/colors'
 import { useTravelMode } from '@/src/travel/TravelModeContext'
 import { PRIVACY_POLICY_URL } from '@/src/constants/legal'
+import { getAskSlipAfterPayment, setAskSlipAfterPayment } from '@/src/slips/promptPrefs'
 
 const PLAY_PACKAGE = 'com.wallettrails.android'
 const PLAY_SUBSCRIPTION_SKUS = new Set(['premium_monthly', 'premium_yearly'])
@@ -98,6 +99,7 @@ export default function SettingsScreen() {
   const [pushSyncMsg, setPushSyncMsg] = useState('')
   const [connMsg, setConnMsg] = useState('')
   const [connBusy, setConnBusy] = useState(false)
+  const [askSlipAfterPayment, setAskSlipAfterPaymentState] = useState(true)
   const [promoCode, setPromoCode] = useState('')
   const [promoBusy, setPromoBusy] = useState(false)
   const [promoMsg, setPromoMsg] = useState('')
@@ -133,6 +135,9 @@ export default function SettingsScreen() {
       setWalletCount(wallets.length)
       setBankCount(list.filter((a) => a.type === 'bank').length)
     }).catch(() => undefined)
+    void getAskSlipAfterPayment().then((ask) => {
+      if (!cancelled) setAskSlipAfterPaymentState(ask)
+    })
     return () => {
       cancelled = true
     }
@@ -429,6 +434,15 @@ export default function SettingsScreen() {
                   onSwitch={(v) => void onTogglePrivacy(v)}
                 />
               ) : null}
+              <SettingsRow
+                icon="file-pdf-o"
+                title="Ask for slip after payment"
+                switchValue={askSlipAfterPayment}
+                onSwitch={(v) => {
+                  setAskSlipAfterPaymentState(v)
+                  void setAskSlipAfterPayment(v)
+                }}
+              />
               <SettingsRow
                 icon="bell-o"
                 title="Reminders"

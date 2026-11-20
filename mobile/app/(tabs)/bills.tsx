@@ -30,6 +30,7 @@ import { ErrorBanner, Field, PrimaryButton, Screen } from '@/src/components/ui'
 import { useMoneyUi } from '@/src/context/MoneyUiContext'
 import { useReminders } from '@/src/notifications'
 import { useMaskedMoney } from '@/src/privacy/useMaskedMoney'
+import { useSlipLauncher } from '@/src/slips/SlipSheet'
 import { useColors } from '@/src/theme/ThemeContext'
 import { radii, spacing, typography } from '@/src/theme/colors'
 import { mutationId, sumMoney, todayISO, toMoney } from '@/src/utils/format'
@@ -76,6 +77,7 @@ export default function BillsScreen() {
   const focusId = params.id ? Number(params.id) : null
   const { refreshKey, bumpRefresh } = useMoneyUi()
   const money = useMaskedMoney()
+  const { openSlip, offerAfterPayment, slipSheets } = useSlipLauncher()
   const {
     reschedule,
     showPromptBanner,
@@ -253,11 +255,21 @@ export default function BillsScreen() {
                   category: 'One-time Income',
                   notes: `One-time payment: ${recordModal.name}`,
                 }
-      await transactionsApi.create(payload)
+      const { data: created } = await transactionsApi.create(payload)
+      const saved = recordModal
       setRecordModal(null)
       setRecordAmount('')
       bumpRefresh()
       await load(true)
+      if (saved.kind === 'payable' || saved.kind === 'receivable' || saved.kind === 'project') {
+        const txId = (created as { id?: number } | undefined)?.id
+        void offerAfterPayment({
+          kind: saved.kind,
+          id: saved.id,
+          name: saved.name,
+          highlightTransactionId: typeof txId === 'number' ? txId : null,
+        })
+      }
     } catch (err) {
       setError(apiErrorMessage(err, 'Could not record payment.'))
     } finally {
@@ -456,13 +468,6 @@ export default function BillsScreen() {
         { text: 'Confirm', onPress: () => void setPayableStatus(item, next) },
       ],
     )
-  }
-
-  const markPayableComplete = (item: Payable) => {
-    Alert.alert('Mark as completed?', `Mark "${item.name}" as fully paid?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Mark completed', onPress: () => void setPayableStatus(item, 'completed') },
-    ])
   }
 
   const deletePayable = (item: Payable) => {
@@ -1017,6 +1022,12 @@ export default function BillsScreen() {
                               )
                             ) : null}
                             <BouncyPressable
+                              style={[styles.actionBtnOutline, { borderColor: colors.primary }]}
+                              onPress={() => openSlip({ kind: 'payable', id: item.id, name: item.name })}
+                            >
+                              <Text style={[styles.actionOutlineText, { color: colors.primary }]}>Slip</Text>
+                            </BouncyPressable>
+                            <BouncyPressable
                               style={[styles.actionBtnOutline, { borderColor: colors.border }]}
                               onPress={() => openEditPayable(item)}
                             >
@@ -1043,15 +1054,6 @@ export default function BillsScreen() {
                             >
                               <Text style={[styles.actionOutlineText, { color: colors.danger }]}>Delete</Text>
                             </BouncyPressable>
-                            {item.status === 'ongoing' ? (
-                              <BouncyPressable
-                                disabled={isBusy}
-                                style={[styles.actionBtnOutline, { borderColor: 'rgba(22,163,74,0.3)' }]}
-                                onPress={() => markPayableComplete(item)}
-                              >
-                                <Text style={[styles.actionOutlineText, { color: colors.success }]}>Mark Complete</Text>
-                              </BouncyPressable>
-                            ) : null}
                           </View>
                         </View>
                       </Reveal>
@@ -1124,6 +1126,12 @@ export default function BillsScreen() {
                                   <Text style={[styles.actionBtnMutedText, { color: colors.success }]}>✓ Fully received</Text>
                                 </View>
                               )}
+                              <BouncyPressable
+                                style={[styles.actionBtnOutline, { borderColor: colors.primary }]}
+                                onPress={() => openSlip({ kind: 'project', id: p.id, name: p.name })}
+                              >
+                                <Text style={[styles.actionOutlineText, { color: colors.primary }]}>Slip</Text>
+                              </BouncyPressable>
                               <BouncyPressable
                                 style={[styles.actionBtnOutline, { borderColor: colors.border }]}
                                 onPress={() => openEditProject(p)}
@@ -1237,6 +1245,18 @@ export default function BillsScreen() {
                                   <Text style={styles.actionBtnText}>Record Receipt</Text>
                                 </BouncyPressable>
                               ) : null}
+                              <BouncyPressable
+                                style={[styles.actionBtnOutline, { borderColor: colors.primary }]}
+                                onPress={() =>
+                                  openSlip({
+                                    kind: 'receivable',
+                                    id: item.id,
+                                    name: item.project_name || `Project #${item.linked_project}`,
+                                  })
+                                }
+                              >
+                                <Text style={[styles.actionOutlineText, { color: colors.primary }]}>Slip</Text>
+                              </BouncyPressable>
                               <BouncyPressable
                                 style={[styles.actionBtnOutline, { borderColor: colors.border }]}
                                 onPress={() => openEditReceivable(item)}
@@ -1430,6 +1450,7 @@ export default function BillsScreen() {
           loading={saving}
         />
       </AppSheet>
+      {slipSheets}
     </Screen>
   )
 }

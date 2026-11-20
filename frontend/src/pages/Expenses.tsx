@@ -3,6 +3,7 @@ import { Banknote, ClipboardList, CircleDollarSign, X } from 'lucide-react'
 import { expensesApi, payablesApi, receivablesApi, accountsApi, projectsApi, transactionsApi, asList, apiErrorMessage } from '../api/client'
 import { fmt, fmtNum, sumMoney } from '../utils/format'
 import { useConfirm } from '../hooks/useConfirm'
+import { SlipModal, type SlipTarget } from '../slips/SlipModal'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,7 @@ export default function Expenses() {
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [slipTarget, setSlipTarget] = useState<SlipTarget | null>(null)
 
   // ── load ──
   const load = useCallback(async () => {
@@ -211,16 +213,6 @@ export default function Expenses() {
     })
     if (!ok) return
     await expensesApi.update(exp.id, { active: !exp.active }); load()
-  }
-
-  const markPayableComplete = async (p: Payable) => {
-    const ok = await confirm({
-      title: 'Mark as completed?',
-      message: `Mark “${p.name}” as fully paid?`,
-      confirmLabel: 'Mark completed',
-    })
-    if (!ok) return
-    await payablesApi.update(p.id, { status: 'completed' }); load()
   }
 
   const markPayableStuck = async (p: Payable) => {
@@ -652,6 +644,13 @@ export default function Expenses() {
                           </button>
                         )
                       )}
+                      <button
+                        className="btn-glass"
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: 'var(--primary)', borderColor: 'rgba(15,157,110,0.35)' }}
+                        onClick={() => setSlipTarget({ kind: 'payable', id: p.id, name: p.name })}
+                      >
+                        Slip
+                      </button>
                       <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }} onClick={() => openEditPay(p)}>Edit</button>
                       {p.status !== 'completed' && (
                         <button
@@ -669,11 +668,6 @@ export default function Expenses() {
                       >
                         Delete
                       </button>
-                      {p.status === 'ongoing' && (
-                        <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: '#34d399', borderColor: 'rgba(52,211,153,0.3)' }} onClick={() => markPayableComplete(p)}>
-                          Mark Complete
-                        </button>
-                      )}
                     </div>
                   </div>
                 )
@@ -775,6 +769,13 @@ export default function Expenses() {
                           ✓ Fully received
                         </button>
                       )}
+                      <button
+                        className="btn-glass"
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: 'var(--primary)', borderColor: 'rgba(15,157,110,0.35)' }}
+                        onClick={() => setSlipTarget({ kind: 'project', id: p.id, name: p.name })}
+                      >
+                        Slip
+                      </button>
                       {!done && (
                         <button
                           className="btn-glass"
@@ -880,6 +881,19 @@ export default function Expenses() {
                           )}
                         </>
                       )}
+                      <button
+                        className="btn-glass"
+                        style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem', color: 'var(--primary)', borderColor: 'rgba(15,157,110,0.35)' }}
+                        onClick={() =>
+                          setSlipTarget({
+                            kind: 'receivable',
+                            id: r.id,
+                            name: r.project_name || `Project #${r.linked_project}`,
+                          })
+                        }
+                      >
+                        Slip
+                      </button>
                       <button className="btn-glass" style={{ fontSize: '0.75rem', padding: '0.3rem 0.7rem' }} onClick={() => openEditRec(r)}>Edit</button>
                       {!cashDone && (
                         <button
@@ -1094,6 +1108,8 @@ export default function Expenses() {
           </div>
         </div>
       )}
+
+      <SlipModal target={slipTarget} onClose={() => setSlipTarget(null)} />
     </div>
   )
 }

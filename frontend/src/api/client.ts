@@ -215,6 +215,23 @@ export const payablesApi = {
   remove: (id: number) => api.delete(`/payables/${id}/`),
 }
 
+export type SlipHistoryResponse = import('../slips/types').SlipHistoryResponse
+
+export const slipsApi = {
+  payable: (id: number) => api.get<SlipHistoryResponse>(`/payables/${id}/payments/`),
+  receivable: (id: number) => api.get<SlipHistoryResponse>(`/receivables/${id}/payments/`),
+  project: (id: number) => api.get<SlipHistoryResponse>(`/projects/${id}/payments/`),
+  /** Remote config for store_url + Pro flag. */
+  config: async () => {
+    const { data } = await api.get<{
+      store_url?: string
+      feature_flags?: Record<string, unknown>
+      viewer?: { is_premium?: boolean }
+    }>('/config/')
+    return data
+  },
+}
+
 export const dashboardApi = {
   get: () => api.get('/dashboard/'),
 }

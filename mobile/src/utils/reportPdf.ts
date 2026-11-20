@@ -2,6 +2,7 @@ import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 import { Platform } from 'react-native'
 import { fmt, fmtBalance } from '@/src/utils/format'
+import { printHtmlOnWeb } from '@/src/utils/printHtmlWeb'
 
 export type ReportLedgerRow = {
   date: string
@@ -170,19 +171,11 @@ function buildHtml(rows: ReportLedgerRow[], meta: ReportPdfMeta): string {
 export async function shareReportPdf(rows: ReportLedgerRow[], meta: ReportPdfMeta) {
   const html = buildHtml(rows, meta)
   const filename = `${safeName(`WalletTrails_${meta.username}_${meta.monthLabel}`)}.pdf`
-  const { uri } = await Print.printToFileAsync({ html, base64: false })
-
   if (Platform.OS === 'web') {
-    // expo-print on web may download already; still try share if available
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(uri, {
-        mimeType: 'application/pdf',
-        dialogTitle: filename,
-        UTI: 'com.adobe.pdf',
-      })
-    }
-    return uri
+    await printHtmlOnWeb(html, filename)
+    return null
   }
+  const { uri } = await Print.printToFileAsync({ html, base64: false })
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {

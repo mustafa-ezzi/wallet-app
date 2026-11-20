@@ -61,7 +61,9 @@
     "start:clear": "expo start -c --tunnel",
     "web": "expo start --web --port 8081",
     "android": "expo start --android",
-    "ios": "expo start --ios"
+    "ios": "expo start --ios",
+    "test:slips": "node --experimental-strip-types --no-warnings --import ./scripts/ts-resolve.mjs --test src/slips/__tests__/slips.test.mjs",
+    "slips:samples": "node --experimental-strip-types --no-warnings --import ./scripts/ts-resolve.mjs scripts/slip-samples.mjs"
   },
   "private": true
 }

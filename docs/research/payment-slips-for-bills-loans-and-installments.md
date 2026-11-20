@@ -212,6 +212,14 @@ Each phase ends with tests and a short manual check before the next one starts. 
 
 **Exit:** all tests pass; no change in the app yet.
 
+**Status: done (19 November 2026).**
+
+- Code: `backend/api/payment_slips_api.py`, routes in `backend/api/urls.py`, tests in `backend/api/tests_payment_slips.py` (11 tests).
+- `PayableInstallment.payment_transactions()` and `ReceivableInstallment.payment_transactions()` were added in `models.py`. Both the card's remaining amount and the slip use them, so the two cannot drift apart. One-time payments use the existing `Project._linked_income_qs()`.
+- Response fields: `kind` (`payable` | `receivable` | `project`), `direction` (`owe` | `owed`), `id`, `name`, `status`, `total_amount`, `advance_amount`, `payments[]` (`index`, `transaction_id`, `date`, `amount`, `is_advance`), `payment_count` (excludes the advance row), `total_paid`, `remaining_amount`, `paid_in_full`, `closed_without_full_payment`, `monthly_amount`, `total_installments`, `installments_done`, `generated_at`. Amounts are strings with 2 decimals.
+- Pro only: enforced when Ops sets the feature flag `enforce_pro_slips: true` in **Ads & Config → feature flags**. Non-Pro users then get `403` with `code: "pro_required"`. The flag is off by default so internal testers are not blocked. The app can read the same flag from `/api/config/` to decide when to show the upgrade sheet.
+- `/api/projects/<id>/payments/` returns `400` for projects that are not `one_time`. Installment-based projects use their installment plan instead.
+
 ---
 
 ### Phase 2 — The slip PDF template (no buttons yet)
@@ -234,6 +242,26 @@ Each phase ends with tests and a short manual check before the next one starts. 
 - Manual: open the PDF in WhatsApp, Gmail, and Google Drive on a real phone.
 
 **Exit:** sample PDFs reviewed and approved by you.
+
+**Status: built (19 November 2026), waiting for your review of the sample PDFs.**
+
+- Code in `mobile/src/slips/`:
+  - `types.ts`, `logo.ts` (160 px logo, about 25 KB).
+  - `templates/shared.ts`, `templates/classic.ts`, `templates/index.ts`.
+  - `slipData.ts`: turns the API response into `SlipData`, builds the slip number (`WT-P12-0004`) and the file name.
+  - `shareSlipPdf.ts`: `createSlipPdf()` and `shareSlipPdf()`.
+  - `index.ts`.
+- `slipsApi.payable / receivable / project` added to `mobile/src/api/client.ts`.
+- Tests: `npm run test:slips` (11 tests, all passing). They use Node's built-in test runner; `scripts/ts-resolve.mjs` lets Node load the app's TypeScript.
+- Samples: `npm run slips:samples` writes six HTML files to `mobile/slip-samples/`, which were also printed to PDF. The six samples:
+  - loan with 0 payments
+  - loan with 1 payment
+  - loan paid in full (12 payments)
+  - installment plan owed to you (40 payments)
+  - one-time payment with an advance
+  - loan closed without full payment
+- Not built yet: the share message (§3.11). `expo-sharing` sends only the file and cannot attach text, so the message moves to Phase 6. The Play Store link is already in the PDF footer.
+- Still manual: open a slip in WhatsApp, Gmail, and Drive on a real phone. This happens in Phase 3, when the button exists.
 
 ---
 
@@ -261,6 +289,25 @@ Each phase ends with tests and a short manual check before the next one starts. 
 
 **Exit:** manual checklist passes on a real device.
 
+**Status: built (19 November 2026), waiting for the manual check on a real phone.**
+
+- `mobile/src/slips/SlipSheet.tsx` adds two things:
+  - `useSlipLauncher()`, which gives a screen `openSlip(target)` and the sheets to render. Phase 4 reuses it on "Owed to you".
+  - The slip sheet itself:
+    - payment history with S.No, date, and amount;
+    - total, paid, and remaining;
+    - "Paid in full" or "closed without full payment" notes;
+    - an editable "Your name" field, remembered on the phone;
+    - **Generate & share PDF**.
+- **Pro:** when the `enforce_pro_slips` flag is on and the user is not premium, tapping **Slip** opens a "WalletTrails Pro" message instead. A `403 pro_required` from the server shows the same message. The app has no purchase screen yet, so the message has only an **OK** button. Add an **Upgrade** button when billing is ready.
+- **Hide amounts:** when amounts are hidden, **Slip** opens the PIN / fingerprint sheet first. The slip opens after a successful unlock, and cancelling does nothing. If the app locks again while the slip is open, the slip closes.
+- `bills.tsx`:
+  - **Mark Complete** removed. Its `markPayableComplete` code was deleted.
+  - **Slip** added on every loan card, including completed ones.
+  - Record Payment, Edit, Mark Stuck, and Delete are unchanged.
+- Web (`frontend/src/pages/Expenses.tsx`): **Mark Complete** removed from loans too, matching the Phase 0 decision. The web Slip button is still Phase 7.
+- Analytics: `slip_opened`, `slip_pro_required`, `slip_shared` (kind and row count only, no amounts).
+
 ---
 
 ### Phase 4 — Slip button on "Owed to you"
@@ -276,6 +323,14 @@ Each phase ends with tests and a short manual check before the next one starts. 
 - Numbers match the card for every case.
 
 **Exit:** manual checklist passes.
+
+**Status: built (19 November 2026), waiting for the manual check on a real phone.**
+
+- Reuses `useSlipLauncher()` / `SlipSheet` from Phase 3 — same Pro gate, Hide-amounts unlock, name field, and Generate & share PDF.
+- `bills.tsx` → **Owed to you**:
+  - **Slip** on every one-time payment card (`kind: 'project'`), including completed ones. Advance shows as the first row when present.
+  - **Slip** on every installment plan card (`kind: 'receivable'`), including completed ones. Labels use "Payment received" / "Total received" / "Remaining to receive".
+- Edit, Mark Stuck, Delete, and Record Receipt are unchanged.
 
 ---
 
@@ -296,6 +351,15 @@ Each phase ends with tests and a short manual check before the next one starts. 
 
 **Exit:** manual checklist passes.
 
+**Status: built (19 November 2026), waiting for the manual check on a real phone.**
+
+- After a successful **Save payment** / **Save receipt** for a loan, installment plan, or one-time payment, a centered prompt asks: "Payment saved. Generate a slip for this payment?" with **Generate slip**, **Not now**, and **Don't ask again**.
+- Monthly costs do not show the prompt.
+- **Generate slip** opens the Phase 3 sheet with the new payment highlighted (`highlightTransactionId` from the create response). Pro / Hide-amounts gates still apply.
+- Preference stored as `wallettrails_slip_ask_after_payment` (`mobile/src/slips/promptPrefs.ts`). Default is on.
+- Settings → **Ask for slip after payment** turns the prompt back on or off.
+- Analytics: `slip_prompt_accepted`, `slip_prompt_dismissed` (with `dont_ask_again`). The `savingRef` and an `offeringRef` stop double saves / double prompts.
+
 ---
 
 ### Phase 6 — Sharing polish and Play Store link
@@ -303,7 +367,7 @@ Each phase ends with tests and a short manual check before the next one starts. 
 **Build**
 
 - Read `store_url` from remote config at share time, with the fallback link (§2).
-- Share text from §3.11.
+- Share text from §3.11. `expo-sharing` cannot attach text, so this needs a library that can (for example `react-native-share`, which needs a new build) or a "Copy message" option next to Share.
 - Analytics events from §3.12.
 
 **Tests**
@@ -313,11 +377,30 @@ Each phase ends with tests and a short manual check before the next one starts. 
 
 **Exit:** release to internal testers; collect feedback through the tester Google Form.
 
+**Status: built (21 November 2026), waiting for the manual check / internal release.**
+
+- `store_url` is read from remote config when the slip is built; empty values fall back to the Play Store link in `DEFAULT_STORE_URL`. The PDF footer already prints the same link.
+- Share text (§3.11) is built by `buildSlipShareMessage()` in `slipData.ts`. Because `expo-sharing` cannot attach text to a file, the slip sheet has a second action:
+  - Native: **Share message** (React Native `Share.share`)
+  - Web: **Copy share message** (`navigator.clipboard`)
+- After sharing the PDF on native, a short tip reminds the user they can also share the message/link.
+- Analytics (§3.12): `slip_opened`, `slip_generated`, `slip_shared`, `slip_prompt_accepted`, `slip_prompt_dismissed`, plus `slip_message_shared` / `slip_message_copied`. Counts and kind only — never amounts.
+- Did not add `react-native-share` (would need a new native build). PDF + text in one sheet can wait until that library is added later if needed.
+
 ---
 
 ### Phase 7 — Web app parity (optional)
 
 Add the same **Slip** button on the web Bills page (`frontend/src/pages/Expenses.tsx`), reusing the Phase 1 endpoints and the same HTML template, printed through the browser ("Save as PDF").
+
+**Status: built (21 November 2026), waiting for the manual check in the browser.**
+
+- `frontend/src/slips/` — Classic template, types, `slipData`, logo, and `printHtml` (same design as mobile).
+- `slipsApi` in `frontend/src/api/client.ts` (payable / receivable / project payment history + `/config/` for `store_url` and Pro flag).
+- `SlipModal` on Bills: payment history, name field, **Save as PDF** (browser print), **Copy share message**.
+- **Slip** on loans, installment plans, and one-time payments (including completed).
+- Pro: when `enforce_pro_slips` is on and the user is not premium, the modal shows the Pro message instead.
+- Web does not yet include the after-payment prompt from Phase 5 (mobile-only for now).
 
 ---
 
