@@ -24,4 +24,15 @@ export {
   setDetectedTxAlertsEnabled,
   claimDetectedTxResponse,
 } from './detectedTransaction'
-export { DETECTED_TX_CHANNEL_ID, DETECTED_TX_TYPE } from './detectedTransactionCopy'
+export {
+  DETECTED_TX_ACTION_APPROVE,
+  DETECTED_TX_ACTION_LATER,
+  DETECTED_TX_CATEGORY,
+  DETECTED_TX_CHANNEL_ID,
+  DETECTED_TX_NOTIFICATION_ID,
+  DETECTED_TX_SIMPLE_ID,
+  DETECTED_TX_TYPE,
+  bankAlertBannerAction,
+  detectedTxTapOpensReview,
+  shouldPostDetectedTxBanner,
+} from './detectedTransactionCopy'

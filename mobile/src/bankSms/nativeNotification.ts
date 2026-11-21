@@ -6,6 +6,11 @@
  * we filter to bank-like alerts in JS (see walletApps.isBankishNotification).
  */
 import { Platform } from 'react-native'
+import * as Notifications from 'expo-notifications'
+import { getPermissionStatus } from '@/src/notifications/schedule'
+import { getDetectedTxAlertsEnabled } from '@/src/notifications/detectedTransaction'
+import { DETECTED_TX_SIMPLE_ID } from '@/src/notifications/detectedTransactionCopy'
+import { getBankNotifEnabled } from './storage'
 import {
   isBankishNotification,
   resolveBankLabel,
@@ -40,6 +45,10 @@ type ListenerApi = {
   syncActiveNotifications?: () => void | Promise<void>
   /** Remember a notification key so later shade catch-up does not import it twice. */
   markNotificationSeen?: (key: string) => void
+  /** Closed-app bank alerts post a placeholder only when this is on. */
+  setBankAlertBannerEnabled?: (on: boolean) => void
+  /** Remove the placeholder after JS parses the alert. */
+  cancelBankAlertBanner?: () => void
 }
 
 function loadNative(): ListenerApi | null {
@@ -156,6 +165,40 @@ export async function catchUpWalletNotifications(): Promise<void> {
   }
   try {
     await Promise.resolve(mod.syncActiveNotifications?.())
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Bank-app listening and the alert switch both have to be on, and notifications allowed.
+ * The listener reads this flag with no JavaScript running.
+ */
+export async function refreshBankAlertBannerGate(): Promise<void> {
+  const mod = loadNative()
+  if (!mod?.setBankAlertBannerEnabled) return
+  try {
+    const [bankOn, alertsOn, perm] = await Promise.all([
+      getBankNotifEnabled(),
+      getDetectedTxAlertsEnabled(),
+      getPermissionStatus(),
+    ])
+    mod.setBankAlertBannerEnabled(bankOn && alertsOn && perm === 'granted')
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Clear the "New bank alert" placeholder. Leaves a richer SMS banner in place. */
+export async function cancelSimpleBankAlertBanner(): Promise<void> {
+  const mod = loadNative()
+  try {
+    mod?.cancelBankAlertBanner?.()
+  } catch {
+    /* ignore */
+  }
+  try {
+    await Notifications.dismissNotificationAsync(DETECTED_TX_SIMPLE_ID)
   } catch {
     /* ignore */
   }

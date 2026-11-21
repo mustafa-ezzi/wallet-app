@@ -14,6 +14,7 @@ import { useAuth } from '@/src/context/AuthContext'
 import { track } from '@/src/lib/analytics'
 import type { Account, Payable, Receivable, RecurringExpense } from '@/src/api/types'
 import { claimDetectedTxResponse } from './detectedTransaction'
+import { detectedTxTapOpensReview } from './detectedTransactionCopy'
 import {
   getPermissionStatus,
   requestReminderPermission,
@@ -102,14 +103,27 @@ export function RemindersProvider({ children }: { children: React.ReactNode }) {
         importId?: number | string
       }
       if (data?.type !== 'bank_sms_review') return false
-      const key = response.notification.request.identifier
+      const postedAt = (data as { postedAt?: number | string }).postedAt
+      const actionId = response.actionIdentifier
+      const key = [
+        response.notification.request.identifier,
+        postedAt ?? '',
+        actionId,
+      ].join(':')
       void (async () => {
         const fresh = await claimDetectedTxResponse(key)
+        const kind = typeof data.kind === 'string' ? data.kind : 'unknown'
+        const source = typeof data.source === 'string' ? data.source : 'unknown'
+        // Not now clears the shade entry only. The draft stays pending.
+        if (!detectedTxTapOpensReview(actionId)) {
+          if (fresh) track('detected_tx_notification_later', { kind, source })
+          await Notifications.dismissNotificationAsync(
+            response.notification.request.identifier,
+          ).catch(() => undefined)
+          return
+        }
         if (!fresh) return
-        track('detected_tx_notification_opened', {
-          kind: typeof data.kind === 'string' ? data.kind : 'unknown',
-          source: typeof data.source === 'string' ? data.source : 'unknown',
-        })
+        track('detected_tx_notification_opened', { kind, source })
         const importId = Number(data.importId)
         if (Number.isFinite(importId) && importId > 0) {
           router.push(`/bank-sms?focus=${importId}` as never)

@@ -443,3 +443,189 @@ Use this as the strategy layer on top of §3:
 - Live PH data via MCP (Creatify, Alsona, Fina, Monarch, Wealthfolio, week W46 2026 leaderboard) — 21 Nov 2026.
 - Maker write-ups: [David Kelly / TidyCal](https://dmkthinks.org/blog/how-we-reached-1-on-product-hunt/), [Tom Dekan / Stackfix](https://tomdekan.com/articles/product-hunt-launch-guide), [The Swarm](https://www.theswarm.com/insights/zero-to-1-on-product-hunt), [Shootmail](https://shootmail.app/blog/how-shootmail-became-product-of-the-day-product-hunt).
 - Fina launch detail: [hunted.space Fina May 2023](https://hunted.space/product/fina/launches/fina), Clay Raterman LinkedIn post on #3 + Fintech badge.
+
+---
+
+## 8. How WalletTrails can trend on Product Hunt (our playbook)
+
+This is the practical “what do *we* do?” section. Rivals’ tactics from §6–§7, translated into WalletTrails actions, posts, and a day plan. Goal: land in the **top 5 of the day** (frontpage), with a stretch goal of **#1–#3**. For a solo maker, top 5 + strong comments is already a win.
+
+### 8.1 Honest goal (so we pick the right day)
+
+| Goal | Votes needed (rough, late 2026) | When to aim for it |
+| --- | --- | --- |
+| **#1 Product of the Day** | ~400–550+ midweek; often less on Sat/Sun | Only if Play is live **and** you have 80–150 warm PH supporters ready at 1:00 PM PKT |
+| **Top 5 / featured** | ~150–300 depending on the day | Realistic first launch target |
+| **Top 10–15 + lasting page** | ~80–150 | Fallback if the day is AI-crowded (like 17 Nov) |
+
+**Pick the day after Google Play is public.** Prefer **Friday–Sunday** for a first solo launch (less AI noise, easier frontpage). Use **Tue–Thu** only if the supporter list is strong and you want maximum eyeballs more than absolute #1.
+
+### 8.2 Rival tactics → what WalletTrails does instead
+
+| Rival tactic | Who uses it | Can we copy? | Our version |
+| --- | --- | --- | --- |
+| Huge existing user email blast at +2h | Creatify, TidyCal / AppSumo | Partially | Email / WhatsApp / in-app push to testers + anyone who signed up on the landing site |
+| Famous hunter (Ben Lang, etc.) | Fina’s first #3 | Optional | Self-hunt as `mustafa_moiz` is fine; only ask a hunter if they already know you |
+| “AI financial advisor” narrative | Fina | Yes, carefully | Lead with **Trai** (“say it / type it → confirm → save”), not vague “AI money app” |
+| Bank sync / Mint replacement | Monarch, Copilot | No (and we shouldn’t) | Own the opposite: **no bank login**; cash + multi-wallet + SMS approve |
+| Privacy / local-first | Wealthfolio | Partially | Privacy lock, hide amounts, “we don’t need your bank password” |
+| Buying-signal / number-heavy story | Alsona | Yes | Concrete: “3 wallets, cash, installments, family trip ledger” |
+| Relaunch with a new surface | Fina Business, Monarch AI | Later | First launch = full product; later = Trai voice / slips / iOS if you ship it |
+| Paid ads + big team on the page | Creatify, Maxma | No for now | Skip PH ads until organic launch is done |
+| AMA / live call on launch day | Fina | Yes | Stay in comments all day; optional LinkedIn Live / Zoom “ask me anything” at evening PKT |
+| PH-only promo code | Fina (`finafamily20`) | Yes, when Plus/Pro unlocks something | e.g. `PRODUCTHUNT` → 3 months Plus (only if redeem works) |
+| Open source + GitHub | Wealthfolio, Rakazo | No | Don’t fake OSS; use “solo maker in Pakistan” as authenticity instead |
+| Vote buying / upvote groups | Losers who get buried | **Never** | Ask for feedback and a visit, never “please upvote” |
+
+### 8.3 What to put on the Product Hunt page (to climb)
+
+These are the page pieces that turn a visit into a vote or a useful comment.
+
+| Asset | Rival pattern | WalletTrails version |
+| --- | --- | --- |
+| **Tagline** (≤60) | Short benefit | Keep or sharpen: *Track every rupee: wallets, bills, budgets and family costs* |
+| **Thumbnail** | Clean logo, readable tiny | WalletTrails mark only — no tiny text |
+| **Gallery image 1** | Instant “wow” | Trai: typed “Slanty chips, Rs 50, cash” → confirmation card |
+| **Gallery 2** | Core loop | Home: multi-wallet total + month spend |
+| **Gallery 3** | Differentiator | Bank alerts: SMS draft → Approve |
+| **Gallery 4** | Social proof of use case | Family / trip ledger settle-up |
+| **Gallery 5** | Trust | Privacy: amounts hidden + lock |
+| **Video (30–60s)** | Founder talking + screen | You: “Most apps assume one US bank. We don’t.” Then Trai + SMS in 40s |
+| **First comment** | Long story + ask + promo | Use the draft in §4; rewrite with your real origin story |
+| **Topics** | Exact audience | Personal Finance, Fintech, Android (already set) |
+| **Pricing** | Free options | Free options (core free) |
+| **Promo** | PH-only deal | Only if Plus redeem works on launch day |
+
+**Do not** fill the gallery with feature grids or “AI powered!!!” stickers. Rivals that trend show **one clear workflow per image**.
+
+### 8.4 What to post *before* launch (hype content)
+
+Post these on LinkedIn, Instagram, and X in the 2–3 weeks before launch. Voice matches `docs/social/instagram-linkedin-facebook.md`. Always link the landing site; in the last 5 days, also link the PH **teaser** (Notify me).
+
+| When | Channel | What to post | Why rivals do this |
+| --- | --- | --- | --- |
+| Week −3 | LinkedIn | “Building WalletTrails in public — why cash + 3 wallets broke every US money app I tried.” Short story, 1 screenshot | Warm list + authenticity (Fina / Swarm style) |
+| Week −3 | Instagram | Reel: Trai voice or type → Save | Visual wow for the gallery later |
+| Week −2 | LinkedIn / IG | “Bank SMS → review → approve. No bank password.” Screen recording | Differentiator vs Monarch/Copilot |
+| Week −2 | PH account | 5–10 real comments on other finance/productivity launches | Age trust on `mustafa_moiz` |
+| Week −2 | WhatsApp / Discord | Soft ask to your tester list: “Launching on Product Hunt on [date]. Can I ping you that day?” | First-4-hours army |
+| Week −1 | LinkedIn | “We’re launching on Product Hunt on [day] at 1:00 PM PKT. Here’s the teaser — hit Notify.” | Teaser followers = PH email at go-live |
+| Week −1 | Instagram Stories | Countdown sticker + teaser link | Same |
+| Day −3 | All | 15s cut of Trai + Family; “3 days” | Peak curiosity |
+| Day −1 | Personal DMs | Final personal messages to your top 30 supporters (not a broadcast) | Highest conversion channel winners use |
+
+**Sample LinkedIn teaser (adapt, don’t copy-paste blindly):**
+
+```
+Launching WalletTrails on Product Hunt this [Day] at 1:00 PM PKT.
+
+Most money apps assume one bank account that syncs itself.
+A lot of us don’t live like that — cash, several wallets, installments, money with friends, family trip costs.
+
+WalletTrails is built for that. Trai turns a sentence into an entry (nothing saves until you confirm). Bank alerts you approve. Household ledgers that don’t expose your personal wallets.
+
+If you want a reminder when we go live: [Product Hunt teaser link]
+Honest feedback means more than anything.
+```
+
+**Sample WhatsApp / DM (supporters):**
+
+```
+Hey — launching WalletTrails on Product Hunt tomorrow at 1:00 PM PKT.
+I’ll send the link then. If you have 2 minutes, open it, try the site/app, and leave honest feedback in the comments. No pressure to vote — real comments help more.
+Thanks!
+```
+
+### 8.5 Launch-day tactics (how we actually get on top)
+
+**Pakistan time** (PH day = 1:00 PM PKT → next day 1:00 PM PKT).
+
+| Time (PKT) | Rival move | What you do |
+| --- | --- | --- |
+| **12:50–1:00** | Be ready at midnight PT | Draft open, first comment ready, supporter list open, LinkedIn/IG drafts ready |
+| **1:00–1:15** | Win minute zero | Confirm live. First comment posts. Copy the **/posts/…** link (not the /products/ teaser). Message top 20 supporters personally |
+| **1:15–2:00** | Email / community blast | WhatsApp groups (tech/uni), Instagram Story link sticker, LinkedIn post, X post. Landing site banner: “We’re live on Product Hunt” |
+| **1:00–5:00** | **First 4 hours** (critical) | Stay on the page. Reply to every comment in &lt;5 minutes. Ask clarifying questions. Thank people by name. Do **not** ask for upvotes |
+| **~5:00–6:00** | Frontpage lock | Check if you’re roughly top 5. If yes, keep pushing social. If no, still reply — comments still help week rank and credibility |
+| **Evening (US morning)** | Second wave | Repost LinkedIn / X for US + EU. Message any supporters who said they’d help but haven’t opened yet |
+| **Night** | Team handoff (rivals with global teams) | If alone: sleep 4–5h then resume; or ask one trusted friend to watch comments |
+| **Next day 1:00** | Day ends | Screenshot rank. Thank everyone. Add PH badge to landing site. Soft “we landed #X” LinkedIn post |
+
+**Message you send at 1:00 PM (supporters) — correct link form:**
+
+```
+We’re live: https://www.producthunt.com/posts/<slug-or-id>
+Would love your honest take in the comments. Try Trai or Bank alerts if you can.
+```
+
+### 8.6 What to say in Product Hunt comments (tactics that climb)
+
+Rivals that stay high don’t only collect upvotes — they **create a busy comment thread**. PH surfaces active launches.
+
+| Someone says… | You reply with… |
+| --- | --- |
+| “How is this different from YNAB / Monarch?” | Cash + multi-wallet + no bank login; Trai confirm-before-save; family ledgers |
+| “Is it free?” | Core tracker free; Plus/Pro for Trai / automation when live — be honest |
+| “Android only?” | Android + web today; iOS later if true |
+| “Do you sync my bank?” | Optional SMS/notification drafts you approve — we never take bank passwords |
+| Empty “Congrats!” | Thanks + one question: “What’s the one money thing you always forget to log?” |
+| A bug report | Own it, fix if you can same day, thank them publicly |
+
+Seed **3–5 thoughtful early comments** from real friends who tried the app (not “Great app!!”). Empty praise looks fake; specific praise (“approved a Meezan SMS in 10 seconds”) looks real — same pattern as Alsona’s early reviews.
+
+### 8.7 Channels ranked by impact for *us*
+
+| Priority | Channel | Why |
+| --- | --- | --- |
+| 1 | Personal WhatsApp / LinkedIn DMs to people who already tried WalletTrails | Highest trust; wins first 4 hours |
+| 2 | Google Play closed testers | Already have the app; ask them to create PH accounts **before** launch day |
+| 3 | LinkedIn (your profile + short posts) | Pakistani + diaspora founders browse LinkedIn; matches solo-maker story |
+| 4 | Instagram Reels / Stories (`wallettrails`) | Trai demos travel well; use for awareness, weaker for PH votes |
+| 5 | Landing site banner + in-app news / push | Catch people who already like the product |
+| 6 | Pakistani tech WhatsApp / Discord / Reddit | Volume, but ask for *feedback*, not votes |
+| 7 | X / Twitter | Secondary; PH crowd still lives there somewhat |
+| 8 | Product Hunt ads | Skip until after organic launch |
+| ❌ | Upvote Slack/Telegram groups, paid votes | Can kill the launch |
+
+### 8.8 Week-by-week “make us trend” checklist
+
+**Now (before a date is picked)**
+
+- [ ] Play Store public (or a clear web signup that works for PH visitors)
+- [ ] PH profile complete (photo, headline, LinkedIn, website)
+- [ ] Warm account: comment on 3 launches/week
+- [ ] Spreadsheet of 50–150 supporters (name, contact, has PH account? Y/N)
+- [ ] Gallery screenshots + 30–60s founder video exported
+- [ ] First comment rewritten in your voice
+- [ ] Decide promo code yes/no
+
+**T‑21 to T‑7**
+
+- [ ] Schedule launch date on PH; share teaser Notify link
+- [ ] Publish 4–6 “building in public” posts (§8.4)
+- [ ] Confirm top 30 people will open the link in the first hour
+- [ ] Landing page “Launching on Product Hunt on [date]” banner ready
+
+**T‑1**
+
+- [ ] Sleep early; clear calendar for launch day
+- [ ] Prep DM list, LinkedIn post, IG Story, WhatsApp text
+- [ ] Double-check product URL, signup, privacy page
+
+**Launch day**
+
+- [ ] Execute §8.5 timeline
+- [ ] Never say “please upvote”
+- [ ] Screenshot metrics at +4h, +12h, end of day
+
+**Day after**
+
+- [ ] Thank-you post + badge on site
+- [ ] Note what comments asked for → product backlog
+- [ ] Keep answering late comments (helps week ranking)
+
+### 8.9 One-line strategy for WalletTrails
+
+> **Win the first four hours with a warm list, look different from Monarch/YNAB in one sentence, show Trai + bank SMS + family in the gallery, and out-reply every rival on the comment thread — without buying a single upvote.**
+
+If you do only five things: (1) Play live, (2) teaser + supporter list, (3) Trai-first gallery, (4) personal DMs at 1:00 PM PKT, (5) reply to every comment all day.

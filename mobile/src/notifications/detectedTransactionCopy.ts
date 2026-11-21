@@ -7,7 +7,21 @@
  */
 export const DETECTED_TX_CHANNEL_ID = 'wallettrails-detected-tx'
 
-export const DETECTED_TX_TYPE = 'bank_sms_review'
+/** One shade entry while the app is closed, so a second SMS replaces the first. */
+export const DETECTED_TX_NOTIFICATION_ID = 'wallettrails-detected-tx'
+
+/**
+ * Placeholder posted by the bank-app listener before JavaScript can parse.
+ * Must match SIMPLE_TAG in ExpoNotificationListenerService.kt.
+ */
+export const DETECTED_TX_SIMPLE_ID = 'wallettrails-detected-tx-simple'
+
+export const DETECTED_TX_TYPE = 'bank_sms_review' as const
+
+/** Action buttons on the detected-transaction banner. */
+export const DETECTED_TX_CATEGORY = 'wallettrails-detected-tx-actions'
+export const DETECTED_TX_ACTION_APPROVE = 'approve'
+export const DETECTED_TX_ACTION_LATER = 'later'
 
 const BOOKKEEPING =
   'A new transaction was detected. Approve it so your expenses and records stay up to date.'
@@ -42,9 +56,9 @@ export function buildDetectedTransactionContent(input: {
   const source = input.source || 'unknown'
 
   if (count > 1) {
-    const data = {
+    const data: DetectedTxContent['data'] = {
       type: DETECTED_TX_TYPE,
-      screen: 'bank-sms' as const,
+      screen: 'bank-sms',
       kind,
       source,
     }
@@ -76,12 +90,46 @@ export function buildDetectedTransactionContent(input: {
     body = BOOKKEEPING
   }
 
-  const data = {
+  const data: DetectedTxContent['data'] = {
     type: DETECTED_TX_TYPE,
-    screen: 'bank-sms' as const,
+    screen: 'bank-sms',
     kind,
     source,
     importId: input.id,
   }
   return { title, body, importId: input.id, data }
+}
+
+/**
+ * Closed-app SMS posts a banner only for a new draft that is still waiting.
+ * A duplicate, an auto-approved row, or SMS auto-detect turned off stays quiet.
+ */
+export function shouldPostDetectedTxBanner(input: {
+  smsEnabled: boolean
+  created: boolean
+  pending: boolean
+}): boolean {
+  return input.smsEnabled && input.created && input.pending
+}
+
+/**
+ * Body tap and Approve open the draft. Not now only clears the banner.
+ * The draft stays pending either way until the user approves it in the app.
+ */
+export function detectedTxTapOpensReview(actionId: string | null | undefined): boolean {
+  return actionId !== DETECTED_TX_ACTION_LATER
+}
+
+/**
+ * A bank-app alert posts a short banner before we know the amount.
+ * A new pending draft replaces it. Anything else clears it and leaves an SMS banner alone.
+ */
+export function bankAlertBannerAction(input: {
+  source: string
+  created: boolean
+  pending: boolean
+}): 'replace' | 'cancel' | 'none' {
+  if (input.source !== 'notification') return 'none'
+  if (input.created && input.pending) return 'replace'
+  return 'cancel'
 }

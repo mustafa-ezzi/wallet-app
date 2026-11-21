@@ -45,6 +45,18 @@
 }
 @media(prefers-reduced-motion:reduce){.uc-panel{animation:none}}
 
+/* Product Hunt badge */
+.hero-actions{flex-wrap:wrap}
+.ph-badge{display:inline-flex;align-items:center;gap:10px;height:48px;padding:5px 16px 5px 6px;border:1.5px solid #ff6154;border-radius:14px;background:#fff;color:#1c1c1c;box-shadow:0 1px 0 rgba(255,97,84,.08);transition:transform .15s ease,box-shadow .15s ease}
+.ph-badge:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(255,97,84,.16)}
+.ph-badge:focus-visible{outline:3px solid #ff615455;outline-offset:2px}
+.ph-badge__mark{display:grid;place-items:center;flex:0 0 auto}
+.ph-badge__mark svg{display:block}
+.ph-badge__copy{display:flex;flex-direction:column;align-items:flex-start;line-height:1.05}
+.ph-badge__copy small{color:#ff6154;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.ph-badge__copy strong{color:#1c1c1c;font:700 16px/1.1 var(--display);letter-spacing:-.02em}
+@media(prefers-reduced-motion:reduce){.ph-badge{transition:none}.ph-badge:hover{transform:none}}
+
 /* Site-wide polish */
 body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 ::selection{background:#c4f3dc;color:#0f1f18}

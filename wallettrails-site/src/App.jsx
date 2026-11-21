@@ -30,6 +30,25 @@ const Icon = ({ name, size = 20 }) => <svg width={size} height={size} viewBox="0
 const Reveal = ({ children, className = '' }) => <div className={`reveal ${className}`}>{children}</div>
 const Logo = ({ inverse = false }) => <a className={`logo ${inverse ? 'logo--inverse' : ''}`} href="#home"><img src="/media/wallettrail-logo.png" alt="WalletTrails" /><span>Wallet<span>Trails</span></span></a>
 
+const PRODUCT_HUNT_ACCOUNT = 'https://www.producthunt.com/@mustafa_moiz'
+
+function ProductHuntBadge() {
+  return (
+    <a className="ph-badge" href={PRODUCT_HUNT_ACCOUNT} target="_blank" rel="noopener noreferrer">
+      <span className="ph-badge__mark" aria-hidden="true">
+        <svg viewBox="0 0 240 240" width="36" height="36">
+          <path fill="#FF6154" d="M240 120c0 66.3-53.7 120-120 120S0 186.3 0 120 53.7 0 120 0s120 53.7 120 120" />
+          <path fill="#fff" d="M136.4 136.4h-20.5V168h-22.8V72h43.3c19.6 0 32.6 12.3 32.6 32.1 0 19.9-13 32.3-32.6 32.3zm-20.5-18.2h17.8c8.4 0 13.4-4.6 13.4-12.1 0-7.4-5-12-13.4-12h-17.8v24.1z" />
+        </svg>
+      </span>
+      <span className="ph-badge__copy">
+        <small>Featured on</small>
+        <strong>Product Hunt</strong>
+      </span>
+    </a>
+  )
+}
+
 const productFeatures = [
   ['wallet', 'All your wallets', 'Bring bank accounts and cash wallets into one simple total.', 'blue'],
   ['sms', 'Bank SMS auto-detect', 'Opt in on Android so bank alerts become a draft. You Approve, Reject, or edit — nothing posts silently.', 'purple'],
@@ -447,6 +466,7 @@ function App() {
         return
       }
       if (href === '#support') track('support_click', { link_text: text })
+      if (el.classList.contains('ph-badge')) track('product_hunt_click', { link_text: text })
     }
     const onToggle = (event) => {
       const details = event.target
@@ -465,7 +485,7 @@ function App() {
     }
   }, [])
   return <><Header menu={menu} setMenu={setMenu} active={active} setActive={setActive} /><main>
-    <section className="hero" id="home"><div className="shell hero-grid"><Reveal className="hero-copy"><span className="eyebrow"><i />Pakistan-first · Privacy · Auto SMS</span><h1>Follow every <em>rupee.</em><br />Feel more <span>free.</span></h1><p>WalletTrails brings wallets, bills, family ledgers, and optional bank SMS auto-detect together in one calm place. A bank alert can become a draft. You tap Approve.</p><div className="hero-actions"><a className="button" href="#download">Start tracking free <Icon name="arrow" size={17} /></a><button className="watch" onClick={() => setTour(true)}><span><Icon name="play" size={12} /></span>See how it works</button></div><div className="human-note"><div><i>H</i><i>S</i><i>M</i></div>Made for real life, not spreadsheets</div></Reveal><Reveal className="hero-visual"><div className="orb one" /><div className="orb two" /><PhonePreview /><div className="float spent"><span>↘</span><p><small>Spent this week</small><b>Rs. 14,850</b></p><strong>−12%</strong></div><div className="float budget"><span>✓</span><p><small>Budget</small><b>On track</b></p></div></Reveal></div></section>
+    <section className="hero" id="home"><div className="shell hero-grid"><Reveal className="hero-copy"><span className="eyebrow"><i />Pakistan-first · Privacy · Auto SMS</span><h1>Follow every <em>rupee.</em><br />Feel more <span>free.</span></h1><p>WalletTrails brings wallets, bills, family ledgers, and optional bank SMS auto-detect together in one calm place. A bank alert can become a draft. You tap Approve.</p><div className="hero-actions"><a className="button" href="#download">Start tracking free <Icon name="arrow" size={17} /></a><button className="watch" onClick={() => setTour(true)}><span><Icon name="play" size={12} /></span>See how it works</button><ProductHuntBadge /></div><div className="human-note"><div><i>H</i><i>S</i><i>M</i></div>Made for real life, not spreadsheets</div></Reveal><Reveal className="hero-visual"><div className="orb one" /><div className="orb two" /><PhonePreview /><div className="float spent"><span>↘</span><p><small>Spent this week</small><b>Rs. 14,850</b></p><strong>−12%</strong></div><div className="float budget"><span>✓</span><p><small>Budget</small><b>On track</b></p></div></Reveal></div></section>
     <section className="trust"><div className="shell"><p>ONE SIMPLE HOME FOR THE FINANCIAL THINGS THAT MATTER</p><div><span>Personal money</span><i /><span>Freelance work</span><i /><span>Shared living</span><i /><span>Bank SMS drafts</span></div></div></section>
     <section className="showcase" id="preview"><div className="shell"><Reveal className="heading center"><span className="eyebrow">A look inside</span><h2>Clear money moments,<br /><em>beautifully connected.</em></h2><p>From a quick expense to your monthly picture, every detail is designed to feel simple and human.</p></Reveal><div className="showcase-grid"><Reveal className="overview"><header><span>◔</span><p><small>Monthly overview</small><b>September 2026</b></p><i>•••</i></header><div className="total"><small>You have spent</small><b>Rs. 42,780</b><span>of Rs. 55,000 planned</span></div><div className="donut-content"><div className="donut"><span><b>78%</b><small>used</small></span></div><div>{[['Food & dining', 'Rs. 15,200', 'blue'], ['Home & bills', 'Rs. 12,500', 'purple'], ['Travel', 'Rs. 6,750', 'orange'], ['Other', 'Rs. 8,330', 'gray']].map(([label, amount, tone]) => <p className="legend" key={label}><i className={tone} />{label}<b>{amount}</b></p>)}</div></div><footer>Spending by category <a>See details →</a></footer></Reveal><Reveal className="tour-card"><div className="tour-art"><div /><button onClick={() => setTour(true)} aria-label="Play product tour"><Icon name="play" size={18} /></button><span>01:00</span></div><article><small>PRODUCT TOUR</small><h3>Your day, in one minute.</h3><p>See how WalletTrails helps you capture expenses, approve a bank SMS, and stay on course.</p><button onClick={() => setTour(true)}>Play video →</button></article></Reveal><Reveal className="quick-card"><span className="ficon purple">⇄</span><small>BANK SMS IN</small><h3>Drafts you approve.</h3><p>Opt in on Android. Eligible bank alerts become a suggestion—not a silent post.</p><div>SMS <i>→</i> Approve</div></Reveal><Reveal className="people-card"><span className="people"><i>H</i><i>S</i><i>M</i></span><small>SHARED SPENDING</small><h3>Fairness without the maths.</h3><p>Split household expenses and keep everyone in the loop.</p><a href="#features">↗</a></Reveal></div></div></section>
     <section className="features shell" id="features"><Reveal className="heading split"><div><span className="eyebrow">Everything in reach</span><h2>Less money stress.<br /><em>More clarity.</em></h2></div><p>Helpful tools for understanding each rupee—without making personal finance feel like work.</p></Reveal><div className="feature-grid">{productFeatures.map(([icon, title, text, tone], index) => <Reveal className="feature" key={title}><span className={`ficon ${tone}`}><Icon name={icon} size={21} /></span><i>{String(index + 1).padStart(2, '0')}</i><h3>{title}</h3><p>{text}</p></Reveal>)}</div></section>

@@ -4,6 +4,10 @@ import { test } from 'node:test'
 import {
   buildDetectedTransactionContent,
   DETECTED_TX_CHANNEL_ID,
+  bankAlertBannerAction,
+  DETECTED_TX_ACTION_LATER,
+  detectedTxTapOpensReview,
+  shouldPostDetectedTxBanner,
 } from '../detectedTransactionCopy.ts'
 
 test('channel id stays off the due-reminder channel', () => {
@@ -98,4 +102,26 @@ test('hidden amounts omit every digit of the figure', () => {
     source: 'android_sms',
   })
   assert.equal(expense.title, 'New expense to book')
+})
+
+test('Not now stays on the banner, Approve and the body open the draft', () => {
+  assert.equal(detectedTxTapOpensReview(DETECTED_TX_ACTION_LATER), false)
+  assert.equal(detectedTxTapOpensReview('approve'), true)
+  assert.equal(detectedTxTapOpensReview('expo.modules.notifications.actions.DEFAULT'), true)
+  assert.equal(detectedTxTapOpensReview(undefined), true)
+})
+
+test('bank-app placeholder is replaced only for a new pending draft', () => {
+  assert.equal(bankAlertBannerAction({ source: 'notification', created: true, pending: true }), 'replace')
+  assert.equal(bankAlertBannerAction({ source: 'notification', created: false, pending: true }), 'cancel')
+  assert.equal(bankAlertBannerAction({ source: 'notification', created: true, pending: false }), 'cancel')
+  assert.equal(bankAlertBannerAction({ source: 'android_sms', created: true, pending: true }), 'none')
+  assert.equal(bankAlertBannerAction({ source: 'paste', created: false, pending: false }), 'none')
+})
+
+test('closed-app SMS posts only for a new draft that is still pending', () => {
+  assert.equal(shouldPostDetectedTxBanner({ smsEnabled: true, created: true, pending: true }), true)
+  assert.equal(shouldPostDetectedTxBanner({ smsEnabled: false, created: true, pending: true }), false)
+  assert.equal(shouldPostDetectedTxBanner({ smsEnabled: true, created: false, pending: true }), false)
+  assert.equal(shouldPostDetectedTxBanner({ smsEnabled: true, created: true, pending: false }), false)
 })

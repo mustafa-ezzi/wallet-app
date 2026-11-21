@@ -11,6 +11,8 @@ import {
 } from '@/src/lib/bank-sms-parser'
 import { accountsApi, asList, bankSmsApi } from '@/src/api/client'
 import { notifyDetectedTransaction } from '@/src/notifications/detectedTransaction'
+import { bankAlertBannerAction } from '@/src/notifications/detectedTransactionCopy'
+import { cancelSimpleBankAlertBanner } from './nativeNotification'
 import { getBankSmsAutoApprove } from './storage'
 import { bankHintForPackage, bankLabelFromText } from './walletApps'
 
@@ -45,8 +47,22 @@ async function loadSettings(): Promise<{
 }
 
 export type IngestResult =
-  | { ok: true; id: number; kind: string; created: boolean; pending: boolean }
+  | {
+      ok: true
+      id: number
+      kind: string
+      created: boolean
+      pending: boolean
+      amount: number
+      /** Pending drafts after this save. 0 when nothing new is waiting. */
+      pendingCount: number
+    }
   | { ok: false; reason: string }
+
+export type IngestOptions = {
+  /** Live app posts from here. The closed-app SMS task posts itself. */
+  notify?: boolean
+}
 
 export type IngestMeta = {
   packageName?: string
@@ -60,6 +76,20 @@ async function countPending(): Promise<number> {
     return Math.max(1, rows.length)
   } catch {
     return 1
+  }
+}
+
+async function settleBankAlertBanner(
+  source: string,
+  created: boolean,
+  pending: boolean,
+): Promise<void> {
+  const action = bankAlertBannerAction({ source, created, pending })
+  if (action !== 'cancel') return
+  try {
+    await cancelSimpleBankAlertBanner()
+  } catch {
+    /* placeholder clear is best-effort */
   }
 }
 
@@ -80,9 +110,13 @@ export async function ingestBankSmsBody(
   body: string,
   source: 'android_sms' | 'notification' | 'paste' | 'share' = 'android_sms',
   meta?: IngestMeta,
+  options?: IngestOptions,
 ): Promise<IngestResult> {
   const text = (body || '').trim()
-  if (!text) return { ok: false, reason: 'empty' }
+  if (!text) {
+    await settleBankAlertBanner(source, false, false)
+    return { ok: false, reason: 'empty' }
+  }
 
   const { aliases, defaultCashId, kindOverrides } = await loadSettings()
   let parsed = parseBankSms(text, { kindOverrides })
@@ -106,8 +140,14 @@ export async function ingestBankSmsBody(
     parsed = { ...parsed, bankHint: forcedHint }
   }
 
-  if (parsed.ignore) return { ok: false, reason: parsed.ignoreReason || 'ignored' }
-  if (!parsed.amount) return { ok: false, reason: 'no-amount' }
+  if (parsed.ignore) {
+    await settleBankAlertBanner(source, false, false)
+    return { ok: false, reason: parsed.ignoreReason || 'ignored' }
+  }
+  if (!parsed.amount) {
+    await settleBankAlertBanner(source, false, false)
+    return { ok: false, reason: 'no-amount' }
+  }
 
   // Auto-capture: paste can be weak; SMS still needs a clear parse.
   // Wallet notifications often omit classic bank verbs — accept amount + known wallet.
@@ -125,6 +165,7 @@ export async function ingestBankSmsBody(
         reason: parsed.reason === 'no-match' ? `wallet-notif:${forcedHint || parsed.bankHint}` : parsed.reason,
       }
     } else {
+      await settleBankAlertBanner(source, false, false)
       return { ok: false, reason: 'weak-parse' }
     }
   }
@@ -167,7 +208,8 @@ export async function ingestBankSmsBody(
     const importStatus = (res.data as { status?: string }).status
     // Already saved or dismissed — do not create a second transaction.
     if (importStatus === 'approved' || importStatus === 'rejected') {
-      return { ok: true, id, kind, created: false, pending: false }
+      await settleBankAlertBanner(source, false, false)
+      return { ok: true, id, kind, created: false, pending: false, amount: draft.amount, pendingCount: 0 }
     }
     const autoOn = await getBankSmsAutoApprove()
     const canAuto =
@@ -199,23 +241,34 @@ export async function ingestBankSmsBody(
 
     // 201 + still pending only. A 200 is a duplicate and stays quiet.
     // Auto-approve success stays quiet too.
+    let pendingCount = 0
     if (created && pending) {
-      try {
-        const pendingCount = await countPending()
-        await notifyDetectedTransaction({
-          id,
-          kind,
-          amount: draft.amount,
-          pendingCount,
-          source,
-        })
-      } catch {
-        /* the draft is saved; the banner is best-effort */
+      pendingCount = await countPending()
+      if (options?.notify !== false) {
+        try {
+          const posted = await notifyDetectedTransaction(
+            {
+              id,
+              kind,
+              amount: draft.amount,
+              pendingCount,
+              source,
+            },
+            // Same id as other detected banners, so the placeholder is not a second card.
+            { stableId: source === 'notification' },
+          )
+          if (source === 'notification' && posted) await cancelSimpleBankAlertBanner()
+        } catch {
+          /* the draft is saved; the banner is best-effort */
+        }
       }
+    } else {
+      await settleBankAlertBanner(source, created, pending)
     }
 
-    return { ok: true, id, kind, created, pending }
+    return { ok: true, id, kind, created, pending, amount: draft.amount, pendingCount }
   } catch (err: unknown) {
+    await settleBankAlertBanner(source, false, false)
     const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
     return { ok: false, reason: typeof detail === 'string' ? detail : 'create-failed' }
   }

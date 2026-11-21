@@ -1,16 +1,21 @@
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-index 77e247a..45df27a 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerService.kt
-@@ -1,68 +1,159 @@
+@@ -1,68 +1,169 @@
  package expo.modules.androidnotificationlistenerservice
  
 -import android.service.notification.NotificationListenerService
 -import android.service.notification.StatusBarNotification
  import android.app.Notification
 -import android.graphics.drawable.Drawable
++import android.app.NotificationChannel
++import android.app.NotificationManager
++import android.app.PendingIntent
 +import android.content.ComponentName
 +import android.content.Context
++import android.content.Intent
++import android.content.pm.PackageManager
++import android.net.Uri
  import android.graphics.Bitmap
  import android.graphics.Canvas
 +import android.graphics.drawable.Drawable
@@ -60,10 +65,11 @@ index 77e247a..45df27a 100644
 +
      override fun onNotificationPosted(sbn: StatusBarNotification) {
 -        val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance() ?: return
+-        
+-        val packageManager = applicationContext.packageManager
 +        handlePosted(sbn, fromSync = false)
 +    }
- 
--        val packageManager = applicationContext.packageManager
++
 +    /** Notifications still in the shade that were posted while this service was unbound. */
 +    fun syncActiveNotifications() {
 +        val active = try {
@@ -82,13 +88,14 @@ index 77e247a..45df27a 100644
 +    private fun handlePosted(sbn: StatusBarNotification, fromSync: Boolean) {
          try {
 -            val applicationInfo = packageManager.getApplicationInfo(sbn.packageName, 0)
-+            val key = sbn.key ?: "${sbn.packageName}|${sbn.id}|${sbn.postTime}"
-+            if (fromSync && hasSeen(applicationContext, key)) return
- 
+-            
 -            val iconPath = try {
 -                val appIcon = applicationInfo.loadIcon(packageManager)
 -                if (appIcon != null) {
 -                    saveAppIconToStorage(appIcon, sbn.packageName)
++            val key = sbn.key ?: "${sbn.packageName}|${sbn.id}|${sbn.postTime}"
++            if (fromSync && hasSeen(applicationContext, key)) return
++
 +            val packageManager = applicationContext.packageManager
 +            val applicationInfo = try {
 +                packageManager.getApplicationInfo(sbn.packageName, 0)
@@ -106,9 +113,8 @@ index 77e247a..45df27a 100644
 -                e.printStackTrace()
 -                null
 +                ""
-             }
- 
--            if (!moduleInstance.isPackageAllowed(sbn.packageName)) {
++            }
++
 +            val notification = sbn.notification ?: return
 +            // Cheap extras first. RemoteViews reflection is only for a known bank/wallet
 +            // whose amount is missing from the standard title/text fields.
@@ -123,7 +129,9 @@ index 77e247a..45df27a 100644
 +                    .filter { it.isNotBlank() }
 +                    .joinToString(" ")
 +                if (!hasMoneySignal(blob)) return
-+            }
+             }
+-            
+-            if (!moduleInstance.isPackageAllowed(sbn.packageName)) {
 +
 +            val moduleInstance = ExpoAndroidNotificationListenerServiceModule.getInstance()
 +            if (moduleInstance != null && !moduleInstance.isPackageAllowed(sbn.packageName)) {
@@ -178,9 +186,14 @@ index 77e247a..45df27a 100644
 +                "appName" to appName,
                  "appIconPath" to (iconPath ?: "")
              )
- 
+-            
 -            ExpoAndroidNotificationListenerServiceModule.getInstance()?.emitNotificationEvent(notificationData)
++
 +            persistNotification(applicationContext, notificationData)
++            // JS may be dead. Post a short banner now; JS replaces or clears it after parse.
++            if (sbn.packageName != packageName) {
++                postSimpleBankAlert(applicationContext)
++            }
 +            bufferedNotifications.add(notificationData)
 +            if (bufferedNotifications.size > 80) {
 +                bufferedNotifications.removeAt(0)
@@ -189,20 +202,27 @@ index 77e247a..45df27a 100644
          } catch (e: Exception) {
              e.printStackTrace()
          }
-@@ -72,28 +163,23 @@ class ExpoNotificationListenerService : NotificationListenerService() {
-         if (drawable == null) return null
+@@ -70,34 +171,29 @@
  
+     private fun saveAppIconToStorage(drawable: Drawable?, packageName: String): String? {
+         if (drawable == null) return null
+-        
++
          try {
 -            // Create icons directory if it doesn't exist
-             val iconsDir = File(applicationContext.filesDir, "icons").apply {
-                 if (!exists()) mkdirs()
+-            val iconsDir = File(applicationContext.filesDir, "icons").apply { 
+-                if (!exists()) mkdirs() 
++            val iconsDir = File(applicationContext.filesDir, "icons").apply {
++                if (!exists()) mkdirs()
              }
- 
+-            
 -            // Generate a unique filename based on the package name
++
              val fileName = "app_icon_${packageName}.png"
              val file = File(iconsDir, fileName)
- 
+-            
 -            // Return the path if the icon is already saved
++
              if (file.exists()) {
                  return "file://${file.absolutePath}"
              }
@@ -219,7 +239,12 @@ index 77e247a..45df27a 100644
              FileOutputStream(file).use { out ->
                  bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
              }
-@@ -105,13 +191,284 @@ class ExpoNotificationListenerService : NotificationListenerService() {
+-            
++
+             return "file://${file.absolutePath}"
+         } catch (e: Exception) {
+             e.printStackTrace()
+@@ -105,13 +201,374 @@
          }
      }
  
@@ -227,6 +252,10 @@ index 77e247a..45df27a 100644
 -    private fun shouldUpdateIcon(packageName: String): Boolean {
 -        val iconFile = File(applicationContext.filesDir, "icons/app_icon_${packageName}.png")
 -        if (!iconFile.exists()) return true
+-        
+-        // Update icon if last modified time is more than a week ago
+-        val weekInMillis = 7 * 24 * 60 * 60 * 1000L
+-        return System.currentTimeMillis() - iconFile.lastModified() > weekInMillis
 +    private data class Extracted(
 +        val title: String,
 +        val text: String,
@@ -250,10 +279,7 @@ index 77e247a..45df27a 100644
 +        val messages = messagingLines(extras)
 +        val remote = if (includeRemote) remoteViewLines(notification) else ""
 +        val ticker = notification.tickerText?.toString()?.trim().orEmpty()
- 
--        // Update icon if last modified time is more than a week ago
--        val weekInMillis = 7 * 24 * 60 * 60 * 1000L
--        return System.currentTimeMillis() - iconFile.lastModified() > weekInMillis
++
 +        val body = uniqueLines(
 +            listOf(text, bigText, textLines, subText, summaryText, infoText, conversation, messages, remote, ticker),
 +        ).joinToString("\n")
@@ -269,7 +295,7 @@ index 77e247a..45df27a 100644
 +            subText = subText,
 +            summaryText = summaryText,
 +        )
-     }
++    }
 +
 +    private fun charSeq(extras: Bundle, key: String): String {
 +        return try {
@@ -369,6 +395,12 @@ index 77e247a..45df27a 100644
 +        private const val PREFS = "wallettrails_notif_queue"
 +        private const val KEY = "queue"
 +        private const val SEEN = "seen_keys"
++        private const val BANNER_ENABLED = "banner_enabled"
++        private const val SIMPLE_TAG = "wallettrails-detected-tx-simple"
++        private const val SIMPLE_CHANNEL = "wallettrails-detected-tx"
++        private const val SIMPLE_TITLE = "New bank alert"
++        private const val SIMPLE_BODY =
++            "A new transaction may have been detected. Open WalletTrails to approve it and keep your records."
 +        private const val MAX_CATCHUP_AGE_MS = 72L * 60L * 60L * 1000L
 +        private val queueLock = Any()
 +
@@ -437,6 +469,90 @@ index 77e247a..45df27a 100644
 +            }
 +        }
 +
++        fun setBannerEnabled(context: Context, on: Boolean) {
++            try {
++                context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                    .edit()
++                    .putBoolean(BANNER_ENABLED, on)
++                    .commit()
++            } catch (e: Exception) {
++                e.printStackTrace()
++            }
++        }
++
++        /** Placeholder banner while JS is not running. Same tag is cleared from JS after parse. */
++        fun postSimpleBankAlert(context: Context) {
++            try {
++                val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++                if (!prefs.getBoolean(BANNER_ENABLED, false)) return
++                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
++                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && !nm.areNotificationsEnabled()) return
++                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++                    val channel = NotificationChannel(
++                        SIMPLE_CHANNEL,
++                        "Transaction alerts",
++                        NotificationManager.IMPORTANCE_HIGH,
++                    )
++                    channel.description =
++                        "Asks you to approve a detected transaction and keep your records"
++                    nm.createNotificationChannel(channel)
++                }
++                val notification = simpleNotification(context)
++                nm.notify(SIMPLE_TAG, 0, notification)
++            } catch (e: Exception) {
++                e.printStackTrace()
++            }
++        }
++
++        fun cancelSimpleBankAlert(context: Context) {
++            try {
++                val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
++                nm.cancel(SIMPLE_TAG, 0)
++            } catch (e: Exception) {
++                e.printStackTrace()
++            }
++        }
++
++        private fun simpleNotification(context: Context): Notification {
++            val deep = Intent(Intent.ACTION_VIEW, Uri.parse("wallettrails://bank-sms")).apply {
++                setPackage(context.packageName)
++                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
++            }
++            val launch = if (context.packageManager.resolveActivity(deep, PackageManager.MATCH_DEFAULT_ONLY) != null) {
++                deep
++            } else {
++                context.packageManager.getLaunchIntentForPackage(context.packageName)
++            }
++            val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
++            val pending = if (launch != null) {
++                PendingIntent.getActivity(context, 9204, launch, flags)
++            } else {
++                null
++            }
++            val icon = listOf("notification_icon", "ic_notification")
++                .map { context.resources.getIdentifier(it, "drawable", context.packageName) }
++                .firstOrNull { it != 0 }
++                ?: android.R.drawable.stat_notify_chat
++            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
++                Notification.Builder(context, SIMPLE_CHANNEL)
++            } else {
++                @Suppress("DEPRECATION")
++                Notification.Builder(context)
++            }
++            builder
++                .setContentTitle(SIMPLE_TITLE)
++                .setContentText(SIMPLE_BODY)
++                .setStyle(Notification.BigTextStyle().bigText(SIMPLE_BODY))
++                .setSmallIcon(icon)
++                .setAutoCancel(true)
++            if (pending != null) builder.setContentIntent(pending)
++            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
++                @Suppress("DEPRECATION")
++                builder.setPriority(Notification.PRIORITY_HIGH)
++            }
++            return builder.build()
++        }
++
 +        fun markSeen(context: Context, key: String) {
 +            if (key.isBlank()) return
 +            synchronized(queueLock) {
@@ -491,7 +607,9 @@ index 77e247a..45df27a 100644
 +            }
 +            return byKey.values.toList()
 +        }
-+    }
+     }
+-}
+\ No newline at end of file
 +}
 +
 +private val BANKISH = Regex(
@@ -510,12 +628,11 @@ index 77e247a..45df27a 100644
 +
 +private fun hasMoneySignal(blob: String): Boolean {
 +    return blob.isNotBlank() && (MONEYISH.containsMatchIn(blob) || blob.any { it.isDigit() })
- }
++}
 diff --git a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
-index 8c92037..b6e24e2 100644
 --- a/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
 +++ b/node_modules/expo-android-notification-listener-service/android/src/main/java/expo/modules/androidnotificationlistenerservice/ExpoAndroidNotificationListenerServiceModule.kt
-@@ -2,11 +2,8 @@ package expo.modules.androidnotificationlistenerservice
+@@ -2,11 +2,8 @@
  
  import expo.modules.kotlin.modules.Module
  import expo.modules.kotlin.modules.ModuleDefinition
@@ -527,7 +644,7 @@ index 8c92037..b6e24e2 100644
  import android.os.Handler
  import android.os.Looper
  import java.util.concurrent.atomic.AtomicBoolean
-@@ -24,7 +21,11 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+@@ -24,7 +21,11 @@
  
          OnCreate {
              isReady.set(true)
@@ -539,7 +656,7 @@ index 8c92037..b6e24e2 100644
                  pendingNotifications.forEach { notification ->
                      sendEvent("onNotificationReceived", notification)
                  }
-@@ -54,6 +55,32 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+@@ -54,6 +55,46 @@
          Function("setAllowedPackages") { packages: List<String> ->
              allowedPackages = packages.toSet()
          }
@@ -569,10 +686,24 @@ index 8c92037..b6e24e2 100644
 +            ExpoNotificationListenerService.markSeen(context, key)
 +            Unit
 +        }
++
++        /** Closed-app bank alerts may show a placeholder banner. JS turns this on. */
++        Function("setBankAlertBannerEnabled") { on: Boolean ->
++            val context = appContext.reactContext ?: return@Function Unit
++            ExpoNotificationListenerService.setBannerEnabled(context, on)
++            Unit
++        }
++
++        /** Remove the placeholder after JS parses the bank alert. */
++        Function("cancelBankAlertBanner") {
++            val context = appContext.reactContext ?: return@Function Unit
++            ExpoNotificationListenerService.cancelSimpleBankAlert(context)
++            Unit
++        }
      }
  
      companion object {
-@@ -88,5 +115,3 @@ class ExpoAndroidNotificationListenerServiceModule : Module() {
+@@ -88,5 +129,3 @@
          return allowedPackages.isEmpty() || allowedPackages.contains(packageName)
      }
  }

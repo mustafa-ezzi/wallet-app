@@ -33,6 +33,7 @@ import {
   notifyDetectedTransaction,
   setDetectedTxAlertsEnabled,
 } from '@/src/notifications/detectedTransaction'
+import { refreshBankAlertBannerGate } from '@/src/bankSms/nativeNotification'
 import { getPermissionStatus, requestReminderPermission } from '@/src/notifications/schedule'
 import { AppSheet } from '@/src/components/AppSheet'
 import { ErrorBanner, PrimaryButton } from '@/src/components/ui'
@@ -145,6 +146,7 @@ export default function BankSmsScreen() {
   const notifDisclosureResolve = useRef<((ok: boolean) => void) | null>(null)
   const [detectAlertsOn, setDetectAlertsOn] = useState(true)
   const [detectAlertsPerm, setDetectAlertsPerm] = useState<'granted' | 'denied' | 'undetermined'>('undetermined')
+  const [inboxReady, setInboxReady] = useState(false)
   const focusedImport = useRef<number | null>(null)
 
   useEffect(() => {
@@ -235,10 +237,14 @@ export default function BankSmsScreen() {
   }, [])
 
   useEffect(() => {
-    void loadWallets()
-    void loadPending()
-    void loadSettings()
-    void loadBooks()
+    let cancelled = false
+    void (async () => {
+      await Promise.all([loadWallets(), loadPending(), loadSettings(), loadBooks()])
+      if (!cancelled) setInboxReady(true)
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [loadWallets, loadPending, loadSettings, loadBooks])
 
   useEffect(() => {
@@ -450,6 +456,7 @@ export default function BankSmsScreen() {
   }
 
   useEffect(() => {
+    if (!inboxReady) return
     const raw = Array.isArray(params.focus) ? params.focus[0] : params.focus
     const id = Number(raw)
     if (!Number.isFinite(id) || id <= 0) return
@@ -458,7 +465,7 @@ export default function BankSmsScreen() {
     if (!row) return
     focusedImport.current = id
     openPending(row)
-  }, [params.focus, pending])
+  }, [inboxReady, params.focus, pending])
 
   const patchDraft = (patch: Partial<ApproveDraft>) => {
     setDraft((prev) => (prev ? { ...prev, ...patch } : prev))
@@ -722,6 +729,20 @@ export default function BankSmsScreen() {
     }
   }
 
+  const onDetectAlerts = async (on: boolean) => {
+    if (!on) {
+      setDetectAlertsOn(false)
+      await setDetectedTxAlertsEnabled(false)
+      await refreshBankAlertBannerGate()
+      return
+    }
+    const ok = await requestReminderPermission()
+    setDetectAlertsPerm(ok ? 'granted' : 'denied')
+    setDetectAlertsOn(ok)
+    await setDetectedTxAlertsEnabled(ok)
+    await refreshBankAlertBannerGate()
+  }
+
   return (
     <View style={[styles.root, { paddingTop: insets.top + 8, backgroundColor: colors.background }]}>
       <View style={styles.topBar}>
@@ -779,6 +800,29 @@ export default function BankSmsScreen() {
                 onValueChange={(v) => void bankSms.setAutoApprove(v)}
               />
             </View>
+            {(bankSms.enabled || bankSms.notifEnabled) ? (
+              <View style={[styles.switchRow, { marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  <Text style={[styles.cardTitle, { color: colors.text, marginBottom: 0 }]}>
+                    Alert me when a transaction is detected
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 4, lineHeight: 17 }}>
+                    We'll ask you to approve it, with a reminder to keep your records.
+                  </Text>
+                  {detectAlertsPerm !== 'granted' ? (
+                    <Pressable onPress={() => void onDetectAlerts(true)} style={{ marginTop: 6 }}>
+                      <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>
+                        Allow notifications
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+                <Switch
+                  value={detectAlertsOn && detectAlertsPerm === 'granted'}
+                  onValueChange={(v) => void onDetectAlerts(v)}
+                />
+              </View>
+            ) : null}
           </View>
         ) : null}
 

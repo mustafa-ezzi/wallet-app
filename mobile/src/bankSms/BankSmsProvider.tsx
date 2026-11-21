@@ -28,6 +28,7 @@ import {
   openNotificationListenerSettings,
   markWalletNotificationHandled,
   processQueuedWalletNotifications,
+  refreshBankAlertBannerGate,
   subscribeWalletNotifications,
 } from './nativeNotification'
 import { confirmNotificationAccessDisclosure } from './notifDisclosureGate'
@@ -116,6 +117,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
     setNotifEnabledState(notifOn)
     setNotifPermissionGranted(notifGranted)
     setAutoApproveState(autoOn)
+    await refreshBankAlertBannerGate()
   }, [])
 
   useEffect(() => {
@@ -137,6 +139,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
         setNotifPermissionGranted(getNotificationListenerGranted())
         if (user) void refreshPending()
         void getSmsPermissionGranted().then(setPermissionGranted)
+        void refreshBankAlertBannerGate()
         // Catch bank notifications received while JS was frozen / app closed.
         const wantNotifs = notifEnabled || enabled
         const grantedNow = getNotificationListenerGranted()
@@ -236,11 +239,13 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
         const ok = await confirmNotificationAccessDisclosure()
         if (ok) openNotificationListenerSettings()
       }
+      await refreshBankAlertBannerGate()
       return
     }
     await setBankSmsEnabled(false)
     setEnabledState(false)
     await stopSmsBackgroundService()
+    await refreshBankAlertBannerGate()
   }, [])
 
   const setNotifEnabled = useCallback(async (on: boolean) => {
@@ -254,14 +259,17 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
         setNotifEnabledState(true)
         const ok = await confirmNotificationAccessDisclosure()
         if (ok) openNotificationListenerSettings()
+        await refreshBankAlertBannerGate()
         return
       }
       await setBankNotifEnabled(true)
       setNotifEnabledState(true)
+      await refreshBankAlertBannerGate()
       return
     }
     await setBankNotifEnabled(false)
     setNotifEnabledState(false)
+    await refreshBankAlertBannerGate()
   }, [])
 
   const openNotifSettings = useCallback(async () => {
@@ -298,6 +306,7 @@ export function BankSmsProvider({ children }: { children: ReactNode }) {
       const ok = await confirmNotificationAccessDisclosure()
       if (ok) openNotificationListenerSettings()
     }
+    await refreshBankAlertBannerGate()
     return true
   }, [markPromptSeen])
 

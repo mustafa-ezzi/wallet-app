@@ -192,7 +192,7 @@ Build in this order. Each phase is usable on its own.
 
 **Exit:** this file is the spec. No app change.
 
-**Status:** this document.
+**Status:** done. Copy, quiet rules, and channel id `wallettrails-detected-tx` are frozen above. Phase 1 follows them.
 
 ---
 
@@ -218,6 +218,8 @@ Build in this order. Each phase is usable on its own.
 
 **Exit:** with the app open or recently used, a new pending draft raises the banner and the tap lands on review.
 
+**Status:** built. Channel in `ensureAndroidChannel`. Banner from `notifyDetectedTransaction` on a new pending draft (HTTP 201, still pending) inside `ingestBankSmsBody`, and on paste from the Bank alerts screen. Tap routes to `/bank-sms` and opens that draft when the banner is for one item. Settings switch on the Bank alerts screen, default on, stored on the device. Approve, reject, and an empty inbox clear the banner.
+
 ---
 
 ### Phase 2 — Same banner when an SMS arrives and the app is closed
@@ -235,6 +237,8 @@ Build in this order. Each phase is usable on its own.
 - One Xiaomi or similar device, same steps, and write down whether the OEM blocked it.
 
 **Exit:** a closed app still shows the banner for a new bank SMS on a stock or Samsung phone.
+
+**Status:** built. `handleSmsHeadlessTask` creates the channel first, saves the draft without posting from ingest, then calls `notifyDetectedTransaction` only when SMS auto-detect is on and the row is a new pending draft. The closed-app post uses one fixed banner id so a second SMS replaces the first, and it does not open the app. A duplicate or a successful auto-approve stays quiet. Needs a phone check: swipe the app away, send a real bank SMS, tap the banner.
 
 ---
 
@@ -255,6 +259,8 @@ Build in this order. Each phase is usable on its own.
 
 **Exit:** a bank-app alert raises a WalletTrails banner even when the UI process was not running.
 
+**Status:** built. The notification listener posts “New bank alert” on channel `wallettrails-detected-tx` when Bank apps listening and the alert switch are on. JavaScript replaces that placeholder with the amount banner when the draft is new and still pending, and clears it when the alert is ignored, duplicated, or auto-approved. An SMS banner uses a different id, so a duplicate bank alert does not remove it. Needs an EAS rebuild before a phone can show the closed-app banner. Expo Go cannot load this module.
+
 ---
 
 ### Phase 4 — Approve and Not now buttons
@@ -272,6 +278,8 @@ Build in this order. Each phase is usable on its own.
 - The Home card still shows the count after Not now.
 
 **Exit:** the shade itself asks the question, and both answers behave as written.
+
+**Status:** built. The banner category `wallettrails-detected-tx-actions` has **Approve** (opens that draft, or the inbox when several are waiting) and **Not now** (clears the banner, draft stays pending). A tap on the body does the same as Approve. Approving or rejecting inside the app still clears the banner. Not now does not post or reject anything, so the Home card keeps the count. The short “New bank alert” placeholder from a closed bank app still opens the inbox on tap; the Approve and Not now buttons are on the banner that names the draft.
 
 ---
 
